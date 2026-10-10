@@ -32,6 +32,10 @@ var bounty_reserved := 0
 var bounty_paid := 0
 ## Plain-language notable moments, newest last.
 var story: Array[String] = []
+## Structured facts for the run record: {hero, killer, time} per hero death.
+var hero_deaths: Array[Dictionary] = []
+var retreats := 0
+var keep_damage_taken := 0.0
 ## Recent attacks for drawing: {from: Vector2, to: Vector2, ranged: bool, time: float}.
 var shots: Array[Dictionary] = []
 
@@ -114,6 +118,7 @@ func _hero_tick(hero: Unit) -> void:
 		hero.retreating = true
 		hero.target = null
 		story.append("%s is badly hurt and falls back to the keep." % hero.display_name)
+		retreats += 1
 	if hero.retreating:
 		hero.intent = "retreating to heal"
 		if hero.pos.distance_to(keep_pos) > KEEP_RADIUS:
@@ -191,6 +196,7 @@ func _enemy_tick(enemy: Unit) -> void:
 	elif enemy.cooldown_left <= 0.0:
 		enemy.cooldown_left = enemy.cooldown
 		keep_hp -= enemy.attack * war_chant()
+		keep_damage_taken += enemy.attack * war_chant()
 		shots.append({"from": enemy.pos, "to": keep_pos, "ranged": enemy.attack_range > 60, "time": time})
 
 
@@ -255,6 +261,8 @@ func _damage(attacker: Unit, victim: Unit, amount: float) -> void:
 	if victim.is_hero():
 		var by := attacker.display_name if attacker != null else "the enemy"
 		story.append("%s fell to a %s." % [run.describe(victim), by])
+		hero_deaths.append({"hero": victim.display_name, "killer": attacker.type_id if attacker != null else "",
+			"time": snappedf(time, 0.1)})
 		return
 	if attacker == null:
 		return

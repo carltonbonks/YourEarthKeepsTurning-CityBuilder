@@ -30,6 +30,12 @@ var next_wave: Array[String] = []
 ## Plain-language story of what happened, newest last.
 var story: Array[String] = []
 
+## Machine-readable history of this run for stats and debugging (see to_record()).
+## Format changes bump RECORD_FORMAT so old saved runs can still be read.
+const RECORD_FORMAT := 1
+var record_rounds: Array[Dictionary] = []
+var _round_entry := {}
+
 var _next_id := 1
 var _hero_rng: SeededRng
 
@@ -43,6 +49,7 @@ func _init(game_content: Content, seed_value: int) -> void:
 	for i in content.int_num("start_heroes"):
 		_add_hero()
 	next_wave = generate_wave(round_number)
+	_begin_round_entry()
 	_tell("Round 1. %d heroes answer the call." % heroes.size())
 
 
@@ -86,6 +93,7 @@ func recruit() -> bool:
 		return false
 	gold -= recruit_cost()
 	var hero := _add_hero()
+	_note_action("recruit", recruit_cost(), hero.display_name)
 	_tell("%s joins the town." % describe(hero))
 	return true
 
@@ -100,6 +108,7 @@ func build_market() -> bool:
 		return false
 	gold -= content.int_num("market_cost")
 	markets += 1
+	_note_action("market", content.int_num("market_cost"))
 	return true
 
 
@@ -113,6 +122,7 @@ func repair_keep() -> bool:
 		return false
 	gold -= content.int_num("repair_cost")
 	keep_hp = minf(keep_max_hp(), keep_hp + content.num("repair_amount"))
+	_note_action("repair", content.int_num("repair_cost"))
 	return true
 
 
@@ -147,6 +157,10 @@ func set_bounty(enemy_type: String, amount: int) -> bool:
 func start_battle() -> Battle:
 	assert(phase == Phase.DECIDE)
 	phase = Phase.BATTLE
+	_round_entry["bounties"] = bounties.duplicate()
+	_round_entry["gold_before_battle"] = gold
+	_round_entry["keep_hp_before"] = roundi(keep_hp)
+	_round_entry["heroes_before"] = heroes.map(_hero_snapshot)
 	var reserved := bounty_reserved()
 	gold -= reserved
 	for hero in heroes:
@@ -159,6 +173,15 @@ func finish_battle(battle: Battle) -> void:
 	gold += battle.bounty_reserved - battle.bounty_paid
 	keep_hp = maxf(0.0, battle.keep_hp)
 	battle.release()
+	_round_entry["battle"] = {
+		"seconds": snappedf(battle.time, 0.1),
+		"keep_hp_after": roundi(keep_hp),
+		"keep_damage": roundi(battle.keep_damage_taken),
+		"bounty_paid": battle.bounty_paid,
+		"bounty_refunded": battle.bounty_reserved - battle.bounty_paid,
+		"hero_deaths": battle.hero_deaths.duplicate(),
+		"retreats": battle.retreats,
+	}
 	for line in battle.story:
 		_tell(line)
 	for hero in heroes.duplicate():
@@ -170,14 +193,17 @@ func finish_battle(battle: Battle) -> void:
 	if keep_hp <= 0.0:
 		phase = Phase.LOST
 		_tell("The keep has fallen in round %d." % round_number)
+		_end_round_entry()
 		return
 	if round_number >= content.int_num("rounds_to_win"):
 		phase = Phase.WON
 		_tell("The town survived all %d rounds!" % round_number)
+		_end_round_entry()
 		return
 	_heal_heroes()
 	_heroes_go_shopping()
 	relic_offer = _roll_relic_offer()
+	_round_entry["relic_offer"] = relic_offer.duplicate()
 	phase = Phase.RELIC
 
 
@@ -194,6 +220,8 @@ func choose_relic(relic_id: String) -> void:
 			if heroes.size() < content.int_num("max_heroes"):
 				_tell("%s arrives, drawn by the posters." % describe(_add_hero()))
 		_tell("Relic taken: %s." % content.relics[relic_id]["name"])
+	_round_entry["relic_pick"] = relic_id
+	_end_round_entry()
 	relic_offer = []
 	round_number += 1
 	var earned := income()
@@ -201,6 +229,8 @@ func choose_relic(relic_id: String) -> void:
 	bounties = {}
 	next_wave = generate_wave(round_number)
 	phase = Phase.DECIDE
+	_begin_round_entry()
+	_round_entry["income"] = earned
 	_tell("Round %d. The town earns %d gold." % [round_number, earned])
 
 
@@ -234,6 +264,34 @@ func wave_counts() -> Dictionary:
 	for id in next_wave:
 		counts[id] = int(counts.get(id, 0)) + 1
 	return counts
+
+
+## The whole run so far as plain data (saved by the game, read by tools/run_report.gd).
+## Deterministic: no clock or machine details; the game adds those when saving.
+func to_record() -> Dictionary:
+	var result := "in_progress"
+	if phase == Phase.WON:
+		result = "won"
+	elif phase == Phase.LOST:
+		result = "lost"
+	var rounds: Array = record_rounds.duplicate(true)
+	if not is_over():
+		rounds.append(_round_entry.duplicate(true))
+	return {
+		"format": RECORD_FORMAT,
+		"seed": run_seed,
+		"result": result,
+		"round_reached": round_number,
+		"rounds_to_win": content.int_num("rounds_to_win"),
+		"gold": gold,
+		"keep_hp": roundi(keep_hp),
+		"markets": markets,
+		"relics": relics.duplicate(),
+		"heroes": heroes.map(_hero_snapshot),
+		"fallen": fallen.map(_hero_snapshot),
+		"rounds": rounds,
+		"story": story.duplicate(),
+	}
 
 
 func is_over() -> bool:
@@ -350,6 +408,30 @@ func _roll_relic_offer() -> Array[String]:
 		pool.erase(pick)
 		offer.append(pick)
 	return offer
+
+
+func _begin_round_entry() -> void:
+	_round_entry = {"round": round_number, "gold_start": gold, "keep_hp_start": roundi(keep_hp),
+		"wave": wave_counts(), "actions": []}
+
+
+func _end_round_entry() -> void:
+	_round_entry["gold_end"] = gold
+	record_rounds.append(_round_entry)
+	_round_entry = {}
+
+
+func _note_action(kind: String, cost: int, detail := "") -> void:
+	var action := {"kind": kind, "cost": cost}
+	if detail != "":
+		action["detail"] = detail
+	_round_entry["actions"].append(action)
+
+
+func _hero_snapshot(hero: Unit) -> Dictionary:
+	return {"name": hero.display_name, "class": hero.type_id, "trait": hero.trait_id, "level": hero.level,
+		"hp": roundi(hero.hp), "max_hp": roundi(hero.max_hp), "gold": hero.gold, "weapon": hero.weapon_tier,
+		"armor": hero.armor_tier, "kills": hero.kills, "alive": hero.alive}
 
 
 func _tell(line: String) -> void:
