@@ -26,6 +26,10 @@ func play_run(run: RunState) -> void:
 func build(run: RunState) -> void:
 	if style != "workers" and (run.round_number >= 2 or style == "heroes"):
 		run.build("longhouse")
+	if style == "heroes" and run.round_number >= 2:
+		run.build("tavern")
+	if style != "workers" and run.round_number >= (3 if style == "heroes" else 4):
+		run.build("shrine")
 	if run.housing() - run.population() <= 2:
 		run.build("hut")
 	if run.round_number >= 3:

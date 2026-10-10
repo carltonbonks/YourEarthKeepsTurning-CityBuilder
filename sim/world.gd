@@ -470,6 +470,10 @@ func _choose_work(unit: Unit) -> void:
 
 
 # --- Heroes ----------------------------------------------------------------
+# Heroes run on energy. It drains while they are up and about (faster in the
+# wilds) and comes back while they rest in a lodging. They go to bed when tired
+# and at dusk, and get up once rested. A sleeper only wakes when an enemy comes
+# within the lodging's wake radius, so where heroes sleep shapes the defence.
 
 func _hero_tick(hero: Unit) -> void:
 	var t: Dictionary = content.traits[hero.trait_id]
@@ -477,6 +481,7 @@ func _hero_tick(hero: Unit) -> void:
 	var retreat_at := clampf(float(t["retreat_at"]) + run.mod("retreat_shift"), 0.0, 0.95)
 	if not hero.retreating and hero.hp_fraction() < retreat_at:
 		hero.retreating = true
+		hero.resting = false
 		hero.target = null
 		if wave_spawned:
 			wave_stats["retreats"] = int(wave_stats["retreats"]) + 1
@@ -487,12 +492,36 @@ func _hero_tick(hero: Unit) -> void:
 			if hero.hp_fraction() >= HEAL_UNTIL:
 				hero.retreating = false
 		return
-	var wilds := float(t["wilds"])
+	if hero.resting:
+		_rest_tick(hero)
+		return
+	var drain := content.num("energy_drain_wilds") if hero.pos.length() > content.num("settlement_radius") else content.num("energy_drain")
+	drain *= maxf(0.2, 1.0 - Loot.total(content, hero, "energy"))
+	var was_awake := hero.energy > 0.0
+	hero.energy = maxf(0.0, hero.energy - drain * dt)
+	if was_awake and hero.energy <= 0.0:
+		run.tell("%s is exhausted and fights weakly until they rest." % hero.display_name)
+
+	var whim: Dictionary = content.whims.get(hero.whim, {})
+	var wilds := float(whim.get("wilds", t["wilds"]))
 	# By day the keen ones hunt far out; at dusk and night everyone stays near home.
 	var reach := content.num("settlement_radius") + 160.0
 	if not is_dusk():
 		reach = maxf(reach, wilds * (content.num("den_max_distance") + 120.0))
-	hero.target = _choose_target(hero, t, reach)
+	hero.target = _choose_target(hero, t, reach, whim.get("trophy", false))
+	var bed := bed_index(hero)
+	var why_bed := _wants_bed(hero, t)
+	if why_bed != "":
+		# On the way to bed a hero only fights what is close or chasing them.
+		if hero.target != null and (hero.target.pos.distance_to(hero.pos) <= wake_radius(bed) or hero.target.target == hero):
+			_fight(hero, hero.target)
+			return
+		hero.target = null
+		hero.intent = "%s, heading to %s" % [why_bed, bed_name(bed)]
+		if _move_toward(hero, bed_pos(hero), 8.0):
+			hero.resting = true
+			_on_lie_down(hero, bed)
+		return
 	if hero.target != null:
 		_fight(hero, hero.target)
 		return
@@ -501,15 +530,178 @@ func _hero_tick(hero: Unit) -> void:
 		hero.intent = "stalking the %s" % content.world["dens"][den["type"]]["name"].to_lower()
 		_move_toward(hero, den["pos"] * 0.85, 10.0)
 		return
-	hero.intent = "guarding the camp" if not is_dusk() else "returning for the night"
+	hero.intent = "guarding the camp"
 	var index := run.heroes.find(hero)
 	_move_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * (content.num("settlement_radius") * 0.6), 4.0)
+
+
+## Why a hero wants to be in bed right now ("" if they don't).
+func _wants_bed(hero: Unit, t: Dictionary) -> String:
+	if is_dusk():
+		return "night is falling"
+	if hero.energy <= float(t.get("tired_at", 25)):
+		return "tired"
+	if _carousing(hero):
+		return "off to drink"
+	if time_of_day() < content.num("day_seconds") * float(content.whims.get(hero.whim, {}).get("lie_in", 0.0)):
+		return "sleeping in"
+	return ""
+
+
+func _rest_tick(hero: Unit) -> void:
+	var bed := bed_index(hero)
+	if hero.pos.distance_to(bed_pos(hero)) > 20.0:
+		# The bed moved (a new lodging opened): walk over and lie down again.
+		hero.resting = false
+		return
+	var danger := _nearest_enemy(hero.pos, wake_radius(bed))
+	if danger != null:
+		hero.resting = false
+		if is_night() and hero.woke_night != _night_key():
+			hero.woke_night = _night_key()
+			run.tell("%s wakes in %s to fight a %s." % [hero.display_name, bed_name(bed), danger.display_name.to_lower()])
+		return
+	var def := lodging_def(bed)
+	var rate := content.num("energy_rest") * (float(def["rest"]) if not def.is_empty() else content.num("energy_rest_rough"))
+	if is_preferred(hero, bed):
+		rate *= content.num("energy_home_bonus")
+	hero.energy = minf(content.num("hero_energy_max"), hero.energy + rate * dt)
+	hero.hp = minf(hero.max_hp, hero.hp + (float(def.get("heal", 0.0)) + Loot.total(content, hero, "rest_heal")) * dt)
+	if _carousing(hero):
+		hero.intent = "drinking in %s" % bed_name(bed)
+	else:
+		hero.intent = "asleep in %s" % bed_name(bed) if is_night() else "resting in %s" % bed_name(bed)
+	if is_night() and bed >= 0 and hero.paid_night != _night_key():
+		hero.paid_night = _night_key()
+		_pay_town(hero, int(def.get("night_price", 0)), "tavern")
+	if _wants_bed(hero, content.traits[hero.trait_id]) == "" and hero.energy >= content.num("energy_wake_at"):
+		hero.resting = false
+
+
+func _on_lie_down(hero: Unit, bed: int) -> void:
+	if _carousing(hero) and hero.caroused != _night_key():
+		hero.caroused = _night_key()
+		var spent := _pay_town(hero, int(content.whims["carouse"].get("spend", 0)), "carousing")
+		run.tell("%s settles in at %s and drinks %d shells' worth." % [hero.display_name, bed_name(bed), spent])
+
+
+## Takes up to `amount` shells from a hero into the settlement's stock. Returns what was paid.
+func _pay_town(hero: Unit, amount: int, reason: String) -> int:
+	var paid := mini(amount, hero.gold)
+	if paid <= 0:
+		return 0
+	hero.gold -= paid
+	run.stock["shells"] = int(run.stock["shells"]) + paid
+	run.note_hero_spending(reason, paid)
+	return paid
+
+
+func _night_key() -> int:
+	return run.round_number * 10 + day_index()
+
+
+func _carousing(hero: Unit) -> bool:
+	if hero.whim != "carouse" or _first_built("tavern") < 0:
+		return false
+	return is_night() or time_of_day() >= content.num("day_seconds") * float(content.whims["carouse"].get("from", 0.5))
+
+
+## Gives each living hero a bed: their favourite lodging with a free bed, then
+## any free bed, else a spot by the hearth.
+func assign_lodgings() -> void:
+	var used := {}
+	for hero in run.living_heroes():
+		hero.lodging = -1
+		var choices: Array = content.traits[hero.trait_id].get("lodging", []).duplicate()
+		for id in content.lodging_types():
+			if not choices.has(id):
+				choices.append(id)
+		for type: String in choices:
+			var i := _free_bed(type, used)
+			if i >= 0:
+				hero.lodging = i
+				used[i] = int(used.get(i, 0)) + 1
+				break
+
+
+func _free_bed(type: String, used: Dictionary) -> int:
+	for i in buildings.size():
+		var b := buildings[i]
+		if b["type"] == type and float(b["work_left"]) <= 0.0 \
+				and int(used.get(i, 0)) < int(content.buildings[type]["lodging"]["beds"]):
+			return i
+	return -1
+
+
+func _first_built(type: String) -> int:
+	for i in buildings.size():
+		if buildings[i]["type"] == type and float(buildings[i]["work_left"]) <= 0.0:
+			return i
+	return -1
+
+
+func count_lodgings() -> int:
+	var n := 0
+	for type in content.lodging_types():
+		n += count_buildings(type)
+	return n
+
+
+## Where a hero sleeps tonight: a building index, or -1 for the hearth.
+func bed_index(hero: Unit) -> int:
+	if _carousing(hero):
+		return _first_built("tavern")
+	return hero.lodging
+
+
+func bed_pos(hero: Unit) -> Vector2:
+	var bed := bed_index(hero)
+	if bed >= 0:
+		return buildings[bed]["pos"]
+	return Vector2.from_angle(run.heroes.find(hero) * 1.7 + 0.4) * (HEARTH_RADIUS + 16.0)
+
+
+func lodging_def(bed: int) -> Dictionary:
+	return content.buildings[buildings[bed]["type"]]["lodging"] if bed >= 0 else {}
+
+
+func bed_name(bed: int) -> String:
+	return "the %s" % content.buildings[buildings[bed]["type"]]["name"].to_lower() if bed >= 0 else "the open by the hearth"
+
+
+func wake_radius(bed: int) -> float:
+	return float(lodging_def(bed)["wake_radius"]) if bed >= 0 else content.num("rough_wake_radius")
+
+
+func is_preferred(hero: Unit, bed: int) -> bool:
+	return bed >= 0 and buildings[bed]["type"] in content.traits[hero.trait_id].get("lodging", [])
+
+
+## Each hero's whim for the day, rolled at dawn from their trait's weights.
+func roll_whims() -> void:
+	var rng := SeededRng.stream(run.run_seed, "whims", _night_key())
+	var notes := PackedStringArray()
+	for hero in run.living_heroes():
+		var weights: Dictionary = content.traits[hero.trait_id].get("whims", {}).duplicate()
+		for id: String in weights.keys():
+			var needs: String = content.whims[id].get("needs", "")
+			if needs != "" and count_buildings(needs) == 0:
+				weights[id] = 0.0
+		hero.whim = rng.weighted(weights)
+		if hero.whim == "":
+			hero.whim = "none"
+		run.note_whim(hero)
+		if hero.whim != "none":
+			notes.append("%s is %s" % [hero.display_name, content.whims[hero.whim]["name"]])
+	if not notes.is_empty():
+		run.tell("Today %s." % ", ".join(notes))
 
 
 ## Scores every reachable enemy from this hero's point of view and picks the best.
 ## Brave and greedy heroes value wanderers (glory and loot); dutiful ones value
 ## threats to the camp; cautious ones avoid enemies that could kill them fast.
-func _choose_target(hero: Unit, t: Dictionary, reach: float) -> Unit:
+## A hero after a trophy also values big, tough monsters.
+func _choose_target(hero: Unit, t: Dictionary, reach: float, trophy := false) -> Unit:
 	var best: Unit = null
 	var best_score := -INF
 	var reason := ""
@@ -523,6 +715,8 @@ func _choose_target(hero: Unit, t: Dictionary, reach: float) -> Unit:
 		var threat_to_camp := 1.0 - clampf(from_home / content.num("world_radius"), 0.0, 1.0)
 		var danger := enemy.attack / maxf(hero.hp, 1.0) * 10.0
 		var glory := float(t["wilds"]) * (4.0 if enemy.den_index >= 0 else 1.0) * (0.5 + float(t["greed"]) * 0.5)
+		if trophy:
+			glory += enemy.max_hp / 12.0
 		var duty := float(t["duty"]) * threat_to_camp * 8.0
 		var score := 10.0 - distance / 60.0 + glory + duty - float(t["caution"]) * danger * 2.0
 		if enemy == hero.target:
@@ -539,16 +733,45 @@ func _choose_target(hero: Unit, t: Dictionary, reach: float) -> Unit:
 func apply_hero_stats(hero: Unit) -> void:
 	var c: Dictionary = content.hero_classes[hero.type_id]
 	var old_max := hero.max_hp
-	hero.max_hp = float(c["hp"]) + (hero.level - 1) * content.num("level_hp") \
-		+ hero.armor_tier * float(content.gear["armor"]["hp"]) + run.mod("hero_hp")
+	hero.max_hp = maxf(1.0, float(c["hp"]) + (hero.level - 1) * content.num("level_hp") \
+		+ Loot.total(content, hero, "hp") + run.mod("hero_hp"))
 	hero.attack = float(c["attack"]) + (hero.level - 1) * content.num("level_attack") \
-		+ hero.weapon_tier * float(content.gear["weapon"]["attack"]) + run.mod("hero_attack")
+		+ Loot.total(content, hero, "attack") + run.mod("hero_attack")
 	hero.attack_range = float(c["range"])
 	hero.cooldown = float(c["cooldown"])
-	hero.speed = float(c["speed"])
+	hero.speed = float(c["speed"]) + Loot.total(content, hero, "speed")
 	if old_max > 1.0 and hero.max_hp > old_max:
 		hero.hp += hero.max_hp - old_max
 	hero.hp = minf(hero.hp, hero.max_hp)
+
+
+## A hero picks up an item: wears it if they like it better than what they have
+## (by their personality), otherwise carries it to sell.
+func give_item(hero: Unit, item: Dictionary) -> void:
+	var slot := Loot.slot(content, item)
+	var likes: Dictionary = content.traits[hero.trait_id].get("likes", {})
+	var current: Dictionary = hero.items.get(slot, {})
+	var equip := current.is_empty() or Loot.score(content, item, likes) > Loot.score(content, current, likes)
+	if equip:
+		if not current.is_empty():
+			hero.spares.append(current)
+		hero.items[slot] = item
+		apply_hero_stats(hero)
+		run.tell("%s finds a %s and takes it up." % [hero.display_name, Loot.describe(content, item)])
+	else:
+		hero.spares.append(item)
+		run.tell("%s finds a %s and keeps it to sell." % [hero.display_name, Loot.describe(content, item)])
+	run.note_loot(hero, item, equip)
+	if hero.spares.size() > int(content.items["spare_limit"]):
+		hero.spares.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return Loot.value(content, a) > Loot.value(content, b))
+		hero.spares.pop_back()
+
+
+func _maybe_drop(hero: Unit, victim: Unit) -> void:
+	var drops: Dictionary = content.items["drops"]
+	var chance := float(drops["boss"]) if victim.is_boss else float(drops["den"] if victim.den_index >= 0 else drops["wave"])
+	if rng.randf() < chance:
+		give_item(hero, Loot.roll(content, rng, run.round_number))
 
 
 # --- Enemies ---------------------------------------------------------------
@@ -730,6 +953,10 @@ func _hit(attacker: Unit, victim: Unit) -> void:
 	var amount := attacker.attack * rng.randf_range(0.85, 1.15)
 	if attacker.is_enemy():
 		amount *= war_chant()
+	elif attacker.is_hero():
+		if attacker.energy <= 0.0:
+			amount *= content.num("exhausted_attack")
+		attacker.energy = maxf(0.0, attacker.energy - content.num("energy_per_attack"))
 	_damage(attacker, victim, amount)
 
 
@@ -762,7 +989,8 @@ func _damage(attacker: Unit, victim: Unit, amount: float) -> void:
 	var e: Dictionary = content.enemies[victim.type_id]
 	attacker.kills += 1
 	attacker.xp += float(e["xp"]) * (1.0 + run.mod("xp_mult"))
-	attacker.gold += int(e["loot"]) + int(run.mod("loot_shells"))
+	attacker.gold += int(e["loot"]) + int(run.mod("loot_shells")) + int(Loot.total(content, attacker, "loot"))
+	_maybe_drop(attacker, victim)
 	if victim.is_boss:
 		run.tell("%s slays %s!" % [attacker.display_name, victim.display_name])
 

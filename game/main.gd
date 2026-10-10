@@ -1,5 +1,5 @@
 extends Control
-## Slice 2 screen: the settlement map in the middle, decisions on the left,
+## Slice 3 screen: the settlement map in the middle, decisions on the left,
 ## heroes and the story underneath. UI is built in code for now (placeholder
 ## layout); all rules live in sim/.
 
@@ -212,11 +212,26 @@ func _refresh_live() -> void:
 	for hero in run.heroes:
 		var c: Dictionary = content.hero_classes[hero.type_id]
 		var name_color: String = c["color"] if hero.alive else "#666666"
-		text += "[color=%s][b]%s[/b][/color] %s %s  Lv%d  HP %d/%d  %d shells  gear W%d A%d  kills %d%s\n" % [
+		var energy_color := "#7fd0ff" if hero.energy > 40.0 else ("#e0a050" if hero.energy > 0.0 else "#e05050")
+		text += "[color=%s][b]%s[/b][/color] %s %s  Lv%d  HP %d/%d  [color=%s]Energy %d[/color]  %d shells  kills %d%s\n" % [
 			name_color, hero.display_name, content.traits[hero.trait_id]["name"], c["name"], hero.level,
-			int(hero.hp), int(hero.max_hp), hero.gold, hero.weapon_tier, hero.armor_tier, hero.kills,
+			int(hero.hp), int(hero.max_hp), energy_color, int(hero.energy), hero.gold, hero.kills,
 			"" if hero.alive else "  [color=#e05050]fallen[/color]"]
-		if hero.alive and hero.intent != "" and run.phase == RunState.Phase.SIM:
+		if not hero.alive:
+			continue
+		var whim: String = content.whims.get(hero.whim, {}).get("name", "")
+		var bed := "No bed: sleeps by the hearth" if hero.lodging < 0 else "Sleeps in %s%s" % [w.bed_name(hero.lodging),
+			"" if w.is_preferred(hero, hero.lodging) else " (not their favourite)"]
+		text += "    [color=#9aa]%s%s[/color]\n" % [bed,
+			("  ·  today: " + whim) if whim != "" and run.phase != RunState.Phase.BUILD else ""]
+		var gear := PackedStringArray()
+		for slot: String in Loot.SLOTS:
+			if hero.items.has(slot):
+				gear.append(Loot.describe(content, hero.items[slot]))
+		if not gear.is_empty() or not hero.spares.is_empty():
+			text += "    [color=#c8b88a]%s%s[/color]\n" % [", ".join(gear) if not gear.is_empty() else "no gear",
+				"  ·  %d to sell" % hero.spares.size() if not hero.spares.is_empty() else ""]
+		if hero.intent != "" and run.phase == RunState.Phase.SIM:
 			text += "    [color=#9aa]%s[/color]\n" % hero.intent
 	for hero in run.fallen:
 		text += "[color=#666666]%s (fallen)[/color]\n" % hero.display_name
@@ -256,14 +271,16 @@ func _show_pick() -> void:
 	for i in run.pick_offer.size():
 		var card := run.pick_offer[i]
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(230, 150)
+		btn.custom_minimum_size = Vector2(230, 170)
 		btn.autowrap_mode = TextServer.AUTOWRAP_WORD
 		if card["kind"] == "hero":
 			var hero: Unit = card["hero"]
 			var c: Dictionary = content.hero_classes[hero.type_id]
-			btn.text = "HERO: %s\n%s %s\nHP %d, damage %d%s\nCosts %d shells" % [hero.display_name,
+			var likes: Array = content.traits[hero.trait_id].get("lodging", [])
+			btn.text = "HERO: %s\n%s %s\nHP %d, damage %d%s\nLikes to sleep in: %s\nCosts %d shells" % [hero.display_name,
 				content.traits[hero.trait_id]["name"], c["name"], int(hero.max_hp), int(hero.attack),
-				", ranged" if hero.attack_range > 60 else "", card["cost"]]
+				", ranged" if hero.attack_range > 60 else "",
+				" or ".join(likes.map(func(id: String) -> String: return content.buildings[id]["name"].to_lower())), card["cost"]]
 			btn.tooltip_text = _trait_hint(hero.trait_id)
 		else:
 			var def: Dictionary = content.townsfolk[card["role"]]
@@ -281,7 +298,8 @@ func _show_pick() -> void:
 func _trait_hint(trait_id: String) -> String:
 	var t: Dictionary = content.traits[trait_id]
 	var wilds := "hunts far out at the dens by day" if float(t["wilds"]) > 0.6 else ("stays near the camp" if float(t["wilds"]) < 0.2 else "ventures out sometimes")
-	return "%s: %s, retreats at %d%% health." % [t["name"], wilds, roundi(float(t["retreat_at"]) * 100.0)]
+	return "%s: %s, retreats at %d%% health, goes to rest when energy falls to %d." % [t["name"], wilds,
+		roundi(float(t["retreat_at"]) * 100.0), int(t.get("tired_at", 25))]
 
 
 ## One line on what happened last night, above the dawn and relic picks.

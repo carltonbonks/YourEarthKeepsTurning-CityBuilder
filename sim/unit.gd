@@ -29,10 +29,24 @@ var intent := ""
 var level := 1
 var xp := 0.0
 var gold := 0  ## Shells the hero carries (named gold in older run records).
-var weapon_tier := 0
-var armor_tier := 0
 var kills := 0
 var retreating := false
+## 0 (exhausted) to hero_energy_max. Drains while awake, comes back while resting.
+var energy := 100.0
+var resting := false
+## Index into World.buildings of the lodging this hero sleeps in; -1 sleeps by the hearth.
+var lodging := -1
+## Today's whim id (see "whims" in data/heroes.json).
+var whim := "none"
+## Equipped items by slot ("weapon", "armor", "charm"); each item is {base, tier, affixes}. See Loot.
+var items := {}
+## Round*10+day keys of the last tavern night paid for, the last carousing day
+## and the last night the story told of this hero waking.
+var paid_night := -1
+var caroused := -1
+var woke_night := -1
+## Items carried to sell.
+var spares: Array[Dictionary] = []
 
 # Townsfolk work.
 var task := ""  ## e.g. "gather", "return", "build", "repair", "home".

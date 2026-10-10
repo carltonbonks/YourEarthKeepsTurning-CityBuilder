@@ -1,0 +1,35 @@
+{
+	"_note": "Items heroes find, buy, keep or sell. A base names the slot and its stats per tier (an item's stats are base x tier, plus each affix). Affixes are item traits. Stats: attack, hp, speed, energy (cuts how fast energy drains: 0.2 = 20% slower), loot (extra shells per kill), rest_heal (extra HP per second while resting). value = shells a trader pays: value_per_tier x tier + value_per_affix x affixes. drops: chance a kill drops an item (den wanderers are where the loot is).",
+	"bases": {
+		"flint_blade": {"name": "flint blade", "slot": "weapon", "attack": 3},
+		"bone_spear": {"name": "bone spear", "slot": "weapon", "attack": 2, "speed": 6},
+		"obsidian_edge": {"name": "obsidian edge", "slot": "weapon", "attack": 4, "min_tier": 2},
+		"hide_armour": {"name": "hide armour", "slot": "armor", "hp": 16},
+		"fur_cloak": {"name": "fur cloak", "slot": "armor", "hp": 10, "energy": 0.1},
+		"claw_necklace": {"name": "claw necklace", "slot": "charm", "loot": 1},
+		"antler_charm": {"name": "antler charm", "slot": "charm", "energy": 0.12},
+		"amber_amulet": {"name": "amber amulet", "slot": "charm", "rest_heal": 1.0}
+	},
+	"affixes": {
+		"keen": {"name": "Keen", "attack": 2},
+		"sturdy": {"name": "Sturdy", "hp": 10},
+		"swift": {"name": "Swift", "speed": 10},
+		"tireless": {"name": "Tireless", "energy": 0.2},
+		"lucky": {"name": "Lucky", "loot": 1},
+		"blessed": {"name": "Blessed", "rest_heal": 1.5},
+		"cursed": {"name": "Cursed", "attack": 4, "hp": -10}
+	},
+	"value_per_tier": 10,
+	"value_per_affix": 8,
+	"drops": {
+		"den": 0.35,
+		"wave": 0.06,
+		"boss": 1.0,
+		"affix_chance": 0.55,
+		"second_affix_chance": 0.2,
+		"tier_every_rounds": 4,
+		"max_tier": 3
+	},
+	"spare_limit": 3,
+	"sell_tax": 0.2
+}

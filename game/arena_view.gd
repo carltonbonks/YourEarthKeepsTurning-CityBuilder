@@ -186,10 +186,16 @@ func main_color(resource: String) -> String:
 func _draw_hero(hero: Unit, p: Vector2, font: Font) -> void:
 	var r := HERO_RADIUS * maxf(1.0, zoom * 0.7)
 	var color := Color(run.content.hero_classes[hero.type_id]["color"])
-	draw_circle(p, r, color)
-	draw_arc(p, r, 0, TAU, 24, Color.WHITE, 1.5)
+	if hero.resting:
+		# Sleepers are drawn dimmer, with a "z".
+		draw_circle(p, r * 0.8, Color(color, 0.55))
+		draw_string(font, p + Vector2(r * 0.6, -r * 0.6), "z", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#cfe0ff"))
+	else:
+		draw_circle(p, r, color)
+		draw_arc(p, r, 0, TAU, 24, Color.WHITE if hero.energy > 0.0 else Color("#e05050"), 1.5)
 	draw_string(font, p + Vector2(-4, 4), hero.display_name.left(1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.BLACK)
-	_bar(p + Vector2(-r, -r - 6), r * 2.0, hero.hp_fraction(), Color("#5ee07a"))
+	_bar(p + Vector2(-r, -r - 9), r * 2.0, hero.hp_fraction(), Color("#5ee07a"))
+	_bar(p + Vector2(-r, -r - 5), r * 2.0, hero.energy / run.content.num("hero_energy_max"), Color("#7fd0ff"))
 	draw_string(font, p + Vector2(r + 3, 4), hero.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
 
 

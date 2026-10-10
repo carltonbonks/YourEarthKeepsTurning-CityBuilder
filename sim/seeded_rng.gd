@@ -29,6 +29,24 @@ func pick(items: Array) -> Variant:
 	return items[_rng.randi_range(0, items.size() - 1)]
 
 
+## A key of `weights` (key -> weight), chosen with chance in proportion to its weight.
+## Keys are sorted first so the result only depends on the seed. "" if all weights are 0.
+func weighted(weights: Dictionary) -> String:
+	var keys := weights.keys()
+	keys.sort()
+	var sum := 0.0
+	for k in keys:
+		sum += maxf(0.0, float(weights[k]))
+	if sum <= 0.0:
+		return ""
+	var roll := _rng.randf() * sum
+	for k in keys:
+		roll -= maxf(0.0, float(weights[k]))
+		if roll < 0.0:
+			return k
+	return keys[-1]
+
+
 func randf_range(from: float, to: float) -> float:
 	return _rng.randf_range(from, to)
 

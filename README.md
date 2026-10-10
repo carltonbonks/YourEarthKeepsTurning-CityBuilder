@@ -10,12 +10,13 @@ Every change merged to `main` is published as a browser build:
 No install needed. Desktop Chrome, Edge or Firefox recommended.
 Add `?seed=1234` to the address to replay a specific run. Add `&dev=1` for developer tools such as skipping ahead.
 
-### How it plays (slice 2)
+### How it plays (slice 3)
 
 A handful of people around a fire, in the middle of a map. Resources ring the camp, monster dens sit far out in the wilds. Survive 10 rounds. Each round:
-1. **Build.** Order huts, watch posts, a longhouse or drying racks. Craftspeople raise them during the day. You also see where the round's attack will come from.
-2. **Three days and nights.** At each dawn, pick one newcomer from three cards (tribesperson, warrior, craftsperson, or a hero once a longhouse stands). Then everyone acts on their own: tribespeople gather and patch the hearth, warriors patrol, heroes hunt at the dens by day for glory and loot. Everyone eats food each day and the fire burns fuel each night.
-3. **Night 3 brings the warned attack.** Survive it, then **pick a relic** (1 of 3). Heroes spend their own shells on gear.
+1. **Build.** Order huts, watch posts, drying racks, and hero lodgings: a longhouse, a mead hall or a spirit shrine. Craftspeople raise them during the day. You also see where the round's attack will come from.
+2. **Three days and nights.** At each dawn, pick one newcomer from three cards (tribesperson, warrior, craftsperson, or a hero once any lodging stands). Then everyone acts on their own: tribespeople gather and patch the hearth, warriors patrol, heroes follow the day's whim (hunt, guard, sleep in, carouse) and hunt at the dens for loot and XP.
+3. **Heroes run on energy.** They tire as they work and fight, go to bed when tired and at nightfall, and only wake when an enemy comes close to where they sleep. Each personality has a favourite lodging: the mead hall rests them fast and earns shells but they sleep deeply; the shrine heals them and they wake at the first sign of danger. Heroes without a bed sleep by the hearth and recover slowly.
+4. **Night 3 brings the warned attack.** Survive it, then **pick a relic** (1 of 3). Heroes sell the loot they don't wear (the settlement keeps a cut) and buy gear with their own shells.
 
 ## Layout
 

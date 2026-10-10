@@ -38,7 +38,8 @@ var last_night := {}
 ## Format changes bump RECORD_FORMAT so old saved runs can still be read.
 ## 1: one wave per round. 2: days, dawn picks, townsfolk, dens.
 ## 3: small raids on early nights, a report per night ("nights").
-const RECORD_FORMAT := 3
+## 4: hero energy, lodgings, whims and items ("whims", "loot", "sales", "hero_spending"; hero items).
+const RECORD_FORMAT := 4
 var record_rounds: Array[Dictionary] = []
 var _round_entry := {}
 
@@ -137,8 +138,9 @@ func begin_round() -> void:
 	_offer_picks()
 
 
-func on_building_done(_type: String) -> void:
-	pass
+func on_building_done(type: String) -> void:
+	if content.buildings[type].has("lodging"):
+		world.assign_lodgings()
 
 
 # --- Dawn picks ------------------------------------------------------------
@@ -161,7 +163,7 @@ func choose_pick(index: int) -> void:
 			var hero: Unit = card["hero"]
 			_add_hero(hero)
 			taken = "hero:" + hero.type_id
-			tell("%s arrives and takes a bench in the longhouse." % describe(hero))
+			tell("%s arrives and sleeps in %s." % [describe(hero), world.bed_name(hero.lodging)])
 		else:
 			world.add_folk(card["role"])
 			taken = card["role"]
@@ -171,6 +173,7 @@ func choose_pick(index: int) -> void:
 	phase = Phase.SIM
 	world.resume()
 	tell("Day %d dawns." % (world.day_index() + 1))
+	world.roll_whims()
 
 
 func _offer_picks() -> void:
@@ -180,8 +183,8 @@ func _offer_picks() -> void:
 	roles.sort()
 	for role: String in roles:
 		pool.append({"kind": "folk", "role": role, "cost": 0})
-	if world.count_buildings("longhouse") > 0:
-		pool.append({"kind": "hero", "role": "hero", "cost": content.int_num("hero_card_cost"), "hero": _make_hero()})
+	if world.count_lodgings() > 0:
+		pool.append({"kind": "hero", "role": "hero", "cost": content.int_num("hero_card_cost"), "hero": _make_hero(true)})
 	pick_offer = []
 	while pick_offer.size() < content.int_num("pick_choices") and not pool.is_empty():
 		var card: Dictionary = rng.pick(pool)
@@ -472,7 +475,8 @@ func _folk_counts() -> Dictionary:
 func _begin_round_entry() -> void:
 	_round_entry = {"round": round_number, "stock_start": stock.duplicate(), "keep_hp_start": roundi(world.hearth_hp),
 		"wave": wave_counts(), "wave_sides": world.side_names(), "townsfolk_start": _folk_counts(),
-		"heroes_start": living_heroes().size(), "actions": [], "picks": []}
+		"heroes_start": living_heroes().size(), "actions": [], "picks": [],
+		"whims": [], "loot": [], "sales": [], "hero_spending": {}}
 
 
 func _end_round_entry() -> void:
@@ -483,15 +487,46 @@ func _end_round_entry() -> void:
 
 
 func _hero_snapshot(hero: Unit) -> Dictionary:
+	var items := []
+	for slot: String in Loot.SLOTS:
+		if hero.items.has(slot):
+			items.append(_item_record(hero.items[slot]))
 	return {"name": hero.display_name, "class": hero.type_id, "trait": hero.trait_id, "level": hero.level,
-		"hp": roundi(hero.hp), "max_hp": roundi(hero.max_hp), "gold": hero.gold, "weapon": hero.weapon_tier,
-		"armor": hero.armor_tier, "kills": hero.kills, "alive": hero.alive}
+		"hp": roundi(hero.hp), "max_hp": roundi(hero.max_hp), "gold": hero.gold,
+		"weapon": int(hero.items.get("weapon", {}).get("tier", 0)), "armor": int(hero.items.get("armor", {}).get("tier", 0)),
+		"charm": int(hero.items.get("charm", {}).get("tier", 0)), "items": items,
+		"energy": roundi(hero.energy), "lodging": world.buildings[hero.lodging]["type"] if hero.lodging >= 0 else "",
+		"kills": hero.kills, "alive": hero.alive}
+
+
+func _item_record(item: Dictionary) -> Dictionary:
+	return {"base": item["base"], "slot": Loot.slot(content, item), "tier": item["tier"],
+		"affixes": item["affixes"].duplicate(), "value": Loot.value(content, item)}
+
+
+func note_whim(hero: Unit) -> void:
+	if _round_entry.has("whims"):
+		_round_entry["whims"].append({"day": world.day_index() + 1, "hero": hero.display_name, "whim": hero.whim})
+
+
+func note_loot(hero: Unit, item: Dictionary, equipped: bool) -> void:
+	if _round_entry.has("loot"):
+		var entry := _item_record(item)
+		entry.merge({"day": world.day_index() + 1, "hero": hero.display_name, "trait": hero.trait_id, "equipped": equipped})
+		_round_entry["loot"].append(entry)
+
+
+## Shells heroes paid the settlement this round, by reason (tavern nights, carousing).
+func note_hero_spending(reason: String, shells: int) -> void:
+	if _round_entry.has("hero_spending"):
+		_round_entry["hero_spending"][reason] = int(_round_entry["hero_spending"].get(reason, 0)) + shells
 
 
 # --- Internals -------------------------------------------------------------
 
 ## A new hero, not yet in the settlement (dawn cards show these).
-func _make_hero() -> Unit:
+## For dawn cards, heroes whose favourite lodging stands are likelier to turn up.
+func _make_hero(drawn_by_lodging := false) -> Unit:
 	var hero := Unit.new()
 	hero.id = new_id()
 	hero.team = Unit.Team.HERO
@@ -500,7 +535,14 @@ func _make_hero() -> Unit:
 	var trait_ids := content.traits.keys()
 	trait_ids.sort()
 	hero.type_id = _hero_rng.pick(class_ids)
-	hero.trait_id = _hero_rng.pick(trait_ids)
+	if drawn_by_lodging:
+		var weights := {}
+		for id: String in trait_ids:
+			var favourite: Array = content.traits[id].get("lodging", [])
+			weights[id] = 1.0 + (content.num("lodging_draw_bonus") if not favourite.is_empty() and world.count_buildings(favourite[0]) > 0 else 0.0)
+		hero.trait_id = _hero_rng.weighted(weights)
+	else:
+		hero.trait_id = _hero_rng.pick(trait_ids)
 	hero.display_name = _unused_name()
 	world.apply_hero_stats(hero)
 	hero.hp = hero.max_hp
@@ -511,6 +553,7 @@ func _add_hero(hero: Unit) -> void:
 	hero.pos = Vector2.from_angle(heroes.size() * 1.7 + 0.4) * 60.0
 	world.apply_hero_stats(hero)
 	heroes.append(hero)
+	world.assign_lodgings()
 
 
 func _bury_heroes() -> void:
@@ -542,38 +585,59 @@ func _level_up(hero: Unit) -> void:
 func _heal_heroes() -> void:
 	var full := mod("full_heal") > 0.0
 	for hero in heroes:
+		hero.energy = content.num("hero_energy_max")
+		hero.resting = false
 		var heal := hero.max_hp if full else hero.max_hp * content.num("between_round_heal")
 		hero.hp = minf(hero.max_hp, hero.hp + heal)
 	for unit in world.folk:
 		unit.hp = minf(unit.max_hp, unit.hp + unit.max_hp * content.num("between_round_heal"))
 
 
-## Heroes spend their own shells on gear from passing traders, by personality.
-## The player doesn't choose.
+## Between rounds traders pass through. Heroes sell the loot they carry (the
+## settlement takes a cut), then buy gear with their own shells if they like it
+## better than what they wear. The player doesn't choose.
 func _heroes_go_shopping() -> void:
 	var discount := clampf(mod("gear_discount"), 0.0, 0.9)
+	var tax_rate := float(content.items["sell_tax"])
 	for hero in heroes:
+		if not hero.spares.is_empty():
+			var total := 0
+			var tax := 0
+			for item in hero.spares:
+				var v := Loot.value(content, item)
+				var cut := roundi(v * tax_rate)
+				total += v
+				tax += cut
+				_round_entry["sales"].append({"hero": hero.display_name, "base": item["base"], "tier": item["tier"],
+					"affixes": item["affixes"].duplicate(), "value": v, "town_cut": cut})
+			hero.gold += total - tax
+			stock["shells"] = int(stock["shells"]) + tax
+			tell("%s sells %d found item%s for %d shells; the settlement keeps %d." % [hero.display_name,
+				hero.spares.size(), "" if hero.spares.size() == 1 else "s", total, tax])
+			hero.spares.clear()
 		var t: Dictionary = content.traits[hero.trait_id]
+		var likes: Dictionary = t.get("likes", {})
 		var order := ["weapon", "armor"] if t["prefers"] == "weapon" else ["armor", "weapon"]
 		var bought := true
 		while bought:
 			bought = false
 			for slot: String in order:
-				var tier := hero.weapon_tier if slot == "weapon" else hero.armor_tier
+				var current: Dictionary = hero.items.get(slot, {})
+				var tier: int = 1 if current.is_empty() else int(current["tier"]) + 1
 				var costs: Array = content.gear[slot]["costs"]
-				if tier >= costs.size():
+				if tier > costs.size():
 					continue
-				var cost := int(round(float(costs[tier]) * (1.0 - discount)))
+				var offer := Loot.make(content.gear[slot]["base"], tier)
+				if not current.is_empty() and Loot.score(content, offer, likes) <= Loot.score(content, current, likes):
+					continue
+				var cost := int(round(float(costs[tier - 1]) * (1.0 - discount)))
 				# Hoarders only buy when they have plenty left over.
 				if hero.gold < cost * float(t["hoard"]):
 					continue
 				hero.gold -= cost
-				if slot == "weapon":
-					hero.weapon_tier += 1
-				else:
-					hero.armor_tier += 1
+				hero.items[slot] = offer
 				world.apply_hero_stats(hero)
-				tell("%s trades for a tier %d %s (%d shells)." % [hero.display_name, tier + 1, content.gear[slot]["name"], cost])
+				tell("%s trades for a %s (%d shells)." % [hero.display_name, Loot.describe(content, offer), cost])
 				bought = true
 				break
 
