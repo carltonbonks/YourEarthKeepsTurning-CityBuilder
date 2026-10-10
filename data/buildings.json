@@ -1,7 +1,7 @@
 {
-	"_note": "Buildings you order at the start of a round. work = craftsperson-seconds to raise it. Plots fill in rings around the hearth.",
-	"hut": {"name": "Hut", "text": "Room for 3 more people.", "cost": {"wood": 6}, "work": 15, "housing": 3, "color": "#8a6a44"},
+	"_note": "Buildings you order at the start of a round. work = craftsperson-seconds to raise it. Plots fill in rings around the hearth. fuel = extra fuel burned each night once raised (homes need heat).",
+	"hut": {"name": "Hut", "text": "Room for 3 more people.", "cost": {"wood": 8}, "work": 15, "housing": 3, "fuel": 0.5, "color": "#8a6a44"},
 	"watch_post": {"name": "Watch post", "text": "Shoots arrows at enemies near it.", "cost": {"wood": 8, "stone": 2}, "work": 25, "attack": 4, "range": 150, "cooldown": 1.2, "max": 4, "color": "#6f7d8a"},
-	"longhouse": {"name": "Longhouse", "text": "Lodging for heroes. Heroes can appear in dawn picks (for a shell fee).", "cost": {"wood": 12, "stone": 4}, "work": 40, "max": 1, "housing": 2, "color": "#9c7a3c"},
+	"longhouse": {"name": "Longhouse", "text": "Lodging for heroes. Heroes can appear in dawn picks (for a shell fee).", "cost": {"wood": 12, "stone": 4}, "work": 40, "max": 1, "housing": 2, "fuel": 1, "color": "#9c7a3c"},
 	"drying_rack": {"name": "Drying rack", "text": "Food lasts: each day's food upkeep is 25% lower.", "cost": {"wood": 5}, "work": 12, "max": 2, "color": "#a08860"}
 }

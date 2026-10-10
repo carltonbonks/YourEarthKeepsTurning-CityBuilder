@@ -2,13 +2,13 @@
 	"_note": "Core balance numbers. Edit and reload; no code changes needed. Times are in seconds of game time.",
 	"rounds_to_win": 10,
 	"days_per_round": 3,
-	"day_seconds": 40,
-	"night_seconds": 20,
-	"dusk_seconds": 6,
+	"day_seconds": 32,
+	"night_seconds": 16,
+	"dusk_seconds": 5,
 	"ticks_per_second": 10,
 
 	"world_radius": 800,
-	"settlement_radius": 150,
+	"settlement_radius": 180,
 	"hearth_max_hp": 150,
 	"hearth_attack": 3,
 	"hearth_range": 160,
@@ -24,15 +24,19 @@
 	"fuel_per_night_base": 2,
 	"fuel_per_person_per_night": 0.25,
 	"cold_night_damage": 0.35,
+	"wood_burns_as_fuel": true,
+	"folk_night_heal": 0.6,
 	"income_shells_per_round": 10,
 
 	"pick_choices": 3,
 	"hero_card_cost": 30,
 
 	"wave_budget_base": 6,
-	"wave_budget_per_round": 7,
+	"wave_budget_per_round": 8,
 	"wave_spawn_interval": 0.8,
 	"wave_two_sides_from_round": 5,
+	"probe_budget_base": 1,
+	"probe_budget_per_round": 1.5,
 
 	"den_count": 2,
 	"den_min_distance": 560,
@@ -40,7 +44,7 @@
 	"den_base_wanderers": 2,
 	"den_wanderers_per_level": 1,
 	"den_respawn_seconds": 25,
-	"den_roam_day": 110,
+	"den_roam_day": 180,
 	"den_roam_night": 380,
 
 	"node_min_distance": 200,
@@ -53,5 +57,6 @@
 	"between_round_heal": 0.5,
 	"relic_choices": 3,
 
-	"enemy_aggro": 50
+	"enemy_aggro": 50,
+	"warrior_answer_radius": 260
 }

@@ -43,6 +43,11 @@ func int_num(key: String) -> int:
 	return int(balance[key])
 
 
+## True if an enemy type carries a tag (see "tags" in data/enemies.json).
+func enemy_has_tag(type_id: String, tag: String) -> bool:
+	return tag in enemies[type_id].get("tags", [])
+
+
 static func _read(file: String) -> Dictionary:
 	var path := DATA_DIR.path_join(file)
 	var text := FileAccess.get_file_as_string(path)

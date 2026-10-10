@@ -67,6 +67,7 @@ When a feature doesn't serve at least one pillar, question it.
   - Automated tests for core simulation logic (e.g. GUT for Godot) and CI (GitHub Actions) that runs them, plus headless export builds.
   - Data-driven content (buildings, heroes, relics, items and enemies defined in resource/data files, not hardcoded) so balancing and modding stay easy.
   - Keep simulation logic separate from presentation, so the auto-resolve phase can run headless for tests and balance simulations.
+  - **Tags (proposed by Yusuf 2026-10-10):** entities carry descriptive tags in their data (e.g. a wolf is `animal`, `sentient`, `beast`), and rules key on a few of them (sentient creatures turn on whoever hits them). Add a tag only when a rule reads it.
   - Deterministic, seedable RNG, so runs are reproducible for debugging and balancing.
   - Versioned save formats, settings, and input remapping. Plan for the Steamworks integration points (achievements, cloud saves) without building them early.
 - **Yusuf's background:** low familiarity with code. They understand SDLC concepts from years around software projects, but have written very little code and no end-to-end programs. Claude owns build, test, troubleshoot and deploy end to end. Explain technical choices in plain language, never ask Yusuf to debug or edit code, and give one-click or one-command ways to run things.

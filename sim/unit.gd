@@ -48,6 +48,9 @@ var spawned := false
 var is_boss := false
 var den_index := -1  ## Which den a wanderer belongs to; -1 for wave enemies.
 var wander_goal := Vector2.ZERO
+var is_probe := false  ## Part of a small raid on an early night.
+## Sentient enemies chase whoever last hurt them until this time.
+var grudge_until := -1.0
 
 
 func is_hero() -> bool:

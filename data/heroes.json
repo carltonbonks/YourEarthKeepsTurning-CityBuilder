@@ -32,10 +32,10 @@
 	"traits": {
 		"brave": {
 			"name": "Brave",
-			"retreat_at": 0.15,
+			"retreat_at": 0.3,
 			"greed": 0.6,
 			"duty": 0.6,
-			"caution": 0.2,
+			"caution": 0.45,
 			"prefers": "weapon",
 			"hoard": 1.0,
 			"wilds": 1.0
@@ -68,7 +68,7 @@
 			"caution": 0.8,
 			"prefers": "armor",
 			"hoard": 1.0,
-			"wilds": 0.0
+			"wilds": 0.45
 		}
 	},
 	"names": [
