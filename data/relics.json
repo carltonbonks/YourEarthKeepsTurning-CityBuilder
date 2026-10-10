@@ -1,0 +1,17 @@
+{
+	"_note": "Relics. Each effect key is summed across owned relics; see sim/run_state.gd mod().",
+	"war_banner": {"name": "War Banner", "text": "Heroes deal +2 damage.", "effects": {"hero_attack": 2}},
+	"golden_idol": {"name": "Golden Idol", "text": "Heroes earn 50% extra from bounties (paid by the gods, not you).", "effects": {"bounty_bonus": 0.5}},
+	"tax_ledger": {"name": "Tax Ledger", "text": "+15 gold every round.", "effects": {"income": 15}},
+	"stone_walls": {"name": "Stone Walls", "text": "Keep +40 max HP.", "effects": {"keep_max_hp": 40}},
+	"blood_pact": {"name": "Blood Pact", "text": "Heroes deal +4 damage. Keep -30 max HP.", "effects": {"hero_attack": 4, "keep_max_hp": -30}},
+	"piggy_bank": {"name": "Piggy Bank", "text": "+4 gold per round for every round you have owned it.", "effects": {"income_growth": 4}},
+	"veterans_medal": {"name": "Veteran's Medal", "text": "Heroes gain double XP.", "effects": {"xp_mult": 1.0}},
+	"courage_charm": {"name": "Courage Charm", "text": "Heroes +10 max HP and retreat later.", "effects": {"hero_hp": 10, "retreat_shift": -0.1}},
+	"recruiting_poster": {"name": "Recruiting Poster", "text": "A free hero joins now. Recruiting costs 15 less.", "effects": {"free_hero": 1, "recruit_discount": 15}},
+	"smiths_hammer": {"name": "Smith's Hammer", "text": "Heroes pay 40% less for gear.", "effects": {"gear_discount": 0.4}},
+	"keep_ballista": {"name": "Keep Ballista", "text": "Keep arrows deal +6 damage.", "effects": {"keep_attack": 6}},
+	"sanctuary_bell": {"name": "Sanctuary Bell", "text": "Heroes heal fully between rounds and 3x faster at the keep.", "effects": {"full_heal": 1, "keep_heal_mult": 2}},
+	"merchants_guild": {"name": "Merchants' Guild", "text": "Each market gives +8 more gold.", "effects": {"market_income": 8}},
+	"lucky_coin": {"name": "Lucky Coin", "text": "Every kill drops +2 gold for the hero.", "effects": {"loot_gold": 2}}
+}
