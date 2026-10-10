@@ -207,12 +207,13 @@ func test_sentient_enemies_turn_on_attackers() -> void:
 	var run := _run()
 	var w := run.world
 	var raider := w._make_enemy("raider", Vector2(400, 0), 0.0)
-	var wight := w._make_enemy("barrow_wight", Vector2(-400, 0), 0.0)
+	var spirit := w._make_enemy("barrow_wight", Vector2(-400, 0), 0.0)
+	w.content.enemies["barrow_wight"]["tags"] = ["undead"]
 	var hero := run.heroes[0]
 	w._damage(hero, raider, 1.0)
-	w._damage(hero, wight, 1.0)
+	w._damage(hero, spirit, 1.0)
 	check(raider.target == hero, "raider (sentient) goes after the hero who hit it")
-	check(wight.target == null, "barrow-wight (undead) does not")
+	check(spirit.target == null, "a creature without the sentient tag does not")
 
 
 func test_wood_burns_when_fuel_runs_out() -> void:

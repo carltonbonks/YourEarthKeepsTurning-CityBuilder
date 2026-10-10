@@ -4,6 +4,6 @@
 	"wolf": {"tags": ["animal", "sentient", "beast"], "name": "Wolf", "hp": 18, "attack": 4, "range": 22, "cooldown": 0.8, "speed": 105, "cost": 2, "min_round": 2, "xp": 2, "loot": 1, "color": "#a0665a"},
 	"cave_bear": {"tags": ["animal", "sentient", "beast"], "name": "Cave bear", "hp": 75, "attack": 11, "range": 26, "cooldown": 1.4, "speed": 42, "cost": 5, "min_round": 3, "xp": 6, "loot": 4, "color": "#7a3b2b"},
 	"bone_caller": {"tags": ["human", "sentient", "mystic"], "name": "Bone-caller", "hold_at": 330, "war_chant": 0.25, "hp": 24, "attack": 5, "range": 150, "cooldown": 1.3, "speed": 50, "cost": 3, "min_round": 4, "xp": 3, "loot": 3, "color": "#d06aa8"},
-	"barrow_wight": {"tags": ["undead"], "name": "Barrow-wight", "wave": false, "hp": 34, "attack": 6, "range": 24, "cooldown": 1.1, "speed": 55, "cost": 3, "min_round": 99, "xp": 4, "loot": 4, "color": "#8fa3b8"},
+	"barrow_wight": {"tags": ["undead", "sentient"], "name": "Barrow-wight", "wave": false, "hp": 34, "attack": 6, "range": 24, "cooldown": 1.1, "speed": 55, "cost": 3, "min_round": 99, "xp": 4, "loot": 4, "color": "#8fa3b8"},
 	"antlered_king": {"tags": ["spirit", "sentient", "beast"], "name": "The Antlered King", "hp": 300, "attack": 16, "range": 30, "cooldown": 1.5, "speed": 36, "cost": 0, "min_round": 99, "boss": true, "xp": 20, "loot": 25, "color": "#ff3b3b"}
 }
