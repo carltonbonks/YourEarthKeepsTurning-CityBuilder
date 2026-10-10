@@ -1,0 +1,14 @@
+# Godot cache and imported assets (regenerated automatically)
+.godot/
+*.import.tmp
+*.tmp
+
+# Export output
+build/
+
+# OS and editor clutter
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
