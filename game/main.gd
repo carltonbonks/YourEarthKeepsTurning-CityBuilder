@@ -242,6 +242,7 @@ func _show_pick() -> void:
 	_clear_overlay()
 	var day := run.world.day_index() + 1
 	_overlay_title("Dawn of day %d: who joins the settlement?" % day)
+	_night_summary()
 	var room := run.population() < run.housing()
 	var sub := Label.new()
 	sub.text = "Shells: %d   Room: %d / %d%s" % [run.stock["shells"], run.population(), run.housing(),
@@ -283,9 +284,28 @@ func _trait_hint(trait_id: String) -> String:
 	return "%s: %s, retreats at %d%% health." % [t["name"], wilds, roundi(float(t["retreat_at"]) * 100.0)]
 
 
+## One line on what happened last night, above the dawn and relic picks.
+func _night_summary() -> void:
+	var n := run.last_night
+	if n.is_empty():
+		return
+	var deaths: Array = n["deaths"]
+	var text := "Night %d: raiders %d, enemies killed %d, hearth damage %d. " % [
+		n["night"], n["raiders"], n["kills"], n["hearth_damage"]]
+	text += "Lost: %s." % ", ".join(deaths) if not deaths.is_empty() else "Nobody was lost."
+	var label := Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	label.custom_minimum_size.x = 600
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_color_override("font_color", Color("#e0a050") if not deaths.is_empty() else Color("#a8c8a0"))
+	_overlay_box.add_child(label)
+
+
 func _show_relic_pick() -> void:
 	_clear_overlay()
 	_overlay_title("Round %d survived! Choose a relic" % run.round_number)
+	_night_summary()
 	for id in run.relic_offer:
 		var r: Dictionary = content.relics[id]
 		var btn := Button.new()
@@ -417,6 +437,14 @@ func _initial_seed() -> int:
 	return _random_seed()
 
 
+## Dev tools show in desktop runs, or in the browser with ?dev=1 in the address.
+func _dev_mode() -> bool:
+	if not OS.has_feature("web"):
+		return true
+	var flag: Variant = JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('dev')")
+	return flag is String and flag == "1"
+
+
 func _random_seed() -> int:
 	return randi_range(1000, 99999)
 
@@ -479,7 +507,8 @@ func _build_ui() -> void:
 		b.button_pressed = s == speed
 		b.pressed.connect(func() -> void: speed = s)
 		speeds.add_child(b)
-	_button(_sim_box, "Skip to the next decision", _skip_ahead)
+	if _dev_mode():
+		_button(_sim_box, "Skip to the next decision (dev)", _skip_ahead)
 
 	left.add_child(HSeparator.new())
 	_relic_label = _rich(left, 0)

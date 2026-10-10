@@ -31,11 +31,14 @@ var pick_offer: Array[Dictionary] = []
 var next_wave: Array[String] = []
 ## Plain-language story of what happened, newest last.
 var story: Array[String] = []
+## The last night's report, shown at the next decision (see World.night_report).
+var last_night := {}
 
 ## Machine-readable history of this run for stats and debugging (see to_record()).
 ## Format changes bump RECORD_FORMAT so old saved runs can still be read.
 ## 1: one wave per round. 2: days, dawn picks, townsfolk, dens.
-const RECORD_FORMAT := 2
+## 3: small raids on early nights, a report per night ("nights").
+const RECORD_FORMAT := 3
 var record_rounds: Array[Dictionary] = []
 var _round_entry := {}
 
@@ -200,6 +203,7 @@ func step() -> void:
 	match world.pause:
 		World.Pause.DAWN:
 			_bury_heroes()
+			_close_night()
 			_offer_picks()
 		World.Pause.ROUND_OVER:
 			_finish_round()
@@ -233,6 +237,8 @@ func daily_upkeep() -> void:
 
 func fuel_needed_tonight() -> int:
 	var need := content.num("fuel_per_night_base") + population() * content.num("fuel_per_person_per_night") - mod("fuel_saving")
+	for type: String in content.buildings:
+		need += world.count_buildings(type) * float(content.buildings[type].get("fuel", 0.0))
 	return maxi(0, int(ceil(need)))
 
 
@@ -254,7 +260,20 @@ func most_needed_resource() -> String:
 	return best
 
 
+## Files the night's report in the round record and keeps it for the UI.
+func _close_night() -> void:
+	var report := world.night_report.duplicate(true)
+	report["night"] = world.day_index() + (0 if world.pause == World.Pause.DAWN else 1)
+	report["hearth_damage"] = roundi(float(report["hearth_damage"]))
+	last_night = report
+	if not _round_entry.has("nights"):
+		_round_entry["nights"] = []
+	_round_entry["nights"].append(report)
+	world.reset_night_report()
+
+
 func _finish_round() -> void:
+	_close_night()
 	_bury_heroes()
 	world.release()
 	var stats := world.wave_stats
@@ -286,6 +305,8 @@ func _finish_round() -> void:
 
 
 func _lose() -> void:
+	if world.pause == World.Pause.HEARTH_LOST:
+		_close_night()
 	phase = Phase.LOST
 	_bury_heroes()
 	world.release()
@@ -353,6 +374,28 @@ func generate_wave(for_round: int) -> Array[String]:
 			if content.enemies[id].get("boss", false):
 				wave.append(id)
 	return wave
+
+
+## A small raid for an early night: cheap enemies from a small budget.
+func generate_probe(for_round: int, night: int) -> Array[String]:
+	var rng := SeededRng.stream(run_seed, "probe_units", for_round * 10 + night)
+	var budget := int(content.num("probe_budget_base") + content.num("probe_budget_per_round") * (for_round - 1))
+	var ids := content.enemies.keys()
+	ids.sort()
+	var probe: Array[String] = []
+	while budget > 0:
+		var options := []
+		for id: String in ids:
+			var e: Dictionary = content.enemies[id]
+			if e.get("wave", true) and not e.get("boss", false) and not e.has("hold_at") \
+					and int(e["min_round"]) <= for_round and int(e["cost"]) <= budget:
+				options.append(id)
+		if options.is_empty():
+			break
+		var pick: String = rng.pick(options)
+		probe.append(pick)
+		budget -= int(content.enemies[pick]["cost"])
+	return probe
 
 
 ## Enemy type id -> count, for the wave preview.

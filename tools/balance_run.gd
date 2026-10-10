@@ -1,12 +1,14 @@
 extends SceneTree
 ## Headless balance report: plays many seeded runs with a scripted player.
-## Usage: godot --headless --path . -s res://tools/balance_run.gd [-- runs=50 style=balanced out=runs.jsonl]
-## out= also writes every run's record (same format as the game's Run history) for run_report.gd.
+## Usage: godot --headless --path . -s res://tools/balance_run.gd [-- runs=50 style=balanced out=runs.jsonl label=pr5]
+## out= also writes every run's record (same format as the game's Run history) for run_report.gd
+## and tools/export_csv.py. label= names the build being tested (it becomes the runs' game_version).
 
 func _init() -> void:
 	var runs := 100
 	var style := "balanced"
 	var out_path := ""
+	var label := "dev"
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("runs="):
 			runs = int(arg.trim_prefix("runs="))
@@ -14,6 +16,8 @@ func _init() -> void:
 			style = arg.trim_prefix("style=")
 		elif arg.begins_with("out="):
 			out_path = arg.trim_prefix("out=")
+		elif arg.begins_with("label="):
+			label = arg.trim_prefix("label=")
 	var out_file: FileAccess = FileAccess.open(out_path, FileAccess.WRITE) if out_path != "" else null
 	var content := Content.load_default()
 	var wins := 0
@@ -30,6 +34,8 @@ func _init() -> void:
 			var record := run.to_record()
 			record.erase("story")
 			record["player"] = "bot:" + style
+			record["id"] = "%s-%s-%d" % [label, style, run.run_seed]
+			record["game_version"] = label
 			out_file.store_line(JSON.stringify(record))
 		if run.phase == RunState.Phase.WON:
 			wins += 1

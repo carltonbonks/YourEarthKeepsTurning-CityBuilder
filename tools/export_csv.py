@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""Turns saved run records into tidy CSV tables for spreadsheets, databases and Tableau.
+
+Reads every run record (one JSON per file, a JSON list, or JSON lines) from the input
+folder, and rewrites one CSV per table in the output folder. Rows join on run_id.
+Re-running is safe: runs are de-duplicated by run_id and the tables are rebuilt.
+
+Usage: python3 tools/export_csv.py <raw_folder> <csv_folder>
+
+Run records come from the game's Run history (Copy / Download) and from
+tools/balance_run.gd out=... (bot runs). See RunState.to_record() for the format.
+"""
+
+import csv
+import json
+import os
+import sys
+
+RESOURCES = ["food", "fuel", "wood", "stone", "shells"]
+ROLES = ["tribesperson", "warrior", "craftsperson"]
+
+
+def load_records(folder):
+    runs = {}
+    for name in sorted(os.listdir(folder)):
+        path = os.path.join(folder, name)
+        if not name.endswith((".json", ".jsonl")):
+            continue
+        with open(path, encoding="utf-8") as f:
+            text = f.read().strip()
+        if not text:
+            continue
+        if name.endswith(".jsonl"):
+            items = [json.loads(line) for line in text.splitlines() if line.strip()]
+        else:
+            data = json.loads(text)
+            items = data if isinstance(data, list) else [data]
+        for record in items:
+            run_id = str(record.get("id") or "%s-%s" % (record.get("player", "unknown"), int(record.get("seed", 0))))
+            record["_run_id"] = run_id
+            record["_source_file"] = name
+            runs[run_id] = record
+    return list(runs.values())
+
+
+def n(value):
+    """Whole numbers come back from JSON as floats (12.0); write them as 12."""
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
+
+
+def write(folder, table, columns, rows):
+    path = os.path.join(folder, table + ".csv")
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({k: n(row.get(k, "")) for k in columns})
+    return len(rows)
+
+
+def main(raw_folder, out_folder):
+    os.makedirs(out_folder, exist_ok=True)
+    records = load_records(raw_folder)
+    tables = {name: [] for name in
+              ["runs", "rounds", "picks", "builds", "wave_enemies", "deaths", "nights", "relic_offers", "heroes"]}
+
+    for r in records:
+        rid = r["_run_id"]
+        player = str(r.get("player", "unknown"))
+        rounds = r.get("rounds", [])
+        all_deaths = [d for rd in rounds for d in rd.get("deaths", [])]
+        tables["runs"].append({
+            "run_id": rid, "player": player, "player_kind": player.split(":")[0],
+            "bot_style": player.split(":")[1] if ":" in player else "",
+            "game_version": r.get("game_version", ""), "record_format": r.get("format", ""),
+            "seed": r.get("seed", ""), "saved_at": r.get("saved_at", ""), "result": r.get("result", ""),
+            "won": 1 if r.get("result") == "won" else 0,
+            "round_reached": r.get("round_reached", ""), "rounds_to_win": r.get("rounds_to_win", ""),
+            "hearth_hp_end": r.get("keep_hp", ""), "townsfolk_lost": r.get("townsfolk_lost", ""),
+            "heroes_lost": len(r.get("fallen", [])), "heroes_alive_end": len(r.get("heroes", [])),
+            "townsfolk_end": sum(r.get("townsfolk", {}).values()),
+            "relics_taken": len(r.get("relics", [])), "buildings_total": len(r.get("buildings", [])),
+            "huts": r.get("buildings", []).count("hut"),
+            "watch_posts": r.get("buildings", []).count("watch_post"),
+            "deaths_total": len(all_deaths), "source_file": r["_source_file"],
+            **{"stock_end_" + k: r.get("stock", {}).get(k, "") for k in RESOURCES},
+        })
+        for h in r.get("heroes", []) + r.get("fallen", []):
+            tables["heroes"].append({"run_id": rid, **{k: h.get(k, "") for k in
+                                     ["name", "class", "trait", "level", "kills", "alive", "weapon", "armor", "gold", "max_hp"]}})
+
+        for rd in rounds:
+            rn = rd.get("round", "")
+            battle = rd.get("battle", {})
+            deaths = rd.get("deaths", [])
+            wave = rd.get("wave", {})
+            folk_start = rd.get("townsfolk_start", {})
+            folk_end = rd.get("townsfolk_end", {})
+            tables["rounds"].append({
+                "run_id": rid, "round": rn, "wave_size": sum(wave.values()),
+                "wave_sides": "+".join(rd.get("wave_sides", [])), "wave_side_count": len(rd.get("wave_sides", [])),
+                "hearth_hp_start": rd.get("keep_hp_start", ""), "hearth_damage": battle.get("keep_damage", ""),
+                "hearth_hp_after": battle.get("keep_hp_after", ""), "wave_seconds": battle.get("seconds", ""),
+                "hero_retreats": battle.get("retreats", ""),
+                "hero_deaths": sum(1 for d in deaths if d.get("hero")),
+                "townsfolk_deaths": sum(1 for d in deaths if not d.get("hero")),
+                "heroes_start": rd.get("heroes_start", ""),
+                "townsfolk_start": sum(folk_start.values()), "townsfolk_end": sum(folk_end.values()) if folk_end else "",
+                "buildings_ordered": len(rd.get("actions", [])), "left_hungry": rd.get("left_hungry", 0),
+                "relic_pick": rd.get("relic_pick", ""), "survived": 1 if "relic_pick" in rd or (r.get("result") == "won" and rn == r.get("round_reached")) else 0,
+                **{"start_" + k: folk_start.get(k, 0) for k in ROLES},
+                **{"stock_start_" + k: rd.get("stock_start", {}).get(k, "") for k in RESOURCES},
+                **{"stock_end_" + k: rd.get("stock_end", {}).get(k, "") for k in RESOURCES},
+            })
+            for p in rd.get("picks", []):
+                offered = p.get("offered", [])
+                taken = p.get("taken", "")
+                tables["picks"].append({
+                    "run_id": rid, "round": rn, "day": p.get("day", ""),
+                    "offered_1": offered[0] if len(offered) > 0 else "",
+                    "offered_2": offered[1] if len(offered) > 1 else "",
+                    "offered_3": offered[2] if len(offered) > 2 else "",
+                    "hero_offered": 1 if any(o.startswith("hero:") for o in offered) else 0,
+                    "taken": taken or "(skipped)", "taken_kind": "hero" if taken.startswith("hero:") else ("none" if not taken else "townsfolk"),
+                })
+            for a in rd.get("actions", []):
+                tables["builds"].append({"run_id": rid, "round": rn, "building": a.get("building", a.get("kind", ""))})
+            for enemy, count in wave.items():
+                tables["wave_enemies"].append({"run_id": rid, "round": rn, "enemy": enemy, "count": count})
+            for d in deaths:
+                tables["deaths"].append({
+                    "run_id": rid, "round": rn, "day": d.get("day", ""), "at_night": 1 if d.get("night") else 0,
+                    "name": d.get("name", ""), "role": d.get("role", ""), "is_hero": 1 if d.get("hero") else 0,
+                    "killer": d.get("killer") or "unknown",
+                })
+            for night in rd.get("nights", []):
+                tables["nights"].append({
+                    "run_id": rid, "round": rn, "night": night.get("night", ""), "raiders": night.get("raiders", ""),
+                    "kills": night.get("kills", ""), "hearth_damage": night.get("hearth_damage", ""),
+                    "deaths": len(night.get("deaths", [])), "wave_night": 1 if night.get("night") == 3 else 0,
+                })
+            for relic in rd.get("relic_offer", []):
+                tables["relic_offers"].append({"run_id": rid, "round": rn, "relic": relic,
+                                               "picked": 1 if rd.get("relic_pick") == relic else 0})
+
+    columns = {
+        "runs": list(tables["runs"][0].keys()) if tables["runs"] else ["run_id"],
+        "rounds": list(tables["rounds"][0].keys()) if tables["rounds"] else ["run_id"],
+        "picks": ["run_id", "round", "day", "offered_1", "offered_2", "offered_3", "hero_offered", "taken", "taken_kind"],
+        "builds": ["run_id", "round", "building"],
+        "wave_enemies": ["run_id", "round", "enemy", "count"],
+        "deaths": ["run_id", "round", "day", "at_night", "name", "role", "is_hero", "killer"],
+        "nights": ["run_id", "round", "night", "raiders", "kills", "hearth_damage", "deaths", "wave_night"],
+        "relic_offers": ["run_id", "round", "relic", "picked"],
+        "heroes": ["run_id", "name", "class", "trait", "level", "kills", "alive", "weapon", "armor", "gold", "max_hp"],
+    }
+    for table, rows in tables.items():
+        count = write(out_folder, table, columns[table], rows)
+        print("%-13s %6d rows" % (table, count))
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print(__doc__)
+        sys.exit(1)
+    main(sys.argv[1], sys.argv[2])

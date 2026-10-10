@@ -15,7 +15,10 @@ const HOME_RADIUS := 60.0
 const HEAL_UNTIL := 0.85
 const TARGET_STICKINESS := 3.0
 const FLEE_DISTANCE := 70.0
-const PLOT_RINGS := [[78.0, 8], [118.0, 12], [158.0, 16]]
+## Building plots: rings around the hearth, spaced so footprints never overlap.
+const PLOT_RINGS := [70.0, 115.0, 160.0]
+const PLOT_SPACING := 42.0
+const BUILDING_SIZE := 26.0
 
 enum Pause { NONE, DAWN, ROUND_OVER, HEARTH_LOST }
 
@@ -46,6 +49,12 @@ var shots: Array[Dictionary] = []
 ## Facts for this round's record.
 var deaths: Array[Dictionary] = []
 var wave_stats := {}
+## What happened since the last dawn pick: {raiders, kills, hearth_damage, deaths: [names]}.
+## RunState reads it at each dawn and at the end of the round.
+var night_report := {}
+## Enemies chasing a fleeing worker (seen last tick); warriors answer the call.
+var alarms: Array[Unit] = []
+var _new_alarms: Array[Unit] = []
 
 
 func _init(run_state: RunState) -> void:
@@ -54,11 +63,13 @@ func _init(run_state: RunState) -> void:
 	rng = SeededRng.stream(run.run_seed, "world")
 	dt = 1.0 / content.num("ticks_per_second")
 	hearth_hp = run.hearth_max_hp()
-	for ring: Array in PLOT_RINGS:
-		var count: int = ring[1]
+	for ring in PLOT_RINGS.size():
+		var r: float = PLOT_RINGS[ring]
+		var count := int(TAU * r / PLOT_SPACING)
 		for i in count:
-			var angle := TAU * (i + 0.5 * (plots.size() % 2)) / count
-			plots.append(Vector2.from_angle(angle) * float(ring[0]))
+			# Every other ring is turned half a step so plots don't line up.
+			var angle := TAU * (i + 0.5 * (ring % 2)) / count
+			plots.append(Vector2.from_angle(angle) * r)
 	_place_nodes()
 	_place_dens()
 
@@ -97,9 +108,14 @@ func start_round() -> void:
 	wave_spawned = false
 	deaths = []
 	wave_stats = {"seconds": 0.0, "keep_damage": 0.0, "hero_deaths": [], "retreats": 0, "hearth_hp_before": hearth_hp}
+	reset_night_report()
 	for den in dens:
 		den["respawn_left"] = 0.0
 	pause = Pause.NONE
+
+
+func reset_night_report() -> void:
+	night_report = {"raiders": 0, "kills": 0, "hearth_damage": 0.0, "deaths": []}
 
 
 ## Decides (reproducibly) which sides this round's wave comes from, so it can be warned of.
@@ -140,6 +156,8 @@ func step() -> void:
 	if wave_spawned:
 		wave_stats["seconds"] = time - (night_end - content.num("night_seconds"))
 
+	alarms = _new_alarms
+	_new_alarms = []
 	_dens_tick()
 	for enemy in enemies:
 		if not enemy.spawned and time >= enemy.spawn_time:
@@ -173,14 +191,24 @@ func step() -> void:
 
 func _nightfall() -> void:
 	var need := run.fuel_needed_tonight()
-	if run.stock["fuel"] >= need:
-		run.stock["fuel"] -= need
-		cold_tonight = false
+	cold_tonight = false
+	if int(run.stock["fuel"]) >= need:
+		run.stock["fuel"] = int(run.stock["fuel"]) - need
 	else:
+		var short := need - int(run.stock["fuel"])
 		run.stock["fuel"] = 0
-		cold_tonight = true
-		run.tell("The fuel runs out. A cold night: everyone suffers.")
-	run.tell("Night %d falls." % (day_index() + 1) if not is_wave_night() else "Night %d falls. The warned attack is coming from the %s." % [day_index() + 1, " and ".join(side_names())])
+		var wood := mini(short, int(run.stock["wood"])) if content.balance.get("wood_burns_as_fuel", false) else 0
+		if wood > 0:
+			run.stock["wood"] = int(run.stock["wood"]) - wood
+			run.tell("Out of fuel: %d wood goes on the fire instead." % wood)
+		if wood < short:
+			cold_tonight = true
+			run.tell("The fire burns low. A cold night: everyone suffers.")
+	if is_wave_night():
+		run.tell("Night %d falls. The warned attack is coming from the %s." % [day_index() + 1, " and ".join(side_names())])
+	else:
+		run.tell("Night %d falls." % (day_index() + 1))
+		_spawn_probe()
 
 
 func _end_of_night_effects() -> void:
@@ -193,6 +221,10 @@ func _end_of_night_effects() -> void:
 
 func _dawn() -> void:
 	_end_of_night_effects()
+	var stayed := enemies.filter(func(e: Unit) -> bool: return e.alive and e.is_probe)
+	if not stayed.is_empty():
+		run.tell("At first light the last %d raiders slip back into the wilds." % stayed.size())
+	enemies = enemies.filter(func(e: Unit) -> bool: return not e.is_probe)
 	for node in nodes:
 		node["amount"] = mini(int(node["max"]), int(node["amount"]) + content.int_num("node_regrow_per_day"))
 	run.daily_upkeep()
@@ -293,6 +325,9 @@ func apply_folk_stats(unit: Unit) -> void:
 
 func _folk_tick(unit: Unit) -> void:
 	unit.cooldown_left -= dt
+	# Rest at night heals anyone not in a fight.
+	if is_night() and _nearest_enemy(unit.pos, 120.0) == null:
+		unit.hp = minf(unit.max_hp, unit.hp + content.num("folk_night_heal") * dt)
 	match unit.type_id:
 		"warrior":
 			_warrior_tick(unit)
@@ -303,13 +338,21 @@ func _folk_tick(unit: Unit) -> void:
 func _warrior_tick(unit: Unit) -> void:
 	var patrol := float(content.townsfolk["warrior"]["patrol_radius"])
 	if unit.hp_fraction() < 0.3:
-		unit.intent = "falling back to the hearth"
-		_go_heal(unit)
+		unit.retreating = true
+	if unit.retreating:
+		unit.intent = "falling back to heal"
+		if _go_heal(unit) and unit.hp_fraction() >= HEAL_UNTIL:
+			unit.retreating = false
 		return
 	var threat := _nearest_enemy(unit.pos, 220.0, patrol + 60.0)
 	if threat != null:
 		unit.intent = "defending the camp"
 		_fight(unit, threat)
+		return
+	var call := _nearest_alarm(unit.pos)
+	if call != null:
+		unit.intent = "answering a call for help"
+		_fight(unit, call)
 		return
 	var index := folk.filter(func(u: Unit) -> bool: return u.type_id == "warrior").find(unit)
 	var angle := time * 0.05 + index * 2.4
@@ -322,8 +365,10 @@ func _worker_tick(unit: Unit) -> void:
 	var def: Dictionary = content.townsfolk[unit.type_id]
 	var danger := _nearest_enemy(unit.pos, FLEE_DISTANCE)
 	if danger != null:
-		unit.intent = "fleeing to the hearth"
+		unit.intent = "fleeing and calling for help"
 		unit.task = ""
+		if not _new_alarms.has(danger):
+			_new_alarms.append(danger)
 		var away := unit.pos + (unit.pos - danger.pos).normalized() * 30.0
 		_move_toward(unit, away.lerp(Vector2.ZERO, 0.5))
 		if danger.pos.distance_to(unit.pos) <= danger.attack_range + 4.0 and unit.cooldown_left <= 0.0:
@@ -527,7 +572,8 @@ func _dens_tick() -> void:
 func _enemy_tick(enemy: Unit) -> void:
 	enemy.cooldown_left -= dt
 	var aggro := content.num("enemy_aggro")
-	if enemy.target == null or not enemy.target.alive or enemy.pos.distance_to(enemy.target.pos) > aggro * 3.0:
+	var holding_grudge := enemy.target != null and enemy.target.alive and time < enemy.grudge_until
+	if not holding_grudge and (enemy.target == null or not enemy.target.alive or enemy.pos.distance_to(enemy.target.pos) > aggro * 3.0):
 		enemy.target = _nearest_friend(enemy.pos, aggro)
 	if enemy.target != null:
 		_fight(enemy, enemy.target)
@@ -545,6 +591,7 @@ func _enemy_tick(enemy: Unit) -> void:
 		var dmg := enemy.attack * war_chant()
 		hearth_hp -= dmg
 		wave_stats["keep_damage"] = float(wave_stats["keep_damage"]) + dmg
+		night_report["hearth_damage"] = float(night_report["hearth_damage"]) + dmg
 		shots.append({"from": enemy.pos, "to": Vector2.ZERO, "ranged": enemy.attack_range > 60, "time": time})
 
 
@@ -566,10 +613,25 @@ func _spawn_wave() -> void:
 	wave_stats["hearth_hp_before"] = hearth_hp
 	var types := run.generate_wave(run.round_number)
 	var interval := content.num("wave_spawn_interval")
+	night_report["raiders"] = int(night_report["raiders"]) + types.size()
 	for i in types.size():
 		var side: float = wave_sides[i % wave_sides.size()]
 		var at := Vector2.from_angle(side + rng.randf_range(-0.25, 0.25)) * content.num("world_radius")
 		enemies.append(_make_enemy(types[i], at, time + i * interval))
+
+
+## A small raid on an early night, from a random side, not warned of.
+func _spawn_probe() -> void:
+	var types := run.generate_probe(run.round_number, day_index())
+	var side := SeededRng.stream(run.run_seed, "probe", run.round_number * 10 + day_index()).randi_range(0, 3) * PI / 2.0
+	for i in types.size():
+		var at := Vector2.from_angle(side + rng.randf_range(-0.3, 0.3)) * content.num("world_radius") * 0.8
+		var e := _make_enemy(types[i], at, time + i * content.num("wave_spawn_interval"))
+		e.is_probe = true
+		enemies.append(e)
+	night_report["raiders"] = int(night_report["raiders"]) + types.size()
+	if not types.is_empty():
+		run.tell("Raiders probe the camp from the %s." % ["east", "south", "west", "north"][int(round(side / (PI / 2.0))) % 4])
 
 
 func war_chant() -> float:
@@ -674,6 +736,10 @@ func _hit(attacker: Unit, victim: Unit) -> void:
 func _damage(attacker: Unit, victim: Unit, amount: float) -> void:
 	victim.hp -= amount
 	if victim.hp > 0.0:
+		# Sentient creatures turn on whoever hurt them.
+		if victim.is_enemy() and attacker != null and content.enemy_has_tag(victim.type_id, "sentient"):
+			victim.target = attacker
+			victim.grudge_until = time + 8.0
 		return
 	victim.alive = false
 	victim.hp = 0.0
@@ -688,7 +754,9 @@ func _damage(attacker: Unit, victim: Unit, amount: float) -> void:
 			run.tell("%s fell to a %s." % [run.describe(victim), attacker.display_name if attacker != null else "the dark"])
 		else:
 			run.tell("A %s was killed by a %s." % [victim.display_name.to_lower(), attacker.display_name.to_lower() if attacker != null else "beast"])
+		night_report["deaths"].append(victim.display_name)
 		return
+	night_report["kills"] = int(night_report["kills"]) + 1
 	if attacker == null or not attacker.is_hero():
 		return
 	var e: Dictionary = content.enemies[victim.type_id]
@@ -726,6 +794,20 @@ func _nearest_enemy(from: Vector2, max_distance: float, max_from_home := INF) ->
 	return best
 
 
+## The closest enemy chasing a worker, if it is within reach of the warriors.
+func _nearest_alarm(from: Vector2) -> Unit:
+	var best: Unit = null
+	var best_d := INF
+	for enemy in alarms:
+		if not enemy.alive or enemy.pos.length() > content.num("warrior_answer_radius"):
+			continue
+		var d := from.distance_to(enemy.pos)
+		if d < best_d:
+			best_d = d
+			best = enemy
+	return best
+
+
 func _nearest_friend(from: Vector2, max_distance: float) -> Unit:
 	var best: Unit = null
 	var best_d := max_distance
@@ -741,5 +823,7 @@ func _nearest_friend(from: Vector2, max_distance: float) -> Unit:
 
 ## Breaks unit-to-unit references so everything can be freed.
 func release() -> void:
+	alarms = []
+	_new_alarms = []
 	for unit in folk + enemies + run.heroes:
 		unit.target = null

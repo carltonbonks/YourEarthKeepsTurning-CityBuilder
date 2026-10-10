@@ -103,7 +103,7 @@ func _draw() -> void:
 	for b in w.buildings:
 		var def: Dictionary = content.buildings[b["type"]]
 		var p := _to_screen(b["pos"])
-		var half := maxf(6.0, 14.0 * s * 1.6)
+		var half := maxf(4.0, World.BUILDING_SIZE * 0.5 * s)
 		var rect := Rect2(p - Vector2(half, half), Vector2(half, half) * 2.0)
 		var col := Color(def["color"])
 		var work_left := float(b["work_left"])

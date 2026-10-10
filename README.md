@@ -8,7 +8,7 @@ Every change merged to `main` is published as a browser build:
 **https://carltonbonks.github.io/YourEarthKeepsTurning-CityBuilder/**
 
 No install needed. Desktop Chrome, Edge or Firefox recommended.
-Add `?seed=1234` to the address to replay a specific run.
+Add `?seed=1234` to the address to replay a specific run. Add `&dev=1` for developer tools such as skipping ahead.
 
 ### How it plays (slice 2)
 

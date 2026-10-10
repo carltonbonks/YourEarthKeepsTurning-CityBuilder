@@ -140,7 +140,7 @@ func test_building_costs_and_gets_raised() -> void:
 	var run := _run()
 	var wood: int = run.stock["wood"]
 	check(run.build("hut"), "can build a hut")
-	check_eq(run.stock["wood"], wood - 6, "hut costs 6 wood")
+	check_eq(run.stock["wood"], wood - int(run.content.buildings["hut"]["cost"]["wood"]), "hut costs its listed wood")
 	check_eq(run.world.count_buildings("hut"), 0, "not raised yet")
 	run.world.add_folk("craftsperson")
 	run.begin_round()
@@ -191,3 +191,60 @@ func test_relic_pick_advances_round_and_pays_income() -> void:
 	check_eq(run.round_number, 2, "round advanced")
 	check(run.stock["shells"] >= shells + 10, "income paid")
 	check_eq(run.phase, RunState.Phase.BUILD, "back to building")
+
+
+func test_small_raids_on_early_nights() -> void:
+	var run := _run()
+	run.begin_round()
+	run.choose_pick(-1)
+	run.run_until_pause()
+	check_eq(run.phase, RunState.Phase.PICK, "second dawn")
+	check(int(run.last_night["raiders"]) > 0, "a small raid came on night 1")
+	check(int(run.last_night["raiders"]) < run.next_wave.size(), "the raid is smaller than the warned wave")
+
+
+func test_sentient_enemies_turn_on_attackers() -> void:
+	var run := _run()
+	var w := run.world
+	var raider := w._make_enemy("raider", Vector2(400, 0), 0.0)
+	var spirit := w._make_enemy("barrow_wight", Vector2(-400, 0), 0.0)
+	w.content.enemies["barrow_wight"]["tags"] = ["undead"]
+	var hero := run.heroes[0]
+	w._damage(hero, raider, 1.0)
+	w._damage(hero, spirit, 1.0)
+	check(raider.target == hero, "raider (sentient) goes after the hero who hit it")
+	check(spirit.target == null, "a creature without the sentient tag does not")
+
+
+func test_wood_burns_when_fuel_runs_out() -> void:
+	var run := _run()
+	run.begin_round()
+	run.choose_pick(-1)
+	while not run.world.is_dusk():
+		run.step()
+	run.stock["fuel"] = 0
+	run.stock["wood"] = 50
+	while not run.world.is_night():
+		run.stock["fuel"] = 0
+		run.step()
+	check(run.story.any(func(l: String) -> bool: return l.begins_with("Out of fuel")), "wood was burned")
+	check(not run.world.cold_tonight, "no cold night while wood lasts")
+
+
+func test_huts_need_fuel() -> void:
+	var run := _run()
+	var before := run.fuel_needed_tonight()
+	run.stock["wood"] = 99
+	run.build("hut")
+	run.build("hut")
+	for b in run.world.buildings:
+		b["work_left"] = 0.0
+	check(run.fuel_needed_tonight() > before, "more homes burn more fuel")
+
+
+func test_nights_are_recorded() -> void:
+	var run := _run()
+	_to_round_end(run)
+	var nights: Array = run._round_entry["nights"]
+	check_eq(nights.size(), 3, "one report per night")
+	check_eq(nights[2]["night"], 3, "last report is night 3")
