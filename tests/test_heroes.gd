@@ -231,7 +231,7 @@ func test_record_has_hero_items_whims_and_loot() -> void:
 	var run := _run(4821)
 	AutoPlayer.new().play_run(run)
 	var record := run.to_record()
-	check_eq(record["format"], 4, "record format 4")
+	check(int(record["format"]) >= 4, "record format 4 or later")
 	var whims := 0
 	for rd: Dictionary in record["rounds"]:
 		check(rd.has("loot") and rd.has("sales") and rd.has("hero_spending"), "round %d has loot fields" % rd["round"])

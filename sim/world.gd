@@ -49,7 +49,7 @@ var shots: Array[Dictionary] = []
 ## Facts for this round's record.
 var deaths: Array[Dictionary] = []
 var wave_stats := {}
-## What happened since the last dawn pick: {raiders, kills, hearth_damage, deaths: [names]}.
+## What happened since the last dawn pick: {raiders, kills, hearth_damage, deaths: [names], left: [names]}.
 ## RunState reads it at each dawn and at the end of the round.
 var night_report := {}
 ## Enemies chasing a fleeing worker (seen last tick); warriors answer the call.
@@ -115,7 +115,7 @@ func start_round() -> void:
 
 
 func reset_night_report() -> void:
-	night_report = {"raiders": 0, "kills": 0, "hearth_damage": 0.0, "deaths": []}
+	night_report = {"raiders": 0, "kills": 0, "hearth_damage": 0.0, "deaths": [], "left": []}
 
 
 ## Decides (reproducibly) which sides this round's wave comes from, so it can be warned of.

@@ -39,7 +39,8 @@ var last_night := {}
 ## 1: one wave per round. 2: days, dawn picks, townsfolk, dens.
 ## 3: small raids on early nights, a report per night ("nights").
 ## 4: hero energy, lodgings, whims and items ("whims", "loot", "sales", "hero_spending"; hero items).
-const RECORD_FORMAT := 4
+## 5: each night's report also lists who walked away hungry ("left").
+const RECORD_FORMAT := 5
 var record_rounds: Array[Dictionary] = []
 var _round_entry := {}
 
@@ -234,6 +235,7 @@ func daily_upkeep() -> void:
 	if not world.folk.is_empty():
 		var leaver: Unit = world.folk[SeededRng.stream(run_seed, "hunger", round_number * 10 + world.day_index()).randi_range(0, world.folk.size() - 1)]
 		world.folk.erase(leaver)
+		world.night_report["left"].append(leaver.display_name)
 		_round_entry["left_hungry"] = int(_round_entry.get("left_hungry", 0)) + 1
 		tell("Hunger: a %s walks away into the wilds." % leaver.display_name.to_lower())
 
