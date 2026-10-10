@@ -12,6 +12,8 @@ var hero_classes: Dictionary
 var traits: Dictionary
 var hero_names: Array
 var gear: Dictionary
+var whims: Dictionary
+var items: Dictionary
 var enemies: Dictionary
 var relics: Dictionary
 var townsfolk: Dictionary
@@ -27,6 +29,8 @@ static func load_default() -> Content:
 	c.traits = heroes["traits"]
 	c.hero_names = heroes["names"]
 	c.gear = heroes["gear"]
+	c.whims = heroes["whims"]
+	c.items = _strip(_read("items.json"))
 	c.enemies = _strip(_read("enemies.json"))
 	c.relics = _strip(_read("relics.json"))
 	c.townsfolk = _strip(_read("townsfolk.json"))
@@ -46,6 +50,16 @@ func int_num(key: String) -> int:
 ## True if an enemy type carries a tag (see "tags" in data/enemies.json).
 func enemy_has_tag(type_id: String, tag: String) -> bool:
 	return tag in enemies[type_id].get("tags", [])
+
+
+## Building type ids that heroes can sleep in, sorted.
+func lodging_types() -> Array[String]:
+	var out: Array[String] = []
+	for id: String in buildings:
+		if buildings[id].has("lodging"):
+			out.append(id)
+	out.sort()
+	return out
 
 
 static func _read(file: String) -> Dictionary:

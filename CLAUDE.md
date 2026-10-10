@@ -105,4 +105,5 @@ Yusuf must be able to try changes and give feedback quickly, without heavy build
 - Final art style (pixel vs low-poly 3D).
 - How Yusuf wants to playtest (browser builds from a link are the assumed default).
 - Working title.
-- Which buildings post which incentives, and the exact energy and lodging rules for heroes.
+- Which buildings post which incentives.
+- Hero energy and lodging rules: slice 3 uses Claude's defaults (energy drains awake and per attack, lodgings differ in rest speed, healing and how deeply heroes sleep, each trait has a favourite lodging, daily whims). Pending Yusuf's playtest.

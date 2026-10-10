@@ -1,5 +1,5 @@
 {
-	"_note": "Hero classes, personality traits, names and gear. wilds = how keen a hero is to hunt at the dens by day (0 = stays home). Traits also drive retreat and target choice.",
+	"_note": "Hero classes, personality traits, names, whims and the traders' gear. wilds = how keen a hero is to hunt at the dens by day (0 = stays home). Traits also drive retreat, target choice, where heroes like to sleep (lodging, first match wins), when they feel tired (tired_at, energy 0-100), how they rate items (likes: weight per item stat) and how likely each whim is (whims: weights).",
 	"classes": {
 		"hunter": {
 			"name": "Hunter",
@@ -38,7 +38,28 @@
 			"caution": 0.45,
 			"prefers": "weapon",
 			"hoard": 1.0,
-			"wilds": 1.0
+			"wilds": 1.0,
+			"lodging": [
+				"tavern",
+				"longhouse"
+			],
+			"tired_at": 20,
+			"likes": {
+				"attack": 1.5,
+				"hp": 0.15,
+				"speed": 0.05,
+				"energy": 10,
+				"loot": 2,
+				"rest_heal": 2
+			},
+			"whims": {
+				"none": 4,
+				"hunt": 3,
+				"trophy": 2,
+				"guard": 1,
+				"lie_in": 0.5,
+				"carouse": 1
+			}
 		},
 		"cautious": {
 			"name": "Cautious",
@@ -48,7 +69,28 @@
 			"caution": 1.6,
 			"prefers": "armor",
 			"hoard": 1.0,
-			"wilds": 0.3
+			"wilds": 0.3,
+			"lodging": [
+				"shrine",
+				"longhouse"
+			],
+			"tired_at": 40,
+			"likes": {
+				"attack": 0.8,
+				"hp": 0.3,
+				"speed": 0.08,
+				"energy": 15,
+				"loot": 1,
+				"rest_heal": 5
+			},
+			"whims": {
+				"none": 4,
+				"hunt": 0.5,
+				"trophy": 0,
+				"guard": 3,
+				"lie_in": 2,
+				"carouse": 0.5
+			}
 		},
 		"greedy": {
 			"name": "Greedy",
@@ -58,7 +100,27 @@
 			"caution": 0.7,
 			"prefers": "weapon",
 			"hoard": 2.0,
-			"wilds": 0.9
+			"wilds": 0.9,
+			"lodging": [
+				"tavern"
+			],
+			"tired_at": 25,
+			"likes": {
+				"attack": 1.2,
+				"hp": 0.15,
+				"speed": 0.05,
+				"energy": 10,
+				"loot": 5,
+				"rest_heal": 2
+			},
+			"whims": {
+				"none": 4,
+				"hunt": 2,
+				"trophy": 1,
+				"guard": 0,
+				"lie_in": 1,
+				"carouse": 3
+			}
 		},
 		"dutiful": {
 			"name": "Dutiful",
@@ -68,7 +130,28 @@
 			"caution": 0.8,
 			"prefers": "armor",
 			"hoard": 1.0,
-			"wilds": 0.45
+			"wilds": 0.45,
+			"lodging": [
+				"shrine",
+				"longhouse"
+			],
+			"tired_at": 25,
+			"likes": {
+				"attack": 1.0,
+				"hp": 0.25,
+				"speed": 0.05,
+				"energy": 20,
+				"loot": 0.5,
+				"rest_heal": 3
+			},
+			"whims": {
+				"none": 4,
+				"hunt": 1,
+				"trophy": 0,
+				"guard": 4,
+				"lie_in": 0.5,
+				"carouse": 0
+			}
 		}
 	},
 	"names": [
@@ -99,22 +182,54 @@
 	],
 	"gear": {
 		"weapon": {
-			"name": "flint blade",
+			"base": "flint_blade",
 			"costs": [
 				15,
 				30,
 				50
-			],
-			"attack": 3
+			]
 		},
 		"armor": {
-			"name": "hide armour",
+			"base": "hide_armour",
 			"costs": [
 				15,
 				30,
 				50
-			],
-			"hp": 16
+			]
+		}
+	},
+	"whims": {
+		"none": {
+			"name": "",
+			"text": "An ordinary day."
+		},
+		"hunt": {
+			"name": "eager to hunt",
+			"text": "Heads for the dens all day, however cautious.",
+			"wilds": 1.0
+		},
+		"trophy": {
+			"name": "after a trophy",
+			"text": "Goes after the toughest monster in reach.",
+			"wilds": 0.8,
+			"trophy": true
+		},
+		"guard": {
+			"name": "staying close",
+			"text": "Keeps near the camp today.",
+			"wilds": 0.0
+		},
+		"lie_in": {
+			"name": "sleeping in",
+			"text": "Stays in bed until midday.",
+			"lie_in": 0.45
+		},
+		"carouse": {
+			"name": "carousing",
+			"text": "Spends the afternoon drinking at the mead hall (needs one).",
+			"needs": "tavern",
+			"from": 0.5,
+			"spend": 3
 		}
 	}
 }

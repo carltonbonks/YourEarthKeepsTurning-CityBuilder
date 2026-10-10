@@ -30,6 +30,7 @@
 
 	"pick_choices": 3,
 	"hero_card_cost": 30,
+	"lodging_draw_bonus": 2,
 
 	"wave_budget_base": 6,
 	"wave_budget_per_round": 8,
@@ -56,6 +57,18 @@
 	"level_attack": 1,
 	"between_round_heal": 0.5,
 	"relic_choices": 3,
+
+	"_energy_note": "Hero energy: drains per second while awake (faster out in the wilds) and per attack, comes back while resting at a lodging (energy_rest x the lodging's rest, x home bonus in a preferred lodging, x rest_rough when sleeping by the hearth). Heroes get up once they reach wake_at. At 0 energy a hero is exhausted and hits for exhausted_attack of normal.",
+	"hero_energy_max": 100,
+	"energy_drain": 1.6,
+	"energy_drain_wilds": 3.0,
+	"energy_per_attack": 2,
+	"energy_rest": 5,
+	"energy_rest_rough": 0.5,
+	"energy_home_bonus": 1.25,
+	"energy_wake_at": 90,
+	"exhausted_attack": 0.6,
+	"rough_wake_radius": 150,
 
 	"enemy_aggro": 50,
 	"warrior_answer_radius": 260
