@@ -1,33 +1,29 @@
 extends Control
-## Vertical-slice screen: decision panel on the left, the battle in the middle,
-## heroes and the town's story underneath. UI is built in code for now
-## (placeholder layout); all rules live in sim/.
+## Slice 2 screen: the settlement map in the middle, decisions on the left,
+## heroes and the story underneath. UI is built in code for now (placeholder
+## layout); all rules live in sim/.
 
 const SPEEDS := [1, 2, 4, 8]
+const RESOURCE_COLORS := {"food": "#d98aa8", "fuel": "#e0b050", "wood": "#7fbf6a", "stone": "#b0b4bc", "shells": "#ffd24a"}
 
 var content: Content
 var run: RunState
-var battle: Battle
 var speed := 2
 var _tick_acc := 0.0
-## How much of the story is already on screen. Battle lines are shown live and
-## then repeated in run.story when the battle finishes, so those get skipped.
+## How much of run.story is already on screen.
 var _shown_story := 0
-var _battle_story_shown := 0
-var _skip_lines := 0
 ## Id of this run's file in Run history.
 var _run_id := ""
 
 var _status: RichTextLabel
-var _decide_box: VBoxContainer
-var _wave_box: VBoxContainer
-var _recruit_btn: Button
-var _market_btn: Button
-var _repair_btn: Button
-var _start_btn: Button
-var _battle_box: VBoxContainer
+var _build_box: VBoxContainer
+var _build_list: VBoxContainer
+var _wave_label: RichTextLabel
+var _begin_btn: Button
+var _sim_box: VBoxContainer
 var _relic_label: RichTextLabel
 var _arena: ArenaView
+var _clock_label: RichTextLabel
 var _heroes_label: RichTextLabel
 var _story_label: RichTextLabel
 var _overlay: PanelContainer
@@ -42,31 +38,28 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if battle == null:
+	if run.phase != RunState.Phase.SIM:
 		return
 	_tick_acc += delta * speed
-	while _tick_acc >= battle.dt and not battle.over:
-		_tick_acc -= battle.dt
-		battle.step()
-	_refresh_live()
-	if battle.over:
-		var finished := battle
-		battle = null
-		_arena.battle = null
-		_skip_lines = finished.story.size()
-		run.finish_battle(finished)
-		RunHistory.save(_run_id, run)
-		_after_battle()
+	var dt := run.world.dt
+	while _tick_acc >= dt and run.phase == RunState.Phase.SIM:
+		_tick_acc -= dt
+		run.step()
+	if run.phase != RunState.Phase.SIM:
+		_on_pause()
+	else:
+		_refresh_live()
 
 
 # --- Flow ------------------------------------------------------------------
 
 func _new_run(seed_value: int) -> void:
+	if run != null:
+		run.dispose()
 	run = RunState.new(content, seed_value)
 	_run_id = RunHistory.new_run_id(seed_value)
-	battle = null
 	_arena.run = run
-	_arena.battle = null
+	_arena.reset_camera()
 	_shown_story = 0
 	_story_label.clear()
 	_overlay.hide()
@@ -74,28 +67,49 @@ func _new_run(seed_value: int) -> void:
 	_refresh()
 
 
-func _start_wave() -> void:
-	if run.phase != RunState.Phase.DECIDE:
+func _build(type: String) -> void:
+	run.build(type)
+	_refresh()
+
+
+func _begin_round() -> void:
+	if run.phase != RunState.Phase.BUILD:
 		return
-	battle = run.start_battle()
-	_arena.battle = battle
+	run.begin_round()
 	_tick_acc = 0.0
-	_battle_story_shown = 0
+	_on_pause()
+
+
+## Runs straight to the next decision (dawn pick or end of round).
+func _skip_ahead() -> void:
+	if run.phase == RunState.Phase.SIM:
+		run.run_until_pause()
+		_on_pause()
+
+
+## The sim stopped for a decision: save the run and show the right overlay.
+func _on_pause() -> void:
+	RunHistory.save(_run_id, run)
 	_refresh()
+	_show_phase_overlay()
 
 
-func _skip_battle() -> void:
-	if battle != null:
-		battle.run_to_end()
-
-
-func _after_battle() -> void:
-	_refresh()
+func _show_phase_overlay() -> void:
 	match run.phase:
+		RunState.Phase.PICK:
+			_show_pick()
 		RunState.Phase.RELIC:
 			_show_relic_pick()
 		RunState.Phase.WON, RunState.Phase.LOST:
 			_show_end()
+		_:
+			_overlay.hide()
+
+
+func _take_pick(index: int) -> void:
+	run.choose_pick(index)
+	_overlay.hide()
+	_refresh()
 
 
 func _pick_relic(relic_id: String) -> void:
@@ -108,19 +122,11 @@ func _pick_relic(relic_id: String) -> void:
 # --- Refresh ---------------------------------------------------------------
 
 func _refresh() -> void:
-	var deciding := run.phase == RunState.Phase.DECIDE
-	_decide_box.visible = deciding
-	_battle_box.visible = run.phase == RunState.Phase.BATTLE
-	_refresh_status()
-	_refresh_wave()
-	_recruit_btn.text = "Recruit a hero (%dg)  [%d/%d]" % [run.recruit_cost(), run.heroes.size(), content.int_num("max_heroes")]
-	_recruit_btn.disabled = not run.can_recruit()
-	_market_btn.text = "Build a market (%dg)  [%d/%d]  +%dg/round" % [content.int_num("market_cost"), run.markets,
-		content.int_num("max_markets"), int(content.num("market_income") + run.mod("market_income"))]
-	_market_btn.disabled = not run.can_build_market()
-	_repair_btn.text = "Repair keep (%dg)  +%d HP" % [content.int_num("repair_cost"), content.int_num("repair_amount")]
-	_repair_btn.disabled = not run.can_repair()
-	_start_btn.text = "Start wave %d" % run.round_number
+	var building := run.phase == RunState.Phase.BUILD
+	_build_box.visible = building
+	_sim_box.visible = run.phase == RunState.Phase.SIM
+	if building:
+		_refresh_build()
 	var relic_text := "[b]Relics[/b]\n"
 	if run.relics.is_empty():
 		relic_text += "[color=#888]none yet[/color]"
@@ -130,91 +136,156 @@ func _refresh() -> void:
 	_refresh_live()
 
 
-func _refresh_status() -> void:
-	var keep_hp := battle.keep_hp if battle != null else run.keep_hp
-	_status.text = "[b]Round %d / %d[/b]\nGold: [color=#ffd24a]%d[/color]  (free %d, +%d next round)\nKeep: %d / %d HP\nSeed: %d" % [
-		run.round_number, content.int_num("rounds_to_win"), run.gold, run.free_gold(), run.income(),
-		maxi(0, int(keep_hp)), int(run.keep_max_hp()), run.run_seed]
-
-
-func _refresh_wave() -> void:
-	for child in _wave_box.get_children():
+func _refresh_build() -> void:
+	for child in _build_list.get_children():
 		child.queue_free()
+	var types := content.buildings.keys()
+	for type: String in types:
+		var def: Dictionary = content.buildings[type]
+		var cost := PackedStringArray()
+		for r: String in def["cost"]:
+			cost.append("%d %s" % [def["cost"][r], r])
+		var owned := run.world.count_buildings(type, false)
+		var btn := Button.new()
+		btn.text = "%s  (%s)%s" % [def["name"], ", ".join(cost), "  [%d/%d]" % [owned, def["max"]] if def.has("max") else ("  [%d]" % owned if owned > 0 else "")]
+		btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], def["work"]]
+		btn.disabled = not run.can_build(type)
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.pressed.connect(_build.bind(type))
+		_build_list.add_child(btn)
+		var note := Label.new()
+		note.text = def["text"]
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD
+		note.add_theme_font_size_override("font_size", 11)
+		note.add_theme_color_override("font_color", Color("#9aa"))
+		_build_list.add_child(note)
+	var pending := run.world.buildings.filter(func(b: Dictionary) -> bool: return float(b["work_left"]) > 0.0).size()
+	if pending > 0 and run.count_role("craftsperson") == 0:
+		var warn := Label.new()
+		warn.text = "Nobody can raise buildings yet: pick a craftsperson at dawn."
+		warn.autowrap_mode = TextServer.AUTOWRAP_WORD
+		warn.add_theme_color_override("font_color", Color("#e0a050"))
+		_build_list.add_child(warn)
+
 	var counts := run.wave_counts()
 	var ids := counts.keys()
 	ids.sort()
+	var parts := PackedStringArray()
 	for id: String in ids:
-		var e: Dictionary = content.enemies[id]
-		var row := HBoxContainer.new()
-		var label := Label.new()
-		label.text = "%s x%d" % [e["name"], counts[id]]
-		label.tooltip_text = "HP %d, damage %d, range %d%s" % [e["hp"], e["attack"], e["range"],
-			"\nHangs back and makes every enemy hit harder while alive." if e.has("war_chant") else ""]
-		label.mouse_filter = Control.MOUSE_FILTER_PASS
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(label)
-		var amount := int(run.bounties.get(id, 0))
-		var step := content.int_num("bounty_step")
-		var minus := Button.new()
-		minus.text = " - "
-		minus.disabled = amount <= 0
-		minus.pressed.connect(func() -> void: run.set_bounty(id, amount - step); _refresh())
-		row.add_child(minus)
-		var bounty := Label.new()
-		bounty.text = "%dg" % amount
-		bounty.custom_minimum_size.x = 36
-		bounty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		bounty.add_theme_color_override("font_color", Color("#ffd24a") if amount > 0 else Color("#888"))
-		row.add_child(bounty)
-		var plus := Button.new()
-		plus.text = " + "
-		plus.pressed.connect(func() -> void: run.set_bounty(id, amount + step); _refresh())
-		row.add_child(plus)
-		_wave_box.add_child(row)
+		parts.append("%s x%d" % [content.enemies[id]["name"], counts[id]])
+	_wave_label.text = "[b]Night %d attack[/b] from the [color=#ff7060]%s[/color]:\n%s" % [
+		content.int_num("days_per_round"), " and ".join(run.world.side_names()), ", ".join(parts)]
+	_begin_btn.text = "Begin round %d" % run.round_number
 
 
-## Parts that change every frame during a battle.
+## Parts that change every frame while the sim runs.
 func _refresh_live() -> void:
-	if battle != null:
-		_refresh_status()
+	var w := run.world
+	var stock := PackedStringArray()
+	for r: String in RunState.RESOURCES:
+		stock.append("[color=%s]%s %d[/color]" % [RESOURCE_COLORS[r], r.capitalize(), run.stock[r]])
+	var folk := PackedStringArray()
+	for role: String in content.townsfolk:
+		folk.append("%s %d" % [content.townsfolk[role]["name"], run.count_role(role)])
+	_status.text = "[b]Round %d / %d[/b]   Seed %d\nHearth: %d / %d HP\n%s\nPeople %d / %d housing  (%s, heroes %d)\nUpkeep: %d food per day, %d fuel per night" % [
+		run.round_number, content.int_num("rounds_to_win"), run.run_seed, maxi(0, int(w.hearth_hp)), int(run.hearth_max_hp()),
+		"  ".join(stock), run.population(), run.housing(), ", ".join(folk), run.living_heroes().size(),
+		_food_per_day(), run.fuel_needed_tonight()]
+
+	var clock := ""
+	if run.phase == RunState.Phase.BUILD:
+		clock = "[b]Build[/b]: order buildings, then begin the round."
+	else:
+		var night := w.is_night()
+		var wave_night := w.day_index() == content.int_num("days_per_round") - 1
+		clock = "[b]Day %d / %d[/b]  %s%s" % [w.day_index() + 1, content.int_num("days_per_round"),
+			"[color=#8fa8ff]Night[/color]" if night else ("[color=#e0a050]Dusk[/color]" if w.is_dusk() else "[color=#ffe08a]Day[/color]"),
+			("   [color=#ff7060]Attack tonight from the %s[/color]" % " and ".join(w.side_names())) if wave_night and not w.wave_spawned else ""]
+		if w.wave_spawned:
+			var left := w.enemies.filter(func(e: Unit) -> bool: return e.alive and e.den_index < 0).size()
+			clock += "   [color=#ff7060]Attackers left: %d[/color]" % left
+		if w.cold_tonight:
+			clock += "   [color=#8fd0ff]No fuel: a cold night[/color]"
+	_clock_label.text = clock
+
 	var text := ""
-	var heroes: Array[Unit] = battle.heroes if battle != null else run.heroes
-	for hero in heroes:
+	for hero in run.heroes:
 		var c: Dictionary = content.hero_classes[hero.type_id]
 		var name_color: String = c["color"] if hero.alive else "#666666"
-		text += "[color=%s][b]%s[/b][/color] %s %s  Lv%d  HP %d/%d  %dg  gear W%d A%d  kills %d%s\n" % [
+		text += "[color=%s][b]%s[/b][/color] %s %s  Lv%d  HP %d/%d  %d shells  gear W%d A%d  kills %d%s\n" % [
 			name_color, hero.display_name, content.traits[hero.trait_id]["name"], c["name"], hero.level,
 			int(hero.hp), int(hero.max_hp), hero.gold, hero.weapon_tier, hero.armor_tier, hero.kills,
 			"" if hero.alive else "  [color=#e05050]fallen[/color]"]
+		if hero.alive and hero.intent != "" and run.phase == RunState.Phase.SIM:
+			text += "    [color=#9aa]%s[/color]\n" % hero.intent
 	for hero in run.fallen:
-		if battle == null or not battle.heroes.has(hero):
-			text += "[color=#666666]%s (fallen)[/color]\n" % hero.display_name
+		text += "[color=#666666]%s (fallen)[/color]\n" % hero.display_name
 	_heroes_label.text = text
 	_append_story()
-	if battle != null:
-		while _battle_story_shown < battle.story.size():
-			_story_label.append_text("  " + battle.story[_battle_story_shown] + "\n")
-			_battle_story_shown += 1
+
+
+func _food_per_day() -> int:
+	return maxi(0, int(ceil(run.population() * content.num("food_per_person_per_day") * (1.0 - 0.25 * run.world.count_buildings("drying_rack")))))
 
 
 func _append_story() -> void:
-	if battle != null:
-		return
 	while _shown_story < run.story.size():
 		var line := run.story[_shown_story]
 		_shown_story += 1
-		if _skip_lines > 0:
-			_skip_lines -= 1
-			continue
-		var bold := line.begins_with("Round ") or line.begins_with("The keep") or line.begins_with("The town")
+		var bold := line.begins_with("Round ") or line.begins_with("The hearth") or line.begins_with("Night 3") or line.begins_with("No one")
 		_story_label.append_text(("[b]%s[/b]" if bold else "%s") % line + "\n")
 
 
 # --- Overlays --------------------------------------------------------------
 
+func _show_pick() -> void:
+	_clear_overlay()
+	var day := run.world.day_index() + 1
+	_overlay_title("Dawn of day %d: who joins the settlement?" % day)
+	var room := run.population() < run.housing()
+	var sub := Label.new()
+	sub.text = "Shells: %d   Room: %d / %d%s" % [run.stock["shells"], run.population(), run.housing(),
+		"" if room else "\nNo room for anyone new. Build huts at the start of the next round."]
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.add_theme_color_override("font_color", Color("#c8c8c8") if room else Color("#e0a050"))
+	_overlay_box.add_child(sub)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	_overlay_box.add_child(row)
+	for i in run.pick_offer.size():
+		var card := run.pick_offer[i]
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(230, 150)
+		btn.autowrap_mode = TextServer.AUTOWRAP_WORD
+		if card["kind"] == "hero":
+			var hero: Unit = card["hero"]
+			var c: Dictionary = content.hero_classes[hero.type_id]
+			btn.text = "HERO: %s\n%s %s\nHP %d, damage %d%s\nCosts %d shells" % [hero.display_name,
+				content.traits[hero.trait_id]["name"], c["name"], int(hero.max_hp), int(hero.attack),
+				", ranged" if hero.attack_range > 60 else "", card["cost"]]
+			btn.tooltip_text = _trait_hint(hero.trait_id)
+		else:
+			var def: Dictionary = content.townsfolk[card["role"]]
+			btn.text = "%s\n\n%s\nFree. Eats 1 food a day." % [def["name"], def["text"]]
+		btn.disabled = not run.can_take_pick(i)
+		btn.pressed.connect(_take_pick.bind(i))
+		row.add_child(btn)
+	var skip := Button.new()
+	skip.text = "Nobody today"
+	skip.pressed.connect(_take_pick.bind(-1))
+	_overlay_box.add_child(skip)
+	_overlay.show()
+
+
+func _trait_hint(trait_id: String) -> String:
+	var t: Dictionary = content.traits[trait_id]
+	var wilds := "hunts far out at the dens by day" if float(t["wilds"]) > 0.6 else ("stays near the camp" if float(t["wilds"]) < 0.2 else "ventures out sometimes")
+	return "%s: %s, retreats at %d%% health." % [t["name"], wilds, roundi(float(t["retreat_at"]) * 100.0)]
+
+
 func _show_relic_pick() -> void:
 	_clear_overlay()
-	_overlay_title("Wave %d survived! Choose a relic" % run.round_number)
+	_overlay_title("Round %d survived! Choose a relic" % run.round_number)
 	for id in run.relic_offer:
 		var r: Dictionary = content.relics[id]
 		var btn := Button.new()
@@ -232,9 +303,9 @@ func _show_relic_pick() -> void:
 func _show_end() -> void:
 	_clear_overlay()
 	var won := run.phase == RunState.Phase.WON
-	_overlay_title("Victory! The town endures." if won else "The keep has fallen in round %d." % run.round_number)
+	_overlay_title("Victory! The people endure." if won else "The fire goes out in round %d." % run.round_number)
 	var summary := Label.new()
-	summary.text = "Seed %d  ·  heroes lost: %d  ·  relics: %s" % [run.run_seed, run.fallen.size(),
+	summary.text = "Seed %d  ·  heroes lost: %d  ·  townsfolk lost: %d  ·  relics: %s" % [run.run_seed, run.fallen.size(), run.fallen_folk,
 		", ".join(run.relics.map(func(id: String) -> String: return content.relics[id]["name"])) if not run.relics.is_empty() else "none"]
 	summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	summary.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -262,7 +333,7 @@ func _show_history() -> void:
 	_overlay_title("Run history")
 	var runs := RunHistory.load_all()
 	var stats := Label.new()
-	stats.text = "No runs saved yet. Runs are saved after each wave." if runs.is_empty() \
+	stats.text = "No runs saved yet. Runs are saved at every dawn and after each round." if runs.is_empty() \
 		else "\n".join(RunStats.report(runs).slice(0, 6))
 	stats.add_theme_font_size_override("font_size", 13)
 	_overlay_box.add_child(stats)
@@ -373,32 +444,32 @@ func _build_ui() -> void:
 	left.add_theme_constant_override("separation", 6)
 	left_scroll.add_child(left)
 
-	_status = _rich(left, 96)
+	_status = _rich(left, 120)
+	_status.add_theme_font_size_override("normal_font_size", 13)
+	_status.add_theme_font_size_override("bold_font_size", 14)
 
-	_decide_box = VBoxContainer.new()
-	left.add_child(_decide_box)
-	_heading(_decide_box, "Next wave: post bounties (paid per kill)")
+	_build_box = VBoxContainer.new()
+	left.add_child(_build_box)
+	_heading(_build_box, "Order buildings")
 	var hint := Label.new()
-	hint.text = "Bounties steer heroes. Greedy heroes chase them; unpaid heroes stay near the keep."
+	hint.text = "Craftspeople raise what you order during the days. Nobody takes orders otherwise."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color("#9aa"))
-	_decide_box.add_child(hint)
-	_wave_box = VBoxContainer.new()
-	_decide_box.add_child(_wave_box)
-	_heading(_decide_box, "Town")
-	_recruit_btn = _button(_decide_box, "", func() -> void: run.recruit(); _refresh())
-	_market_btn = _button(_decide_box, "", func() -> void: run.build_market(); _refresh())
-	_repair_btn = _button(_decide_box, "", func() -> void: run.repair_keep(); _refresh())
-	_decide_box.add_child(HSeparator.new())
-	_start_btn = _button(_decide_box, "", _start_wave)
-	_start_btn.custom_minimum_size.y = 44
+	_build_box.add_child(hint)
+	_build_list = VBoxContainer.new()
+	_build_box.add_child(_build_list)
+	_build_box.add_child(HSeparator.new())
+	_wave_label = _rich(_build_box, 0)
+	_wave_label.fit_content = true
+	_begin_btn = _button(_build_box, "", _begin_round)
+	_begin_btn.custom_minimum_size.y = 44
 
-	_battle_box = VBoxContainer.new()
-	left.add_child(_battle_box)
-	_heading(_battle_box, "Battle speed")
+	_sim_box = VBoxContainer.new()
+	left.add_child(_sim_box)
+	_heading(_sim_box, "Speed")
 	var speeds := HBoxContainer.new()
-	_battle_box.add_child(speeds)
+	_sim_box.add_child(speeds)
 	var group := ButtonGroup.new()
 	for s: int in SPEEDS:
 		var b := Button.new()
@@ -408,7 +479,7 @@ func _build_ui() -> void:
 		b.button_pressed = s == speed
 		b.pressed.connect(func() -> void: speed = s)
 		speeds.add_child(b)
-	_button(_battle_box, "Skip to end of wave", _skip_battle)
+	_button(_sim_box, "Skip to the next decision", _skip_ahead)
 
 	left.add_child(HSeparator.new())
 	_relic_label = _rich(left, 0)
@@ -428,13 +499,17 @@ func _build_ui() -> void:
 	seed_row.add_child(restart)
 	_button(left, "Run history", _show_history)
 
-	# Right: arena above, heroes + story below.
+	# Right: clock line, map, then heroes + story.
 	var right := VBoxContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_child(right)
+	_clock_label = _rich(right, 26)
+	_clock_label.add_theme_font_size_override("normal_font_size", 15)
+	_clock_label.add_theme_font_size_override("bold_font_size", 15)
 	_arena = ArenaView.new()
 	_arena.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_arena.size_flags_stretch_ratio = 2.2
+	_arena.size_flags_stretch_ratio = 2.6
+	_arena.clip_contents = true
 	right.add_child(_arena)
 	var bottom := HBoxContainer.new()
 	bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -449,11 +524,11 @@ func _build_ui() -> void:
 	_story_label.add_theme_font_size_override("normal_font_size", 13)
 	_story_label.add_theme_font_size_override("bold_font_size", 13)
 
-	# Overlay for relic picks and the end screen: dims the screen, panel in the middle.
+	# Overlay for picks, relics and the end screen: dims the screen, panel in the middle.
 	_overlay = PanelContainer.new()
 	_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var dim := StyleBoxFlat.new()
-	dim.bg_color = Color(0, 0, 0, 0.6)
+	dim.bg_color = Color(0, 0, 0, 0.45)
 	_overlay.add_theme_stylebox_override("panel", dim)
 	add_child(_overlay)
 	var center := CenterContainer.new()

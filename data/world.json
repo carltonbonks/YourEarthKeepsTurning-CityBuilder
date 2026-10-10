@@ -1,0 +1,13 @@
+{
+	"_note": "Map features. Resource nodes are placed in a ring around the hearth; dens far out in the wilds.",
+	"nodes": {
+		"brush": {"name": "Dry brush", "gives": "fuel", "amount": 14, "count": 5, "color": "#b3a25a"},
+		"berries": {"name": "Berry thicket", "gives": "food", "amount": 12, "count": 5, "color": "#9a4b7a"},
+		"grove": {"name": "Grove", "gives": "wood", "amount": 24, "count": 4, "color": "#3f7a46"},
+		"rocks": {"name": "Rocks", "gives": "stone", "amount": 16, "count": 3, "color": "#8c8c8c"}
+	},
+	"dens": {
+		"wolf_den": {"name": "Wolf den", "spawns": "wolf", "color": "#5a4636"},
+		"barrow": {"name": "Barrow mound", "spawns": "barrow_wight", "color": "#4a4a5e"}
+	}
+}

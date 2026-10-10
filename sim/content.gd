@@ -14,6 +14,9 @@ var hero_names: Array
 var gear: Dictionary
 var enemies: Dictionary
 var relics: Dictionary
+var townsfolk: Dictionary
+var buildings: Dictionary
+var world: Dictionary
 
 
 static func load_default() -> Content:
@@ -26,6 +29,9 @@ static func load_default() -> Content:
 	c.gear = heroes["gear"]
 	c.enemies = _strip(_read("enemies.json"))
 	c.relics = _strip(_read("relics.json"))
+	c.townsfolk = _strip(_read("townsfolk.json"))
+	c.buildings = _strip(_read("buildings.json"))
+	c.world = _strip(_read("world.json"))
 	return c
 
 

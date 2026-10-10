@@ -5,11 +5,27 @@ func _run(seed_value := 4821) -> RunState:
 	return RunState.new(Content.load_default(), seed_value)
 
 
-func test_new_run_has_heroes_gold_and_a_wave() -> void:
+## Plays until the next decision, taking the first pick each dawn.
+func _to_round_end(run: RunState) -> void:
+	if run.phase == RunState.Phase.BUILD:
+		run.begin_round()
+	while run.phase == RunState.Phase.PICK or run.phase == RunState.Phase.SIM:
+		if run.phase == RunState.Phase.PICK:
+			run.choose_pick(0)
+		else:
+			run.run_until_pause()
+
+
+func test_new_run_starts_small_around_the_hearth() -> void:
 	var run := _run()
-	check_eq(run.heroes.size(), 3, "starting heroes")
-	check_eq(run.gold, 60, "starting gold")
+	check_eq(run.phase, RunState.Phase.BUILD, "starts in the build phase")
+	check_eq(run.heroes.size(), 2, "starting heroes")
+	check_eq(run.count_role("tribesperson"), 3, "starting tribespeople")
+	check_eq(run.count_role("warrior"), 1, "starting warriors")
+	check_eq(run.world.dens.size(), 2, "dens in the wilds")
 	check(not run.next_wave.is_empty(), "first wave should have enemies")
+	for den in run.world.dens:
+		check(den["pos"].length() > 500.0, "dens sit far out")
 
 
 func test_same_seed_and_choices_replay_identically() -> void:
@@ -21,6 +37,131 @@ func test_same_seed_and_choices_replay_identically() -> void:
 	check_eq(a.story, b.story, "story of the run")
 
 
+func test_round_has_three_dawn_picks_then_a_relic() -> void:
+	var run := _run()
+	run.begin_round()
+	var picks := 0
+	while run.phase == RunState.Phase.PICK or run.phase == RunState.Phase.SIM:
+		if run.phase == RunState.Phase.PICK:
+			picks += 1
+			check_eq(run.pick_offer.size(), 3, "three cards each dawn")
+			run.choose_pick(-1)
+		else:
+			run.run_until_pause()
+	check_eq(picks, 3, "one pick per day")
+	check_eq(run.phase, RunState.Phase.RELIC, "relic pick after the round")
+
+
+func test_wave_only_on_the_last_night() -> void:
+	var run := _run()
+	run.begin_round()
+	run.choose_pick(-1)
+	var saw_wave_early := false
+	while run.phase == RunState.Phase.SIM:
+		run.step()
+		if run.world.day_index() < 2 and run.world.wave_spawned:
+			saw_wave_early = true
+	check(not saw_wave_early, "no wave before night 3")
+	run.choose_pick(-1)
+	run.run_until_pause()
+	run.choose_pick(-1)
+	run.run_until_pause()
+	check(run.world.wave_spawned, "wave came on night 3")
+
+
+func test_taking_a_pick_adds_a_person() -> void:
+	var run := _run()
+	run.begin_round()
+	var before := run.population()
+	var folk_card := -1
+	for i in run.pick_offer.size():
+		if run.pick_offer[i]["kind"] == "folk":
+			folk_card = i
+	run.choose_pick(folk_card)
+	check_eq(run.population(), before + 1, "newcomer joined")
+
+
+func test_no_hero_cards_without_a_longhouse() -> void:
+	var run := _run()
+	for r in 3:
+		_to_round_end(run)
+		if run.phase != RunState.Phase.RELIC:
+			break
+		for card in run._round_entry["picks"]:
+			for label: String in card["offered"]:
+				check(not label.begins_with("hero:"), "hero card without lodging")
+		run.choose_relic("")
+
+
+func test_longhouse_brings_hero_cards() -> void:
+	var run := _run()
+	run.stock["wood"] = 99
+	run.stock["stone"] = 99
+	check(run.build("longhouse"), "can order a longhouse")
+	run.world.buildings[0]["work_left"] = 0.0
+	run.begin_round()
+	var heroes_seen := 0
+	for i in 6:
+		for card in run.pick_offer:
+			if card["kind"] == "hero":
+				heroes_seen += 1
+				check_eq(card["cost"], run.content.int_num("hero_card_cost"), "hero card costs shells")
+		run._offer_picks()
+	check(heroes_seen > 0, "hero cards appear once the longhouse stands")
+
+
+func test_hero_card_needs_shells() -> void:
+	var run := _run()
+	run.stock["wood"] = 99
+	run.stock["stone"] = 99
+	run.build("longhouse")
+	run.world.buildings[0]["work_left"] = 0.0
+	run.begin_round()
+	run.pick_offer = [{"kind": "hero", "role": "hero", "cost": 30, "hero": run._make_hero()}]
+	run.stock["shells"] = 10
+	check(not run.can_take_pick(0), "can't afford hero with 10 shells")
+	run.stock["shells"] = 40
+	check(run.can_take_pick(0), "can afford hero with 40 shells")
+	var heroes := run.heroes.size()
+	run.choose_pick(0)
+	check_eq(run.heroes.size(), heroes + 1, "hero joined")
+	check_eq(run.stock["shells"], 10, "paid 30 shells")
+
+
+func test_housing_limits_picks() -> void:
+	var run := _run()
+	run.begin_round()
+	while run.population() < run.housing():
+		run.world.add_folk("tribesperson")
+	check(not run.can_take_pick(0), "no room means no newcomer")
+
+
+func test_building_costs_and_gets_raised() -> void:
+	var run := _run()
+	var wood: int = run.stock["wood"]
+	check(run.build("hut"), "can build a hut")
+	check_eq(run.stock["wood"], wood - 6, "hut costs 6 wood")
+	check_eq(run.world.count_buildings("hut"), 0, "not raised yet")
+	run.world.add_folk("craftsperson")
+	run.begin_round()
+	run.choose_pick(-1)
+	run.run_until_pause()
+	check_eq(run.world.count_buildings("hut"), 1, "craftsperson raised the hut on day 1")
+
+
+func test_hunger_drives_people_away() -> void:
+	var run := _run()
+	run.stock["food"] = 0
+	var before := run.world.folk.size()
+	run.begin_round()
+	run.choose_pick(-1)
+	for i in 10:
+		run.step()
+	run.stock["food"] = 0
+	run.run_until_pause()
+	check(run.world.folk.size() < before or run.stock["food"] > 0, "someone leaves when there is no food")
+
+
 func test_waves_grow() -> void:
 	var run := _run()
 	check(run.generate_wave(8).size() > run.generate_wave(1).size(), "round 8 wave should be bigger than round 1")
@@ -28,54 +169,25 @@ func test_waves_grow() -> void:
 
 func test_last_round_has_boss() -> void:
 	var run := _run()
-	check(run.generate_wave(run.content.int_num("rounds_to_win")).has("warlord"), "final wave should include the warlord")
-
-
-func test_bounty_reserves_gold_and_refuses_overspend() -> void:
-	var run := _run()
-	run.next_wave = ["goblin", "goblin"] as Array[String]
-	check(run.set_bounty("goblin", 10), "should afford 2 x 10g")
-	check_eq(run.free_gold(), 40, "free gold after reserving 20")
-	run.gold = 15
-	check(not run.set_bounty("goblin", 10), "can't reserve 20 with 15 gold")
-
-
-func test_unclaimed_bounty_is_refunded() -> void:
-	var run := _run()
-	run.next_wave = ["goblin"] as Array[String]
-	run.set_bounty("goblin", 10)
-	var battle := run.start_battle()
-	check_eq(run.gold, 50, "bounty held during battle")
-	battle.run_to_end()
-	var paid := battle.bounty_paid
-	run.finish_battle(battle)
-	check_eq(run.gold, 60 - paid, "town only pays for claimed bounties")
+	check(run.generate_wave(run.content.int_num("rounds_to_win")).has("antlered_king"), "final wave includes the boss")
 
 
 func test_relic_changes_stats() -> void:
 	var run := _run()
 	var before := run.heroes[0].attack
-	run.relics.append("war_banner")
-	run.relic_acquired_round["war_banner"] = 1
-	run.start_battle()
-	check_eq(run.heroes[0].attack, before + 2.0, "war banner adds 2 attack")
+	run.relics.append("war_paint")
+	run.relic_acquired_round["war_paint"] = 1
+	run.world.apply_hero_stats(run.heroes[0])
+	check(run.heroes[0].attack > before, "attack relic raises hero attack")
 
 
 func test_relic_pick_advances_round_and_pays_income() -> void:
 	var run := _run()
-	var battle := run.start_battle()
-	battle.run_to_end()
-	run.finish_battle(battle)
-	check_eq(run.phase, RunState.Phase.RELIC, "relic pick after a won wave")
+	_to_round_end(run)
+	check_eq(run.phase, RunState.Phase.RELIC, "relic pick after the round")
 	check_eq(run.relic_offer.size(), 3, "three relics offered")
-	var gold := run.gold
+	var shells: int = run.stock["shells"]
 	run.choose_relic(run.relic_offer[0])
 	check_eq(run.round_number, 2, "round advanced")
-	check(run.gold >= gold + 25, "income paid")
-
-
-func test_market_raises_income() -> void:
-	var run := _run()
-	var before := run.income()
-	check(run.build_market(), "can build a market at the start")
-	check_eq(run.income(), before + 10, "market adds 10 income")
+	check(run.stock["shells"] >= shells + 10, "income paid")
+	check_eq(run.phase, RunState.Phase.BUILD, "back to building")

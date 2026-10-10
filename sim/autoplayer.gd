@@ -3,45 +3,58 @@ extends RefCounted
 ## A simple scripted player for headless balance runs and tests.
 ## It stands in for a human making decisions so we can simulate many runs fast.
 
-## "bounty": 10g on the toughest enemy type; "shaman": 10g on shamans; "common": 5g on the most numerous type;
-## "none": never posts bounties.
-var bounty_style := "bounty"
+## "balanced": huts as needed, a longhouse early, then watch posts; picks by need.
+## "workers": never takes heroes or builds the longhouse; picks townsfolk only.
+## "heroes": rushes the longhouse and takes every hero card it can afford.
+var style := "balanced"
 
 
 func play_run(run: RunState) -> void:
 	while not run.is_over():
-		decide(run)
-		var battle := run.start_battle()
-		battle.run_to_end()
-		run.finish_battle(battle)
-		if run.phase == RunState.Phase.RELIC:
-			run.choose_relic(run.relic_offer[0] if not run.relic_offer.is_empty() else "")
+		match run.phase:
+			RunState.Phase.BUILD:
+				build(run)
+				run.begin_round()
+			RunState.Phase.PICK:
+				run.choose_pick(pick(run))
+			RunState.Phase.SIM:
+				run.run_until_pause()
+			RunState.Phase.RELIC:
+				run.choose_relic(run.relic_offer[0] if not run.relic_offer.is_empty() else "")
 
 
-func decide(run: RunState) -> void:
-	if run.keep_hp < run.keep_max_hp() * 0.5:
-		run.repair_keep()
-	if run.round_number <= 2:
-		run.build_market()
-	while run.heroes.size() < 5 and run.recruit():
-		pass
-	if bounty_style == "shaman" and run.wave_counts().has("shaman"):
-		run.set_bounty("shaman", 10)
-	if bounty_style == "common":
-		var counts := run.wave_counts()
-		var most := ""
-		for id: String in counts:
-			if most == "" or counts[id] > counts[most]:
-				most = id
-		run.set_bounty(most, 5)
-	if bounty_style == "bounty":
-		var worst := ""
-		var worst_hp := 0.0
-		for id: String in run.wave_counts():
-			var hp := float(run.content.enemies[id]["hp"])
-			if hp > worst_hp:
-				worst_hp = hp
-				worst = id
-		var amount := 10
-		while amount > 0 and not run.set_bounty(worst, amount):
-			amount -= run.content.int_num("bounty_step")
+func build(run: RunState) -> void:
+	if style != "workers" and (run.round_number >= 2 or style == "heroes"):
+		run.build("longhouse")
+	if run.housing() - run.population() <= 2:
+		run.build("hut")
+	if run.round_number >= 3:
+		run.build("drying_rack")
+	if run.round_number >= 2:
+		run.build("watch_post")
+
+
+func pick(run: RunState) -> int:
+	var best := -1
+	var best_score := -INF
+	for i in run.pick_offer.size():
+		if not run.can_take_pick(i):
+			continue
+		var card := run.pick_offer[i]
+		var score := 0.0
+		match card["role"]:
+			"hero":
+				score = 5.0 if style != "workers" else -100.0
+				if style == "heroes":
+					score = 50.0
+			"tribesperson":
+				score = 4.0 - run.count_role("tribesperson") * 0.6
+			"warrior":
+				score = 3.0 - run.count_role("warrior") * 0.8
+			"craftsperson":
+				var pending := run.world.buildings.any(func(b: Dictionary) -> bool: return float(b["work_left"]) > 0.0)
+				score = (4.0 if pending else 1.0) - run.count_role("craftsperson") * 1.5
+		if score > best_score:
+			best_score = score
+			best = i
+	return best

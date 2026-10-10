@@ -1,38 +1,41 @@
 class_name RunState
 extends RefCounted
-## One run of the game: the town, its heroes, relics and the round loop.
+## One run of the game: the settlement, its people, relics and the round loop.
 ##
-## Round loop: DECIDE (player posts bounties, builds, recruits) -> BATTLE
-## (auto-resolved, see Battle) -> RELIC (pick 1 of N) -> next round's DECIDE.
-## The run ends in WON (survived the last round) or LOST (keep destroyed).
-## No scenes or nodes here, so whole runs can be simulated headless.
+## Round loop: BUILD (order buildings) -> for each day: PICK (choose a newcomer
+## at dawn) -> SIM (the day and night play out on their own) -> after the last
+## night, which brings the round's warned wave: RELIC (pick 1 of N) -> next BUILD.
+## The run ends in WON (survived the last round) or LOST (hearth destroyed or
+## everyone gone). No scenes or nodes here, so whole runs can be simulated headless.
 
-enum Phase { DECIDE, BATTLE, RELIC, WON, LOST }
+enum Phase { BUILD, PICK, SIM, RELIC, WON, LOST }
+
+const RESOURCES := ["food", "fuel", "wood", "stone", "shells"]
 
 var content: Content
 var run_seed: int
 var round_number := 1
-var phase := Phase.DECIDE
+var phase := Phase.BUILD
 
-var gold := 0
-var keep_hp := 0.0
-var markets := 0
+var world: World
+var stock := {}
 var heroes: Array[Unit] = []
 var fallen: Array[Unit] = []
+var fallen_folk := 0
 var relics: Array[String] = []
 var relic_acquired_round := {}
 var relic_offer: Array[String] = []
-
-## Enemy type id -> gold paid per kill this round.
-var bounties := {}
-## Enemy type ids of the coming wave, in spawn order.
+## Dawn cards: {kind: "folk"|"hero", role: String, cost: int, hero: Unit (for hero cards)}.
+var pick_offer: Array[Dictionary] = []
+## Enemy type ids of this round's wave, in spawn order.
 var next_wave: Array[String] = []
 ## Plain-language story of what happened, newest last.
 var story: Array[String] = []
 
 ## Machine-readable history of this run for stats and debugging (see to_record()).
 ## Format changes bump RECORD_FORMAT so old saved runs can still be read.
-const RECORD_FORMAT := 1
+## 1: one wave per round. 2: days, dawn picks, townsfolk, dens.
+const RECORD_FORMAT := 2
 var record_rounds: Array[Dictionary] = []
 var _round_entry := {}
 
@@ -44,13 +47,19 @@ func _init(game_content: Content, seed_value: int) -> void:
 	content = game_content
 	run_seed = seed_value
 	_hero_rng = SeededRng.stream(run_seed, "heroes")
-	gold = content.int_num("start_gold")
-	keep_hp = keep_max_hp()
+	for r in RESOURCES:
+		stock[r] = int(content.balance["start_stock"].get(r, 0))
+	world = World.new(self)
+	var start_people: Dictionary = content.balance["start_people"]
+	var roles := start_people.keys()
+	roles.sort()
+	for role: String in roles:
+		for i in int(start_people[role]):
+			world.add_folk(role)
 	for i in content.int_num("start_heroes"):
-		_add_hero()
-	next_wave = generate_wave(round_number)
-	_begin_round_entry()
-	_tell("Round 1. %d heroes answer the call." % heroes.size())
+		_add_hero(_make_hero())
+	tell("Round 1. A handful of people gather around a fire at the edge of the world.")
+	_enter_build()
 
 
 # --- Modifiers -------------------------------------------------------------
@@ -64,140 +73,209 @@ func mod(key: String) -> float:
 	return total
 
 
-func keep_max_hp() -> float:
-	return content.num("keep_max_hp") + mod("keep_max_hp")
+func hearth_max_hp() -> float:
+	return content.num("hearth_max_hp") + mod("hearth_max_hp")
 
 
+## Shells the settlement earns at the start of each round.
 func income() -> int:
-	var total := content.num("income_per_round") + mod("income")
-	total += markets * (content.num("market_income") + mod("market_income"))
-	for id in relics:
-		var growth := float(content.relics[id]["effects"].get("income_growth", 0.0))
-		total += growth * (round_number - int(relic_acquired_round[id]))
-	return int(total)
+	return int(content.num("income_shells_per_round") + mod("income"))
 
 
-# --- Decisions -------------------------------------------------------------
-
-func recruit_cost() -> int:
-	return maxi(0, content.int_num("recruit_cost") - int(mod("recruit_discount")))
+func living_heroes() -> Array[Unit]:
+	return heroes.filter(func(h: Unit) -> bool: return h.alive)
 
 
-func can_recruit() -> bool:
-	return phase == Phase.DECIDE and heroes.size() < content.int_num("max_heroes") \
-		and free_gold() >= recruit_cost()
+func population() -> int:
+	return world.folk.size() + living_heroes().size()
 
 
-func recruit() -> bool:
-	if not can_recruit():
-		return false
-	gold -= recruit_cost()
-	var hero := _add_hero()
-	_note_action("recruit", recruit_cost(), hero.display_name)
-	_tell("%s joins the town." % describe(hero))
-	return true
-
-
-func can_build_market() -> bool:
-	return phase == Phase.DECIDE and markets < content.int_num("max_markets") \
-		and free_gold() >= content.int_num("market_cost")
-
-
-func build_market() -> bool:
-	if not can_build_market():
-		return false
-	gold -= content.int_num("market_cost")
-	markets += 1
-	_note_action("market", content.int_num("market_cost"))
-	return true
-
-
-func can_repair() -> bool:
-	return phase == Phase.DECIDE and keep_hp < keep_max_hp() \
-		and free_gold() >= content.int_num("repair_cost")
-
-
-func repair_keep() -> bool:
-	if not can_repair():
-		return false
-	gold -= content.int_num("repair_cost")
-	keep_hp = minf(keep_max_hp(), keep_hp + content.num("repair_amount"))
-	_note_action("repair", content.int_num("repair_cost"))
-	return true
-
-
-## Gold set aside to pay every posted bounty if every bountied enemy dies.
-func bounty_reserved(override := {}) -> int:
-	var b: Dictionary = override if not override.is_empty() else bounties
-	var total := 0
-	for enemy_type in next_wave:
-		total += int(b.get(enemy_type, 0))
+func housing() -> int:
+	var total := content.int_num("base_housing")
+	for type: String in content.buildings:
+		total += world.count_buildings(type) * int(content.buildings[type].get("housing", 0))
 	return total
 
 
-func free_gold() -> int:
-	return gold - bounty_reserved()
+func count_role(role: String) -> int:
+	return world.folk.filter(func(u: Unit) -> bool: return u.type_id == role).size()
 
 
-## Sets the per-kill bounty on an enemy type. Fails if the town can't cover it.
-func set_bounty(enemy_type: String, amount: int) -> bool:
-	if phase != Phase.DECIDE:
-		return false
-	amount = clampi(amount, 0, content.int_num("bounty_max"))
-	var trial := bounties.duplicate()
-	trial[enemy_type] = amount
-	if bounty_reserved(trial) > gold:
-		return false
-	bounties = trial
+# --- Building (start of round) ----------------------------------------------
+
+func can_afford(cost: Dictionary) -> bool:
+	for r: String in cost:
+		if int(stock.get(r, 0)) < int(cost[r]):
+			return false
 	return true
 
 
-# --- Round flow ------------------------------------------------------------
-
-func start_battle() -> Battle:
-	assert(phase == Phase.DECIDE)
-	phase = Phase.BATTLE
-	_round_entry["bounties"] = bounties.duplicate()
-	_round_entry["gold_before_battle"] = gold
-	_round_entry["keep_hp_before"] = roundi(keep_hp)
-	_round_entry["heroes_before"] = heroes.map(_hero_snapshot)
-	var reserved := bounty_reserved()
-	gold -= reserved
-	for hero in heroes:
-		_apply_hero_stats(hero)
-	return Battle.new(self, SeededRng.stream(run_seed, "battle", round_number), reserved)
+func can_build(type: String) -> bool:
+	var def: Dictionary = content.buildings[type]
+	return phase == Phase.BUILD and can_afford(def["cost"]) and world.free_plot() >= 0 \
+		and world.count_buildings(type, false) < int(def.get("max", 99))
 
 
-func finish_battle(battle: Battle) -> void:
-	assert(phase == Phase.BATTLE)
-	gold += battle.bounty_reserved - battle.bounty_paid
-	keep_hp = maxf(0.0, battle.keep_hp)
-	battle.release()
-	_round_entry["battle"] = {
-		"seconds": snappedf(battle.time, 0.1),
-		"keep_hp_after": roundi(keep_hp),
-		"keep_damage": roundi(battle.keep_damage_taken),
-		"bounty_paid": battle.bounty_paid,
-		"bounty_refunded": battle.bounty_reserved - battle.bounty_paid,
-		"hero_deaths": battle.hero_deaths.duplicate(),
-		"retreats": battle.retreats,
+func build(type: String) -> bool:
+	if not can_build(type):
+		return false
+	var cost: Dictionary = content.buildings[type]["cost"]
+	for r: String in cost:
+		stock[r] = int(stock[r]) - int(cost[r])
+	world.add_building(type)
+	_round_entry["actions"].append({"kind": "build", "building": type})
+	return true
+
+
+## Ends the build phase; the first dawn of the round follows.
+func begin_round() -> void:
+	assert(phase == Phase.BUILD)
+	world.start_round()
+	_offer_picks()
+
+
+func on_building_done(_type: String) -> void:
+	pass
+
+
+# --- Dawn picks ------------------------------------------------------------
+
+func can_take_pick(index: int) -> bool:
+	if phase != Phase.PICK or index < 0 or index >= pick_offer.size():
+		return false
+	var card := pick_offer[index]
+	return population() < housing() and int(stock["shells"]) >= int(card["cost"])
+
+
+## Takes a dawn card (-1 skips), then lets the day begin.
+func choose_pick(index: int) -> void:
+	assert(phase == Phase.PICK)
+	var taken := ""
+	if can_take_pick(index):
+		var card := pick_offer[index]
+		stock["shells"] = int(stock["shells"]) - int(card["cost"])
+		if card["kind"] == "hero":
+			var hero: Unit = card["hero"]
+			_add_hero(hero)
+			taken = "hero:" + hero.type_id
+			tell("%s arrives and takes a bench in the longhouse." % describe(hero))
+		else:
+			world.add_folk(card["role"])
+			taken = card["role"]
+			tell("A %s joins the settlement." % content.townsfolk[card["role"]]["name"].to_lower())
+	_round_entry["picks"].append({"day": world.day_index() + 1, "offered": pick_offer.map(_card_label), "taken": taken})
+	pick_offer = []
+	phase = Phase.SIM
+	world.resume()
+	tell("Day %d dawns." % (world.day_index() + 1))
+
+
+func _offer_picks() -> void:
+	var rng := SeededRng.stream(run_seed, "picks", round_number * 10 + world.day_index())
+	var pool: Array[Dictionary] = []
+	var roles := content.townsfolk.keys()
+	roles.sort()
+	for role: String in roles:
+		pool.append({"kind": "folk", "role": role, "cost": 0})
+	if world.count_buildings("longhouse") > 0:
+		pool.append({"kind": "hero", "role": "hero", "cost": content.int_num("hero_card_cost"), "hero": _make_hero()})
+	pick_offer = []
+	while pick_offer.size() < content.int_num("pick_choices") and not pool.is_empty():
+		var card: Dictionary = rng.pick(pool)
+		pool.erase(card)
+		pick_offer.append(card)
+	phase = Phase.PICK
+
+
+func _card_label(card: Dictionary) -> String:
+	return "hero:" + card["hero"].type_id if card["kind"] == "hero" else card["role"]
+
+
+# --- Simulation ------------------------------------------------------------
+
+func step() -> void:
+	if phase != Phase.SIM:
+		return
+	world.step()
+	match world.pause:
+		World.Pause.DAWN:
+			_bury_heroes()
+			_offer_picks()
+		World.Pause.ROUND_OVER:
+			_finish_round()
+		World.Pause.HEARTH_LOST:
+			_lose()
+
+
+## Runs the world until it needs a decision (a dawn pick, a relic, or the end).
+func run_until_pause() -> void:
+	while phase == Phase.SIM:
+		step()
+
+
+## Food eaten at each dawn. If there isn't enough, someone leaves.
+func daily_upkeep() -> void:
+	var racks := world.count_buildings("drying_rack")
+	var growth := 0.0
+	for id in relics:
+		growth += float(content.relics[id]["effects"].get("food_growth", 0.0)) * (round_number - int(relic_acquired_round[id]))
+	var need := maxi(0, int(ceil(population() * content.num("food_per_person_per_day") * (1.0 - 0.25 * racks) - growth)))
+	if int(stock["food"]) >= need:
+		stock["food"] = int(stock["food"]) - need
+		return
+	stock["food"] = 0
+	if not world.folk.is_empty():
+		var leaver: Unit = world.folk[SeededRng.stream(run_seed, "hunger", round_number * 10 + world.day_index()).randi_range(0, world.folk.size() - 1)]
+		world.folk.erase(leaver)
+		_round_entry["left_hungry"] = int(_round_entry.get("left_hungry", 0)) + 1
+		tell("Hunger: a %s walks away into the wilds." % leaver.display_name.to_lower())
+
+
+func fuel_needed_tonight() -> int:
+	var need := content.num("fuel_per_night_base") + population() * content.num("fuel_per_person_per_night") - mod("fuel_saving")
+	return maxi(0, int(ceil(need)))
+
+
+## What gatherers should fetch next: whatever is shortest against two days of need.
+func most_needed_resource() -> String:
+	var wants := {
+		"food": population() * content.num("food_per_person_per_day") * 2.0,
+		"fuel": fuel_needed_tonight() * 2.0,
+		"wood": 12.0,
+		"stone": 6.0,
 	}
-	for line in battle.story:
-		_tell(line)
-	for hero in heroes.duplicate():
-		if not hero.alive:
-			heroes.erase(hero)
-			fallen.append(hero)
+	var best := "food"
+	var best_gap := -INF
+	for r: String in ["food", "fuel", "wood", "stone"]:
+		var gap: float = (wants[r] - float(stock[r])) / maxf(wants[r], 1.0)
+		if gap > best_gap:
+			best_gap = gap
+			best = r
+	return best
+
+
+func _finish_round() -> void:
+	_bury_heroes()
+	world.release()
+	var stats := world.wave_stats
+	_round_entry["battle"] = {
+		"seconds": snappedf(float(stats["seconds"]), 0.1),
+		"keep_hp_after": roundi(world.hearth_hp),
+		"keep_damage": roundi(float(stats["keep_damage"])),
+		"bounty_paid": 0,
+		"bounty_refunded": 0,
+		"hero_deaths": stats["hero_deaths"].duplicate(),
+		"retreats": int(stats["retreats"]),
+	}
+	_round_entry["deaths"] = world.deaths.duplicate()
 	for hero in heroes:
 		_level_up(hero)
-	if keep_hp <= 0.0:
-		phase = Phase.LOST
-		_tell("The keep has fallen in round %d." % round_number)
-		_end_round_entry()
+	if world.hearth_hp <= 0.0:
+		_lose()
 		return
 	if round_number >= content.int_num("rounds_to_win"):
 		phase = Phase.WON
-		_tell("The town survived all %d rounds!" % round_number)
+		tell("The people endured all %d rounds!" % round_number)
 		_end_round_entry()
 		return
 	_heal_heroes()
@@ -207,31 +285,49 @@ func finish_battle(battle: Battle) -> void:
 	phase = Phase.RELIC
 
 
+func _lose() -> void:
+	phase = Phase.LOST
+	_bury_heroes()
+	world.release()
+	if world.hearth_hp <= 0.0:
+		tell("The hearth is trampled and goes dark in round %d." % round_number)
+	else:
+		tell("No one is left to tend the fire in round %d." % round_number)
+	_round_entry["deaths"] = world.deaths.duplicate()
+	_end_round_entry()
+
+
 ## Takes a relic from the offer ("" skips), then starts the next round.
 func choose_relic(relic_id: String) -> void:
 	assert(phase == Phase.RELIC)
 	if relic_id != "" and relic_id in relic_offer:
-		var before_max := keep_max_hp()
+		var before_max := hearth_max_hp()
 		relics.append(relic_id)
 		relic_acquired_round[relic_id] = round_number + 1
 		var effects: Dictionary = content.relics[relic_id]["effects"]
-		keep_hp = clampf(keep_hp + keep_max_hp() - before_max, 1.0, keep_max_hp())
+		world.hearth_hp = clampf(world.hearth_hp + hearth_max_hp() - before_max, 1.0, hearth_max_hp())
 		for i in int(effects.get("free_hero", 0)):
-			if heroes.size() < content.int_num("max_heroes"):
-				_tell("%s arrives, drawn by the posters." % describe(_add_hero()))
-		_tell("Relic taken: %s." % content.relics[relic_id]["name"])
+			var hero := _make_hero()
+			_add_hero(hero)
+			tell("%s follows the wanderer's fire to your camp." % describe(hero))
+		for u in world.folk:
+			world.apply_folk_stats(u)
+		tell("Relic taken: %s." % content.relics[relic_id]["name"])
 	_round_entry["relic_pick"] = relic_id
 	_end_round_entry()
 	relic_offer = []
 	round_number += 1
 	var earned := income()
-	gold += earned
-	bounties = {}
+	stock["shells"] = int(stock["shells"]) + earned
+	tell("Round %d. Traders leave %d shells." % [round_number, earned])
+	_enter_build()
+
+
+func _enter_build() -> void:
+	phase = Phase.BUILD
 	next_wave = generate_wave(round_number)
-	phase = Phase.DECIDE
+	world.roll_wave_sides()
 	_begin_round_entry()
-	_round_entry["income"] = earned
-	_tell("Round %d. The town earns %d gold." % [round_number, earned])
 
 
 ## Wave contents for a round: random enemies bought from a growing budget.
@@ -239,20 +335,21 @@ func generate_wave(for_round: int) -> Array[String]:
 	var rng := SeededRng.stream(run_seed, "wave", for_round)
 	var budget := content.int_num("wave_budget_base") + content.int_num("wave_budget_per_round") * (for_round - 1)
 	var wave: Array[String] = []
+	var ids := content.enemies.keys()
+	ids.sort()
 	while budget > 0:
 		var options := []
-		for id: String in content.enemies:
+		for id: String in ids:
 			var e: Dictionary = content.enemies[id]
-			if not e.get("boss", false) and int(e["min_round"]) <= for_round and int(e["cost"]) <= budget:
+			if e.get("wave", true) and not e.get("boss", false) and int(e["min_round"]) <= for_round and int(e["cost"]) <= budget:
 				options.append(id)
 		if options.is_empty():
 			break
-		options.sort()
 		var pick: String = rng.pick(options)
 		wave.append(pick)
 		budget -= int(content.enemies[pick]["cost"])
 	if for_round == content.int_num("rounds_to_win"):
-		for id: String in content.enemies:
+		for id: String in ids:
 			if content.enemies[id].get("boss", false):
 				wave.append(id)
 	return wave
@@ -265,6 +362,32 @@ func wave_counts() -> Dictionary:
 		counts[id] = int(counts.get(id, 0)) + 1
 	return counts
 
+
+func is_over() -> bool:
+	return phase == Phase.WON or phase == Phase.LOST
+
+
+## Breaks the run <-> world reference loop so a finished run can be freed.
+func dispose() -> void:
+	world.release()
+	world.run = null
+
+
+func describe(hero: Unit) -> String:
+	return "%s the %s %s" % [hero.display_name, content.traits[hero.trait_id]["name"].to_lower(),
+		content.hero_classes[hero.type_id]["name"].to_lower()]
+
+
+func new_id() -> int:
+	_next_id += 1
+	return _next_id
+
+
+func tell(line: String) -> void:
+	story.append(line)
+
+
+# --- Run record ------------------------------------------------------------
 
 ## The whole run so far as plain data (saved by the game, read by tools/run_report.gd).
 ## Deterministic: no clock or machine details; the game adds those when saving.
@@ -283,9 +406,11 @@ func to_record() -> Dictionary:
 		"result": result,
 		"round_reached": round_number,
 		"rounds_to_win": content.int_num("rounds_to_win"),
-		"gold": gold,
-		"keep_hp": roundi(keep_hp),
-		"markets": markets,
+		"stock": stock.duplicate(),
+		"keep_hp": roundi(world.hearth_hp),
+		"buildings": world.buildings.map(func(b: Dictionary) -> String: return b["type"]),
+		"townsfolk": _folk_counts(),
+		"townsfolk_lost": fallen_folk,
 		"relics": relics.duplicate(),
 		"heroes": heroes.map(_hero_snapshot),
 		"fallen": fallen.map(_hero_snapshot),
@@ -294,23 +419,36 @@ func to_record() -> Dictionary:
 	}
 
 
-func is_over() -> bool:
-	return phase == Phase.WON or phase == Phase.LOST
+func _folk_counts() -> Dictionary:
+	var counts := {}
+	for u in world.folk:
+		counts[u.type_id] = int(counts.get(u.type_id, 0)) + 1
+	return counts
 
 
-func describe(hero: Unit) -> String:
-	return "%s the %s %s" % [hero.display_name, content.traits[hero.trait_id]["name"].to_lower(),
-		content.hero_classes[hero.type_id]["name"]]
+func _begin_round_entry() -> void:
+	_round_entry = {"round": round_number, "stock_start": stock.duplicate(), "keep_hp_start": roundi(world.hearth_hp),
+		"wave": wave_counts(), "wave_sides": world.side_names(), "townsfolk_start": _folk_counts(),
+		"heroes_start": living_heroes().size(), "actions": [], "picks": []}
 
 
-func new_id() -> int:
-	_next_id += 1
-	return _next_id
+func _end_round_entry() -> void:
+	_round_entry["stock_end"] = stock.duplicate()
+	_round_entry["townsfolk_end"] = _folk_counts()
+	record_rounds.append(_round_entry)
+	_round_entry = {}
+
+
+func _hero_snapshot(hero: Unit) -> Dictionary:
+	return {"name": hero.display_name, "class": hero.type_id, "trait": hero.trait_id, "level": hero.level,
+		"hp": roundi(hero.hp), "max_hp": roundi(hero.max_hp), "gold": hero.gold, "weapon": hero.weapon_tier,
+		"armor": hero.armor_tier, "kills": hero.kills, "alive": hero.alive}
 
 
 # --- Internals -------------------------------------------------------------
 
-func _add_hero() -> Unit:
+## A new hero, not yet in the settlement (dawn cards show these).
+func _make_hero() -> Unit:
 	var hero := Unit.new()
 	hero.id = new_id()
 	hero.team = Unit.Team.HERO
@@ -321,10 +459,22 @@ func _add_hero() -> Unit:
 	hero.type_id = _hero_rng.pick(class_ids)
 	hero.trait_id = _hero_rng.pick(trait_ids)
 	hero.display_name = _unused_name()
-	_apply_hero_stats(hero)
+	world.apply_hero_stats(hero)
 	hero.hp = hero.max_hp
-	heroes.append(hero)
 	return hero
+
+
+func _add_hero(hero: Unit) -> void:
+	hero.pos = Vector2.from_angle(heroes.size() * 1.7 + 0.4) * 60.0
+	world.apply_hero_stats(hero)
+	heroes.append(hero)
+
+
+func _bury_heroes() -> void:
+	for hero in heroes.duplicate():
+		if not hero.alive:
+			heroes.erase(hero)
+			fallen.append(hero)
 
 
 func _unused_name() -> String:
@@ -333,24 +483,8 @@ func _unused_name() -> String:
 		taken[h.display_name] = true
 	var free := content.hero_names.filter(func(n: String) -> bool: return not taken.has(n))
 	if free.is_empty():
-		return "Hero %d" % _next_id
+		return "Wanderer %d" % _next_id
 	return _hero_rng.pick(free)
-
-
-## Recomputes a hero's combat stats from class, level, gear and relics.
-func _apply_hero_stats(hero: Unit) -> void:
-	var c: Dictionary = content.hero_classes[hero.type_id]
-	var old_max := hero.max_hp
-	hero.max_hp = float(c["hp"]) + (hero.level - 1) * content.num("level_hp") \
-		+ hero.armor_tier * float(content.gear["armor"]["hp"]) + mod("hero_hp")
-	hero.attack = float(c["attack"]) + (hero.level - 1) * content.num("level_attack") \
-		+ hero.weapon_tier * float(content.gear["weapon"]["attack"]) + mod("hero_attack")
-	hero.attack_range = float(c["range"])
-	hero.cooldown = float(c["cooldown"])
-	hero.speed = float(c["speed"])
-	if old_max > 1.0 and hero.max_hp > old_max:
-		hero.hp += hero.max_hp - old_max
-	hero.hp = minf(hero.hp, hero.max_hp)
 
 
 func _level_up(hero: Unit) -> void:
@@ -358,8 +492,8 @@ func _level_up(hero: Unit) -> void:
 	while hero.xp >= per_level * hero.level:
 		hero.xp -= per_level * hero.level
 		hero.level += 1
-		_apply_hero_stats(hero)
-		_tell("%s reaches level %d." % [hero.display_name, hero.level])
+		world.apply_hero_stats(hero)
+		tell("%s reaches level %d." % [hero.display_name, hero.level])
 
 
 func _heal_heroes() -> void:
@@ -367,9 +501,12 @@ func _heal_heroes() -> void:
 	for hero in heroes:
 		var heal := hero.max_hp if full else hero.max_hp * content.num("between_round_heal")
 		hero.hp = minf(hero.max_hp, hero.hp + heal)
+	for unit in world.folk:
+		unit.hp = minf(unit.max_hp, unit.hp + unit.max_hp * content.num("between_round_heal"))
 
 
-## Heroes spend their own gold on gear, by personality. The player doesn't choose.
+## Heroes spend their own shells on gear from passing traders, by personality.
+## The player doesn't choose.
 func _heroes_go_shopping() -> void:
 	var discount := clampf(mod("gear_discount"), 0.0, 0.9)
 	for hero in heroes:
@@ -392,8 +529,8 @@ func _heroes_go_shopping() -> void:
 					hero.weapon_tier += 1
 				else:
 					hero.armor_tier += 1
-				_apply_hero_stats(hero)
-				_tell("%s buys a tier %d %s for %dg." % [hero.display_name, tier + 1, slot, cost])
+				world.apply_hero_stats(hero)
+				tell("%s trades for a tier %d %s (%d shells)." % [hero.display_name, tier + 1, content.gear[slot]["name"], cost])
 				bought = true
 				break
 
@@ -408,31 +545,3 @@ func _roll_relic_offer() -> Array[String]:
 		pool.erase(pick)
 		offer.append(pick)
 	return offer
-
-
-func _begin_round_entry() -> void:
-	_round_entry = {"round": round_number, "gold_start": gold, "keep_hp_start": roundi(keep_hp),
-		"wave": wave_counts(), "actions": []}
-
-
-func _end_round_entry() -> void:
-	_round_entry["gold_end"] = gold
-	record_rounds.append(_round_entry)
-	_round_entry = {}
-
-
-func _note_action(kind: String, cost: int, detail := "") -> void:
-	var action := {"kind": kind, "cost": cost}
-	if detail != "":
-		action["detail"] = detail
-	_round_entry["actions"].append(action)
-
-
-func _hero_snapshot(hero: Unit) -> Dictionary:
-	return {"name": hero.display_name, "class": hero.type_id, "trait": hero.trait_id, "level": hero.level,
-		"hp": roundi(hero.hp), "max_hp": roundi(hero.max_hp), "gold": hero.gold, "weapon": hero.weapon_tier,
-		"armor": hero.armor_tier, "kills": hero.kills, "alive": hero.alive}
-
-
-func _tell(line: String) -> void:
-	story.append(line)
