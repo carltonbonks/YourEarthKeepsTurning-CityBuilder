@@ -537,7 +537,8 @@ func _hero_tick(hero: Unit) -> void:
 
 ## Why a hero wants to be in bed right now ("" if they don't).
 func _wants_bed(hero: Unit, t: Dictionary) -> String:
-	if is_dusk():
+	# Everyone knows the warned attack is coming, so heroes stay up for it unless worn out.
+	if is_dusk() and day_index() < content.int_num("days_per_round") - 1:
 		return "night is falling"
 	if hero.energy <= float(t.get("tired_at", 25)):
 		return "tired"
