@@ -38,4 +38,11 @@ godot --headless --path . --export-release "Web" build/web/index.html
 godot --headless --path . -s res://tools/balance_run.gd -- runs=200 style=shaman   # balance report
 ```
 
+Run history: the game saves every run (Run history button). Copy one into chat, or compare many:
+
+```sh
+godot --headless --path . -s res://tools/balance_run.gd -- runs=200 style=shaman out=sim.jsonl
+godot --headless --path . -s res://tools/run_report.gd -- in=sim.jsonl in=my_runs.json
+```
+
 Balance report styles (a scripted player): `none` (no bounties), `common` (5g on the most numerous enemy), `shaman` (10g on shamans), `bounty` (10g on the toughest enemy).

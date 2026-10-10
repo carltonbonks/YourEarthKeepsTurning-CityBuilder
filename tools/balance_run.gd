@@ -1,15 +1,20 @@
 extends SceneTree
 ## Headless balance report: plays many seeded runs with a scripted player.
-## Usage: godot --headless --path . -s res://tools/balance_run.gd [-- runs=100 style=bounty]
+## Usage: godot --headless --path . -s res://tools/balance_run.gd [-- runs=100 style=bounty out=runs.jsonl]
+## out= also writes every run's record (same format as the game's Run history) for run_report.gd.
 
 func _init() -> void:
 	var runs := 100
 	var style := "bounty"
+	var out_path := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("runs="):
 			runs = int(arg.trim_prefix("runs="))
 		elif arg.begins_with("style="):
 			style = arg.trim_prefix("style=")
+		elif arg.begins_with("out="):
+			out_path = arg.trim_prefix("out=")
+	var out_file: FileAccess = FileAccess.open(out_path, FileAccess.WRITE) if out_path != "" else null
 	var content := Content.load_default()
 	var wins := 0
 	var rounds_total := 0
@@ -20,6 +25,11 @@ func _init() -> void:
 		var bot := AutoPlayer.new()
 		bot.bounty_style = style
 		bot.play_run(run)
+		if out_file != null:
+			var record := run.to_record()
+			record.erase("story")
+			record["player"] = "bot:" + style
+			out_file.store_line(JSON.stringify(record))
 		if run.phase == RunState.Phase.WON:
 			wins += 1
 		else:

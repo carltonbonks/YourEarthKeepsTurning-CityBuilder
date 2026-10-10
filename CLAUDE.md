@@ -25,13 +25,19 @@ When a feature doesn't serve at least one pillar, question it.
 - **Rounds:** each round has a decision phase and then an auto-resolved phase.
   - *Decision phase* (where the player's attention goes): placing and upgrading buildings and town layout, managing production chains and resources (Against the Storm), drafting relics, cards and event choices.
   - *Resolve phase:* combat and the simulation play out automatically (How Many Dudes / Ratropolis). The player mostly watches. No direct unit control.
+- **Round shape (decided 2026-10-10):** a round is **3 fast day/night cycles**. At the start of the round the player builds. At each dawn they pick one newcomer from a few cards (How Many Dudes), and the buildings they own shape that pool. During each day heroes and townsfolk act on their own. The telegraphed wave comes on the third night; earlier nights bring only wanderers and small probes.
+- **Map (decided 2026-10-10):** the settlement sits in the centre, with resources and threats on all sides. Monster dens far out in the wilds spawn wandering monsters. The wilds are strictly hero territory, where heroes fight for glory, loot and XP.
+- **Ages (decided 2026-10-10):** runs start as a handful of tribespeople around a campfire and tech up through **neolithic, bronze and medieval**. Neolithic resources are burnable fuel (brush, dung), wood and stone, with furs and flint or obsidian for gear.
 - **Pressure:** escalating enemy waves **and** environmental hardship and scarcity. Social and moral pressure (factions, morale, Frostpunk-style choices) is a *later* layer, added only once the town's internal mechanics are deep enough to support it.
 - **Victory conditions:** a mix, such as surviving waves, reaching economic or production goals, or collecting or completing certain relics and items. Vary them per run or map.
 
 ## NPCs
 
 - **Heroes:** individuals with traits, personalities, morals and itemisation (equipment, loot). They act on their own incentives: they go out to fight, explore and loot based on their goals, and they react to bounties, buildings and town state. They should feel like characters whose stories emerge.
-- **Townspeople / colonists:** mostly generic and handled **in aggregate**. They're modified, transformed and upgraded as groups (Against the Storm's races are a reference for group needs), not micromanaged one by one.
+- **Townspeople / colonists:** mostly generic and handled **in aggregate**. They're modified, transformed and upgraded as groups (Against the Storm's races are a reference for group needs), not micromanaged one by one. Newcomers arrive through the dawn pick (for example tribesperson, warrior or craftsperson), and each one adds upkeep. A sufficiently upgraded townsperson can be promoted to an individual with traits and gear.
+- **Hero recruitment:** heroes need lodging (a guild, tavern or similar). Once you have it, heroes appear as dawn cards with an extra gold recruitment cost. Heroes are scarce and capricious, and they spend energy on their own agendas, then rest at lodging that suits them.
+- **Incentives come from buildings:** bounties and prizes are posted by buildings that have prerequisites, such as a hunting lodge posting prizes on beasts. There is no free bounty button.
+- **Economy:** the marketplace sells goods and services directly to heroes, and each stall is fed by an upstream supply chain of buildings.
 - Heroes do the **bulk of the fighting**. Static defences around the town and castle (walls, towers) help but shouldn't carry the game.
 
 ## Items and relics
@@ -50,7 +56,7 @@ When a feature doesn't serve at least one pillar, question it.
 
 - **For now: simple placeholder art.** Keep visuals swappable (no logic coupled to specific art assets).
 - Final style is undecided. The candidates are **pixel art** or **low-poly 3D**, chosen for ease of development. Claude should help evaluate the options when the prototype is playable.
-- Tone also undecided. The candidates are **grim survival** (Frostpunk) or **mythic and stylish** (Hades), and they could be blended. Claude can propose, Yusuf decides.
+- **Setting and tone (decided 2026-10-10):** historical fiction with dark fantasy mixed in, kept a little mystical. A people rises from stone to steel across the three ages.
 
 ## Technical direction
 
@@ -73,6 +79,7 @@ Yusuf must be able to try changes and give feedback quickly, without heavy build
 - **Tune without rebuilding:** balance numbers live in data files, and in-game debug or tuning panels let Yusuf tweak values and re-run a round live.
 - **Prototype before engine work** when it's cheaper: paper or spreadsheet mockups, or text summaries of headless simulation runs (e.g. "100 seeded runs: average waves survived, top relics"), to settle a design question before building it in-game.
 - **Clear feedback hooks:** each playtest comes with 2-3 specific questions, plus a seed so Yusuf can say "seed 4821, round 6 felt unfair" and Claude can reproduce it.
+- **Run history:** every run is saved as a versioned record (`RunState.to_record()`): the choices made, each wave, hero snapshots, deaths, relics and the result. Yusuf copies runs from the in-game Run history screen into chat, and simulated runs use the same format, so `tools/run_report.gd` can compare them. When mechanics change, extend the record and bump `RECORD_FORMAT` rather than dropping fields.
 - Keep each iteration's report short: what changed, how to try it, what to look for.
 
 ## How to work with Yusuf
@@ -94,7 +101,7 @@ Yusuf must be able to try changes and give feedback quickly, without heavy build
 - Final art style, tone, title, and anything publishing-related (store page, pricing, spending money).
 
 ## Open questions
-- Final art style (pixel vs low-poly 3D) and tone (grim vs mythic).
+- Final art style (pixel vs low-poly 3D).
 - How Yusuf wants to playtest (browser builds from a link are the assumed default).
-- Working title and setting.
-- The exact form of the hero-incentive system (bounties, temples, taverns, etc.) and of hero autonomy outside the walls.
+- Working title.
+- Which buildings post which incentives, and the exact energy and lodging rules for heroes.

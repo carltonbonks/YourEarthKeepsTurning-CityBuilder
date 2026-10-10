@@ -15,6 +15,8 @@ var _tick_acc := 0.0
 var _shown_story := 0
 var _battle_story_shown := 0
 var _skip_lines := 0
+## Id of this run's file in Run history.
+var _run_id := ""
 
 var _status: RichTextLabel
 var _decide_box: VBoxContainer
@@ -53,6 +55,7 @@ func _process(delta: float) -> void:
 		_arena.battle = null
 		_skip_lines = finished.story.size()
 		run.finish_battle(finished)
+		RunHistory.save(_run_id, run)
 		_after_battle()
 
 
@@ -60,6 +63,7 @@ func _process(delta: float) -> void:
 
 func _new_run(seed_value: int) -> void:
 	run = RunState.new(content, seed_value)
+	_run_id = RunHistory.new_run_id(seed_value)
 	battle = null
 	_arena.run = run
 	_arena.battle = null
@@ -96,6 +100,7 @@ func _after_battle() -> void:
 
 func _pick_relic(relic_id: String) -> void:
 	run.choose_relic(relic_id)
+	RunHistory.save(_run_id, run)
 	_overlay.hide()
 	_refresh()
 
@@ -243,6 +248,77 @@ func _show_end() -> void:
 	replay.text = "Replay seed %d" % run.run_seed
 	replay.pressed.connect(func() -> void: _new_run(run.run_seed))
 	_overlay_box.add_child(replay)
+	var history := Button.new()
+	history.text = "Run history"
+	history.pressed.connect(_show_history)
+	_overlay_box.add_child(history)
+	_overlay.show()
+
+
+## Lists saved runs with stats, and lets you copy or download them to share.
+func _show_history() -> void:
+	var was_end_screen := run.is_over()
+	_clear_overlay()
+	_overlay_title("Run history")
+	var runs := RunHistory.load_all()
+	var stats := Label.new()
+	stats.text = "No runs saved yet. Runs are saved after each wave." if runs.is_empty() \
+		else "\n".join(RunStats.report(runs).slice(0, 6))
+	stats.add_theme_font_size_override("font_size", 13)
+	_overlay_box.add_child(stats)
+	var hint := Label.new()
+	hint.text = "Copy a run and paste it in the project chat, with what felt off."
+	hint.add_theme_font_size_override("font_size", 12)
+	hint.add_theme_color_override("font_color", Color("#9aa"))
+	_overlay_box.add_child(hint)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(820, 300)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_overlay_box.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+	for data in runs:
+		var row := HBoxContainer.new()
+		var label := Label.new()
+		label.text = RunHistory.one_line(data)
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		label.add_theme_font_size_override("font_size", 13)
+		row.add_child(label)
+		var copy := Button.new()
+		copy.text = "Copy"
+		copy.pressed.connect(func() -> void:
+			DisplayServer.clipboard_set(JSON.stringify(RunHistory.compact(data)))
+			copy.text = "Copied!")
+		row.add_child(copy)
+		if OS.has_feature("web"):
+			var download := Button.new()
+			download.text = "Download"
+			download.pressed.connect(func() -> void:
+				JavaScriptBridge.download_buffer(JSON.stringify(data, "\t").to_utf8_buffer(),
+					"run-%s.json" % data.get("id", "run"), "application/json"))
+			row.add_child(download)
+		list.add_child(row)
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	_overlay_box.add_child(buttons)
+	if not runs.is_empty():
+		var copy_all := Button.new()
+		copy_all.text = "Copy all runs"
+		copy_all.pressed.connect(func() -> void:
+			DisplayServer.clipboard_set(JSON.stringify(runs.map(RunHistory.compact)))
+			copy_all.text = "Copied!")
+		buttons.add_child(copy_all)
+	var close := Button.new()
+	close.text = "Back"
+	close.pressed.connect(func() -> void:
+		if was_end_screen:
+			_show_end()
+		elif run.phase == RunState.Phase.RELIC:
+			_show_relic_pick()
+		else:
+			_overlay.hide())
+	buttons.add_child(close)
 	_overlay.show()
 
 
@@ -350,6 +426,7 @@ func _build_ui() -> void:
 	restart.pressed.connect(func() -> void:
 		_new_run(int(_seed_edit.text) if _seed_edit.text.is_valid_int() else _random_seed()))
 	seed_row.add_child(restart)
+	_button(left, "Run history", _show_history)
 
 	# Right: arena above, heroes + story below.
 	var right := VBoxContainer.new()
