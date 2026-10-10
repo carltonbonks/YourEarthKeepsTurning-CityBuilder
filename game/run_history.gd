@@ -56,9 +56,9 @@ static func one_line(data: Dictionary) -> String:
 	var result: String = data.get("result", "?")
 	var outcome := "Won" if result == "won" else ("Lost in round %d" % int(data.get("round_reached", 0)) if result == "lost" \
 		else "Unfinished, round %d" % int(data.get("round_reached", 0)))
-	return "%s  ·  seed %d  ·  %s  ·  %d heroes lost  ·  %d relics" % [
+	return "%s  ·  seed %d  ·  %s  ·  %d heroes lost  ·  %d townsfolk lost  ·  %d relics" % [
 		str(data.get("saved_at", "")).left(16).replace("T", " "), int(data.get("seed", 0)), outcome,
-		(data.get("fallen", []) as Array).size(), (data.get("relics", []) as Array).size()]
+		(data.get("fallen", []) as Array).size(), int(data.get("townsfolk_lost", 0)), (data.get("relics", []) as Array).size()]
 
 
 static func _prune() -> void:

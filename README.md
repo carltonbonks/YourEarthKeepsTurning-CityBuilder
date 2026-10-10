@@ -10,12 +10,12 @@ Every change merged to `main` is published as a browser build:
 No install needed. Desktop Chrome, Edge or Firefox recommended.
 Add `?seed=1234` to the address to replay a specific run.
 
-### How the slice plays
+### How it plays (slice 2)
 
-Survive 10 rounds. Each round:
-1. **Decide.** See the coming wave, post per-kill bounties on enemy types, recruit heroes, build markets, repair the keep.
-2. **Watch.** The wave resolves on its own. Heroes pick targets from their personality: greedy ones chase bounties, dutiful ones guard the keep, cautious ones retreat early. Without a bounty, heroes only go as far from the keep as their nature allows.
-3. **Pick a relic** (1 of 3). Heroes spend their own bounty gold on gear.
+A handful of people around a fire, in the middle of a map. Resources ring the camp, monster dens sit far out in the wilds. Survive 10 rounds. Each round:
+1. **Build.** Order huts, watch posts, a longhouse or drying racks. Craftspeople raise them during the day. You also see where the round's attack will come from.
+2. **Three days and nights.** At each dawn, pick one newcomer from three cards (tribesperson, warrior, craftsperson, or a hero once a longhouse stands). Then everyone acts on their own: tribespeople gather and patch the hearth, warriors patrol, heroes hunt at the dens by day for glory and loot. Everyone eats food each day and the fire burns fuel each night.
+3. **Night 3 brings the warned attack.** Survive it, then **pick a relic** (1 of 3). Heroes spend their own shells on gear.
 
 ## Layout
 
@@ -35,14 +35,14 @@ Engine: Godot 4.7.1 (GDScript). The CI workflow in `.github/workflows/ci.yml` sh
 godot --headless --path . --import                       # first time / after adding files
 godot --headless --path . -s res://tests/run_tests.gd    # run tests
 godot --headless --path . --export-release "Web" build/web/index.html
-godot --headless --path . -s res://tools/balance_run.gd -- runs=200 style=shaman   # balance report
+godot --headless --path . -s res://tools/balance_run.gd -- runs=50 style=balanced   # balance report
 ```
 
 Run history: the game saves every run (Run history button). Copy one into chat, or compare many:
 
 ```sh
-godot --headless --path . -s res://tools/balance_run.gd -- runs=200 style=shaman out=sim.jsonl
+godot --headless --path . -s res://tools/balance_run.gd -- runs=50 style=balanced out=sim.jsonl
 godot --headless --path . -s res://tools/run_report.gd -- in=sim.jsonl in=my_runs.json
 ```
 
-Balance report styles (a scripted player): `none` (no bounties), `common` (5g on the most numerous enemy), `shaman` (10g on shamans), `bounty` (10g on the toughest enemy).
+Balance report styles (a scripted player): `balanced` (huts, a longhouse, watch posts, picks by need), `workers` (never takes heroes), `heroes` (rushes the longhouse, takes every hero it can afford).

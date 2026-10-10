@@ -1,0 +1,9 @@
+{
+	"_note": "Townsfolk roles, handled as groups. They do their job on their own; you only choose who joins at dawn.",
+	"tribesperson": {"name": "Tribesperson", "text": "Gathers food, fuel, wood and stone, and patches the hearth. Weak: must be protected.",
+		"hp": 18, "attack": 2, "range": 18, "cooldown": 1.2, "speed": 55, "carry": 2, "gather_seconds": 3, "repair_per_wood": 6, "color": "#c8b48a"},
+	"warrior": {"name": "Warrior", "text": "Patrols the settlement and fights anything that comes close. Never leaves home.",
+		"hp": 45, "attack": 6, "range": 24, "cooldown": 1.0, "speed": 60, "patrol_radius": 130, "color": "#c0603a"},
+	"craftsperson": {"name": "Craftsperson", "text": "Raises the buildings you order. Gathers wood when there is nothing to build.",
+		"hp": 20, "attack": 2, "range": 18, "cooldown": 1.2, "speed": 50, "carry": 2, "gather_seconds": 3, "build_rate": 1.0, "color": "#7fa6c9"}
+}

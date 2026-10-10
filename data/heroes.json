@@ -1,19 +1,120 @@
 {
-	"_note": "Hero classes, personality traits, names and gear. Traits drive what heroes choose to do. roam = how far from the keep a hero will go for an enemy with no bounty on it.",
+	"_note": "Hero classes, personality traits, names and gear. wilds = how keen a hero is to hunt at the dens by day (0 = stays home). Traits also drive retreat and target choice.",
 	"classes": {
-		"warrior": {"name": "Warrior", "hp": 60, "attack": 7, "range": 28, "cooldown": 1.0, "speed": 70, "color": "#d9a441"},
-		"ranger": {"name": "Ranger", "hp": 38, "attack": 6, "range": 170, "cooldown": 1.1, "speed": 75, "color": "#5fbf6a"},
-		"rogue": {"name": "Rogue", "hp": 42, "attack": 9, "range": 28, "cooldown": 0.8, "speed": 95, "color": "#9b7fe0"}
+		"hunter": {
+			"name": "Hunter",
+			"hp": 40,
+			"attack": 6,
+			"range": 170,
+			"cooldown": 1.1,
+			"speed": 75,
+			"color": "#5fbf6a"
+		},
+		"champion": {
+			"name": "Champion",
+			"hp": 62,
+			"attack": 7,
+			"range": 28,
+			"cooldown": 1.0,
+			"speed": 68,
+			"color": "#d9a441"
+		},
+		"stalker": {
+			"name": "Stalker",
+			"hp": 44,
+			"attack": 9,
+			"range": 28,
+			"cooldown": 0.8,
+			"speed": 92,
+			"color": "#9b7fe0"
+		}
 	},
 	"traits": {
-		"brave": {"roam": 500, "name": "Brave", "retreat_at": 0.15, "greed": 0.6, "duty": 0.6, "caution": 0.2, "prefers": "weapon", "hoard": 1.0},
-		"cautious": {"roam": 220, "name": "Cautious", "retreat_at": 0.5, "greed": 0.6, "duty": 0.6, "caution": 1.6, "prefers": "armor", "hoard": 1.0},
-		"greedy": {"roam": 120, "name": "Greedy", "retreat_at": 0.3, "greed": 2.2, "duty": 0.1, "caution": 0.7, "prefers": "weapon", "hoard": 2.0},
-		"dutiful": {"roam": 260, "name": "Dutiful", "retreat_at": 0.3, "greed": 0.2, "duty": 2.2, "caution": 0.8, "prefers": "armor", "hoard": 1.0}
+		"brave": {
+			"name": "Brave",
+			"retreat_at": 0.15,
+			"greed": 0.6,
+			"duty": 0.6,
+			"caution": 0.2,
+			"prefers": "weapon",
+			"hoard": 1.0,
+			"wilds": 1.0
+		},
+		"cautious": {
+			"name": "Cautious",
+			"retreat_at": 0.5,
+			"greed": 0.6,
+			"duty": 0.6,
+			"caution": 1.6,
+			"prefers": "armor",
+			"hoard": 1.0,
+			"wilds": 0.3
+		},
+		"greedy": {
+			"name": "Greedy",
+			"retreat_at": 0.3,
+			"greed": 2.2,
+			"duty": 0.1,
+			"caution": 0.7,
+			"prefers": "weapon",
+			"hoard": 2.0,
+			"wilds": 0.9
+		},
+		"dutiful": {
+			"name": "Dutiful",
+			"retreat_at": 0.3,
+			"greed": 0.2,
+			"duty": 2.2,
+			"caution": 0.8,
+			"prefers": "armor",
+			"hoard": 1.0,
+			"wilds": 0.0
+		}
 	},
-	"names": ["Aldo", "Brakka", "Cora", "Dunstan", "Elka", "Fenn", "Greta", "Hollis", "Ines", "Jory", "Kasimir", "Lune", "Maro", "Nell", "Osric", "Pim", "Quill", "Rhea", "Sable", "Tamsin", "Ulf", "Vesna", "Wren", "Yara"],
+	"names": [
+		"Aed",
+		"Bryn",
+		"Cael",
+		"Dagna",
+		"Eir",
+		"Fenn",
+		"Gorm",
+		"Hild",
+		"Idra",
+		"Jarl",
+		"Kesh",
+		"Lir",
+		"Mor",
+		"Nessa",
+		"Orm",
+		"Pell",
+		"Rauk",
+		"Sif",
+		"Tarn",
+		"Ulla",
+		"Vor",
+		"Wyn",
+		"Yrsa",
+		"Zev"
+	],
 	"gear": {
-		"weapon": {"costs": [15, 30, 50], "attack": 3},
-		"armor": {"costs": [15, 30, 50], "hp": 16}
+		"weapon": {
+			"name": "flint blade",
+			"costs": [
+				15,
+				30,
+				50
+			],
+			"attack": 3
+		},
+		"armor": {
+			"name": "hide armour",
+			"costs": [
+				15,
+				30,
+				50
+			],
+			"hp": 16
+		}
 	}
 }

@@ -1,8 +1,9 @@
 {
-	"_note": "Enemy types. cost = wave budget points; min_round = first round it can appear; loot = gold the killer picks up. hold_at = hangs back this far from the keep until the rest of the wave is dead; war_chant = extra damage for every enemy while it lives.",
-	"goblin": {"name": "Goblin", "hp": 14, "attack": 3, "range": 22, "cooldown": 1.0, "speed": 60, "cost": 1, "min_round": 1, "xp": 1, "loot": 1, "color": "#c0504d"},
-	"wolf": {"name": "Wolf", "hp": 18, "attack": 4, "range": 22, "cooldown": 0.8, "speed": 110, "cost": 2, "min_round": 2, "xp": 2, "loot": 1, "color": "#a0665a"},
-	"brute": {"name": "Brute", "hp": 70, "attack": 11, "range": 26, "cooldown": 1.4, "speed": 40, "cost": 5, "min_round": 3, "xp": 6, "loot": 4, "color": "#8e2f2f"},
-	"shaman": {"name": "Shaman", "hold_at": 480, "war_chant": 0.25, "hp": 24, "attack": 5, "range": 150, "cooldown": 1.3, "speed": 50, "cost": 3, "min_round": 4, "xp": 3, "loot": 2, "color": "#d06aa8"},
-	"warlord": {"name": "Warlord", "hp": 260, "attack": 16, "range": 30, "cooldown": 1.5, "speed": 35, "cost": 0, "min_round": 99, "boss": true, "xp": 20, "loot": 20, "color": "#ff3b3b"}
+	"_note": "Enemies. cost = wave budget points; min_round = first round it can appear in a wave; loot = shells the killer picks up. hold_at = hangs back this far from the hearth until the rest of the wave is dead; war_chant = extra damage for every enemy while it lives. wave = false: only comes from dens.",
+	"raider": {"name": "Raider", "hp": 16, "attack": 3, "range": 22, "cooldown": 1.0, "speed": 58, "cost": 1, "min_round": 1, "xp": 1, "loot": 1, "color": "#c0504d"},
+	"wolf": {"name": "Wolf", "hp": 18, "attack": 4, "range": 22, "cooldown": 0.8, "speed": 105, "cost": 2, "min_round": 2, "xp": 2, "loot": 1, "color": "#a0665a"},
+	"cave_bear": {"name": "Cave bear", "hp": 75, "attack": 11, "range": 26, "cooldown": 1.4, "speed": 42, "cost": 5, "min_round": 3, "xp": 6, "loot": 4, "color": "#7a3b2b"},
+	"bone_caller": {"name": "Bone-caller", "hold_at": 330, "war_chant": 0.25, "hp": 24, "attack": 5, "range": 150, "cooldown": 1.3, "speed": 50, "cost": 3, "min_round": 4, "xp": 3, "loot": 3, "color": "#d06aa8"},
+	"barrow_wight": {"name": "Barrow-wight", "wave": false, "hp": 34, "attack": 6, "range": 24, "cooldown": 1.1, "speed": 55, "cost": 3, "min_round": 99, "xp": 4, "loot": 4, "color": "#8fa3b8"},
+	"antlered_king": {"name": "The Antlered King", "hp": 300, "attack": 16, "range": 30, "cooldown": 1.5, "speed": 36, "cost": 0, "min_round": 99, "boss": true, "xp": 20, "loot": 25, "color": "#ff3b3b"}
 }
