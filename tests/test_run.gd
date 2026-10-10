@@ -248,3 +248,13 @@ func test_nights_are_recorded() -> void:
 	var nights: Array = run._round_entry["nights"]
 	check_eq(nights.size(), 3, "one report per night")
 	check_eq(nights[2]["night"], 3, "last report is night 3")
+
+
+func test_hungry_leavers_show_in_the_night_report() -> void:
+	var run := _run()
+	run.begin_round()
+	run.choose_pick(-1)
+	run.stock["food"] = 0
+	run.world.reset_night_report()
+	run.daily_upkeep()
+	check_eq(run.world.night_report["left"].size(), 1, "someone who walks away hungry is in the report")

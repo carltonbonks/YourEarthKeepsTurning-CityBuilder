@@ -191,6 +191,7 @@ func _refresh_live() -> void:
 		run.round_number, content.int_num("rounds_to_win"), run.run_seed, maxi(0, int(w.hearth_hp)), int(run.hearth_max_hp()),
 		"  ".join(stock), run.population(), run.housing(), ", ".join(folk), run.living_heroes().size(),
 		_food_per_day(), run.fuel_needed_tonight()]
+	_status.text += "\n" + _fuel_line()
 
 	var clock := ""
 	if run.phase == RunState.Phase.BUILD:
@@ -237,6 +238,21 @@ func _refresh_live() -> void:
 		text += "[color=#666666]%s (fallen)[/color]\n" % hero.display_name
 	_heroes_label.text = text
 	_append_story()
+
+
+## Fuel in reserve against the nightly burn: one block per night it will last (up to 8).
+func _fuel_line() -> String:
+	var burn := run.fuel_needed_tonight()
+	var fuel: int = run.stock["fuel"]
+	if burn <= 0:
+		return "Fire: burns nothing tonight"
+	var nights := float(fuel) / burn
+	var color := "#e05050" if nights < 1.0 else ("#e0a050" if nights < 2.0 else "#e0b050")
+	var blocks := mini(8, int(nights))
+	var bar := "█".repeat(blocks) + "░".repeat(8 - blocks)
+	var spare_wood := "" if nights >= 1.0 or not content.balance.get("wood_burns_as_fuel", false) else ", then wood"
+	return "Fire: [color=%s]%s[/color] %d fuel, burns %d a night, lasts %s%s" % [color, bar, fuel, burn,
+		"%d nights" % int(nights) if nights >= 1.0 else "less than a night", spare_wood]
 
 
 func _food_per_day() -> int:
@@ -308,15 +324,21 @@ func _night_summary() -> void:
 	if n.is_empty():
 		return
 	var deaths: Array = n["deaths"]
+	var left: Array = n.get("left", [])
 	var text := "Night %d: raiders %d, enemies killed %d, hearth damage %d. " % [
 		n["night"], n["raiders"], n["kills"], n["hearth_damage"]]
-	text += "Lost: %s." % ", ".join(deaths) if not deaths.is_empty() else "Nobody was lost."
+	var lost := PackedStringArray()
+	for name: String in deaths:
+		lost.append("%s (killed)" % name)
+	for name: String in left:
+		lost.append("%s (left hungry)" % name)
+	text += "Lost: %s." % ", ".join(lost) if not lost.is_empty() else "Nobody was lost."
 	var label := Label.new()
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	label.custom_minimum_size.x = 600
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_color_override("font_color", Color("#e0a050") if not deaths.is_empty() else Color("#a8c8a0"))
+	label.add_theme_color_override("font_color", Color("#e0a050") if not lost.is_empty() else Color("#a8c8a0"))
 	_overlay_box.add_child(label)
 
 
@@ -376,7 +398,7 @@ func _show_history() -> void:
 	stats.add_theme_font_size_override("font_size", 13)
 	_overlay_box.add_child(stats)
 	var hint := Label.new()
-	hint.text = "Copy a run and paste it in the project chat, with what felt off."
+	hint.text = "To share runs, download them as one file and attach it to a chat message."
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color("#9aa"))
 	_overlay_box.add_child(hint)
@@ -418,6 +440,14 @@ func _show_history() -> void:
 			DisplayServer.clipboard_set(JSON.stringify(runs.map(RunHistory.compact)))
 			copy_all.text = "Copied!")
 		buttons.add_child(copy_all)
+		if OS.has_feature("web"):
+			var download_all := Button.new()
+			download_all.text = "Download all runs (one file)"
+			download_all.tooltip_text = "Saves every run as one file. Attach that file to a chat message to share it."
+			download_all.pressed.connect(func() -> void:
+				JavaScriptBridge.download_buffer(JSON.stringify(runs.map(RunHistory.compact)).to_utf8_buffer(),
+					"runs-%s.json" % Time.get_date_string_from_system(), "application/json"))
+			buttons.add_child(download_all)
 	var close := Button.new()
 	close.text = "Back"
 	close.pressed.connect(func() -> void:
@@ -490,7 +520,7 @@ func _build_ui() -> void:
 	left.add_theme_constant_override("separation", 6)
 	left_scroll.add_child(left)
 
-	_status = _rich(left, 120)
+	_status = _rich(left, 140)
 	_status.add_theme_font_size_override("normal_font_size", 13)
 	_status.add_theme_font_size_override("bold_font_size", 14)
 

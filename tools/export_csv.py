@@ -147,7 +147,8 @@ def main(raw_folder, out_folder):
                 tables["nights"].append({
                     "run_id": rid, "round": rn, "night": night.get("night", ""), "raiders": night.get("raiders", ""),
                     "kills": night.get("kills", ""), "hearth_damage": night.get("hearth_damage", ""),
-                    "deaths": len(night.get("deaths", [])), "wave_night": 1 if night.get("night") == 3 else 0,
+                    "deaths": len(night.get("deaths", [])), "left_hungry": len(night.get("left", [])),
+                    "wave_night": 1 if night.get("night") == 3 else 0,
                 })
             for item in rd.get("loot", []):
                 tables["loot"].append({
@@ -170,7 +171,7 @@ def main(raw_folder, out_folder):
         "builds": ["run_id", "round", "building"],
         "wave_enemies": ["run_id", "round", "enemy", "count"],
         "deaths": ["run_id", "round", "day", "at_night", "name", "role", "is_hero", "killer"],
-        "nights": ["run_id", "round", "night", "raiders", "kills", "hearth_damage", "deaths", "wave_night"],
+        "nights": ["run_id", "round", "night", "raiders", "kills", "hearth_damage", "deaths", "left_hungry", "wave_night"],
         "relic_offers": ["run_id", "round", "relic", "picked"],
         "heroes": ["run_id", "name", "class", "trait", "level", "kills", "alive", "weapon", "armor", "charm", "items",
                    "gold", "max_hp", "energy", "lodging"],
