@@ -11,7 +11,6 @@ var balance: Dictionary
 var hero_classes: Dictionary
 var traits: Dictionary
 var hero_names: Array
-var gear: Dictionary
 var whims: Dictionary
 var items: Dictionary
 var enemies: Dictionary
@@ -19,6 +18,7 @@ var relics: Dictionary
 var townsfolk: Dictionary
 var buildings: Dictionary
 var world: Dictionary
+var market: Dictionary  ## data/recipes.json: recipes, provisions and market numbers.
 
 
 static func load_default() -> Content:
@@ -28,7 +28,6 @@ static func load_default() -> Content:
 	c.hero_classes = heroes["classes"]
 	c.traits = heroes["traits"]
 	c.hero_names = heroes["names"]
-	c.gear = heroes["gear"]
 	c.whims = heroes["whims"]
 	c.items = _strip(_read("items.json"))
 	c.enemies = _strip(_read("enemies.json"))
@@ -36,6 +35,7 @@ static func load_default() -> Content:
 	c.townsfolk = _strip(_read("townsfolk.json"))
 	c.buildings = _strip(_read("buildings.json"))
 	c.world = _strip(_read("world.json"))
+	c.market = _strip(_read("recipes.json"))
 	return c
 
 
@@ -50,6 +50,24 @@ func int_num(key: String) -> int:
 ## True if an enemy type carries a tag (see "tags" in data/enemies.json).
 func enemy_has_tag(type_id: String, tag: String) -> bool:
 	return tag in enemies[type_id].get("tags", [])
+
+
+## Recipe ids a workshop type can make, sorted.
+func recipes_for(workshop: String) -> Array[String]:
+	var out: Array[String] = []
+	for id: String in market["recipes"]:
+		if market["recipes"][id]["workshop"] == workshop:
+			out.append(id)
+	out.sort()
+	return out
+
+
+## What a recipe is called, e.g. "flint blade" or "smoked meat".
+func recipe_name(id: String) -> String:
+	var r: Dictionary = market["recipes"][id]
+	if r.has("item"):
+		return items["bases"][r["item"]]["name"]
+	return market["provisions"][r["provision"]]["name"]
 
 
 ## Building type ids that heroes can sleep in, sorted.

@@ -32,7 +32,8 @@ var hearth_cooldown_left := 0.0
 var nodes: Array[Dictionary] = []  ## {type, gives, pos, amount, max}
 var dens: Array[Dictionary] = []  ## {type, spawns, pos, respawn_left}
 var plots: Array[Vector2] = []
-var buildings: Array[Dictionary] = []  ## {type, pos, work_left, cooldown_left}
+## {type, plot, pos, work_left, cooldown_left, goods (stalls), craft, craft_left, craft_tier, made (workshops)}
+var buildings: Array[Dictionary] = []
 
 var folk: Array[Unit] = []
 var enemies: Array[Unit] = []
@@ -55,6 +56,8 @@ var night_report := {}
 ## Enemies chasing a fleeing worker (seen last tick); warriors answer the call.
 var alarms: Array[Unit] = []
 var _new_alarms: Array[Unit] = []
+## Prize shells per creature tag posted by finished buildings (see "prize" in data/buildings.json), refreshed each tick.
+var _prizes := {}
 
 
 func _init(run_state: RunState) -> void:
@@ -158,6 +161,7 @@ func step() -> void:
 
 	alarms = _new_alarms
 	_new_alarms = []
+	_prizes = _posted_prizes()
 	_dens_tick()
 	for enemy in enemies:
 		if not enemy.spawned and time >= enemy.spawn_time:
@@ -249,16 +253,16 @@ func resume() -> void:
 func _place_nodes() -> void:
 	var ids: Array = content.world["nodes"].keys()
 	ids.sort()
-	var lo := content.num("node_min_distance")
-	var hi := content.num("node_max_distance")
 	for id: String in ids:
 		var def: Dictionary = content.world["nodes"][id]
+		var lo := float(def.get("min_distance", content.num("node_min_distance")))
+		var hi := float(def.get("max_distance", content.num("node_max_distance")))
 		for i in int(def["count"]):
 			# Spread each type around the circle, nearer and farther out.
 			var angle := TAU * (i + rng.randf()) / float(def["count"])
 			var dist := lerpf(lo, hi, (i + rng.randf()) / float(def["count"]))
 			nodes.append({"type": id, "gives": def["gives"], "pos": Vector2.from_angle(angle) * dist,
-				"amount": int(def["amount"]), "max": int(def["amount"])})
+				"amount": int(def["amount"]), "max": int(def["amount"]), "heroes_only": def.get("heroes_only", false)})
 
 
 func _place_dens() -> void:
@@ -285,7 +289,8 @@ func add_building(type: String) -> void:
 	if plot < 0:
 		return
 	buildings.append({"type": type, "plot": plot, "pos": plots[plot],
-		"work_left": float(content.buildings[type]["work"]), "cooldown_left": 0.0})
+		"work_left": float(content.buildings[type]["work"]), "cooldown_left": 0.0,
+		"goods": [], "craft": "", "craft_left": 0.0, "craft_tier": 1, "made": 0})
 
 
 func count_buildings(type: String, built_only := true) -> int:
@@ -405,6 +410,21 @@ func _worker_tick(unit: Unit) -> void:
 					run.tell("A %s is finished." % content.buildings[site["type"]]["name"].to_lower())
 					run.on_building_done(site["type"])
 					unit.task = ""
+		"craft":
+			if unit.task_index >= buildings.size():
+				unit.task = ""
+				return
+			var shop: Dictionary = buildings[unit.task_index]
+			if shop["craft"] == "" and not _start_craft(unit.task_index):
+				unit.task = ""
+				return
+			unit.intent = "making a %s at the %s" % [content.recipe_name(shop["craft"]), content.buildings[shop["type"]]["name"].to_lower()]
+			if _move_toward(unit, shop["pos"], 14.0):
+				shop["craft_left"] = float(shop["craft_left"]) - float(def.get("build_rate", 0.5)) * dt
+				if float(shop["craft_left"]) <= 0.0:
+					_finish_craft(unit.task_index)
+					# Look again: a new order or another workshop may need these hands more.
+					unit.task = ""
 		"repair":
 			unit.intent = "patching the hearth"
 			if _move_toward(unit, Vector2.ZERO, HEARTH_RADIUS + 6.0):
@@ -442,6 +462,11 @@ func _choose_work(unit: Unit) -> void:
 				unit.task = "build"
 				unit.task_index = i
 				return
+		var shop := _workshop_needing_hands(unit)
+		if shop >= 0:
+			unit.task = "craft"
+			unit.task_index = shop
+			return
 	if unit.type_id == "tribesperson" and hearth_hp < run.hearth_max_hp() * 0.8 and int(run.stock["wood"]) > 0 \
 			and not folk.any(func(u: Unit) -> bool: return u.task == "repair"):
 		unit.task = "repair"
@@ -452,7 +477,7 @@ func _choose_work(unit: Unit) -> void:
 	var best_d := INF
 	for i in nodes.size():
 		var node := nodes[i]
-		if node["gives"] != want or int(node["amount"]) <= 0:
+		if node["gives"] != want or int(node["amount"]) <= 0 or node.get("heroes_only", false):
 			continue
 		var d := unit.pos.distance_to(node["pos"])
 		# Gatherers avoid nodes with a monster prowling nearby.
@@ -479,6 +504,10 @@ func _hero_tick(hero: Unit) -> void:
 	var t: Dictionary = content.traits[hero.trait_id]
 	hero.cooldown_left -= dt
 	var retreat_at := clampf(float(t["retreat_at"]) + run.mod("retreat_shift"), 0.0, 0.95)
+	if hero.carry_amount > 0 and hero.pos.length() <= content.num("settlement_radius"):
+		_sell_shards(hero)
+	if not hero.retreating and hero.hp_fraction() < retreat_at + 0.1:
+		_use_provision(hero, "heal")
 	if not hero.retreating and hero.hp_fraction() < retreat_at:
 		hero.retreating = true
 		hero.resting = false
@@ -499,6 +528,8 @@ func _hero_tick(hero: Unit) -> void:
 	drain *= maxf(0.2, 1.0 - Loot.total(content, hero, "energy"))
 	var was_awake := hero.energy > 0.0
 	hero.energy = maxf(0.0, hero.energy - drain * dt)
+	if hero.energy <= float(t.get("tired_at", 25)) and hero.pos.length() > content.num("settlement_radius"):
+		_use_provision(hero, "energy")
 	if was_awake and hero.energy <= 0.0:
 		run.tell("%s is exhausted and fights weakly until they rest." % hero.display_name)
 
@@ -509,6 +540,10 @@ func _hero_tick(hero: Unit) -> void:
 	if not is_dusk():
 		reach = maxf(reach, wilds * (content.num("den_max_distance") + 120.0))
 	hero.target = _choose_target(hero, t, reach, whim.get("trophy", false))
+	# By day a hero with shells stops at the stalls, unless a fight is close.
+	var fight_close := hero.target != null and hero.target.pos.distance_to(hero.pos) < 140.0
+	if not is_night() and not fight_close and hero.gold > 0 and _shop_tick(hero, t, whim):
+		return
 	var bed := bed_index(hero)
 	var why_bed := _wants_bed(hero, t)
 	if why_bed != "":
@@ -526,6 +561,12 @@ func _hero_tick(hero: Unit) -> void:
 		_fight(hero, hero.target)
 		return
 	if not is_dusk() and wilds > 0.5 and not dens.is_empty():
+		var outcrop := _outcrop_for(hero)
+		if outcrop >= 0:
+			hero.intent = "prising obsidian from an outcrop"
+			if _move_toward(hero, nodes[outcrop]["pos"], 10.0):
+				_take_shards(hero, outcrop)
+			return
 		var den: Dictionary = dens[hero.id % dens.size()]
 		hero.intent = "stalking the %s" % content.world["dens"][den["type"]]["name"].to_lower()
 		_move_toward(hero, den["pos"] * 0.85, 10.0)
@@ -716,6 +757,8 @@ func _choose_target(hero: Unit, t: Dictionary, reach: float, trophy := false) ->
 		var threat_to_camp := 1.0 - clampf(from_home / content.num("world_radius"), 0.0, 1.0)
 		var danger := enemy.attack / maxf(hero.hp, 1.0) * 10.0
 		var glory := float(t["wilds"]) * (4.0 if enemy.den_index >= 0 else 1.0) * (0.5 + float(t["greed"]) * 0.5)
+		# Prizes posted by buildings (the hunting lodge) draw greedy heroes most.
+		glory += prize_for(enemy.type_id) * float(t["greed"]) * 0.5
 		if trophy:
 			glory += enemy.max_hp / 12.0
 		var duty := float(t["duty"]) * threat_to_camp * 8.0
@@ -763,6 +806,11 @@ func give_item(hero: Unit, item: Dictionary) -> void:
 		hero.spares.append(item)
 		run.tell("%s finds a %s and keeps it to sell." % [hero.display_name, Loot.describe(content, item)])
 	run.note_loot(hero, item, equip)
+	_trim_spares(hero)
+
+
+## Heroes carry only a few spare items; the least valuable is dropped.
+func _trim_spares(hero: Unit) -> void:
 	if hero.spares.size() > int(content.items["spare_limit"]):
 		hero.spares.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return Loot.value(content, a) > Loot.value(content, b))
 		hero.spares.pop_back()
@@ -773,6 +821,293 @@ func _maybe_drop(hero: Unit, victim: Unit) -> void:
 	var chance := float(drops["boss"]) if victim.is_boss else float(drops["den"] if victim.den_index >= 0 else drops["wave"])
 	if rng.randf() < chance:
 		give_item(hero, Loot.roll(content, rng, run.round_number))
+
+
+# --- Market ----------------------------------------------------------------
+# Workshops turn raw goods into gear and provisions, one good at a time, while a
+# craftsperson works the bench. Each good goes to the stall that sells its kind.
+# Heroes passing through town buy what they like with their own shells, and the
+# shells go to the settlement. The player only chooses buildings and prices.
+
+## The finished stall that sells a kind of good, or -1.
+func stall_index(kind: String) -> int:
+	for i in buildings.size():
+		var b := buildings[i]
+		if float(b["work_left"]) <= 0.0 and content.buildings[b["type"]].get("stall", {}).get("sells", "") == kind:
+			return i
+	return -1
+
+
+## Goods on a kind's stall plus those being made for it right now.
+func _stall_load(kind: String) -> int:
+	var s := stall_index(kind)
+	var held: int = 0 if s < 0 else buildings[s]["goods"].size()
+	for b in buildings:
+		if b["craft"] != "" and content.market["recipes"][b["craft"]]["stall"] == kind:
+			held += 1
+	return held
+
+
+## What a workshop should make next: something its stall has room for and the
+## settlement can supply, favouring what the stall has least of. "" if nothing.
+func _next_recipe(index: int) -> String:
+	var b := buildings[index]
+	var options := content.recipes_for(b["type"])
+	var best := ""
+	var best_score := INF
+	for k in options.size():
+		var id: String = options[(k + int(b["made"])) % options.size()]
+		var r: Dictionary = content.market["recipes"][id]
+		var s := stall_index(r["stall"])
+		if s < 0 or _stall_load(r["stall"]) >= int(content.market["stall_capacity"]) or not run.can_afford(r["needs"]):
+			continue
+		var on_stall: int = buildings[s]["goods"].filter(func(g: Dictionary) -> bool: return g["recipe"] == id).size()
+		if on_stall < best_score:
+			best_score = on_stall
+			best = id
+	return best
+
+
+## A finished workshop with a free bench and something to make, the emptiest stall first. -1 if none.
+func _workshop_needing_hands(unit: Unit) -> int:
+	var best := -1
+	var best_load := INF
+	for i in buildings.size():
+		var b := buildings[i]
+		var def: Dictionary = content.buildings[b["type"]]
+		if not def.has("workshop") or float(b["work_left"]) > 0.0:
+			continue
+		var hands := folk.filter(func(u: Unit) -> bool: return u != unit and u.task == "craft" and u.task_index == i).size()
+		if hands >= int(def["workshop"]["slots"]):
+			continue
+		var next: String = b["craft"] if b["craft"] != "" else _next_recipe(i)
+		if next == "":
+			continue
+		var held := _stall_load(content.market["recipes"][next]["stall"])
+		if held < best_load:
+			best_load = held
+			best = i
+	return best
+
+
+## Takes the goods for the next recipe from stock and starts work on it.
+func _start_craft(index: int) -> bool:
+	var id := _next_recipe(index)
+	if id == "":
+		return false
+	var r: Dictionary = content.market["recipes"][id]
+	for res: String in r["needs"]:
+		run.stock[res] = int(run.stock[res]) - int(r["needs"][res])
+	var b := buildings[index]
+	b["craft"] = id
+	b["craft_left"] = float(r["work"])
+	b["craft_tier"] = run.craft_tier(id)
+	return true
+
+
+func _finish_craft(index: int) -> void:
+	var b := buildings[index]
+	var id: String = b["craft"]
+	var r: Dictionary = content.market["recipes"][id]
+	var good := {"recipe": id, "tier": int(b["craft_tier"])}
+	if r.has("item"):
+		var affixes := []
+		if rng.randf() < float(content.market["affix_chance"]):
+			var ids: Array = content.items["affixes"].keys().filter(func(a: String) -> bool: return a != "cursed")
+			ids.sort()
+			affixes.append(rng.pick(ids))
+		good["item"] = Loot.make(r["item"], int(b["craft_tier"]), affixes)
+	b["craft"] = ""
+	b["made"] = int(b["made"]) + 1
+	run.note_crafted(id)
+	var s := stall_index(r["stall"])
+	if s >= 0:
+		buildings[s]["goods"].append(good)
+	if good.has("item"):
+		run.tell("The %s finishes a %s for the %s." % [content.buildings[b["type"]]["name"].to_lower(),
+			Loot.describe(content, good["item"]), content.buildings[buildings[s]["type"]]["name"].to_lower() if s >= 0 else "market"])
+
+
+## How much a hero wants a good on a stall (0 or less: not at all).
+func _want(hero: Unit, t: Dictionary, good: Dictionary) -> float:
+	var r: Dictionary = content.market["recipes"][good["recipe"]]
+	if good.has("item"):
+		var item: Dictionary = good["item"]
+		var likes: Dictionary = t.get("likes", {})
+		var slot := Loot.slot(content, item)
+		var current: Dictionary = hero.items.get(slot, {})
+		var gain := Loot.score(content, item, likes) - (Loot.score(content, current, likes) if not current.is_empty() else 0.0)
+		return gain * (1.25 if slot == t.get("prefers", "") else 1.0)
+	var have := hero.pack.count(good["recipe"])
+	if have >= int(content.market["pack_limit"]):
+		return 0.0
+	var p: Dictionary = content.market["provisions"][r["provision"]]
+	# Cautious heroes stock up on poultices; keen hunters on food for the trail.
+	var keen := float(t["caution"]) if p.has("heal") else float(t["wilds"])
+	return (2.0 + 3.0 * keen) / (1.0 + have)
+
+
+## The good a hero would buy right now: {stall, index, price}, or {} if nothing tempts them.
+func _best_buy(hero: Unit, t: Dictionary) -> Dictionary:
+	var best := {}
+	var best_want := 0.0
+	for i in buildings.size():
+		var b := buildings[i]
+		var kind: String = content.buildings[b["type"]].get("stall", {}).get("sells", "")
+		if kind == "" or float(b["work_left"]) > 0.0 or b["goods"].is_empty():
+			continue
+		if run.price_markup(kind) > float(t.get("max_markup", 1.5)) + 0.001:
+			continue
+		for j in b["goods"].size():
+			var good: Dictionary = b["goods"][j]
+			var price := run.price_of(good)
+			# Hoarders only buy when they have plenty left over.
+			if hero.gold < price * float(t.get("hoard", 1.0)):
+				continue
+			var want := _want(hero, t, good)
+			if want > best_want:
+				best_want = want
+				best = {"stall": i, "index": j, "price": price}
+	return best
+
+
+## A hero in town with shells to spend walks to a stall with something they want.
+## Returns true while they are shopping.
+func _shop_tick(hero: Unit, t: Dictionary, whim: Dictionary) -> bool:
+	var in_town := hero.pos.length() <= content.num("settlement_radius") + 60.0
+	if not in_town and hero.shop_stall < 0 and not whim.get("shop_anywhere", false):
+		return false
+	var pick := _best_buy(hero, t)
+	if pick.is_empty():
+		hero.shop_stall = -1
+		return false
+	var stall: Dictionary = buildings[pick["stall"]]
+	hero.shop_stall = pick["stall"]
+	hero.intent = "shopping at the %s" % content.buildings[stall["type"]]["name"].to_lower()
+	if _move_toward(hero, stall["pos"], 12.0):
+		_buy(hero, pick)
+		hero.shop_stall = -1
+	return true
+
+
+func _buy(hero: Unit, pick: Dictionary) -> void:
+	var stall: Dictionary = buildings[pick["stall"]]
+	var good: Dictionary = stall["goods"][pick["index"]]
+	var price: int = pick["price"]
+	stall["goods"].remove_at(pick["index"])
+	hero.gold -= price
+	run.stock["shells"] = int(run.stock["shells"]) + price
+	run.note_hero_spending("market", price)
+	run.note_market_sale(hero, good, price)
+	var where: String = content.buildings[stall["type"]]["name"].to_lower()
+	if good.has("item"):
+		var item: Dictionary = good["item"]
+		var slot := Loot.slot(content, item)
+		if hero.items.has(slot):
+			hero.spares.append(hero.items[slot])
+			_trim_spares(hero)
+		hero.items[slot] = item
+		apply_hero_stats(hero)
+		run.tell("%s buys a %s at the %s for %d shells." % [hero.display_name, Loot.describe(content, item), where, price])
+	else:
+		hero.pack.append(good["recipe"])
+		run.tell("%s buys %s at the %s for %d shells." % [hero.display_name, content.recipe_name(good["recipe"]), where, price])
+
+
+## Uses one provision from the pack that has `effect` ("energy" or "heal"). True if one was used.
+func _use_provision(hero: Unit, effect: String) -> bool:
+	for k in hero.pack.size():
+		var id := hero.pack[k]
+		var p: Dictionary = content.market["provisions"][content.market["recipes"][id]["provision"]]
+		if not p.has(effect):
+			continue
+		hero.pack.remove_at(k)
+		if effect == "energy":
+			hero.energy = minf(content.num("hero_energy_max"), hero.energy + float(p["energy"]))
+			run.tell("%s eats %s and keeps going." % [hero.display_name, p["name"]])
+		else:
+			hero.hp = minf(hero.max_hp, hero.hp + float(p["heal"]))
+			run.tell("%s presses a %s to their wounds." % [hero.display_name, p["name"]])
+		return true
+	return false
+
+
+## An obsidian outcrop near a hero worth fetching from, or -1. Only once a knapper stands to buy it.
+func _outcrop_for(hero: Unit) -> int:
+	if hero.carry_amount > 0 or count_buildings("knapper") == 0:
+		return -1
+	var best := -1
+	var best_d := 300.0
+	for i in nodes.size():
+		var node := nodes[i]
+		if not node.get("heroes_only", false) or int(node["amount"]) <= 0:
+			continue
+		var d := hero.pos.distance_to(node["pos"])
+		if d < best_d:
+			best_d = d
+			best = i
+	return best
+
+
+func _take_shards(hero: Unit, index: int) -> void:
+	var node := nodes[index]
+	var take := mini(int(node["amount"]), int(content.market["hero_carry"]))
+	node["amount"] = int(node["amount"]) - take
+	hero.carrying = node["gives"]
+	hero.carry_amount = take
+
+
+## A hero back in town sells the shards they carry to the settlement, which pays what it can.
+func _sell_shards(hero: Unit) -> void:
+	var n := hero.carry_amount
+	var pay := mini(n * int(content.market["obsidian_price"]), int(run.stock["shells"]))
+	run.stock[hero.carrying] = int(run.stock[hero.carrying]) + n
+	run.stock["shells"] = int(run.stock["shells"]) - pay
+	hero.gold += pay
+	hero.carry_amount = 0
+	run.note_economy("obsidian", n)
+	run.tell("%s brings back %d obsidian shards and sells them for %d shells." % [hero.display_name, n, pay])
+
+
+func _posted_prizes() -> Dictionary:
+	var out := {}
+	for b in buildings:
+		var prize: Dictionary = content.buildings[b["type"]].get("prize", {})
+		if not prize.is_empty() and float(b["work_left"]) <= 0.0:
+			out[prize["tag"]] = int(out.get(prize["tag"], 0)) + int(prize["shells"])
+	return out
+
+
+## Prize shells posted on a creature type.
+func prize_for(type_id: String) -> int:
+	var total := 0
+	for tag: String in _prizes:
+		if content.enemy_has_tag(type_id, tag):
+			total += int(_prizes[tag])
+	return total
+
+
+## The settlement gets hides and bone from carcasses, plus extra from buildings that skin that kind of creature.
+func _carcass(victim: Unit) -> void:
+	var got: Dictionary = content.enemies[victim.type_id].get("yields", {}).duplicate()
+	for b in buildings:
+		var prize: Dictionary = content.buildings[b["type"]].get("prize", {})
+		if prize.is_empty() or float(b["work_left"]) > 0.0 or not content.enemy_has_tag(victim.type_id, prize["tag"]):
+			continue
+		for res: String in prize.get("yields", {}):
+			got[res] = int(got.get(res, 0)) + int(prize["yields"][res])
+	for res: String in got:
+		run.stock[res] = int(run.stock[res]) + int(got[res])
+		run.note_economy("yields", int(got[res]), res)
+
+
+func _pay_prizes(hero: Unit, victim: Unit) -> void:
+	var paid := mini(prize_for(victim.type_id), int(run.stock["shells"]))
+	if paid <= 0:
+		return
+	run.stock["shells"] = int(run.stock["shells"]) - paid
+	hero.gold += paid
+	run.note_economy("prizes", paid)
 
 
 # --- Enemies ---------------------------------------------------------------
@@ -985,12 +1320,14 @@ func _damage(attacker: Unit, victim: Unit, amount: float) -> void:
 		night_report["deaths"].append(victim.display_name)
 		return
 	night_report["kills"] = int(night_report["kills"]) + 1
+	_carcass(victim)
 	if attacker == null or not attacker.is_hero():
 		return
 	var e: Dictionary = content.enemies[victim.type_id]
 	attacker.kills += 1
 	attacker.xp += float(e["xp"]) * (1.0 + run.mod("xp_mult"))
 	attacker.gold += int(e["loot"]) + int(run.mod("loot_shells")) + int(Loot.total(content, attacker, "loot"))
+	_pay_prizes(attacker, victim)
 	_maybe_drop(attacker, victim)
 	if victim.is_boss:
 		run.tell("%s slays %s!" % [attacker.display_name, victim.display_name])

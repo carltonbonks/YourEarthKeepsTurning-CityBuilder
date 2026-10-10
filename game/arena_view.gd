@@ -115,6 +115,13 @@ func _draw() -> void:
 			draw_rect(rect, Color(col, 0.25))
 			draw_rect(rect, col, false, 1.5)
 			_bar(p + Vector2(-half, half + 3), half * 2.0, done, Color("#e8d9a8"))
+		# Stalls show a dot per good on sale; workshops show how far the current good is.
+		if work_left <= 0.0 and def.has("stall"):
+			for k in b["goods"].size():
+				draw_circle(p + Vector2(-half + 3.0 + k * 5.0, half + 4.0), 2.0, Color("#ffd24a"))
+		elif work_left <= 0.0 and def.has("workshop") and b["craft"] != "":
+			var recipe: Dictionary = content.market["recipes"][b["craft"]]
+			_bar(p + Vector2(-half, half + 3), half * 2.0, 1.0 - float(b["craft_left"]) / float(recipe["work"]), Color("#ffd24a"))
 		if zoom > 1.4:
 			draw_string(font, p + Vector2(-half, -half - 3), def["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#d8d0b8"))
 

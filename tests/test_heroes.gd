@@ -199,7 +199,7 @@ func test_selling_loot_pays_hero_and_settlement() -> void:
 	hero.spares.append(Loot.make("fur_cloak", 2, ["sturdy"]))
 	hero.gold = 0
 	var shells: int = run.stock["shells"]
-	run._heroes_go_shopping()
+	run._heroes_sell_finds()
 	var value := Loot.value(run.content, Loot.make("fur_cloak", 2, ["sturdy"]))
 	var cut := roundi(value * float(run.content.items["sell_tax"]))
 	check_eq(run.stock["shells"], shells + cut, "the settlement keeps a cut")
@@ -207,13 +207,13 @@ func test_selling_loot_pays_hero_and_settlement() -> void:
 	check_eq(run._round_entry["sales"].size(), 1, "sale recorded")
 
 
-func test_traders_sell_gear_heroes_like() -> void:
+func test_no_traders_sell_gear_between_rounds() -> void:
 	var run := _run()
 	var hero := _hero_with_trait(run, "brave")
 	hero.gold = 200
-	run._heroes_go_shopping()
-	check_eq(hero.items["weapon"]["base"], "flint_blade", "a brave hero buys a blade")
-	check(hero.gold < 200, "paid for it")
+	run._heroes_sell_finds()
+	check(not hero.items.has("weapon"), "gear only comes from the market's stalls now")
+	check_eq(hero.gold, 200, "nothing bought")
 
 
 func test_dropped_items_are_valid_and_reproducible() -> void:

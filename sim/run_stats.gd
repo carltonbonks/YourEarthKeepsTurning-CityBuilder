@@ -28,6 +28,8 @@ static func report(runs: Array) -> PackedStringArray:
 	var items_kept := 0
 	var hero_spent := 0.0
 	var sale_cut := 0.0
+	var market_spent := 0.0
+	var bought := {}
 	for r: Dictionary in runs:
 		if r["result"] == "lost":
 			var key := int(r["round_reached"])
@@ -42,6 +44,9 @@ static func report(runs: Array) -> PackedStringArray:
 				hero_spent += float(rd["hero_spending"][reason])
 			for sale: Dictionary in rd.get("sales", []):
 				sale_cut += float(sale.get("town_cut", 0))
+			for sale: Dictionary in rd.get("market", []):
+				market_spent += float(sale.get("price", 0))
+				bought[sale["recipe"]] = int(bought.get(sale["recipe"], 0)) + 1
 			var b: Dictionary = rd.get("battle", {})
 			if b.is_empty():
 				continue
@@ -67,8 +72,10 @@ static func report(runs: Array) -> PackedStringArray:
 	if items_found > 0:
 		out.append("Loot: %d items found, %d%% worn, the rest sold" % [items_found, roundi(100.0 * items_kept / items_found)])
 	if hero_spent + sale_cut > 0.0:
-		out.append("Shells heroes paid the settlement: %d (lodging and drink %d, cut of loot sales %d)" % [
-			hero_spent + sale_cut, hero_spent, sale_cut])
+		out.append("Shells heroes paid the settlement: %d (lodging, drink and stalls %d, of which stalls %d; cut of loot sales %d)" % [
+			hero_spent + sale_cut, hero_spent, market_spent, sale_cut])
+	if not bought.is_empty():
+		out.append("Bought at stalls: %s" % _counts(bought))
 	var rounds := keep_damage.keys()
 	rounds.sort()
 	var dmg := PackedStringArray()

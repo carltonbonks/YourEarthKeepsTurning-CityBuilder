@@ -1,10 +1,12 @@
 {
-	"_note": "Map features. Resource nodes are placed in a ring around the hearth; dens far out in the wilds.",
+	"_note": "Map features. Resource nodes are placed in a ring around the hearth (min_distance/max_distance override the ring); dens far out in the wilds. heroes_only nodes are out in hero territory: townsfolk never gather them, heroes pick them up and sell them to the settlement.",
 	"nodes": {
 		"brush": {"name": "Dry brush", "gives": "fuel", "amount": 14, "count": 5, "color": "#b3a25a"},
 		"berries": {"name": "Berry thicket", "gives": "food", "amount": 12, "count": 5, "color": "#9a4b7a"},
 		"grove": {"name": "Grove", "gives": "wood", "amount": 24, "count": 4, "color": "#3f7a46"},
-		"rocks": {"name": "Rocks", "gives": "stone", "amount": 16, "count": 3, "color": "#8c8c8c"}
+		"rocks": {"name": "Rocks", "gives": "stone", "amount": 16, "count": 3, "color": "#8c8c8c"},
+		"flint_pit": {"name": "Flint pit", "gives": "flint", "amount": 12, "count": 2, "color": "#5a6a7a"},
+		"obsidian": {"name": "Obsidian outcrop", "gives": "obsidian", "amount": 9, "count": 2, "color": "#2a1a3a", "heroes_only": true, "min_distance": 480, "max_distance": 640}
 	},
 	"dens": {
 		"wolf_den": {"name": "Wolf den", "spawns": "wolf", "color": "#5a4636"},

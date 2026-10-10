@@ -107,3 +107,4 @@ Yusuf must be able to try changes and give feedback quickly, without heavy build
 - Working title.
 - Which buildings post which incentives.
 - Hero energy and lodging rules: slice 3 uses Claude's defaults (energy drains awake and per attack, lodgings differ in rest speed, healing and how deeply heroes sleep, each trait has a favourite lodging, daily whims). Pending Yusuf's playtest.
+- Marketplace rules: slice 4 uses Claude's defaults (workshops hold 1 craftsperson and can be built twice, stalls hold 4 goods, Cheap/Fair/Dear prices per stall at x0.6/x1/x1.5, greedy heroes skip Dear stalls, crafted gear tiers up every 3 rounds, the hunting lodge pays 3 shells per beast, obsidian is fetched by heroes and sold for 2 shells a shard, between-round traders are gone). Pending Yusuf's playtest.
