@@ -52,7 +52,7 @@ func test_workshop_makes_goods_for_its_stall() -> void:
 	_raise(run, "market")
 	var stall := _raise(run, "arms_stall")
 	_raise(run, "knapper")
-	run.world.add_folk("craftsperson")
+	run.world.folk_ai.add_folk("craftsperson")
 	run.stock["flint"] = 10
 	run.stock["bone"] = 10
 	run.stock["wood"] = 20
@@ -71,16 +71,16 @@ func test_workshop_idles_without_its_stall_or_goods() -> void:
 	var run := _run()
 	var knapper := _raise(run, "knapper")
 	run.stock["flint"] = 10
-	check_eq(run.world._next_recipe(knapper), "", "no arms stall: nothing to make")
+	check_eq(run.world.market.next_recipe(knapper), "", "no arms stall: nothing to make")
 	_raise(run, "market")
 	_raise(run, "arms_stall")
 	run.stock["flint"] = 0
 	run.stock["bone"] = 0
 	run.stock["obsidian"] = 0
-	check_eq(run.world._next_recipe(knapper), "", "no flint or bone: nothing to make")
+	check_eq(run.world.market.next_recipe(knapper), "", "no flint or bone: nothing to make")
 	run.stock["flint"] = 2
 	run.stock["wood"] = 1
-	check_eq(run.world._next_recipe(knapper), "flint_blade", "flint and wood make a blade")
+	check_eq(run.world.market.next_recipe(knapper), "flint_blade", "flint and wood make a blade")
 
 
 func test_heroes_buy_gear_they_like_and_pay_the_town() -> void:
@@ -128,12 +128,12 @@ func test_greedy_heroes_skip_dear_stalls() -> void:
 	greedy.trait_id = "greedy"
 	greedy.gold = 500
 	var t: Dictionary = run.content.traits["greedy"]
-	check(run.world._best_buy(greedy, t).is_empty(), "a greedy hero won't pay Dear prices")
+	check(run.world.hero_ai.best_buy(greedy, t).is_empty(), "a greedy hero won't pay Dear prices")
 	var brave := run.heroes[1]
 	brave.trait_id = "brave"
 	brave.gold = 500
 	brave.items.erase("weapon")
-	check(not run.world._best_buy(brave, run.content.traits["brave"]).is_empty(), "a brave hero will")
+	check(not run.world.hero_ai.best_buy(brave, run.content.traits["brave"]).is_empty(), "a brave hero will")
 
 
 func test_beast_kills_yield_hides_and_the_lodge_pays_prizes() -> void:
@@ -141,24 +141,24 @@ func test_beast_kills_yield_hides_and_the_lodge_pays_prizes() -> void:
 	var w := run.world
 	w.reset_night_report()
 	var hero := run.heroes[0]
-	var wolf := w._make_enemy("wolf", Vector2(400, 0), 0.0)
-	w._damage(hero, wolf, 999.0)
+	var wolf := w.enemy_ai.make_enemy("wolf", Vector2(400, 0), 0.0)
+	w.damage(hero, wolf, 999.0)
 	check_eq(run.stock["hides"], 1, "a dead wolf gives a hide")
 	check_eq(run.stock["bone"], 1, "and a bone")
 	_raise(run, "hunting_lodge")
-	w._prizes = w._posted_prizes()
+	w.market.refresh_prizes()
 	run.stock["shells"] = 10
 	var gold := hero.gold
-	var raider := w._make_enemy("raider", Vector2(400, 0), 0.0)
-	w._damage(hero, raider, 999.0)
+	var raider := w.enemy_ai.make_enemy("raider", Vector2(400, 0), 0.0)
+	w.damage(hero, raider, 999.0)
 	check_eq(run.stock["shells"], 10, "no prize for a raider (not a beast)")
-	var wolf2 := w._make_enemy("wolf", Vector2(400, 0), 0.0)
+	var wolf2 := w.enemy_ai.make_enemy("wolf", Vector2(400, 0), 0.0)
 	gold = hero.gold
-	w._damage(hero, wolf2, 999.0)
+	w.damage(hero, wolf2, 999.0)
 	check_eq(run.stock["hides"], 3, "the lodge skins an extra hide")
 	check_eq(run.stock["shells"], 7, "the lodge pays a 3-shell prize")
 	check(hero.gold >= gold + 3, "to the hero")
-	check(w.prize_for("cave_bear") == 3 and w.prize_for("raider") == 0, "prizes key on the beast tag")
+	check(w.market.prize_for("cave_bear") == 3 and w.market.prize_for("raider") == 0, "prizes key on the beast tag")
 
 
 func test_provisions_restore_energy_and_heal() -> void:
@@ -170,12 +170,12 @@ func test_provisions_restore_energy_and_heal() -> void:
 	hero.pack.append("poultice")
 	hero.energy = 5.0
 	hero.pos = Vector2(400, 0)
-	w._hero_tick(hero)
+	w.hero_ai.hero_tick(hero)
 	check(hero.energy > 30.0, "a tired hero in the wilds eats smoked meat")
 	check(not hero.pack.has("smoked_meat"), "and it is used up")
 	hero.hp = hero.max_hp * 0.2
 	var before := hero.hp
-	w._hero_tick(hero)
+	w.hero_ai.hero_tick(hero)
 	check(hero.hp > before + 20.0, "a hurt hero uses a poultice")
 	check(hero.pack.is_empty(), "pack empty")
 
@@ -190,14 +190,14 @@ func test_heroes_fetch_obsidian_once_a_knapper_stands() -> void:
 			outcrop = i
 	check(outcrop >= 0, "the map has obsidian outcrops")
 	hero.pos = w.nodes[outcrop]["pos"] + Vector2(20, 0)
-	check_eq(w._outcrop_for(hero), -1, "nobody bothers without a knapper")
+	check_eq(w.hero_ai.outcrop_for(hero), -1, "nobody bothers without a knapper")
 	_raise(run, "knapper")
-	check_eq(w._outcrop_for(hero), outcrop, "with a knapper the shards are worth fetching")
-	w._take_shards(hero, outcrop)
+	check_eq(w.hero_ai.outcrop_for(hero), outcrop, "with a knapper the shards are worth fetching")
+	w.hero_ai.take_shards(hero, outcrop)
 	check_eq(hero.carry_amount, 3, "a hero carries three shards")
 	run.stock["shells"] = 20
 	var gold := hero.gold
-	w._sell_shards(hero)
+	w.hero_ai.sell_shards(hero)
 	check_eq(run.stock["obsidian"], 3, "the settlement gets the shards")
 	check_eq(hero.gold, gold + 6, "and pays 2 shells each")
 	check_eq(run.stock["shells"], 14, "out of its own stock")

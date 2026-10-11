@@ -132,7 +132,7 @@ func test_housing_limits_picks() -> void:
 	var run := _run()
 	run.begin_round()
 	while run.population() < run.housing():
-		run.world.add_folk("tribesperson")
+		run.world.folk_ai.add_folk("tribesperson")
 	check(not run.can_take_pick(0), "no room means no newcomer")
 
 
@@ -142,7 +142,7 @@ func test_building_costs_and_gets_raised() -> void:
 	check(run.build("hut"), "can build a hut")
 	check_eq(run.stock["wood"], wood - int(run.content.buildings["hut"]["cost"]["wood"]), "hut costs its listed wood")
 	check_eq(run.world.count_buildings("hut"), 0, "not raised yet")
-	run.world.add_folk("craftsperson")
+	run.world.folk_ai.add_folk("craftsperson")
 	run.begin_round()
 	run.choose_pick(-1)
 	run.run_until_pause()
@@ -177,7 +177,7 @@ func test_relic_changes_stats() -> void:
 	var before := run.heroes[0].attack
 	run.relics.append("war_paint")
 	run.relic_acquired_round["war_paint"] = 1
-	run.world.apply_hero_stats(run.heroes[0])
+	run.world.hero_ai.apply_hero_stats(run.heroes[0])
 	check(run.heroes[0].attack > before, "attack relic raises hero attack")
 
 
@@ -206,12 +206,12 @@ func test_small_raids_on_early_nights() -> void:
 func test_sentient_enemies_turn_on_attackers() -> void:
 	var run := _run()
 	var w := run.world
-	var raider := w._make_enemy("raider", Vector2(400, 0), 0.0)
-	var spirit := w._make_enemy("barrow_wight", Vector2(-400, 0), 0.0)
+	var raider := w.enemy_ai.make_enemy("raider", Vector2(400, 0), 0.0)
+	var spirit := w.enemy_ai.make_enemy("barrow_wight", Vector2(-400, 0), 0.0)
 	w.content.enemies["barrow_wight"]["tags"] = ["undead"]
 	var hero := run.heroes[0]
-	w._damage(hero, raider, 1.0)
-	w._damage(hero, spirit, 1.0)
+	w.damage(hero, raider, 1.0)
+	w.damage(hero, spirit, 1.0)
 	check(raider.target == hero, "raider (sentient) goes after the hero who hit it")
 	check(spirit.target == null, "a creature without the sentient tag does not")
 

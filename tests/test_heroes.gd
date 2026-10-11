@@ -31,7 +31,7 @@ func _advance(run: RunState, seconds: float) -> void:
 
 func test_heroes_sleep_rough_without_lodging() -> void:
 	var run := _run()
-	run.world.assign_lodgings()
+	run.world.hero_ai.assign_lodgings()
 	for hero in run.heroes:
 		check_eq(hero.lodging, -1, "no lodging means a spot by the hearth")
 
@@ -43,11 +43,11 @@ func test_heroes_pick_their_favourite_lodging() -> void:
 	var shrine := _raise(run, "shrine")
 	run.heroes[0].trait_id = "greedy"
 	run.heroes[1].trait_id = "cautious"
-	run.world.assign_lodgings()
+	run.world.hero_ai.assign_lodgings()
 	check_eq(run.heroes[0].lodging, tavern, "greedy hero sleeps in the mead hall")
 	check_eq(run.heroes[1].lodging, shrine, "cautious hero sleeps in the shrine")
-	check(run.world.is_preferred(run.heroes[0], tavern), "the mead hall is a greedy hero's favourite")
-	check(not run.world.is_preferred(run.heroes[0], longhouse), "the longhouse is not")
+	check(run.world.hero_ai.is_preferred(run.heroes[0], tavern), "the mead hall is a greedy hero's favourite")
+	check(not run.world.hero_ai.is_preferred(run.heroes[0], longhouse), "the longhouse is not")
 
 
 func test_full_lodging_overflows() -> void:
@@ -58,7 +58,7 @@ func test_full_lodging_overflows() -> void:
 		run._add_hero(run._make_hero())
 	for hero in run.heroes:
 		hero.trait_id = "cautious"
-	run.world.assign_lodgings()
+	run.world.hero_ai.assign_lodgings()
 	var in_shrine := run.heroes.filter(func(h: Unit) -> bool: return h.lodging == shrine).size()
 	var in_longhouse := run.heroes.filter(func(h: Unit) -> bool: return h.lodging == longhouse).size()
 	check_eq(in_shrine, 2, "shrine holds 2")
@@ -98,7 +98,7 @@ func test_energy_drains_by_day_and_rest_restores_it() -> void:
 	check(hero.energy < 100.0, "energy drains while awake")
 	hero.energy = 10.0
 	_advance(run, 15.0)
-	check(hero.resting or hero.pos.distance_to(run.world.bed_pos(hero)) > 8.0, "a tired hero heads to bed")
+	check(hero.resting or hero.pos.distance_to(run.world.hero_ai.bed_pos(hero)) > 8.0, "a tired hero heads to bed")
 
 
 func test_rest_rate_depends_on_lodging() -> void:
@@ -110,16 +110,16 @@ func test_rest_rate_depends_on_lodging() -> void:
 	run.choose_pick(-1)
 	run.world.enemies.clear()
 	hero.lodging = -1
-	hero.pos = w.bed_pos(hero)
+	hero.pos = w.hero_ai.bed_pos(hero)
 	hero.resting = true
 	hero.energy = 0.0
-	w._rest_tick(hero)
+	w.hero_ai.rest_tick(hero)
 	var rough := hero.energy
 	hero.lodging = tavern
-	hero.pos = w.bed_pos(hero)
+	hero.pos = w.hero_ai.bed_pos(hero)
 	hero.resting = true
 	hero.energy = 0.0
-	w._rest_tick(hero)
+	w.hero_ai.rest_tick(hero)
 	check(hero.energy > rough * 2.0, "a mead hall bed rests far faster than the bare ground (%.2f vs %.2f)" % [hero.energy, rough])
 
 
@@ -132,15 +132,15 @@ func test_sleepers_wake_for_nearby_enemies_only() -> void:
 	run.choose_pick(-1)
 	w.enemies.clear()
 	hero.lodging = tavern
-	hero.pos = w.bed_pos(hero)
+	hero.pos = w.hero_ai.bed_pos(hero)
 	hero.resting = true
 	hero.energy = 50.0
-	var far := w._make_enemy("raider", hero.pos + Vector2(150, 0), 0.0)
+	var far := w.enemy_ai.make_enemy("raider", hero.pos + Vector2(150, 0), 0.0)
 	w.enemies.append(far)
-	w._rest_tick(hero)
+	w.hero_ai.rest_tick(hero)
 	check(hero.resting, "a deep sleeper in the mead hall ignores a raider 150 away")
 	far.pos = hero.pos + Vector2(60, 0)
-	w._rest_tick(hero)
+	w.hero_ai.rest_tick(hero)
 	check(not hero.resting, "but wakes when it comes close")
 
 
@@ -148,13 +148,13 @@ func test_exhausted_heroes_hit_softer() -> void:
 	var run := _run()
 	var w := run.world
 	var hero := run.heroes[0]
-	var a := w._make_enemy("cave_bear", Vector2(300, 0), 0.0)
-	var b := w._make_enemy("cave_bear", Vector2(300, 0), 0.0)
+	var a := w.enemy_ai.make_enemy("cave_bear", Vector2(300, 0), 0.0)
+	var b := w.enemy_ai.make_enemy("cave_bear", Vector2(300, 0), 0.0)
 	hero.attack = 10.0
 	hero.energy = 100.0
-	w._hit(hero, a)
+	w.hit(hero, a)
 	hero.energy = 0.0
-	w._hit(hero, b)
+	w.hit(hero, b)
 	check(a.max_hp - a.hp > b.max_hp - b.hp, "exhausted hit is weaker")
 
 
@@ -165,7 +165,7 @@ func test_whims_follow_traits_and_lodgings() -> void:
 	var carouse := 0
 	for i in 30:
 		run.round_number = i + 1
-		run.world.roll_whims()
+		run.world.hero_ai.roll_whims()
 		for hero in run.heroes:
 			check(hero.whim in run.content.whims, "whim is a known id")
 			if hero.whim == "carouse":
@@ -174,7 +174,7 @@ func test_whims_follow_traits_and_lodgings() -> void:
 	_raise(run, "tavern")
 	for i in 30:
 		run.round_number = i + 1
-		run.world.roll_whims()
+		run.world.hero_ai.roll_whims()
 		for hero in run.heroes:
 			if hero.whim == "carouse":
 				carouse += 1
@@ -185,10 +185,10 @@ func test_hero_wears_better_loot_and_keeps_the_rest_to_sell() -> void:
 	var run := _run()
 	var hero := _hero_with_trait(run, "brave")
 	var before := hero.attack
-	run.world.give_item(hero, Loot.make("flint_blade", 2))
+	run.world.hero_ai.give_item(hero, Loot.make("flint_blade", 2))
 	check_eq(hero.items["weapon"]["tier"], 2, "wears the blade")
 	check(hero.attack > before, "the blade adds damage")
-	run.world.give_item(hero, Loot.make("flint_blade", 1))
+	run.world.hero_ai.give_item(hero, Loot.make("flint_blade", 1))
 	check_eq(hero.items["weapon"]["tier"], 2, "keeps the better blade on")
 	check_eq(hero.spares.size(), 1, "the worse blade is kept to sell")
 

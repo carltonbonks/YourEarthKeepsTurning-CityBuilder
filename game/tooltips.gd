@@ -21,8 +21,8 @@ static func hero(run: RunState, u: Unit) -> Dictionary:
 	var whim: Dictionary = c.whims.get(u.whim, {})
 	if str(whim.get("name", "")) != "":
 		t["lines"].append("Today: %s" % whim["name"])
-	t["lines"].append("Sleeps in %s%s" % [run.world.bed_name(run.world.bed_index(u)),
-		" (their favourite)" if run.world.is_preferred(u, run.world.bed_index(u)) else ""])
+	t["lines"].append("Sleeps in %s%s" % [run.world.hero_ai.bed_name(run.world.hero_ai.bed_index(u)),
+		" (their favourite)" if run.world.hero_ai.is_preferred(u, run.world.hero_ai.bed_index(u)) else ""])
 	if u.intent != "":
 		t["lines"].append("Now: %s" % u.intent)
 	if u.mood <= c.num("mood_grumble_at"):
@@ -96,7 +96,7 @@ static func building(run: RunState, index: int) -> Dictionary:
 	if def.has("lodging"):
 		var used := 0
 		for h in run.living_heroes():
-			if run.world.bed_index(h) == index:
+			if run.world.hero_ai.bed_index(h) == index:
 				used += 1
 		t["lines"].append("Beds: %d of %d taken" % [used, int(def["lodging"]["beds"])])
 	if def.has("stall"):

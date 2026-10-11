@@ -328,7 +328,7 @@ func _market_text() -> String:
 				var kinds := PackedStringArray()
 				for id in content.recipes_for(b["type"]):
 					var k: String = content.market["recipes"][id]["stall"]
-					if w.stall_index(k) < 0 and not kinds.has(content.market["stall_names"][k]):
+					if w.market.stall_index(k) < 0 and not kinds.has(content.market["stall_names"][k]):
 						kinds.append(content.market["stall_names"][k])
 				why = " (no %s stall)" % "/".join(kinds) if not kinds.is_empty() else ""
 			lines.append("%s: %s%s" % [def["name"], doing, why])
@@ -383,8 +383,8 @@ func _refresh_live() -> void:
 		if not hero.alive:
 			continue
 		var whim: String = content.whims.get(hero.whim, {}).get("name", "")
-		var bed := "No bed: sleeps by the hearth" if hero.lodging < 0 else "Sleeps in %s%s" % [w.bed_name(hero.lodging),
-			"" if w.is_preferred(hero, hero.lodging) else " (not their favourite)"]
+		var bed := "No bed: sleeps by the hearth" if hero.lodging < 0 else "Sleeps in %s%s" % [w.hero_ai.bed_name(hero.lodging),
+			"" if w.hero_ai.is_preferred(hero, hero.lodging) else " (not their favourite)"]
 		text += "    [color=#9aa]%s%s[/color]\n" % [bed,
 			("  ·  today: " + whim) if whim != "" and run.phase != RunState.Phase.BUILD else ""]
 		var gear := PackedStringArray()
