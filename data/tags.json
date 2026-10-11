@@ -1,4 +1,4 @@
 {
-	"_note": "What creature tags do, shown when you hover over a creature or den. Only tags a rule reads get a line here; others show by name alone. Prize tags (the hunting lodge's beast prize) come from data/buildings.json, so the tooltip finds those on its own.",
+	"_note": "What each tag that a rule reads does, shown in hover tooltips. Any entity can carry tags in its data (\"tags\": [...] on enemies, hero classes, traits, townsfolk roles, buildings, item bases or relics; see Content.TAG_KINDS). Descriptive tags no rule reads yet are fine and show by name alone. When a rule starts reading a tag, add its line here: tests/test_tags.gd fails until you do. Prize tags (a building's \"prize\", like the hunting lodge's beast prize) are explained from data/buildings.json, so they need no line.",
 	"sentient": "turns on whoever hits it"
 }

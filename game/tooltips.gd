@@ -21,8 +21,8 @@ static func hero(run: RunState, u: Unit) -> Dictionary:
 	var whim: Dictionary = c.whims.get(u.whim, {})
 	if str(whim.get("name", "")) != "":
 		t["lines"].append("Today: %s" % whim["name"])
-	t["lines"].append("Sleeps in %s%s" % [run.world.bed_name(run.world.bed_index(u)),
-		" (their favourite)" if run.world.is_preferred(u, run.world.bed_index(u)) else ""])
+	t["lines"].append("Sleeps in %s%s" % [run.world.hero_ai.bed_name(run.world.hero_ai.bed_index(u)),
+		" (their favourite)" if run.world.hero_ai.is_preferred(u, run.world.hero_ai.bed_index(u)) else ""])
 	if u.intent != "":
 		t["lines"].append("Now: %s" % u.intent)
 	if u.mood <= c.num("mood_grumble_at"):
@@ -63,15 +63,16 @@ static func enemy(run: RunState, type_id: String, u: Unit = null) -> Dictionary:
 	var yields: Dictionary = def.get("yields", {})
 	if not yields.is_empty():
 		t["lines"].append("Carcass gives %s" % _goods(yields))
-	t["tags"] = tag_notes(run, type_id)
+	t["tags"] = tag_notes(run, "enemy", type_id)
 	return t
 
 
-## Each tag of a creature type with what it does here, e.g. "beast: the hunting lodge pays 3 shells per kill".
-static func tag_notes(run: RunState, type_id: String) -> Array[String]:
+## Each tag of an entity (see Content.TAG_KINDS) with what it does here,
+## e.g. "beast: the hunting lodge pays 3 shells per kill". Tags no rule reads show by name.
+static func tag_notes(run: RunState, kind: String, id: String) -> Array[String]:
 	var c := run.content
 	var out: Array[String] = []
-	for tag: String in c.enemies[type_id].get("tags", []):
+	for tag: String in c.tags_of(kind, id):
 		var notes := PackedStringArray()
 		if str(c.tags.get(tag, "")) != "":
 			notes.append(c.tags[tag])
@@ -96,7 +97,7 @@ static func building(run: RunState, index: int) -> Dictionary:
 	if def.has("lodging"):
 		var used := 0
 		for h in run.living_heroes():
-			if run.world.bed_index(h) == index:
+			if run.world.hero_ai.bed_index(h) == index:
 				used += 1
 		t["lines"].append("Beds: %d of %d taken" % [used, int(def["lodging"]["beds"])])
 	if def.has("stall"):

@@ -55,14 +55,22 @@ var wave_stats := {}
 var night_report := {}
 ## Enemies chasing a fleeing worker (seen last tick); warriors answer the call.
 var alarms: Array[Unit] = []
-var _new_alarms: Array[Unit] = []
-## Prize shells per creature tag posted by finished buildings (see "prize" in data/buildings.json), refreshed each tick.
-var _prizes := {}
+var new_alarms: Array[Unit] = []
+
+## The world's behaviour is split by who acts; each part reads and changes this World's state.
+var folk_ai: FolkAI
+var hero_ai: HeroAI
+var market: Market
+var enemy_ai: EnemyAI
 
 
 func _init(run_state: RunState) -> void:
 	run = run_state
 	content = run.content
+	folk_ai = FolkAI.new(self)
+	hero_ai = HeroAI.new(self)
+	market = Market.new(self)
+	enemy_ai = EnemyAI.new(self)
 	rng = SeededRng.stream(run.run_seed, "world")
 	dt = 1.0 / content.num("ticks_per_second")
 	hearth_hp = run.hearth_max_hp()
@@ -154,7 +162,7 @@ func step() -> void:
 	if is_night() and not was_night:
 		_nightfall()
 	if is_wave_night() and not wave_spawned:
-		_spawn_wave()
+		enemy_ai.spawn_wave()
 	var night_end := float(content.int_num("days_per_round")) * day_length()
 	if day_index() != old_day:
 		_dawn()
@@ -162,23 +170,23 @@ func step() -> void:
 	if wave_spawned:
 		wave_stats["seconds"] = time - (night_end - content.num("night_seconds"))
 
-	alarms = _new_alarms
-	_new_alarms = []
-	_prizes = _posted_prizes()
-	_dens_tick()
+	alarms = new_alarms
+	new_alarms = []
+	market.refresh_prizes()
+	enemy_ai.dens_tick()
 	for enemy in enemies:
 		if not enemy.spawned and time >= enemy.spawn_time:
 			enemy.spawned = true
 	for unit in folk:
 		if unit.alive:
-			_folk_tick(unit)
+			folk_ai.folk_tick(unit)
 	for hero in run.heroes:
 		if hero.alive:
-			_hero_tick(hero)
+			hero_ai.hero_tick(hero)
 	for enemy in enemies:
 		if enemy.alive and enemy.spawned:
-			_enemy_tick(enemy)
-	_towers_tick()
+			enemy_ai.enemy_tick(enemy)
+	enemy_ai.towers_tick()
 	_cleanup()
 	shots = shots.filter(func(s: Dictionary) -> bool: return time - float(s["time"]) < 0.25)
 
@@ -216,7 +224,7 @@ func _nightfall() -> void:
 		run.tell("Night %d falls. The warned attack is coming from the %s." % [day_index() + 1, " and ".join(side_names())])
 	else:
 		run.tell("Night %d falls." % (day_index() + 1))
-		_spawn_probe()
+		enemy_ai.spawn_probe()
 
 
 func _end_of_night_effects() -> void:
@@ -301,7 +309,7 @@ func node_active(node: Dictionary) -> bool:
 
 ## Townsfolk only go to a wild node when no monster is anywhere near it.
 func node_safe(node: Dictionary) -> bool:
-	return not node.get("wild", false) or _nearest_enemy(node["pos"], float(content.world["wild_safe_radius"])) == null
+	return not node.get("wild", false) or nearest_enemy(node["pos"], float(content.world["wild_safe_radius"])) == null
 
 
 func _place_dens() -> void:
@@ -337,1037 +345,21 @@ func count_buildings(type: String, built_only := true) -> int:
 		return b["type"] == type and (not built_only or float(b["work_left"]) <= 0.0)).size()
 
 
-# --- Townsfolk -------------------------------------------------------------
-
-func add_folk(role: String) -> Unit:
-	var def: Dictionary = content.townsfolk[role]
-	var unit := Unit.new()
-	unit.id = run.new_id()
-	unit.team = Unit.Team.FOLK
-	unit.type_id = role
-	unit.display_name = def["name"]
-	unit.home = Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(20.0, HOME_RADIUS)
-	unit.pos = unit.home
-	unit.joined_round = run.round_number
-	apply_folk_stats(unit)
-	unit.hp = unit.max_hp
-	folk.append(unit)
-	return unit
-
-
-func apply_folk_stats(unit: Unit) -> void:
-	var def: Dictionary = content.townsfolk[unit.type_id]
-	unit.max_hp = float(def["hp"])
-	unit.attack = float(def["attack"])
-	if unit.type_id == "warrior":
-		unit.max_hp += run.mod("warrior_hp")
-		unit.attack += run.mod("warrior_attack")
-	unit.max_hp += run.tool_bonus(unit.type_id, "hp")
-	unit.attack += run.tool_bonus(unit.type_id, "attack")
-	unit.attack_range = float(def["range"])
-	unit.cooldown = float(def["cooldown"])
-	unit.speed = float(def["speed"])
-	unit.hp = minf(unit.hp, unit.max_hp)
-
-
-func _folk_tick(unit: Unit) -> void:
-	unit.cooldown_left -= dt
-	# Rest at night heals anyone not in a fight.
-	if is_night() and _nearest_enemy(unit.pos, 120.0) == null:
-		unit.hp = minf(unit.max_hp, unit.hp + content.num("folk_night_heal") * dt)
-	match unit.type_id:
-		"warrior":
-			_warrior_tick(unit)
-		_:
-			_worker_tick(unit)
-
-
-func _warrior_tick(unit: Unit) -> void:
-	var patrol := float(content.townsfolk["warrior"]["patrol_radius"])
-	if unit.hp_fraction() < 0.3:
-		unit.retreating = true
-	if unit.retreating:
-		unit.intent = "falling back to heal"
-		if _go_heal(unit) and unit.hp_fraction() >= HEAL_UNTIL:
-			unit.retreating = false
-		return
-	var threat := _nearest_enemy(unit.pos, 220.0, patrol + 60.0)
-	if threat != null:
-		unit.intent = "defending the camp"
-		_fight(unit, threat)
-		return
-	var call := _nearest_alarm(unit.pos)
-	if call != null:
-		unit.intent = "answering a call for help"
-		_fight(unit, call)
-		return
-	var index := folk.filter(func(u: Unit) -> bool: return u.type_id == "warrior").find(unit)
-	var angle := time * 0.05 + index * 2.4
-	unit.intent = "patrolling"
-	_move_toward(unit, Vector2.from_angle(angle) * patrol)
-
-
-## Tribespeople and craftspeople: gather, haul, build, repair, and go home at dusk.
-func _worker_tick(unit: Unit) -> void:
-	var def: Dictionary = content.townsfolk[unit.type_id]
-	var danger := _nearest_enemy(unit.pos, FLEE_DISTANCE)
-	if danger != null:
-		unit.intent = "fleeing and calling for help"
-		unit.task = ""
-		if not _new_alarms.has(danger):
-			_new_alarms.append(danger)
-		var away := unit.pos + (unit.pos - danger.pos).normalized() * 30.0
-		_move_toward(unit, away.lerp(Vector2.ZERO, 0.5))
-		if danger.pos.distance_to(unit.pos) <= danger.attack_range + 4.0 and unit.cooldown_left <= 0.0:
-			_hit(unit, danger)
-		return
-	if unit.carry_amount > 0 and (unit.task != "gather" or is_dusk()):
-		unit.task = "return"
-	if unit.task == "return":
-		unit.intent = "hauling %s" % unit.carrying
-		if _move_toward(unit, unit.home.limit_length(HEARTH_RADIUS + 8.0)):
-			run.stock[unit.carrying] = int(run.stock[unit.carrying]) + unit.carry_amount
-			unit.carry_amount = 0
-			unit.task = ""
-		return
-	if is_dusk():
-		unit.task = ""
-		unit.intent = "sleeping" if is_night() else "heading home"
-		_move_toward(unit, unit.home)
-		if unit.pos.distance_to(unit.home) < 4.0:
-			unit.hp = minf(unit.max_hp, unit.hp + dt)
-		return
-	if unit.task == "":
-		_choose_work(unit)
-	match unit.task:
-		"build":
-			if unit.task_index >= buildings.size() or float(buildings[unit.task_index]["work_left"]) <= 0.0:
-				unit.task = ""
-				return
-			var site: Dictionary = buildings[unit.task_index]
-			unit.intent = "raising a %s" % content.buildings[site["type"]]["name"].to_lower()
-			if _move_toward(unit, site["pos"], 14.0):
-				site["work_left"] = float(site["work_left"]) - work_rate(unit) * dt
-				if float(site["work_left"]) <= 0.0:
-					run.tell("A %s is finished." % content.buildings[site["type"]]["name"].to_lower())
-					run.on_building_done(site["type"])
-					unit.task = ""
-		"craft":
-			if unit.task_index >= buildings.size():
-				unit.task = ""
-				return
-			var shop: Dictionary = buildings[unit.task_index]
-			if shop["craft"] == "" and not _start_craft(unit.task_index):
-				unit.task = ""
-				return
-			unit.intent = "making a %s at the %s" % [content.recipe_name(shop["craft"]), content.buildings[shop["type"]]["name"].to_lower()]
-			if _move_toward(unit, shop["pos"], 14.0):
-				var rate := work_rate(unit)
-				if unit.master_of == shop["type"]:
-					rate *= float(run.craft_trait(unit).get("craft_rate", 1.0))
-				shop["craft_left"] = float(shop["craft_left"]) - rate * dt
-				if float(shop["craft_left"]) <= 0.0:
-					_finish_craft(unit.task_index, unit)
-					# Look again: a new order or another workshop may need these hands more.
-					unit.task = ""
-		"repair":
-			unit.intent = "patching the hearth"
-			if _move_toward(unit, Vector2.ZERO, HEARTH_RADIUS + 6.0):
-				unit.task_timer -= dt
-				if unit.task_timer <= 0.0:
-					unit.task_timer = 2.0
-					if int(run.stock["wood"]) <= 0 or hearth_hp >= run.hearth_max_hp():
-						unit.task = ""
-						return
-					run.stock["wood"] = int(run.stock["wood"]) - 1
-					hearth_hp = minf(run.hearth_max_hp(), hearth_hp + float(def.get("repair_per_wood", 4)))
-		"gather":
-			var node: Dictionary = nodes[unit.task_index]
-			unit.intent = "gathering %s" % node["gives"]
-			if int(node["amount"]) <= 0 or not node_safe(node):
-				unit.task = "" if unit.carry_amount == 0 else "return"
-				return
-			if _move_toward(unit, node["pos"], 10.0):
-				unit.task_timer -= dt
-				if unit.task_timer <= 0.0:
-					var carry := float(def.get("carry", 2)) + run.tool_bonus(unit.type_id, "carry")
-					var take := mini(int(node["amount"]), int(carry * (1.0 + run.mod("carry_mult"))))
-					node["amount"] = int(node["amount"]) - take
-					unit.carrying = node["gives"]
-					unit.carry_amount = take
-					unit.task = "return"
-		_:
-			unit.intent = "idle"
-			_move_toward(unit, unit.home)
-
-
-func _choose_work(unit: Unit) -> void:
-	if unit.type_id == "craftsperson":
-		for i in buildings.size():
-			if float(buildings[i]["work_left"]) > 0.0:
-				unit.task = "build"
-				unit.task_index = i
-				return
-		var shop := _workshop_needing_hands(unit)
-		if shop >= 0:
-			unit.task = "craft"
-			unit.task_index = shop
-			return
-	if unit.type_id == "tribesperson" and hearth_hp < run.hearth_max_hp() * 0.8 and int(run.stock["wood"]) > 0 \
-			and not folk.any(func(u: Unit) -> bool: return u.task == "repair"):
-		unit.task = "repair"
-		unit.task_timer = 2.0
-		return
-	var wants: Array[String] = ["wood"]
-	if unit.type_id != "craftsperson":
-		wants = run.needed_resources()
-	var best := -1
-	for want in wants:
-		best = _nearest_node(unit, want)
-		if best >= 0:
-			break
-	if best < 0:
-		unit.task = ""
-		return
-	unit.task = "gather"
-	unit.task_index = best
-	unit.task_timer = float(content.townsfolk[unit.type_id].get("gather_seconds", 3)) / (1.0 + run.tool_bonus(unit.type_id, "gather_mult"))
-
-
-## The closest node a townsperson can gather a good from, or -1.
-func _nearest_node(unit: Unit, want: String) -> int:
-	var best := -1
-	var best_d := INF
-	for i in nodes.size():
-		var node := nodes[i]
-		if node["gives"] != want or int(node["amount"]) <= 0 or node.get("heroes_only", false) \
-				or not node_active(node) or not node_safe(node):
-			continue
-		var d := unit.pos.distance_to(node["pos"])
-		# Gatherers avoid nodes with a monster prowling nearby.
-		if _nearest_enemy(node["pos"], 120.0) != null:
-			d += 400.0
-		if d < best_d:
-			best_d = d
-			best = i
-	return best
-
-
-## How fast a craftsperson builds and crafts (tool sets included).
-func work_rate(unit: Unit) -> float:
-	return float(content.townsfolk[unit.type_id].get("build_rate", 0.5)) + run.tool_bonus(unit.type_id, "build_rate")
-
-
-# --- Heroes ----------------------------------------------------------------
-# Heroes run on energy. It drains while they are up and about (faster in the
-# wilds) and comes back while they rest in a lodging. They go to bed when tired
-# and at dusk, and get up once rested. A sleeper only wakes when an enemy comes
-# within the lodging's wake radius, so where heroes sleep shapes the defence.
-
-func _hero_tick(hero: Unit) -> void:
-	var t: Dictionary = content.traits[hero.trait_id]
-	hero.cooldown_left -= dt
-	var retreat_at := clampf(float(t["retreat_at"]) + run.mod("retreat_shift"), 0.0, 0.95)
-	if hero.carry_amount > 0 and hero.pos.length() <= content.num("settlement_radius"):
-		_sell_shards(hero)
-	if not hero.retreating and hero.hp_fraction() < retreat_at + 0.1:
-		_use_provision(hero, "heal")
-	if not hero.retreating and hero.hp_fraction() < retreat_at:
-		hero.retreating = true
-		hero.resting = false
-		hero.target = null
-		if wave_spawned:
-			wave_stats["retreats"] = int(wave_stats["retreats"]) + 1
-		run.tell("%s is badly hurt and falls back to the hearth." % hero.display_name)
-	if hero.retreating:
-		hero.intent = "retreating to heal"
-		if _go_heal(hero, 1.0 + run.mod("hearth_heal_mult")):
-			if hero.hp_fraction() >= HEAL_UNTIL:
-				hero.retreating = false
-		return
-	if hero.resting:
-		_rest_tick(hero)
-		return
-	var drain := content.num("energy_drain_wilds") if hero.pos.length() > content.num("settlement_radius") else content.num("energy_drain")
-	drain *= maxf(0.2, 1.0 - Loot.total(content, hero, "energy"))
-	var was_awake := hero.energy > 0.0
-	hero.energy = maxf(0.0, hero.energy - drain * dt)
-	if hero.energy <= float(t.get("tired_at", 25)) and hero.pos.length() > content.num("settlement_radius"):
-		_use_provision(hero, "energy")
-	if was_awake and hero.energy <= 0.0:
-		run.tell("%s is exhausted and fights weakly until they rest." % hero.display_name)
-
-	var whim: Dictionary = content.whims.get(hero.whim, {})
-	var wilds := float(whim.get("wilds", t["wilds"]))
-	# By day the keen ones hunt far out; at dusk and night everyone stays near home.
-	var reach := content.num("settlement_radius") + 160.0
-	if not is_dusk():
-		reach = maxf(reach, wilds * (content.num("den_max_distance") + 120.0))
-	hero.target = _choose_target(hero, t, reach, whim.get("trophy", false))
-	# By day a hero with shells stops at the stalls, unless a fight is close.
-	var fight_close := hero.target != null and hero.target.pos.distance_to(hero.pos) < 140.0
-	if not is_night() and not fight_close and hero.gold > 0 and _shop_tick(hero, t, whim):
-		return
-	var bed := bed_index(hero)
-	var why_bed := _wants_bed(hero, t)
-	if why_bed != "":
-		# On the way to bed a hero only fights what is close or chasing them.
-		if hero.target != null and (hero.target.pos.distance_to(hero.pos) <= wake_radius(bed) or hero.target.target == hero):
-			_fight(hero, hero.target)
-			return
-		hero.target = null
-		hero.intent = "%s, heading to %s" % [why_bed, bed_name(bed)]
-		if _move_toward(hero, bed_pos(hero), 8.0):
-			hero.resting = true
-			_on_lie_down(hero, bed)
-		return
-	if hero.target != null:
-		_fight(hero, hero.target)
-		return
-	if not is_dusk() and wilds > 0.5 and not dens.is_empty():
-		var outcrop := _outcrop_for(hero)
-		if outcrop >= 0:
-			hero.intent = "prising %s from the %s" % [nodes[outcrop]["gives"], content.world["nodes"][nodes[outcrop]["type"]]["name"].to_lower()]
-			if _move_toward(hero, nodes[outcrop]["pos"], 10.0):
-				_take_shards(hero, outcrop)
-			return
-		var den: Dictionary = dens[hero.id % dens.size()]
-		hero.intent = "stalking the %s" % content.world["dens"][den["type"]]["name"].to_lower()
-		_move_toward(hero, den["pos"] * 0.85, 10.0)
-		return
-	hero.intent = "guarding the camp"
-	var index := run.heroes.find(hero)
-	_move_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * (content.num("settlement_radius") * 0.6), 4.0)
-
-
-## Why a hero wants to be in bed right now ("" if they don't).
-func _wants_bed(hero: Unit, t: Dictionary) -> String:
-	# Everyone knows the warned attack is coming, so heroes stay up for it unless worn out.
-	if is_dusk() and day_index() < content.int_num("days_per_round") - 1:
-		return "night is falling"
-	if hero.energy <= float(t.get("tired_at", 25)):
-		return "tired"
-	if _carousing(hero):
-		return "off to drink"
-	if time_of_day() < content.num("day_seconds") * float(content.whims.get(hero.whim, {}).get("lie_in", 0.0)):
-		return "sleeping in"
-	return ""
-
-
-func _rest_tick(hero: Unit) -> void:
-	var bed := bed_index(hero)
-	if hero.pos.distance_to(bed_pos(hero)) > 20.0:
-		# The bed moved (a new lodging opened): walk over and lie down again.
-		hero.resting = false
-		return
-	var danger := _nearest_enemy(hero.pos, wake_radius(bed))
-	if danger != null:
-		hero.resting = false
-		if is_night() and hero.woke_night != _night_key():
-			hero.woke_night = _night_key()
-			run.tell("%s wakes in %s to fight a %s." % [hero.display_name, bed_name(bed), danger.display_name.to_lower()])
-		return
-	var def := lodging_def(bed)
-	var rate := content.num("energy_rest") * (float(def["rest"]) if not def.is_empty() else content.num("energy_rest_rough"))
-	if is_preferred(hero, bed):
-		rate *= content.num("energy_home_bonus")
-	hero.energy = minf(content.num("hero_energy_max"), hero.energy + rate * dt)
-	hero.hp = minf(hero.max_hp, hero.hp + (float(def.get("heal", 0.0)) + Loot.total(content, hero, "rest_heal")) * dt)
-	if _carousing(hero):
-		hero.intent = "drinking in %s" % bed_name(bed)
-	else:
-		hero.intent = "asleep in %s" % bed_name(bed) if is_night() else "resting in %s" % bed_name(bed)
-	if is_night():
-		# Sleeping by the fire only rankles once the town has beds that others get.
-		if bed < 0:
-			hero.slept = "rough" if count_lodgings() > 0 else ""
-		else:
-			hero.slept = "favourite" if is_preferred(hero, bed) else "other"
-	if is_night() and bed >= 0 and hero.paid_night != _night_key():
-		hero.paid_night = _night_key()
-		_pay_town(hero, int(def.get("night_price", 0)), "tavern")
-	if _wants_bed(hero, content.traits[hero.trait_id]) == "" and hero.energy >= content.num("energy_wake_at"):
-		hero.resting = false
-
-
-func _on_lie_down(hero: Unit, bed: int) -> void:
-	if _carousing(hero) and hero.caroused != _night_key():
-		hero.caroused = _night_key()
-		var spent := _pay_town(hero, int(content.whims["carouse"].get("spend", 0)), "carousing")
-		run.tell("%s settles in at %s and drinks %d shells' worth." % [hero.display_name, bed_name(bed), spent])
-
-
-## Takes up to `amount` shells from a hero into the settlement's stock. Returns what was paid.
-func _pay_town(hero: Unit, amount: int, reason: String) -> int:
-	var paid := mini(amount, hero.gold)
-	if paid <= 0:
-		return 0
-	hero.gold -= paid
-	run.stock["shells"] = int(run.stock["shells"]) + paid
-	run.note_hero_spending(reason, paid)
-	return paid
-
-
-func _night_key() -> int:
+func night_key() -> int:
 	return run.round_number * 10 + day_index()
 
 
-func _carousing(hero: Unit) -> bool:
-	if hero.whim != "carouse" or _first_built("tavern") < 0:
-		return false
-	return is_night() or time_of_day() >= content.num("day_seconds") * float(content.whims["carouse"].get("from", 0.5))
-
-
-## Gives each living hero a bed: their favourite lodging with a free bed, then
-## any free bed, else a spot by the hearth.
-func assign_lodgings() -> void:
-	var used := {}
-	for hero in run.living_heroes():
-		hero.lodging = -1
-		var choices: Array = content.traits[hero.trait_id].get("lodging", []).duplicate()
-		for id in content.lodging_types():
-			if not choices.has(id):
-				choices.append(id)
-		for type: String in choices:
-			var i := _free_bed(type, used)
-			if i >= 0:
-				hero.lodging = i
-				used[i] = int(used.get(i, 0)) + 1
-				break
-
-
-func _free_bed(type: String, used: Dictionary) -> int:
-	for i in buildings.size():
-		var b := buildings[i]
-		if b["type"] == type and float(b["work_left"]) <= 0.0 \
-				and int(used.get(i, 0)) < int(content.buildings[type]["lodging"]["beds"]):
-			return i
-	return -1
-
-
-func _first_built(type: String) -> int:
+func first_built(type: String) -> int:
 	for i in buildings.size():
 		if buildings[i]["type"] == type and float(buildings[i]["work_left"]) <= 0.0:
 			return i
 	return -1
 
 
-func count_lodgings() -> int:
-	var n := 0
-	for type in content.lodging_types():
-		n += count_buildings(type)
-	return n
-
-
-## Where a hero sleeps tonight: a building index, or -1 for the hearth.
-func bed_index(hero: Unit) -> int:
-	if _carousing(hero):
-		return _first_built("tavern")
-	return hero.lodging
-
-
-func bed_pos(hero: Unit) -> Vector2:
-	var bed := bed_index(hero)
-	if bed >= 0:
-		return buildings[bed]["pos"]
-	return Vector2.from_angle(run.heroes.find(hero) * 1.7 + 0.4) * (HEARTH_RADIUS + 16.0)
-
-
-func lodging_def(bed: int) -> Dictionary:
-	return content.buildings[buildings[bed]["type"]]["lodging"] if bed >= 0 else {}
-
-
-func bed_name(bed: int) -> String:
-	return "the %s" % content.buildings[buildings[bed]["type"]]["name"].to_lower() if bed >= 0 else "the open by the hearth"
-
-
-func wake_radius(bed: int) -> float:
-	return float(lodging_def(bed)["wake_radius"]) if bed >= 0 else content.num("rough_wake_radius")
-
-
-func is_preferred(hero: Unit, bed: int) -> bool:
-	return bed >= 0 and buildings[bed]["type"] in content.traits[hero.trait_id].get("lodging", [])
-
-
-## Each hero's whim for the day, rolled at dawn from their trait's weights.
-func roll_whims() -> void:
-	var rng := SeededRng.stream(run.run_seed, "whims", _night_key())
-	var notes := PackedStringArray()
-	for hero in run.living_heroes():
-		var weights: Dictionary = content.traits[hero.trait_id].get("whims", {}).duplicate()
-		for id: String in weights.keys():
-			var needs: String = content.whims[id].get("needs", "")
-			if needs != "" and count_buildings(needs) == 0:
-				weights[id] = 0.0
-		hero.whim = rng.weighted(weights)
-		if hero.whim == "":
-			hero.whim = "none"
-		run.note_whim(hero)
-		if hero.whim != "none":
-			notes.append("%s is %s" % [hero.display_name, content.whims[hero.whim]["name"]])
-	if not notes.is_empty():
-		run.tell("Today %s." % ", ".join(notes))
-
-
-## Scores every reachable enemy from this hero's point of view and picks the best.
-## Brave and greedy heroes value wanderers (glory and loot); dutiful ones value
-## threats to the camp; cautious ones avoid enemies that could kill them fast.
-## A hero after a trophy also values big, tough monsters.
-func _choose_target(hero: Unit, t: Dictionary, reach: float, trophy := false) -> Unit:
-	var best: Unit = null
-	var best_score := -INF
-	var reason := ""
-	for enemy in enemies:
-		if not enemy.alive or not enemy.spawned:
-			continue
-		var from_home := enemy.pos.length()
-		if from_home > reach and enemy.target != hero:
-			continue
-		var distance := hero.pos.distance_to(enemy.pos)
-		var threat_to_camp := 1.0 - clampf(from_home / content.num("world_radius"), 0.0, 1.0)
-		var danger := enemy.attack / maxf(hero.hp, 1.0) * 10.0
-		var glory := float(t["wilds"]) * (4.0 if enemy.den_index >= 0 else 1.0) * (0.5 + float(t["greed"]) * 0.5)
-		# Prizes posted by buildings (the hunting lodge) draw greedy heroes most.
-		glory += prize_for(enemy.type_id) * float(t["greed"]) * 0.5
-		if trophy:
-			glory += enemy.max_hp / 12.0
-		var duty := float(t["duty"]) * threat_to_camp * 8.0
-		var score := 10.0 - distance / 60.0 + glory + duty - float(t["caution"]) * danger * 2.0
-		if enemy == hero.target:
-			score += TARGET_STICKINESS
-		if score > best_score:
-			best_score = score
-			best = enemy
-			reason = "hunting for glory" if glory >= duty and enemy.den_index >= 0 else ("defending the camp" if duty >= 3.0 else "fighting")
-	if best != null:
-		hero.intent = "%s (%s)" % [reason, best.display_name]
-	return best
-
-
-func apply_hero_stats(hero: Unit) -> void:
-	var c: Dictionary = content.hero_classes[hero.type_id]
-	var old_max := hero.max_hp
-	hero.max_hp = maxf(1.0, float(c["hp"]) + (hero.level - 1) * content.num("level_hp") \
-		+ Loot.total(content, hero, "hp") + run.mod("hero_hp"))
-	hero.attack = float(c["attack"]) + (hero.level - 1) * content.num("level_attack") \
-		+ Loot.total(content, hero, "attack") + run.mod("hero_attack")
-	hero.attack_range = float(c["range"])
-	hero.cooldown = float(c["cooldown"])
-	hero.speed = float(c["speed"]) + Loot.total(content, hero, "speed")
-	if old_max > 1.0 and hero.max_hp > old_max:
-		hero.hp += hero.max_hp - old_max
-	hero.hp = minf(hero.hp, hero.max_hp)
-
-
-## A hero picks up an item: wears it if they like it better than what they have
-## (by their personality), otherwise carries it to sell.
-func give_item(hero: Unit, item: Dictionary) -> void:
-	var slot := Loot.slot(content, item)
-	var likes: Dictionary = content.traits[hero.trait_id].get("likes", {})
-	var current: Dictionary = hero.items.get(slot, {})
-	var equip := current.is_empty() or Loot.score(content, item, likes) > Loot.score(content, current, likes)
-	if equip:
-		if not current.is_empty():
-			hero.spares.append(current)
-		hero.items[slot] = item
-		apply_hero_stats(hero)
-		run.tell("%s finds a %s and takes it up." % [hero.display_name, Loot.describe(content, item)])
-	else:
-		hero.spares.append(item)
-		run.tell("%s finds a %s and keeps it to sell." % [hero.display_name, Loot.describe(content, item)])
-	run.note_loot(hero, item, equip)
-	_trim_spares(hero)
-
-
-## Heroes carry only a few spare items; the least valuable is dropped.
-func _trim_spares(hero: Unit) -> void:
-	if hero.spares.size() > int(content.items["spare_limit"]):
-		hero.spares.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return Loot.value(content, a) > Loot.value(content, b))
-		hero.spares.pop_back()
-
-
-func _maybe_drop(hero: Unit, victim: Unit) -> void:
-	var drops: Dictionary = content.items["drops"]
-	var chance := float(drops["boss"]) if victim.is_boss else float(drops["den"] if victim.den_index >= 0 else drops["wave"])
-	if rng.randf() < chance:
-		give_item(hero, Loot.roll(content, rng, run.round_number, run.age))
-
-
-# --- Market ----------------------------------------------------------------
-# Workshops turn raw goods into gear and provisions, one good at a time, while a
-# craftsperson works the bench. Each good goes to the stall that sells its kind.
-# Heroes passing through town buy what they like with their own shells, and the
-# shells go to the settlement. The player only chooses buildings and prices.
-
-## The finished stall that sells a kind of good, or -1.
-func stall_index(kind: String) -> int:
-	for i in buildings.size():
-		var b := buildings[i]
-		if float(b["work_left"]) <= 0.0 and content.buildings[b["type"]].get("stall", {}).get("sells", "") == kind:
-			return i
-	return -1
-
-
-## Goods on a kind's stall plus those being made for it right now.
-func _stall_load(kind: String) -> int:
-	var s := stall_index(kind)
-	var held: int = 0 if s < 0 else buildings[s]["goods"].size()
-	for b in buildings:
-		if b["craft"] != "" and content.market["recipes"][b["craft"]].get("stall", "") == kind:
-			held += 1
-	return held
-
-
-## What a workshop should make next: something its stall has room for and the
-## settlement can supply, favouring what the stall has least of. "" if nothing.
-func _next_recipe(index: int) -> String:
-	var b := buildings[index]
-	var options := content.recipes_for(b["type"])
-	var best := ""
-	var best_score := INF
-	for k in options.size():
-		var id: String = options[(k + int(b["made"])) % options.size()]
-		var r: Dictionary = content.market["recipes"][id]
-		if not run.can_afford(r["needs"]):
-			continue
-		var score := 0.0
-		if r.has("makes"):
-			# Smelting fills the settlement's stock, up to what it wants to keep.
-			var good: String = r["makes"].keys()[0]
-			if int(run.stock[good]) >= int(r.get("keep", 99)):
-				continue
-			score = float(run.stock[good]) / float(r.get("keep", 99)) * float(content.market["stall_capacity"])
-		else:
-			var s := stall_index(r["stall"])
-			if s < 0 or _stall_load(r["stall"]) >= int(content.market["stall_capacity"]):
-				continue
-			score = buildings[s]["goods"].filter(func(g: Dictionary) -> bool: return g["recipe"] == id).size()
-		if score < best_score:
-			best_score = score
-			best = id
-	return best
-
-
-## A finished workshop with a free bench and something to make, the emptiest stall first. -1 if none.
-func _workshop_needing_hands(unit: Unit) -> int:
-	var best := -1
-	var best_load := INF
-	for i in buildings.size():
-		var b := buildings[i]
-		var def: Dictionary = content.buildings[b["type"]]
-		if not def.has("workshop") or float(b["work_left"]) > 0.0:
-			continue
-		var hands := folk.filter(func(u: Unit) -> bool: return u != unit and u.task == "craft" and u.task_index == i).size()
-		if hands >= int(def["workshop"]["slots"]):
-			continue
-		var next: String = b["craft"] if b["craft"] != "" else _next_recipe(i)
-		if next == "":
-			continue
-		var r: Dictionary = content.market["recipes"][next]
-		var held: float = _stall_load(r["stall"]) if r.has("stall") else 0.0
-		# A master goes to their own bench first.
-		if unit.master_of == b["type"]:
-			held -= 100.0
-		if held < best_load:
-			best_load = held
-			best = i
-	return best
-
-
-## Takes the goods for the next recipe from stock and starts work on it.
-func _start_craft(index: int) -> bool:
-	var id := _next_recipe(index)
-	if id == "":
-		return false
-	var r: Dictionary = content.market["recipes"][id]
-	for res: String in r["needs"]:
-		run.stock[res] = int(run.stock[res]) - int(r["needs"][res])
-	var b := buildings[index]
-	b["craft"] = id
-	b["craft_left"] = float(r["work"])
-	b["craft_tier"] = run.craft_tier(id)
-	return true
-
-
-func _finish_craft(index: int, crafter: Unit = null) -> void:
-	var b := buildings[index]
-	var id: String = b["craft"]
-	var r: Dictionary = content.market["recipes"][id]
-	var master := {}
-	if crafter != null:
-		crafter.made[b["type"]] = int(crafter.made.get(b["type"], 0)) + 1
-		if crafter.master_of == b["type"]:
-			master = run.craft_trait(crafter)
-	if r.has("makes"):
-		for good: String in r["makes"]:
-			run.stock[good] = int(run.stock[good]) + int(r["makes"][good])
-		b["craft"] = ""
-		b["made"] = int(b["made"]) + 1
-		run.note_crafted(id)
-		return
-	var good := {"recipe": id, "tier": int(b["craft_tier"]) + int(master.get("extra_tier", 0))}
-	if r.has("item"):
-		var affixes := []
-		var chance := float(content.market["affix_chance"]) if master.is_empty() else float(master.get("affix_chance", 0.0))
-		if rng.randf() < chance:
-			var ids: Array = content.items["affixes"].keys().filter(func(a: String) -> bool: return a != "cursed")
-			ids.sort()
-			affixes.append(rng.pick(ids))
-		good["item"] = Loot.make(r["item"], int(good["tier"]), affixes)
-	b["craft"] = ""
-	b["made"] = int(b["made"]) + 1
-	run.note_crafted(id)
-	var s := stall_index(r["stall"])
-	if s >= 0:
-		buildings[s]["goods"].append(good)
-	if good.has("item"):
-		run.tell("The %s finishes a %s for the %s." % [content.buildings[b["type"]]["name"].to_lower(),
-			Loot.describe(content, good["item"]), content.buildings[buildings[s]["type"]]["name"].to_lower() if s >= 0 else "market"])
-
-
-## How much a hero wants a good on a stall (0 or less: not at all).
-func _want(hero: Unit, t: Dictionary, good: Dictionary) -> float:
-	var r: Dictionary = content.market["recipes"][good["recipe"]]
-	if good.has("item"):
-		var item: Dictionary = good["item"]
-		var likes: Dictionary = t.get("likes", {})
-		var slot := Loot.slot(content, item)
-		var current: Dictionary = hero.items.get(slot, {})
-		var gain := Loot.score(content, item, likes) - (Loot.score(content, current, likes) if not current.is_empty() else 0.0)
-		return gain * (1.25 if slot == t.get("prefers", "") else 1.0)
-	var have := hero.pack.count(good["recipe"])
-	if have >= int(content.market["pack_limit"]):
-		return 0.0
-	var p: Dictionary = content.market["provisions"][r["provision"]]
-	# Cautious heroes stock up on poultices; keen hunters on food for the trail.
-	var keen := float(t["caution"]) if p.has("heal") else float(t["wilds"])
-	return (2.0 + 3.0 * keen) / (1.0 + have)
-
-
-## The good a hero would buy right now: {stall, index, price}, or {} if nothing tempts them.
-func _best_buy(hero: Unit, t: Dictionary) -> Dictionary:
-	var best := {}
-	var best_want := 0.0
-	for i in buildings.size():
-		var b := buildings[i]
-		var kind: String = content.buildings[b["type"]].get("stall", {}).get("sells", "")
-		if kind == "" or float(b["work_left"]) > 0.0 or b["goods"].is_empty():
-			continue
-		if run.price_markup(kind) > float(t.get("max_markup", 1.5)) + 0.001:
-			continue
-		for j in b["goods"].size():
-			var good: Dictionary = b["goods"][j]
-			var price := run.price_of(good)
-			# Hoarders only buy when they have plenty left over.
-			if hero.gold < price * float(t.get("hoard", 1.0)):
-				continue
-			var want := _want(hero, t, good)
-			if want > best_want:
-				best_want = want
-				best = {"stall": i, "index": j, "price": price}
-	return best
-
-
-## A hero in town with shells to spend walks to a stall with something they want.
-## Returns true while they are shopping.
-func _shop_tick(hero: Unit, t: Dictionary, whim: Dictionary) -> bool:
-	var in_town := hero.pos.length() <= content.num("settlement_radius") + 60.0
-	if not in_town and hero.shop_stall < 0 and not whim.get("shop_anywhere", false):
-		return false
-	var pick := _best_buy(hero, t)
-	if pick.is_empty():
-		hero.shop_stall = -1
-		return false
-	var stall: Dictionary = buildings[pick["stall"]]
-	hero.shop_stall = pick["stall"]
-	hero.intent = "shopping at the %s" % content.buildings[stall["type"]]["name"].to_lower()
-	if _move_toward(hero, stall["pos"], 12.0):
-		_buy(hero, pick)
-		hero.shop_stall = -1
-	return true
-
-
-func _buy(hero: Unit, pick: Dictionary) -> void:
-	var stall: Dictionary = buildings[pick["stall"]]
-	var good: Dictionary = stall["goods"][pick["index"]]
-	var price: int = pick["price"]
-	stall["goods"].remove_at(pick["index"])
-	hero.gold -= price
-	run.stock["shells"] = int(run.stock["shells"]) + price
-	hero.mood_events["bought"] = 1
-	run.note_hero_spending("market", price)
-	run.note_market_sale(hero, good, price)
-	var where: String = content.buildings[stall["type"]]["name"].to_lower()
-	if good.has("item"):
-		var item: Dictionary = good["item"]
-		var slot := Loot.slot(content, item)
-		if hero.items.has(slot):
-			hero.spares.append(hero.items[slot])
-			_trim_spares(hero)
-		hero.items[slot] = item
-		apply_hero_stats(hero)
-		run.tell("%s buys a %s at the %s for %d shells." % [hero.display_name, Loot.describe(content, item), where, price])
-	else:
-		hero.pack.append(good["recipe"])
-		run.tell("%s buys %s at the %s for %d shells." % [hero.display_name, content.recipe_name(good["recipe"]), where, price])
-
-
-## Uses one provision from the pack that has `effect` ("energy" or "heal"). True if one was used.
-func _use_provision(hero: Unit, effect: String) -> bool:
-	for k in hero.pack.size():
-		var id := hero.pack[k]
-		var p: Dictionary = content.market["provisions"][content.market["recipes"][id]["provision"]]
-		if not p.has(effect):
-			continue
-		hero.pack.remove_at(k)
-		if effect == "energy":
-			hero.energy = minf(content.num("hero_energy_max"), hero.energy + float(p["energy"]))
-			run.tell("%s eats %s and keeps going." % [hero.display_name, p["name"]])
-		else:
-			hero.hp = minf(hero.max_hp, hero.hp + float(p["heal"]))
-			run.tell("%s presses a %s to their wounds." % [hero.display_name, p["name"]])
-		return true
-	return false
-
-
-## A node out in the wilds near a hero worth fetching from (obsidian, cassiterite), or -1.
-## Only once the building that buys it stands.
-func _outcrop_for(hero: Unit) -> int:
-	if hero.carry_amount > 0:
-		return -1
-	var best := -1
-	var best_d := 300.0
-	for i in nodes.size():
-		var node := nodes[i]
-		if not (node.get("heroes_only", false) or node.get("wild", false)) or int(node["amount"]) <= 0 or not node_active(node):
-			continue
-		var def: Dictionary = content.world["nodes"][node["type"]]
-		if count_buildings(def.get("buyer", "")) == 0 or int(run.stock[node["gives"]]) >= int(def.get("buy_until", 99)):
-			continue
-		var d := hero.pos.distance_to(node["pos"])
-		if d < best_d:
-			best_d = d
-			best = i
-	return best
-
-
-func _take_shards(hero: Unit, index: int) -> void:
-	var node := nodes[index]
-	var take := mini(int(node["amount"]), int(content.market["hero_carry"]))
-	node["amount"] = int(node["amount"]) - take
-	hero.carrying = node["gives"]
-	hero.carry_amount = take
-
-
-## A hero back in town sells what they carry from the wilds to the settlement, which pays what it can.
-func _sell_shards(hero: Unit) -> void:
-	var n := hero.carry_amount
-	var price := 0
-	for id: String in content.world["nodes"]:
-		if content.world["nodes"][id]["gives"] == hero.carrying:
-			price = int(content.world["nodes"][id].get("price", 0))
-	var pay := mini(n * price, int(run.stock["shells"]))
-	run.stock[hero.carrying] = int(run.stock[hero.carrying]) + n
-	run.stock["shells"] = int(run.stock["shells"]) - pay
-	hero.gold += pay
-	hero.carry_amount = 0
-	run.note_economy(hero.carrying, n)
-	run.tell("%s brings back %d %s and sells it for %d shells." % [hero.display_name, n, hero.carrying, pay])
-
-
-func _posted_prizes() -> Dictionary:
-	var out := {}
-	for b in buildings:
-		var prize: Dictionary = content.buildings[b["type"]].get("prize", {})
-		if not prize.is_empty() and float(b["work_left"]) <= 0.0:
-			out[prize["tag"]] = int(out.get(prize["tag"], 0)) + int(prize["shells"])
-	return out
-
-
-## Prize shells posted on a creature type.
-func prize_for(type_id: String) -> int:
-	var total := 0
-	for tag: String in _prizes:
-		if content.enemy_has_tag(type_id, tag):
-			total += int(_prizes[tag])
-	return total
-
-
-## The settlement gets hides and bone from carcasses, plus extra from buildings that skin that kind of creature.
-func _carcass(victim: Unit) -> void:
-	var got: Dictionary = content.enemies[victim.type_id].get("yields", {}).duplicate()
-	for b in buildings:
-		var prize: Dictionary = content.buildings[b["type"]].get("prize", {})
-		if prize.is_empty() or float(b["work_left"]) > 0.0 or not content.enemy_has_tag(victim.type_id, prize["tag"]):
-			continue
-		for res: String in prize.get("yields", {}):
-			got[res] = int(got.get(res, 0)) + int(prize["yields"][res])
-	for res: String in got:
-		run.stock[res] = int(run.stock[res]) + int(got[res])
-		run.note_economy("yields", int(got[res]), res)
-
-
-func _pay_prizes(hero: Unit, victim: Unit) -> void:
-	var paid := mini(prize_for(victim.type_id), int(run.stock["shells"]))
-	if paid <= 0:
-		return
-	run.stock["shells"] = int(run.stock["shells"]) - paid
-	hero.gold += paid
-	hero.mood_events["prize"] = int(hero.mood_events.get("prize", 0)) + 1
-	run.note_economy("prizes", paid)
-
-
-# --- Enemies ---------------------------------------------------------------
-
-func _dens_tick() -> void:
-	var level := 1 + (run.round_number - 1) / 2.0
-	var cap := content.int_num("den_base_wanderers") + int(content.num("den_wanderers_per_level") * (level - 1.0))
-	for i in dens.size():
-		var den := dens[i]
-		var living := enemies.filter(func(e: Unit) -> bool: return e.alive and e.den_index == i).size()
-		den["respawn_left"] = float(den["respawn_left"]) - dt
-		if living < cap and float(den["respawn_left"]) <= 0.0:
-			den["respawn_left"] = content.num("den_respawn_seconds")
-			var e := _make_enemy(den["spawns"], den["pos"] + Vector2.from_angle(rng.randf() * TAU) * 20.0, time,
-				1.0 + 0.08 * (run.round_number - 1))
-			e.den_index = i
-			e.wander_goal = e.pos
-			enemies.append(e)
-
-
-func _enemy_tick(enemy: Unit) -> void:
-	enemy.cooldown_left -= dt
-	var aggro := content.num("enemy_aggro")
-	var holding_grudge := enemy.target != null and enemy.target.alive and time < enemy.grudge_until
-	if not holding_grudge and (enemy.target == null or not enemy.target.alive or enemy.pos.distance_to(enemy.target.pos) > aggro * 3.0):
-		enemy.target = _nearest_friend(enemy.pos, aggro)
-	if enemy.target != null:
-		_fight(enemy, enemy.target)
-		return
-	if enemy.den_index >= 0:
-		_wander(enemy)
-		return
-	var hold_at := float(content.enemies[enemy.type_id].get("hold_at", 0.0))
-	if hold_at > 0.0 and enemy.pos.length() <= hold_at and not _only_holders_left():
-		return
-	if enemy.pos.length() > enemy.attack_range + HEARTH_RADIUS:
-		_move_toward(enemy, Vector2.ZERO)
-	elif enemy.cooldown_left <= 0.0:
-		enemy.cooldown_left = enemy.cooldown
-		var dmg := enemy.attack * war_chant()
-		hearth_hp -= dmg
-		wave_stats["keep_damage"] = float(wave_stats["keep_damage"]) + dmg
-		night_report["hearth_damage"] = float(night_report["hearth_damage"]) + dmg
-		shots.append({"from": enemy.pos, "to": Vector2.ZERO, "ranged": enemy.attack_range > 60, "time": time})
-
-
-## Wanderers drift around their den, ranging much farther at night.
-func _wander(enemy: Unit) -> void:
-	var den: Dictionary = dens[enemy.den_index]
-	var roam := content.num("den_roam_night") if is_night() else content.num("den_roam_day")
-	if enemy.pos.distance_to(enemy.wander_goal) < 6.0 or enemy.wander_goal.distance_to(den["pos"]) > roam:
-		var goal: Vector2 = den["pos"] + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.0, roam)
-		enemy.wander_goal = goal.limit_length(content.num("world_radius"))
-	var old_speed := enemy.speed
-	enemy.speed *= 0.5
-	_move_toward(enemy, enemy.wander_goal)
-	enemy.speed = old_speed
-
-
-func _spawn_wave() -> void:
-	wave_spawned = true
-	wave_stats["hearth_hp_before"] = hearth_hp
-	var types := run.generate_wave(run.round_number)
-	var interval := content.num("wave_spawn_interval")
-	night_report["raiders"] = int(night_report["raiders"]) + types.size()
-	for i in types.size():
-		var side: float = wave_sides[i % wave_sides.size()]
-		var at := Vector2.from_angle(side + rng.randf_range(-0.25, 0.25)) * content.num("world_radius")
-		enemies.append(_make_enemy(types[i], at, time + i * interval))
-
-
-## A small raid on an early night, from a random side, not warned of.
-func _spawn_probe() -> void:
-	var types := run.generate_probe(run.round_number, day_index())
-	var side := SeededRng.stream(run.run_seed, "probe", run.round_number * 10 + day_index()).randi_range(0, 3) * PI / 2.0
-	for i in types.size():
-		var at := Vector2.from_angle(side + rng.randf_range(-0.3, 0.3)) * content.num("world_radius") * 0.8
-		var e := _make_enemy(types[i], at, time + i * content.num("wave_spawn_interval"))
-		e.is_probe = true
-		enemies.append(e)
-	night_report["raiders"] = int(night_report["raiders"]) + types.size()
-	if not types.is_empty():
-		run.tell("Raiders probe the camp from the %s." % ["east", "south", "west", "north"][int(round(side / (PI / 2.0))) % 4])
-
-
-func war_chant() -> float:
-	var mult := 1.0
-	for enemy in enemies:
-		if enemy.alive and enemy.spawned:
-			mult += float(content.enemies[enemy.type_id].get("war_chant", 0.0))
-	return mult
-
-
-func _only_holders_left() -> bool:
-	for enemy in enemies:
-		if enemy.alive and enemy.den_index < 0 and float(content.enemies[enemy.type_id].get("hold_at", 0.0)) <= 0.0:
-			return false
-	return true
-
-
-func _make_enemy(type_id: String, at: Vector2, spawn_time: float, scale := 1.0) -> Unit:
-	var e: Dictionary = content.enemies[type_id]
-	var enemy := Unit.new()
-	enemy.id = run.new_id()
-	enemy.team = Unit.Team.ENEMY
-	enemy.type_id = type_id
-	enemy.display_name = e["name"]
-	enemy.max_hp = float(e["hp"]) * scale
-	enemy.hp = enemy.max_hp
-	enemy.attack = float(e["attack"]) * scale
-	enemy.attack_range = float(e["range"])
-	enemy.cooldown = float(e["cooldown"])
-	enemy.speed = float(e["speed"])
-	enemy.is_boss = e.get("boss", false)
-	enemy.spawn_time = spawn_time
-	enemy.spawned = spawn_time <= time
-	enemy.pos = at
-	return enemy
-
-
-# --- Towers ----------------------------------------------------------------
-
-func _towers_tick() -> void:
-	hearth_cooldown_left -= dt
-	if hearth_cooldown_left <= 0.0:
-		var target := _nearest_enemy(Vector2.ZERO, content.num("hearth_range"))
-		if target != null:
-			hearth_cooldown_left = content.num("hearth_cooldown")
-			shots.append({"from": Vector2.ZERO, "to": target.pos, "ranged": true, "time": time})
-			_damage(null, target, (content.num("hearth_attack") + run.mod("tower_attack")) * _shield_left(target))
-	for b in buildings:
-		var def: Dictionary = content.buildings[b["type"]]
-		if not def.has("attack") or float(b["work_left"]) > 0.0:
-			continue
-		b["cooldown_left"] = float(b["cooldown_left"]) - dt
-		if float(b["cooldown_left"]) > 0.0:
-			continue
-		var target := _nearest_enemy(b["pos"], float(def["range"]))
-		if target != null:
-			b["cooldown_left"] = float(def["cooldown"])
-			shots.append({"from": b["pos"], "to": target.pos, "ranged": true, "time": time})
-			_damage(null, target, (float(def["attack"]) + run.mod("tower_attack")) * _shield_left(target))
-
-
-## Share of a stone blow (arrows, the hearth's fire) that gets past a shield.
-func _shield_left(enemy: Unit) -> float:
-	return 1.0 - float(content.enemies[enemy.type_id].get("shield", 0.0))
-
-
-# --- Shared ----------------------------------------------------------------
+# --- Shared: movement, combat and lookups used by every part ---------------
 
 ## Moves toward a goal; returns true once within `close` of it.
-func _move_toward(unit: Unit, goal: Vector2, close := 2.0) -> bool:
+func walk_toward(unit: Unit, goal: Vector2, close := 2.0) -> bool:
 	var to_goal := goal - unit.pos
 	if to_goal.length() <= close:
 		return true
@@ -1380,34 +372,34 @@ func _move_toward(unit: Unit, goal: Vector2, close := 2.0) -> bool:
 	return false
 
 
-func _fight(unit: Unit, foe: Unit) -> void:
+func fight(unit: Unit, foe: Unit) -> void:
 	if unit.pos.distance_to(foe.pos) > unit.attack_range:
-		_move_toward(unit, foe.pos, unit.attack_range * 0.9)
+		walk_toward(unit, foe.pos, unit.attack_range * 0.9)
 	elif unit.cooldown_left <= 0.0:
-		_hit(unit, foe)
+		hit(unit, foe)
 
 
 ## Walks to the hearth and heals there. Returns true while healing.
-func _go_heal(unit: Unit, mult := 1.0) -> bool:
-	if not _move_toward(unit, unit.pos.limit_length(HEARTH_RADIUS + 10.0).lerp(Vector2.ZERO, 0.2), HEARTH_RADIUS + 14.0):
+func go_heal(unit: Unit, mult := 1.0) -> bool:
+	if not walk_toward(unit, unit.pos.limit_length(HEARTH_RADIUS + 10.0).lerp(Vector2.ZERO, 0.2), HEARTH_RADIUS + 14.0):
 		return false
 	unit.hp = minf(unit.max_hp, unit.hp + content.num("hearth_heal_rate") * mult * dt)
 	return true
 
 
-func _hit(attacker: Unit, victim: Unit) -> void:
+func hit(attacker: Unit, victim: Unit) -> void:
 	attacker.cooldown_left = attacker.cooldown
 	shots.append({"from": attacker.pos, "to": victim.pos, "ranged": attacker.attack_range > 60, "time": time})
 	var amount := attacker.attack * rng.randf_range(0.85, 1.15)
 	if attacker.is_enemy():
-		amount *= war_chant()
+		amount *= enemy_ai.war_chant()
 	elif attacker.is_hero():
 		if attacker.energy <= 0.0:
 			amount *= content.num("exhausted_attack")
 		attacker.energy = maxf(0.0, attacker.energy - content.num("energy_per_attack"))
 	if victim.is_enemy() and not _metal_blow(attacker):
-		amount *= _shield_left(victim)
-	_damage(attacker, victim, amount)
+		amount *= enemy_ai.shield_left(victim)
+	damage(attacker, victim, amount)
 
 
 ## Bronze shields turn stone; a bronze weapon or bronze-armed warrior cuts through.
@@ -1417,11 +409,11 @@ func _metal_blow(attacker: Unit) -> bool:
 	return attacker.is_folk() and run.has_metal_tools(attacker.type_id)
 
 
-func _damage(attacker: Unit, victim: Unit, amount: float) -> void:
+func damage(attacker: Unit, victim: Unit, amount: float) -> void:
 	victim.hp -= amount
 	if victim.hp > 0.0:
 		# Sentient creatures turn on whoever hurt them.
-		if victim.is_enemy() and attacker != null and content.enemy_has_tag(victim.type_id, "sentient"):
+		if victim.is_enemy() and attacker != null and content.unit_has_tag(victim, "sentient"):
 			victim.target = attacker
 			victim.grudge_until = time + 8.0
 		return
@@ -1442,7 +434,7 @@ func _damage(attacker: Unit, victim: Unit, amount: float) -> void:
 		night_report["deaths"].append(victim.display_name)
 		return
 	night_report["kills"] = int(night_report["kills"]) + 1
-	_carcass(victim)
+	market.carcass(victim)
 	if attacker != null and attacker.is_folk():
 		attacker.kills += 1
 	if attacker == null or not attacker.is_hero():
@@ -1451,8 +443,8 @@ func _damage(attacker: Unit, victim: Unit, amount: float) -> void:
 	attacker.kills += 1
 	attacker.xp += float(e["xp"]) * (1.0 + run.mod("xp_mult"))
 	attacker.gold += int(e["loot"]) + int(run.mod("loot_shells")) + int(Loot.total(content, attacker, "loot"))
-	_pay_prizes(attacker, victim)
-	_maybe_drop(attacker, victim)
+	market.pay_prizes(attacker, victim)
+	hero_ai.maybe_drop(attacker, victim)
 	if victim.is_boss:
 		run.tell("%s slays %s!" % [attacker.display_name, victim.display_name])
 
@@ -1471,7 +463,7 @@ func _cleanup() -> void:
 			u.target = null
 
 
-func _nearest_enemy(from: Vector2, max_distance: float, max_from_home := INF) -> Unit:
+func nearest_enemy(from: Vector2, max_distance: float, max_from_home := INF) -> Unit:
 	var best: Unit = null
 	var best_d := max_distance
 	for enemy in enemies:
@@ -1485,7 +477,7 @@ func _nearest_enemy(from: Vector2, max_distance: float, max_from_home := INF) ->
 
 
 ## The closest enemy chasing a worker, if it is within reach of the warriors.
-func _nearest_alarm(from: Vector2) -> Unit:
+func nearest_alarm(from: Vector2) -> Unit:
 	var best: Unit = null
 	var best_d := INF
 	for enemy in alarms:
@@ -1498,7 +490,7 @@ func _nearest_alarm(from: Vector2) -> Unit:
 	return best
 
 
-func _nearest_friend(from: Vector2, max_distance: float) -> Unit:
+func nearest_friend(from: Vector2, max_distance: float) -> Unit:
 	var best: Unit = null
 	var best_d := max_distance
 	for unit in folk + run.heroes:
@@ -1514,6 +506,16 @@ func _nearest_friend(from: Vector2, max_distance: float) -> Unit:
 ## Breaks unit-to-unit references so everything can be freed.
 func release() -> void:
 	alarms = []
-	_new_alarms = []
+	new_alarms = []
 	for unit in folk + enemies + run.heroes:
 		unit.target = null
+
+
+## Breaks every reference loop (run, parts, units) so a finished run can be freed.
+func dispose() -> void:
+	release()
+	run = null
+	folk_ai = null
+	hero_ai = null
+	market = null
+	enemy_ai = null

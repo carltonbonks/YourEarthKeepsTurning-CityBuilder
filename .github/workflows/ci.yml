@@ -49,7 +49,7 @@ jobs:
         run: ~/godot/godot --headless --path . --import
 
       - name: Run tests
-        run: ~/godot/godot --headless --path . -s res://tests/run_tests.gd
+        run: GODOT=~/godot/godot tools/test.sh
 
       - name: Export web build
         run: |

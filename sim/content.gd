@@ -6,6 +6,8 @@ extends RefCounted
 ## a number in data/ changes the game without touching code.
 
 const DATA_DIR := "res://data"
+## Kinds of entity that can carry "tags" in their data, for tags_of() and has_tag().
+const TAG_KINDS := ["enemy", "hero", "trait", "townsfolk", "building", "item", "relic"]
 
 var balance: Dictionary
 var hero_classes: Dictionary
@@ -21,7 +23,7 @@ var world: Dictionary
 var market: Dictionary  ## data/recipes.json: recipes, provisions and market numbers.
 var ages: Dictionary  ## data/ages.json: the tech ages in order, tool sets and the trader.
 var promotions: Dictionary  ## data/promotions.json: when townsfolk can be promoted and into what.
-var tags: Dictionary  ## data/tags.json: what each creature tag means, for tooltips.
+var tags: Dictionary  ## data/tags.json: what each tag that a rule reads means, for tooltips.
 
 
 static func load_default() -> Content:
@@ -53,9 +55,51 @@ func int_num(key: String) -> int:
 	return int(balance[key])
 
 
-## True if an enemy type carries a tag (see "tags" in data/enemies.json).
-func enemy_has_tag(type_id: String, tag: String) -> bool:
-	return tag in enemies[type_id].get("tags", [])
+## The tags an entity carries in its data: its "tags" list. kind is one of TAG_KINDS, e.g.
+## tags_of("enemy", "wolf") -> ["animal", "sentient", "beast"]. Unknown ids carry none.
+func tags_of(kind: String, id: String) -> Array:
+	var table := tag_table(kind)
+	return table.get(id, {}).get("tags", [])
+
+
+## True if an entity's data carries a tag. Rules read tags only through this (or unit_has_tag),
+## and every tag a rule reads is explained in data/tags.json (tests/test_tags.gd checks it).
+func has_tag(kind: String, id: String, tag: String) -> bool:
+	return tag in tags_of(kind, id)
+
+
+## Everything a unit is: an enemy's type tags; a hero's class and trait tags; a townsperson's role tags.
+func unit_tags(unit: Unit) -> Array:
+	if unit.is_enemy():
+		return tags_of("enemy", unit.type_id)
+	if unit.is_hero():
+		return tags_of("hero", unit.type_id) + tags_of("trait", unit.trait_id)
+	return tags_of("townsfolk", unit.type_id)
+
+
+func unit_has_tag(unit: Unit, tag: String) -> bool:
+	return tag in unit_tags(unit)
+
+
+## The data table for a tag kind (see TAG_KINDS), keyed by id.
+func tag_table(kind: String) -> Dictionary:
+	match kind:
+		"enemy":
+			return enemies
+		"hero":
+			return hero_classes
+		"trait":
+			return traits
+		"townsfolk":
+			return townsfolk
+		"building":
+			return buildings
+		"item":
+			return items["bases"]
+		"relic":
+			return relics
+	assert(false, "Unknown tag kind %s (see Content.TAG_KINDS)" % kind)
+	return {}
 
 
 ## True once a town in age `current` has reached age `needed` ("" needs nothing).

@@ -25,7 +25,7 @@ func _crowd(run: RunState, n: int) -> void:
 	for b in run.world.buildings:
 		b["work_left"] = 0.0
 	while run.population() < n:
-		run.world.add_folk("tribesperson")
+		run.world.folk_ai.add_folk("tribesperson")
 
 
 func _age_up(run: RunState) -> void:
@@ -102,16 +102,16 @@ func test_townsfolk_skip_cassiterite_until_the_den_is_quiet() -> void:
 	run.begin_round()
 	run.choose_pick(-1)
 	run.world.enemies.clear()
-	var wolf := run.world._make_enemy("wolf", node["pos"] + Vector2(40, 0), 0.0)
+	var wolf := run.world.enemy_ai.make_enemy("wolf", node["pos"] + Vector2(40, 0), 0.0)
 	wolf.den_index = 0
 	run.world.enemies.append(wolf)
 	check(not run.world.node_safe(node), "a wolf by the vein makes it unsafe")
 	var u := run.world.folk[0]
-	check_eq(run.world._nearest_node(u, "cassiterite"), -1, "a tribesperson won't go while the wolf prowls")
+	check_eq(run.world.folk_ai.nearest_node(u, "cassiterite"), -1, "a tribesperson won't go while the wolf prowls")
 	wolf.alive = false
 	run.world.enemies.clear()
 	check(run.world.node_safe(node), "with the den's wanderers dead the vein is safe")
-	check_eq(run.world._nearest_node(u, "cassiterite"), vein, "now townsfolk can fetch cassiterite")
+	check_eq(run.world.folk_ai.nearest_node(u, "cassiterite"), vein, "now townsfolk can fetch cassiterite")
 
 
 func test_heroes_fetch_cassiterite_once_a_smelter_stands() -> void:
@@ -123,12 +123,12 @@ func test_heroes_fetch_cassiterite_once_a_smelter_stands() -> void:
 		if run.world.nodes[i]["gives"] == "cassiterite":
 			vein = i
 	hero.pos = run.world.nodes[vein]["pos"] + Vector2(30, 0)
-	check_eq(run.world._outcrop_for(hero), -1, "no smelter: nobody buys cassiterite")
+	check_eq(run.world.hero_ai.outcrop_for(hero), -1, "no smelter: nobody buys cassiterite")
 	_raise(run, "smelter")
-	check_eq(run.world._outcrop_for(hero), vein, "with a smelter heroes fetch it")
-	run.world._take_shards(hero, vein)
+	check_eq(run.world.hero_ai.outcrop_for(hero), vein, "with a smelter heroes fetch it")
+	run.world.hero_ai.take_shards(hero, vein)
 	var shells_before := int(run.stock["shells"])
-	run.world._sell_shards(hero)
+	run.world.hero_ai.sell_shards(hero)
 	check(int(run.stock["cassiterite"]) > 0, "the town gets the cassiterite")
 	check(int(run.stock["shells"]) < shells_before, "and pays the hero for it")
 
@@ -141,7 +141,7 @@ func test_smelter_makes_tin_then_bronze() -> void:
 	run.stock["copper"] = 4
 	run.stock["fuel"] = 50
 	run.stock["food"] = 50
-	var u := run.world.add_folk("craftsperson")
+	var u := run.world.folk_ai.add_folk("craftsperson")
 	_start_day(run)
 	_advance(run, 30.0)
 	check(int(run.world.buildings[smelter]["made"]) >= 2, "the smelter has worked")
@@ -163,9 +163,9 @@ func test_tool_sets_cost_bronze_and_upgrade_a_group() -> void:
 	check(run.has_metal_tools("warrior"), "warriors now strike with metal")
 	check_eq(int(run.stock["bronze"]), 6, "the ingots are spent")
 	check(not run.buy_tools("bronze_spears"), "each set only once")
-	var plain := run.world.work_rate(run.world.add_folk("craftsperson"))
+	var plain := run.world.folk_ai.work_rate(run.world.folk_ai.add_folk("craftsperson"))
 	run.buy_tools("bronze_chisels")
-	check(run.world.work_rate(run.world.folk.back()) > plain, "chisels speed up craftspeople")
+	check(run.world.folk_ai.work_rate(run.world.folk.back()) > plain, "chisels speed up craftspeople")
 
 
 func test_caravan_sells_tin_at_a_markup() -> void:
@@ -198,19 +198,19 @@ func test_bronze_shields_turn_stone_but_not_metal() -> void:
 	run.begin_round()
 	run.choose_pick(-1)
 	run.world.enemies.clear()
-	var reaver := run.world._make_enemy("bronze_reaver", Vector2(100, 0), 0.0)
+	var reaver := run.world.enemy_ai.make_enemy("bronze_reaver", Vector2(100, 0), 0.0)
 	run.world.enemies.append(reaver)
 	var hero := run.heroes[0]
 	hero.items = {"weapon": Loot.make("flint_blade", 2)}
-	run.world.apply_hero_stats(hero)
+	run.world.hero_ai.apply_hero_stats(hero)
 	hero.energy = 100.0
 	var hp := reaver.hp
-	run.world._hit(hero, reaver)
+	run.world.hit(hero, reaver)
 	var stone_hit := hp - reaver.hp
 	hero.items = {"weapon": Loot.make("bronze_sword", 2)}
-	run.world.apply_hero_stats(hero)
+	run.world.hero_ai.apply_hero_stats(hero)
 	hp = reaver.hp
-	run.world._hit(hero, reaver)
+	run.world.hit(hero, reaver)
 	var bronze_hit := hp - reaver.hp
 	check(stone_hit < hero.attack * 1.15 * 0.61, "the shield soaks part of a stone blow")
 	check(bronze_hit > hero.attack * 0.84, "a bronze blade cuts through")
@@ -273,7 +273,7 @@ func test_skilled_craftsperson_becomes_a_master() -> void:
 	_raise(run, "market")
 	_raise(run, "arms_stall")
 	var knapper := _raise(run, "knapper")
-	var u := run.world.add_folk("craftsperson")
+	var u := run.world.folk_ai.add_folk("craftsperson")
 	u.made["knapper"] = 8
 	run.stock["shells"] = 100
 	run.begin_round()
@@ -285,7 +285,7 @@ func test_skilled_craftsperson_becomes_a_master() -> void:
 	run.choose_pick(card)
 	check_eq(u.master_of, "knapper", "now master of the knapper")
 	check(u.craft_trait != "" and u.display_name != "Craftsperson", "with a name and a craft trait")
-	check(run.world._workshop_needing_hands(u) == knapper or run.world._next_recipe(knapper) == "", "a master goes to their own bench")
+	check(run.world.market.workshop_needing_hands(u) == knapper or run.world.market.next_recipe(knapper) == "", "a master goes to their own bench")
 
 
 func test_master_trait_shapes_their_goods() -> void:
@@ -293,13 +293,13 @@ func test_master_trait_shapes_their_goods() -> void:
 	_raise(run, "market")
 	var stall := _raise(run, "arms_stall")
 	var knapper := _raise(run, "knapper")
-	var u := run.world.add_folk("craftsperson")
+	var u := run.world.folk_ai.add_folk("craftsperson")
 	u.master_of = "knapper"
 	u.craft_trait = "gifted"
 	run.stock["flint"] = 10
-	run.world._start_craft(knapper)
+	run.world.market.start_craft(knapper)
 	var base_tier := int(run.world.buildings[knapper]["craft_tier"])
-	run.world._finish_craft(knapper, u)
+	run.world.market.finish_craft(knapper, u)
 	var good: Dictionary = run.world.buildings[stall]["goods"][0]
 	check_eq(int(good["tier"]), base_tier + 1, "a gifted master's gear is a tier better")
 

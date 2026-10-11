@@ -82,7 +82,7 @@ func _init(game_content: Content, seed_value: int) -> void:
 	roles.sort()
 	for role: String in roles:
 		for i in int(start_people[role]):
-			world.add_folk(role)
+			world.folk_ai.add_folk(role)
 	for i in content.int_num("start_heroes"):
 		_add_hero(_make_hero())
 	tell("Round 1. A handful of people gather around a fire at the edge of the world.")
@@ -194,7 +194,7 @@ func begin_round() -> void:
 
 func on_building_done(type: String) -> void:
 	if content.buildings[type].has("lodging"):
-		world.assign_lodgings()
+		world.hero_ai.assign_lodgings()
 	var next_age: String = content.buildings[type].get("ages_up", "")
 	if next_age != "" and not content.age_reached(age, next_age):
 		age = next_age
@@ -220,7 +220,7 @@ func buy_tools(id: String) -> bool:
 		stock[r] = int(stock[r]) - int(def["cost"][r])
 	tools.append(id)
 	for u in world.folk:
-		world.apply_folk_stats(u)
+		world.folk_ai.apply_folk_stats(u)
 	_round_entry["actions"].append({"kind": "tools", "tools": id})
 	tell("%s for the %ss." % [def["name"], content.townsfolk[def["role"]]["name"].to_lower()])
 	return true
@@ -280,12 +280,12 @@ func choose_pick(index: int) -> void:
 			var hero: Unit = card["hero"]
 			_add_hero(hero)
 			taken = "hero:" + hero.type_id
-			tell("%s arrives and sleeps in %s." % [describe(hero), world.bed_name(hero.lodging)])
+			tell("%s arrives and sleeps in %s." % [describe(hero), world.hero_ai.bed_name(hero.lodging)])
 		elif card["kind"] == "promote":
 			_promote(card)
 			taken = _card_label(card)
 		else:
-			world.add_folk(card["role"])
+			world.folk_ai.add_folk(card["role"])
 			taken = card["role"]
 			tell("A %s joins the settlement." % content.townsfolk[card["role"]]["name"].to_lower())
 	_round_entry["picks"].append({"day": world.day_index() + 1, "offered": pick_offer.map(_card_label), "taken": taken})
@@ -293,7 +293,7 @@ func choose_pick(index: int) -> void:
 	phase = Phase.SIM
 	world.resume()
 	tell("Day %d dawns." % (world.day_index() + 1))
-	world.roll_whims()
+	world.hero_ai.roll_whims()
 
 
 func _offer_picks() -> void:
@@ -303,7 +303,7 @@ func _offer_picks() -> void:
 	roles.sort()
 	for role: String in roles:
 		pool.append({"kind": "folk", "role": role, "cost": 0})
-	if world.count_lodgings() > 0:
+	if world.hero_ai.count_lodgings() > 0:
 		pool.append({"kind": "hero", "role": "hero", "cost": content.int_num("hero_card_cost"), "hero": _make_hero(true)})
 	pick_offer = []
 	var promote := _promotion_card(rng)
@@ -331,7 +331,7 @@ func _promotion_card(rng: SeededRng) -> Dictionary:
 	var rules := content.promotions
 	var candidates: Array[Dictionary] = []
 	for u in world.folk:
-		if u.type_id == "warrior" and u.kills >= int(rules["warrior"]["kills"]) and world.count_lodgings() > 0:
+		if u.type_id == "warrior" and u.kills >= int(rules["warrior"]["kills"]) and world.hero_ai.count_lodgings() > 0:
 			candidates.append({"kind": "promote", "role": "warrior", "cost": int(rules["warrior"]["cost"]), "unit": u})
 		elif u.type_id == "craftsperson" and u.master_of == "":
 			var best := ""
@@ -350,7 +350,7 @@ func _promotion_card(rng: SeededRng) -> Dictionary:
 		var hero := _make_hero()
 		hero.type_id = rules["warrior"]["becomes"]
 		hero.level = int(rules["warrior"]["start_level"])
-		world.apply_hero_stats(hero)
+		world.hero_ai.apply_hero_stats(hero)
 		hero.hp = hero.max_hp
 		card["hero"] = hero
 	else:
@@ -547,7 +547,7 @@ func choose_relic(relic_id: String) -> void:
 			_add_hero(hero)
 			tell("%s follows the wanderer's fire to your camp." % describe(hero))
 		for u in world.folk:
-			world.apply_folk_stats(u)
+			world.folk_ai.apply_folk_stats(u)
 		tell("Relic taken: %s." % content.relics[relic_id]["name"])
 	_round_entry["relic_pick"] = relic_id
 	_end_round_entry()
@@ -633,8 +633,7 @@ func is_over() -> bool:
 
 ## Breaks the run <-> world reference loop so a finished run can be freed.
 func dispose() -> void:
-	world.release()
-	world.run = null
+	world.dispose()
 
 
 func describe(hero: Unit) -> String:
@@ -792,16 +791,16 @@ func _make_hero(drawn_by_lodging := false) -> Unit:
 		hero.trait_id = _hero_rng.pick(trait_ids)
 	hero.display_name = _unused_name()
 	hero.mood = content.num("mood_start")
-	world.apply_hero_stats(hero)
+	world.hero_ai.apply_hero_stats(hero)
 	hero.hp = hero.max_hp
 	return hero
 
 
 func _add_hero(hero: Unit) -> void:
 	hero.pos = Vector2.from_angle(heroes.size() * 1.7 + 0.4) * 60.0
-	world.apply_hero_stats(hero)
+	world.hero_ai.apply_hero_stats(hero)
 	heroes.append(hero)
-	world.assign_lodgings()
+	world.hero_ai.assign_lodgings()
 
 
 func _bury_heroes() -> void:
@@ -876,7 +875,7 @@ func _hero_leaves(hero: Unit, why: String) -> void:
 		_round_entry["heroes_left"].append({"day": world.day_index() + 1, "hero": hero.display_name, "trait": hero.trait_id,
 			"mood": roundi(hero.mood), "why": why})
 	tell("%s has had enough%s and leaves town with their gear." % [describe(hero), " (%s)" % why if why != "" else ""])
-	world.assign_lodgings()
+	world.hero_ai.assign_lodgings()
 
 
 func _level_up(hero: Unit) -> void:
@@ -884,7 +883,7 @@ func _level_up(hero: Unit) -> void:
 	while hero.xp >= per_level * hero.level:
 		hero.xp -= per_level * hero.level
 		hero.level += 1
-		world.apply_hero_stats(hero)
+		world.hero_ai.apply_hero_stats(hero)
 		tell("%s reaches level %d." % [hero.display_name, hero.level])
 
 
