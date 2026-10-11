@@ -187,6 +187,16 @@ func _refresh_build() -> void:
 		note.add_theme_font_size_override("font_size", 11)
 		note.add_theme_color_override("font_color", Color("#9aa"))
 		_build_list.add_child(note)
+		var problems := Tooltips.warnings(run, type)
+		if not problems.is_empty():
+			btn.tooltip_text += "\n" + "\n".join(PackedStringArray(problems))
+			if owned > 0:
+				var warn := Label.new()
+				warn.text = " ".join(PackedStringArray(problems))
+				warn.autowrap_mode = TextServer.AUTOWRAP_WORD
+				warn.add_theme_font_size_override("font_size", 11)
+				warn.add_theme_color_override("font_color", Color("#ffb060"))
+				_build_list.add_child(warn)
 	var pending := run.world.buildings.filter(func(b: Dictionary) -> bool: return float(b["work_left"]) > 0.0).size()
 	if pending > 0 and run.count_role("craftsperson") == 0:
 		var warn := Label.new()

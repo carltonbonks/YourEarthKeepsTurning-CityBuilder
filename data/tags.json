@@ -1,0 +1,4 @@
+{
+	"_note": "What creature tags do, shown when you hover over a creature or den. Only tags a rule reads get a line here; others show by name alone. Prize tags (the hunting lodge's beast prize) come from data/buildings.json, so the tooltip finds those on its own.",
+	"sentient": "turns on whoever hits it"
+}
