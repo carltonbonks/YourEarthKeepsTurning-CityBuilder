@@ -10,14 +10,15 @@ Every change merged to `main` is published as a browser build:
 No install needed. Desktop Chrome, Edge or Firefox recommended.
 Add `?seed=1234` to the address to replay a specific run. Add `&dev=1` for developer tools such as skipping ahead.
 
-### How it plays (slice 4)
+### How it plays
 
 A handful of people around a fire, in the middle of a map. Resources ring the camp, monster dens sit far out in the wilds. Survive 10 rounds. Each round:
-1. **Build.** Order huts, watch posts, drying racks, and hero lodgings: a longhouse, a mead hall or a spirit shrine. Craftspeople raise them during the day. You also see where the round's attack will come from.
-2. **Three days and nights.** At each dawn, pick one newcomer from three cards (tribesperson, warrior, craftsperson, or a hero once any lodging stands). Then everyone acts on their own: tribespeople gather and patch the hearth, warriors patrol, heroes follow the day's whim (hunt, guard, sleep in, carouse) and hunt at the dens for loot and XP.
-3. **Heroes run on energy.** They tire as they work and fight, go to bed when tired and at nightfall, and only wake when an enemy comes close to where they sleep. Each personality has a favourite lodging: the mead hall rests them fast and earns shells but they sleep deeply; the shrine heals them and they wake at the first sign of danger. Heroes without a bed sleep by the hearth and recover slowly.
-4. **The market.** Build a market square, then stalls (arms, hides, charms, provisions) and the workshops that feed them (knapper, hide rack, bone carver, smoke hut). Craftspeople work the benches when they have nothing to raise. Tribespeople dig flint; beasts give hides and bone when they die; heroes bring obsidian back from the wilds once a knapper stands. Heroes shop by day with their own shells, and the shells go to the settlement. You set each stall's price (Cheap, Fair or Dear) at the start of a round. A hunting lodge pays heroes a prize for every beast.
-5. **Night 3 brings the warned attack.** Survive it, then **pick a relic** (1 of 3). Heroes sell the loot they don't wear (the settlement keeps a cut).
+1. **Build.** Order huts, watch posts, drying racks, hero lodgings (a longhouse, a mead hall or a spirit shrine), and the market and its workshops. Craftspeople raise them during the day. You also see where the round's attack will come from. Hover over anything on the map or in the build list for what it does, its tags, and warnings such as a stall with no workshop feeding it.
+2. **Three days and nights.** At each dawn, pick one newcomer from three cards (tribesperson, warrior, craftsperson, or a hero once any lodging stands). A townsperson who stands out can be offered as a Promote card instead: a veteran warrior becomes a champion hero, a busy craftsperson a named master. Then everyone acts on their own: tribespeople gather and patch the hearth, warriors patrol, heroes follow the day's whim (hunt, guard, sleep in, carouse) and hunt at the dens for loot and XP.
+3. **Heroes run on energy and mood.** They tire as they work and fight, go to bed when tired and at nightfall, and only wake when an enemy comes close. Each personality has a favourite lodging. Hunger, cold, sleeping rough and comrades dying sour their mood; a favourite bed, shopping and prizes lift it. An unhappy hero walks away.
+4. **The market.** Stalls (arms, armour, charms, provisions) sell to heroes, fed by workshops (knapper, hide rack, bone carver, smoke hut) that craftspeople staff. You set each stall's price (Cheap, Fair or Dear). A hunting lodge pays heroes a prize for every beast.
+5. **The bronze age.** Raise the Bronze moot (costly, your choice when) to unlock copper seams, the smelter, the bronzesmith, bronze tool sets for townsfolk groups and a caravan selling tin. Heroes fetch cassiterite from near the dens. Bronze reavers arrive from round 6 and shrug off stone blows.
+6. **Night 3 brings the warned attack.** Survive it, then **pick a relic** (1 of 3).
 
 ## Layout
 
@@ -26,12 +27,13 @@ A handful of people around a fire, in the middle of a map. Resources ring the ca
 | `sim/` | Game rules and simulation. No graphics, so it can run headless for tests and balance runs. |
 | `game/` | Scenes, UI and visuals that show the simulation. |
 | `data/` | Balance numbers and content (heroes, enemies, relics) as JSON files. |
-| `tools/` | Headless helpers, e.g. the balance report. |
+| `tools/` | Headless helpers, e.g. the balance report and Godot setup. |
+| `docs/` | [DEVELOPMENT.md](docs/DEVELOPMENT.md): code map and development habits. |
 | `tests/` | Automated tests for `sim/`. |
 
 ## For developers
 
-Engine: Godot 4.7.1 (GDScript). The CI workflow in `.github/workflows/ci.yml` shows the exact commands.
+Engine: Godot 4.7.1 (GDScript). Read [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) first. `tools/setup_godot.sh` downloads Godot to `~/godot/godot` (Linux); the CI workflow in `.github/workflows/ci.yml` shows the exact commands.
 
 ```sh
 godot --headless --path . --import                       # first time / after adding files
@@ -47,4 +49,4 @@ godot --headless --path . -s res://tools/balance_run.gd -- runs=50 style=balance
 godot --headless --path . -s res://tools/run_report.gd -- in=sim.jsonl in=my_runs.json
 ```
 
-Balance report styles (a scripted player): `balanced` (huts, a longhouse, watch posts, picks by need), `workers` (never takes heroes), `heroes` (rushes the longhouse, takes every hero it can afford), `market` (builds every workshop, stall and the hunting lodge early). `tools/market_probe.gd -- seed=4821 style=market` prints one run's economy round by round.
+Balance report styles (a scripted player): `balanced` (huts, a longhouse, watch posts, picks by need), `workers` (never takes heroes), `heroes` (rushes the longhouse, takes every hero it can afford), `market` (builds every workshop, stall and the hunting lodge early), `bronze` (like market, then ages up as soon as it can). `tools/market_probe.gd -- seed=4821 style=market` prints one run's economy round by round.

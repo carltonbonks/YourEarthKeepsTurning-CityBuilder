@@ -1,5 +1,5 @@
 extends Control
-## Slice 4 screen: the settlement map in the middle, decisions on the left,
+## The game screen: the settlement map in the middle, decisions on the left,
 ## heroes and the story underneath. UI is built in code for now (placeholder
 ## layout); all rules live in sim/.
 
