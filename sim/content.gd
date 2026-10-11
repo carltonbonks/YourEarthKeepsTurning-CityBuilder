@@ -21,6 +21,7 @@ var world: Dictionary
 var market: Dictionary  ## data/recipes.json: recipes, provisions and market numbers.
 var ages: Dictionary  ## data/ages.json: the tech ages in order, tool sets and the trader.
 var promotions: Dictionary  ## data/promotions.json: when townsfolk can be promoted and into what.
+var tags: Dictionary  ## data/tags.json: what each creature tag means, for tooltips.
 
 
 static func load_default() -> Content:
@@ -40,6 +41,7 @@ static func load_default() -> Content:
 	c.market = _strip(_read("recipes.json"))
 	c.ages = _strip(_read("ages.json"))
 	c.promotions = _strip(_read("promotions.json"))
+	c.tags = _strip(_read("tags.json"))
 	return c
 
 

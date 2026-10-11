@@ -2,7 +2,7 @@ class_name ArenaView
 extends Control
 ## Draws the settlement map with placeholder shapes. Read-only: it only looks at
 ## the RunState / World and never changes them, so art can be swapped freely.
-## Mouse wheel zooms, dragging pans.
+## Mouse wheel zooms, dragging pans, hovering shows a tooltip (see Tooltips).
 
 const HERO_RADIUS := 9.0
 const FOLK_RADIUS := 5.5
@@ -15,6 +15,7 @@ var run: RunState
 var zoom := 1.2
 var pan := Vector2.ZERO  ## World point at the centre of the view.
 var _dragging := false
+var _mouse := Vector2(-1, -1)  ## Last mouse position over the map; negative when it is elsewhere.
 
 
 func reset_camera() -> void:
@@ -36,8 +37,15 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_LEFT or mb.button_index == MOUSE_BUTTON_RIGHT:
 			_dragging = mb.pressed
-	elif event is InputEventMouseMotion and _dragging:
-		pan -= (event as InputEventMouseMotion).relative / _scale()
+	elif event is InputEventMouseMotion:
+		_mouse = (event as InputEventMouseMotion).position
+		if _dragging:
+			pan -= (event as InputEventMouseMotion).relative / _scale()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_MOUSE_EXIT:
+		_mouse = Vector2(-1, -1)
 
 
 func _scale() -> float:
@@ -170,7 +178,74 @@ func _draw() -> void:
 	var dark := _darkness()
 	if dark > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.12, dark))
-	draw_string(font, Vector2(8, size.y - 8), "Mouse wheel to zoom, drag to look around", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#8a9088"))
+	draw_string(font, Vector2(8, size.y - 8), "Mouse wheel to zoom, drag to look around, point at anything for details", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#8a9088"))
+	if _mouse.x >= 0.0 and not _dragging:
+		var tip := hovered(_mouse)
+		if not tip.is_empty():
+			_draw_tip(tip, _mouse, font)
+
+
+## The tooltip for whatever is under a screen point ({} if nothing). Small, moving things win over big, still ones.
+func hovered(at: Vector2) -> Dictionary:
+	var w := run.world
+	var grow := maxf(1.0, zoom * 0.7)
+	for hero in run.heroes:
+		if hero.alive and _near(hero.pos, at, HERO_RADIUS * grow):
+			return Tooltips.hero(run, hero)
+	for e in w.enemies:
+		if e.alive and e.spawned and _near(e.pos, at, (BOSS_RADIUS if e.is_boss else ENEMY_RADIUS) * grow):
+			return Tooltips.enemy(run, e.type_id, e)
+	for u in w.folk:
+		if u.alive and _near(u.pos, at, FOLK_RADIUS * grow):
+			return Tooltips.folk(run, u)
+	var half := maxf(4.0, World.BUILDING_SIZE * 0.5 * _scale())
+	for i in w.buildings.size():
+		var d := (at - _to_screen(w.buildings[i]["pos"])).abs()
+		if d.x <= half and d.y <= half:
+			return Tooltips.building(run, i)
+	if _near(Vector2.ZERO, at, World.HEARTH_RADIUS * _scale()):
+		return Tooltips.hearth(run)
+	for den in w.dens:
+		if _near(den["pos"], at, maxf(8.0, 18.0 * _scale() * 1.6)):
+			return Tooltips.den(run, den)
+	for node in w.nodes:
+		if w.node_active(node) and _near(node["pos"], at, maxf(3.0, 14.0 * _scale() * 1.6)):
+			return Tooltips.node(run, node)
+	return {}
+
+
+func _near(world_pos: Vector2, at: Vector2, radius: float) -> bool:
+	return _to_screen(world_pos).distance_to(at) <= radius + 3.0
+
+
+## A dark box beside the mouse: title, lines, tags, then warnings in orange. Kept inside the map.
+func _draw_tip(tip: Dictionary, at: Vector2, font: Font) -> void:
+	var rows: Array = [[tip["title"], 13, Color("#f0e6c8")]]
+	for line: String in tip["lines"]:
+		for part in _wrap(line):
+			rows.append([part, 11, Color("#c8ccc0")])
+	if not tip["tags"].is_empty():
+		rows.append(["Tags", 11, Color("#9fc4e0")])
+		for tag: String in tip["tags"]:
+			for part in _wrap("- " + tag):
+				rows.append([part, 11, Color("#9fc4e0")])
+	for warning: String in tip["warnings"]:
+		for part in _wrap(warning):
+			rows.append([part, 11, Color("#ffb060")])
+	var width := 0.0
+	for row: Array in rows:
+		width = maxf(width, font.get_string_size(row[0], HORIZONTAL_ALIGNMENT_LEFT, -1, row[1]).x)
+	var line_h := 15.0
+	var box := Vector2(width + 16.0, rows.size() * line_h + 10.0)
+	var pos := at + Vector2(16, 16)
+	pos.x = clampf(pos.x, 0.0, maxf(0.0, size.x - box.x))
+	if pos.y + box.y > size.y:
+		pos.y = maxf(0.0, at.y - box.y - 8.0)
+	draw_rect(Rect2(pos, box), Color(0.05, 0.06, 0.05, 0.92))
+	draw_rect(Rect2(pos, box), Color("#6a7458"), false, 1.0)
+	for i in rows.size():
+		var row: Array = rows[i]
+		draw_string(font, pos + Vector2(8, 18 + i * line_h), row[0], HORIZONTAL_ALIGNMENT_LEFT, width, row[1], row[2])
 
 
 ## How dark it is: 0 by day, rising through dusk, 0.45 at night.
@@ -211,3 +286,17 @@ func _draw_hero(hero: Unit, p: Vector2, font: Font) -> void:
 func _bar(at: Vector2, width: float, fraction: float, color: Color) -> void:
 	draw_rect(Rect2(at, Vector2(width, 3)), Color(0, 0, 0, 0.6))
 	draw_rect(Rect2(at, Vector2(width * clampf(fraction, 0.0, 1.0), 3)), color)
+
+
+## Splits a line into pieces of about `limit` characters at spaces.
+func _wrap(text: String, limit := 56) -> Array[String]:
+	var out: Array[String] = []
+	var line := ""
+	for word in text.split(" "):
+		if line != "" and line.length() + 1 + word.length() > limit:
+			out.append(line)
+			line = word
+		else:
+			line = word if line == "" else line + " " + word
+	out.append(line)
+	return out
