@@ -19,7 +19,9 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | --- | --- |
 | `sim/content.gd` | `Content`: loads every `data/*.json` once. The only place data is read. Helpers such as `has_tag` / `unit_has_tag`, `age_reached`, `recipes_for`. |
 | `sim/run_state.gd` | `RunState`: one run. Phases (BUILD, PICK, SIM, RELIC, WON, LOST), stock, building orders, dawn picks, promotions, relics (`mod()`), hero mood, upkeep, wave generation, and the run record (`to_record()`, `RECORD_FORMAT`). |
-| `sim/world.gd` | `World`: the map and everything on it, stepped in fixed ticks. Owns all world state, the day/night clock, the map and building plots, and the shared movement and combat helpers (`walk_toward`, `fight`, `hit`, `damage`, `nearest_enemy`). Pauses at dawn and at round end for `RunState`. Behaviour lives in four parts it creates: |
+| `sim/world.gd` | `World`: the map and everything on it, stepped in fixed ticks. Owns all world state, the day/night clock, the map, and the shared movement and combat helpers (`walk_toward`, `fight`, `hit`, `damage`, `nearest_enemy`). Every move goes through `walk_toward`, which asks `Pathing` for the next point and walks faster on trails and roads. Pauses at dawn and at round end for `RunState`. Behaviour lives in four parts it creates: |
+| `sim/town.gd` | `Town` (`world.town`): the ring town. Plots in rings and sectors round the hearth, obstacles, thickets, where a new building goes (`choose_plot`: its `near` key, never on a staked road, never walling off the hearth), staked roads (`stake`, `route`) and paving. |
+| `sim/pathing.gd` | `Pathing` (`world.pathing`): the ground as a grid of squares (solid or open; plain, thicket, trail or a road kind) and how units find their way (`next_point`, Godot's AStarGrid2D). Walking straight when that is as quick, cached routes otherwise; trails worn by feet (`tread`, `wear_trails` at dawn). |
 | `sim/folk_ai.gd` | `FolkAI` (`world.folk_ai`): townsfolk. Warriors patrol and answer calls; workers gather, haul, build, craft and patch the hearth. |
 | `sim/hero_ai.gd` | `HeroAI` (`world.hero_ai`): heroes. Energy and beds, whims, choosing fights, stats and gear, shopping at stalls, fetching from the wilds. |
 | `sim/market.gd` | `Market` (`world.market`): workshops, stalls, smelting, building-posted prizes and carcass yields. |
@@ -38,12 +40,12 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `game/tooltips.gd` | Hover text for map things and the build list, tag notes and supply warnings. Read-only. |
 | `game/run_history.gd` | Saves runs to `user://runs/`, download/copy for sharing. |
 | `data/*.json` | All content and balance numbers. Each file starts with a `_note` explaining its keys; keep it current when you add a key. |
-| `tools/` | Headless helpers: `balance_run.gd` (bot runs), `run_report.gd` (compare runs), `market_probe.gd` (one run's economy), `export_csv.py` (run records to CSV tables). |
+| `tools/` | Headless helpers: `balance_run.gd` (bot runs), `run_report.gd` (compare runs), `market_probe.gd` (one run's economy), `export_csv.py` (run records to CSV tables). `snapshot.gd` saves a picture of the screen after a bot has played (needs a display: `xvfb-run` in a container). |
 | `tests/` | `run_tests.gd` runs every `test_*` method in `tests/test_*.gd` (classes extend `TestCase`, use `check` / `check_eq`). `test_screen.gd` plays a run through the real UI; `test_tags.gd` enforces the tag habit. |
 
 Flow of a round: `RunState` BUILD → for each of 3 days: PICK at dawn → SIM (`World.step()` until the next pause) → after night 3's wave: RELIC → next BUILD.
 
-Where new code goes: a new townsfolk job goes in `FolkAI`, a hero behaviour or ability in `HeroAI`, an economy building in `Market`, an enemy behaviour in `EnemyAI`. State shared by more than one part lives on `World`; a part keeps private state only if no other part reads it (like `Market._prizes`). Parts call each other through the world (`w.market.stall_index(...)`), and a helper used from another part has no leading underscore. Avoid names Godot already uses for built-in functions (that is why it is `walk_toward`, not `move_toward`). A new panel or pop-up on the screen gets its own file in `game/` rather than growing `main.gd`.
+Where new code goes: a new townsfolk job goes in `FolkAI`, a hero behaviour or ability in `HeroAI`, an economy building in `Market`, an enemy behaviour in `EnemyAI`. State shared by more than one part lives on `World`; a part keeps private state only if no other part reads it (like `Market._prizes`). Parts call each other through the world (`w.market.stall_index(...)`), and a helper used from another part has no leading underscore. Avoid names Godot already uses for built-in functions (that is why it is `walk_toward`, not `move_toward`). Never move a unit by setting `pos` toward a goal yourself: go through `walk_toward`, so units go round buildings and roads count. A new panel or pop-up on the screen gets its own file in `game/` rather than growing `main.gd`.
 
 ## Habits
 

@@ -57,7 +57,10 @@ var _hungry_today := false
 ##    "sales" are now made at the market and there are no trader purchases.
 ## 7: ages and promotions: "age", "age_up_round", "tools", "departed" (heroes who left unhappy), hero "mood";
 ##    per round "promotions", "trades", "cassiterite", "heroes_left"; per night "heroes_left", "hero_deaths", "cold".
-const RECORD_FORMAT := 7
+## 8: the ring town and roads: "road" actions (waypoints, squares), per round "paving" (goods spent on roads) and
+##    "town" at the round's end (squares staked, paved per road kind, trail squares, plots built per ring);
+##    "plots" (each building's ring and sector) in the run record.
+const RECORD_FORMAT := 8
 var record_rounds: Array[Dictionary] = []
 var _round_entry := {}
 
@@ -140,21 +143,62 @@ func can_afford(cost: Dictionary) -> bool:
 func can_build(type: String) -> bool:
 	var def: Dictionary = content.buildings[type]
 	var needs: String = def.get("requires", "")
-	return phase == Phase.BUILD and can_afford(def["cost"]) and world.free_plot() >= 0 \
+	return phase == Phase.BUILD and can_afford(def["cost"]) \
 		and world.count_buildings(type, false) < int(def.get("max", 99)) \
 		and (needs == "" or world.count_buildings(needs, false) > 0) \
-		and content.age_reached(age, def.get("age", "")) and population() >= int(def.get("min_people", 0))
+		and content.age_reached(age, def.get("age", "")) and population() >= int(def.get("min_people", 0)) \
+		and world.town.choose_plot(type) >= 0
 
 
 func build(type: String) -> bool:
-	if not can_build(type):
+	if not can_build(type) or not world.add_building(type):
 		return false
 	var cost: Dictionary = content.buildings[type]["cost"]
 	for r: String in cost:
 		stock[r] = int(stock[r]) - int(cost[r])
-	world.add_building(type)
 	_round_entry["actions"].append({"kind": "build", "building": type})
 	return true
+
+
+# --- Roads (start of round) ---------------------------------------------------
+
+## Stakes out a road through these waypoints (world points; the road bends round
+## whatever stands in the way). Staking is free; buildings never go on a staked road,
+## and once a stone-layers' yard stands, craftspeople pave it a stretch at a time.
+func stake_road(points: Array) -> bool:
+	if phase != Phase.BUILD or not world.town.stake(points):
+		return false
+	var cells: int = world.town.roads[-1]["cells"].size()
+	_round_entry["actions"].append({"kind": "road", "points": points.map(func(p: Vector2) -> Array: return [roundi(p.x), roundi(p.y)]),
+		"cells": cells})
+	tell("A road is staked out, %d paces long." % cells)
+	return true
+
+
+## Pulls up the last staked road's stakes (paved stretches stay).
+func unstake_road() -> bool:
+	if phase != Phase.BUILD or not world.town.unstake_last():
+		return false
+	_round_entry["actions"].append({"kind": "unstake"})
+	return true
+
+
+## Goods spent paving roads this round.
+func note_paving(cost: Dictionary) -> void:
+	if not _round_entry.has("paving"):
+		return
+	for r: String in cost:
+		_round_entry["paving"][r] = int(_round_entry["paving"].get(r, 0)) + int(cost[r])
+
+
+## How the town's ground looks now, for the round record.
+func _town_snapshot() -> Dictionary:
+	var rings := {}
+	for plot in world.town.plots:
+		if int(plot["building"]) >= 0:
+			rings[str(plot["ring"] + 1)] = int(rings.get(str(plot["ring"] + 1), 0)) + 1
+	return {"staked": world.town.staked_count(), "paved": world.town.paved_counts(),
+		"trails": world.pathing.count_ground(Pathing.TRAIL), "plots_by_ring": rings}
 
 
 # --- Market prices ----------------------------------------------------------
@@ -672,6 +716,9 @@ func to_record() -> Dictionary:
 		"stock": stock.duplicate(),
 		"keep_hp": roundi(world.hearth_hp),
 		"buildings": world.buildings.map(func(b: Dictionary) -> String: return b["type"]),
+		"plots": world.buildings.map(func(b: Dictionary) -> Dictionary:
+			var plot: Dictionary = world.town.plots[b["plot"]]
+			return {"building": b["type"], "ring": int(plot["ring"]) + 1, "sector": int(plot["sector"])}),
 		"townsfolk": _folk_counts(),
 		"townsfolk_lost": fallen_folk,
 		"relics": relics.duplicate(),
@@ -700,11 +747,12 @@ func _begin_round_entry() -> void:
 		"heroes_start": living_heroes().size(), "actions": [], "picks": [],
 		"whims": [], "loot": [], "sales": [], "hero_spending": {},
 		"prices": prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
-		"age": age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": []}
+		"age": age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {}}
 
 
 func _end_round_entry() -> void:
 	_round_entry["stock_end"] = stock.duplicate()
+	_round_entry["town"] = _town_snapshot()
 	_round_entry["townsfolk_end"] = _folk_counts()
 	record_rounds.append(_round_entry)
 	_round_entry = {}

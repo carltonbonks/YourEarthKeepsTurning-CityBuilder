@@ -1,7 +1,7 @@
 class_name BuildPanel
 extends VBoxContainer
-## The build-phase panel on the left: building orders, bronze tool sets and the
-## caravan, stall prices, the warned attack and the Begin round button.
+## The build-phase panel on the left: roads to stake out, building orders, bronze
+## tool sets and the caravan, stall prices, the warned attack and the Begin round button.
 ## Every choice goes through RunState; `changed` asks the screen to refresh.
 
 signal changed
@@ -10,6 +10,9 @@ signal begin_pressed
 const PRICE_LEVELS := ["cheap", "fair", "dear"]
 
 var run: RunState
+## The map, which collects road waypoints while staking.
+var arena: ArenaView
+var _road_box: VBoxContainer
 var _build_list: VBoxContainer
 var _price_box: VBoxContainer
 var _wave_label: RichTextLabel
@@ -17,8 +20,13 @@ var _begin_btn: Button
 
 
 func _init() -> void:
+	UiKit.heading(self, "Roads")
+	UiKit.note(self, "Stake out a road by clicking waypoints on the map; it bends round whatever stands in the way. Staking is free, and new buildings leave staked ground clear. Once a stone-layers' yard stands, craftspeople pave it for stone. Everyone walks faster on roads, raiders too.")
+	_road_box = VBoxContainer.new()
+	add_child(_road_box)
+	add_child(HSeparator.new())
 	UiKit.heading(self, "Order buildings")
-	UiKit.note(self, "Craftspeople raise what you order during the days. Nobody takes orders otherwise.")
+	UiKit.note(self, "Craftspeople raise what you order during the days. Each building picks its own plot in the rings round the hearth. Nobody takes orders otherwise.")
 	_build_list = VBoxContainer.new()
 	add_child(_build_list)
 	add_child(HSeparator.new())
@@ -31,6 +39,7 @@ func _init() -> void:
 
 
 func refresh() -> void:
+	refresh_roads()
 	var content := run.content
 	for child in _build_list.get_children():
 		child.queue_free()
@@ -72,6 +81,45 @@ func refresh() -> void:
 	_wave_label.text = "[b]Night %d attack[/b] from the [color=#ff7060]%s[/color]:\n%s" % [
 		content.int_num("days_per_round"), " and ".join(run.world.side_names()), ", ".join(parts)]
 	_begin_btn.text = "Begin round %d" % run.round_number
+
+
+## The road buttons: stake a road (then finish or cancel it), or pull up the last one.
+func refresh_roads() -> void:
+	for child in _road_box.get_children():
+		child.queue_free()
+	var town := run.world.town
+	if arena != null and arena.staking:
+		var points := arena.stake_points.size()
+		var finish := UiKit.button(_road_box, "Finish road (%d waypoints)" % points, _finish_road)
+		finish.disabled = not arena.preview_ok()
+		UiKit.button(_road_box, "Cancel", func() -> void:
+			arena.stop_staking()
+			changed.emit())
+		UiKit.note(_road_box, "Click the map to add waypoints (the hearth is a good start), right-click to drop the last one.", 11, Color("#ffd27a"))
+		return
+	var stake := UiKit.button(_road_box, "Stake a road", func() -> void:
+		if arena != null:
+			arena.start_staking()
+		refresh_roads())
+	stake.disabled = arena == null
+	var undo := UiKit.button(_road_box, "Pull up the last road's stakes", _act.bind(run.unstake_road))
+	undo.disabled = town.roads.is_empty()
+	var paved := town.paved_counts()
+	var parts := PackedStringArray()
+	for id: String in paved:
+		parts.append("%d paces of %s" % [paved[id], run.content.town["roads"][id]["name"].to_lower()])
+	if not town.roads.is_empty() or not parts.is_empty():
+		UiKit.note(_road_box, "Staked: %d paces. Paved: %s." % [town.staked_count(), ", ".join(parts) if not parts.is_empty() else "none yet"], 11)
+	if not town.roads.is_empty() and not town.can_pave():
+		UiKit.note(_road_box, "Nobody paves roads yet: build a %s." % town.paver_name(), 11, Color("#ffb060"))
+
+
+func _finish_road() -> void:
+	if arena == null:
+		return
+	run.stake_road(arena.stake_points)
+	arena.stop_staking()
+	changed.emit()
 
 
 ## Runs a choice on the run, then asks the screen to refresh.

@@ -3,6 +3,10 @@ extends Control
 ## Draws the settlement map with placeholder shapes. Read-only: it only looks at
 ## the RunState / World and never changes them, so art can be swapped freely.
 ## Mouse wheel zooms, dragging pans, hovering shows a tooltip (see Tooltips).
+## While staking a road (BuildPanel), clicks add waypoints and right-click removes the last;
+## the planned road is previewed, and BuildPanel hands the waypoints to RunState.stake_road.
+
+signal stake_points_changed
 
 const HERO_RADIUS := 9.0
 const FOLK_RADIUS := 5.5
@@ -16,6 +20,16 @@ var zoom := 1.2
 var pan := Vector2.ZERO  ## World point at the centre of the view.
 var _dragging := false
 var _mouse := Vector2(-1, -1)  ## Last mouse position over the map; negative when it is elsewhere.
+var _press_at := Vector2.ZERO
+var _moved := false
+## Road staking: on while the player is placing waypoints.
+var staking := false
+var stake_points: Array = []
+var _preview := PackedInt32Array()
+## Squares worth drawing (trails, roads, stakes), rebuilt when the ground or the stakes change:
+## [index, ground kind, staked] per square.
+var _ground_cache: Array = []
+var _ground_seen := [-1, -1, null]
 
 
 func reset_camera() -> void:
@@ -37,10 +51,45 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_LEFT or mb.button_index == MOUSE_BUTTON_RIGHT:
 			_dragging = mb.pressed
+			if mb.pressed:
+				_press_at = mb.position
+				_moved = false
+			elif staking and not _moved:
+				# A click (not a drag) while staking: add a waypoint, or drop the last one.
+				if mb.button_index == MOUSE_BUTTON_LEFT:
+					stake_points.append(_to_world(mb.position))
+				elif not stake_points.is_empty():
+					stake_points.pop_back()
+				_update_preview()
+				accept_event()
 	elif event is InputEventMouseMotion:
 		_mouse = (event as InputEventMouseMotion).position
-		if _dragging:
+		if _dragging and _mouse.distance_to(_press_at) > 5.0:
+			_moved = true
+		if _dragging and _moved:
 			pan -= (event as InputEventMouseMotion).relative / _scale()
+
+
+func start_staking() -> void:
+	staking = true
+	stake_points = []
+	_update_preview()
+
+
+func stop_staking() -> void:
+	staking = false
+	stake_points = []
+	_update_preview()
+
+
+func _update_preview() -> void:
+	_preview = run.world.town.route(stake_points) if run != null and stake_points.size() >= 2 else PackedInt32Array()
+	stake_points_changed.emit()
+
+
+## True if the waypoints so far make a road that fits.
+func preview_ok() -> bool:
+	return _preview.size() >= 2
 
 
 func _notification(what: int) -> void:
@@ -75,8 +124,12 @@ func _draw() -> void:
 	# Ground: the wilds, then the settlement clearing.
 	draw_rect(Rect2(Vector2.ZERO, size), Color("#161a17"))
 	draw_circle(center, radius * s, Color("#25301f"))
+	for thicket in w.town.thickets:
+		draw_circle(_to_screen(thicket["pos"]), float(thicket["radius"]) * s, Color(content.town["thickets"]["color"]))
 	draw_circle(center, content.num("settlement_radius") * s, Color("#33402a"))
 	draw_arc(center, content.num("settlement_radius") * s, 0, TAU, 64, Color("#4d5c3a"), 1.0)
+	_draw_plots()
+	_draw_ground()
 
 	# Warned attack sides: red wedges at the map edge until the wave arrives.
 	if not w.wave_spawned:
@@ -109,21 +162,21 @@ func _draw() -> void:
 		draw_arc(p, r, 0, TAU, 24, Color("#a05050"), 2.0)
 		draw_string(font, p + Vector2(-r, r + 12), def["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#d0a0a0"))
 
-	# Buildings: solid when raised, outline plus progress while being built.
+	# Buildings fill their plot: solid when raised, outline plus progress while being built.
 	for b in w.buildings:
 		var def: Dictionary = content.buildings[b["type"]]
 		var p := _to_screen(b["pos"])
-		var half := maxf(4.0, World.BUILDING_SIZE * 0.5 * s)
-		var rect := Rect2(p - Vector2(half, half), Vector2(half, half) * 2.0)
+		var half := maxf(4.0, 11.0 * s)
+		var shape := _screen_poly(w.town.plot_outline(b["plot"]))
 		var col := Color(def["color"])
 		var work_left := float(b["work_left"])
 		if work_left <= 0.0:
-			draw_rect(rect, col)
-			draw_rect(rect, Color("#e8d9a8"), false, 1.0)
+			draw_colored_polygon(shape, col)
+			draw_polyline(_closed(shape), Color("#e8d9a8"), 1.0)
 		else:
 			var done := 1.0 - work_left / float(def["work"])
-			draw_rect(rect, Color(col, 0.25))
-			draw_rect(rect, col, false, 1.5)
+			draw_colored_polygon(shape, Color(col, 0.25))
+			draw_polyline(_closed(shape), col, 1.5)
 			_bar(p + Vector2(-half, half + 3), half * 2.0, done, Color("#e8d9a8"))
 		# Stalls show a dot per good on sale; workshops show how far the current good is.
 		if work_left <= 0.0 and def.has("stall"):
@@ -178,7 +231,11 @@ func _draw() -> void:
 	var dark := _darkness()
 	if dark > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.12, dark))
-	draw_string(font, Vector2(8, size.y - 8), "Mouse wheel to zoom, drag to look around, point at anything for details", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#8a9088"))
+	if staking:
+		_draw_staking(font)
+	var help := "Click to add road waypoints, right-click to undo one, drag to look around" if staking \
+		else "Mouse wheel to zoom, drag to look around, point at anything for details"
+	draw_string(font, Vector2(8, size.y - 8), help, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#ffd27a") if staking else Color("#8a9088"))
 	if _mouse.x >= 0.0 and not _dragging:
 		var tip := hovered(_mouse)
 		if not tip.is_empty():
@@ -198,11 +255,11 @@ func hovered(at: Vector2) -> Dictionary:
 	for u in w.folk:
 		if u.alive and _near(u.pos, at, FOLK_RADIUS * grow):
 			return Tooltips.folk(run, u)
-	var half := maxf(4.0, World.BUILDING_SIZE * 0.5 * _scale())
-	for i in w.buildings.size():
-		var d := (at - _to_screen(w.buildings[i]["pos"])).abs()
-		if d.x <= half and d.y <= half:
-			return Tooltips.building(run, i)
+	var plot := w.town.plot_at(_to_world(at))
+	if plot >= 0 and int(w.town.plots[plot]["building"]) >= 0:
+		return Tooltips.building(run, w.town.plots[plot]["building"])
+	if plot >= 0 and w.town.plots[plot]["obstacle"] != "":
+		return Tooltips.obstacle(run, w.town.plots[plot]["obstacle"])
 	if _near(Vector2.ZERO, at, World.HEARTH_RADIUS * _scale()):
 		return Tooltips.hearth(run)
 	for den in w.dens:
@@ -211,6 +268,9 @@ func hovered(at: Vector2) -> Dictionary:
 	for node in w.nodes:
 		if w.node_active(node) and _near(node["pos"], at, maxf(3.0, 14.0 * _scale() * 1.6)):
 			return Tooltips.node(run, node)
+	var square := w.pathing.index_of(_to_world(at))
+	if w.pathing.ground[square] != Pathing.PLAIN or w.town.staked[square] > 0:
+		return Tooltips.ground(run, square)
 	return {}
 
 
@@ -281,6 +341,73 @@ func _draw_hero(hero: Unit, p: Vector2, font: Font) -> void:
 	_bar(p + Vector2(-r, -r - 9), r * 2.0, hero.hp_fraction(), Color("#5ee07a"))
 	_bar(p + Vector2(-r, -r - 5), r * 2.0, hero.energy / run.content.num("hero_energy_max"), Color("#7fd0ff"))
 	draw_string(font, p + Vector2(r + 3, 4), hero.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
+
+
+## Ring plots: free ones in opened rings as faint outlines, obstacles filled in.
+func _draw_plots() -> void:
+	var town := run.world.town
+	for k in town.plots.size():
+		var plot: Dictionary = town.plots[k]
+		if not town.ring_open(plot) or int(plot["building"]) >= 0:
+			continue
+		var shape := _screen_poly(town.plot_outline(k))
+		if plot["obstacle"] != "":
+			draw_colored_polygon(shape, Color(run.content.town["obstacles"][plot["obstacle"]]["color"]))
+		else:
+			draw_polyline(_closed(shape), Color(0.6, 0.65, 0.45, 0.18), 1.0)
+
+
+## Trails, roads and staked squares.
+func _draw_ground() -> void:
+	var w := run.world
+	var seen := [w.pathing.ground_version, w.town.staked_version, w]
+	if seen != _ground_seen:
+		_ground_seen = seen
+		_ground_cache = []
+		for i in w.pathing.ground.size():
+			var g := w.pathing.ground[i]
+			if g >= Pathing.TRAIL or w.town.staked[i] > 0:
+				_ground_cache.append([i, g, w.town.staked[i] > 0])
+	var s := _scale()
+	var cell := w.pathing.cell * s
+	var trail := Color(run.content.town["trail"]["color"])
+	for entry: Array in _ground_cache:
+		var p := _to_screen(w.pathing.center(entry[0]))
+		var g: int = entry[1]
+		if g >= Pathing.FIRST_ROAD:
+			draw_rect(Rect2(p - Vector2(cell, cell) / 2.0, Vector2(cell, cell)), Color(w.town.road_def(g)["color"]))
+		elif g == Pathing.TRAIL:
+			draw_rect(Rect2(p - Vector2(cell, cell) * 0.35, Vector2(cell, cell) * 0.7), Color(trail, 0.8))
+		if entry[2] and g < Pathing.FIRST_ROAD:
+			draw_circle(p, maxf(1.0, cell * 0.18), Color("#e8c070"))
+
+
+## The road being staked: waypoints and the planned squares.
+func _draw_staking(font: Font) -> void:
+	var w := run.world
+	var cell := w.pathing.cell * _scale()
+	for i in _preview:
+		var p := _to_screen(w.pathing.center(i))
+		draw_rect(Rect2(p - Vector2(cell, cell) * 0.3, Vector2(cell, cell) * 0.6), Color("#ffd27a"))
+	for n in stake_points.size():
+		var p := _to_screen(stake_points[n])
+		draw_circle(p, 5.0, Color("#ffd27a"))
+		draw_string(font, p + Vector2(6, -6), str(n + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#ffd27a"))
+	if stake_points.size() >= 2 and _preview.is_empty():
+		draw_string(font, _to_screen(stake_points[-1]) + Vector2(8, 14), "no road fits here", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#ff8060"))
+
+
+func _screen_poly(points: PackedVector2Array) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for p in points:
+		out.append(_to_screen(p))
+	return out
+
+
+func _closed(points: PackedVector2Array) -> PackedVector2Array:
+	var out := points.duplicate()
+	out.append(points[0])
+	return out
 
 
 func _bar(at: Vector2, width: float, fraction: float, color: Color) -> void:

@@ -184,6 +184,45 @@ static func den(run: RunState, d: Dictionary) -> Dictionary:
 	return t
 
 
+static func obstacle(run: RunState, id: String) -> Dictionary:
+	var def: Dictionary = run.content.town["obstacles"][id]
+	var t := _tip(def["name"])
+	t["lines"].append(def["text"])
+	return t
+
+
+## A square of ground: a trail, a road, a thicket, or a staked road waiting for stone-layers.
+static func ground(run: RunState, square: int) -> Dictionary:
+	var c := run.content
+	var w := run.world
+	var g := w.pathing.ground[square]
+	var t: Dictionary
+	if g >= Pathing.FIRST_ROAD:
+		var def := w.town.road_def(g)
+		t = _tip(def["name"])
+		t["lines"].append(def["text"])
+	elif g == Pathing.TRAIL:
+		t = _tip(c.town["trail"]["name"])
+		t["lines"].append(c.town["trail"]["text"])
+	elif g == Pathing.THICKET:
+		t = _tip(c.town["thickets"]["name"])
+		t["lines"].append(c.town["thickets"]["text"])
+	else:
+		t = _tip("Staked road")
+	if w.town.staked[square] > 0:
+		var best := w.town.best_road()
+		if g < best:
+			t["lines"].append("Staked out: nothing will be built here.")
+			if not w.town.can_pave():
+				t["warnings"].append("Nobody paves it yet: build a %s." % w.town.paver_name())
+			else:
+				var def := w.town.road_def(best)
+				t["lines"].append("Stone-layers will pave it into a %s." % def["name"].to_lower())
+		else:
+			t["lines"].append("Staked out: nothing will be built here.")
+	return t
+
+
 static func hearth(run: RunState) -> Dictionary:
 	var t := _tip("Hearth")
 	t["lines"].append("Health %d/%d. If it falls, the run is lost." % [roundi(run.world.hearth_hp), roundi(run.hearth_max_hp())])
