@@ -161,7 +161,7 @@ func _posted_prizes() -> Dictionary:
 func prize_for(type_id: String) -> int:
 	var total := 0
 	for tag: String in _prizes:
-		if w.content.enemy_has_tag(type_id, tag):
+		if w.content.has_tag("enemy", type_id, tag):
 			total += int(_prizes[tag])
 	return total
 
@@ -171,7 +171,7 @@ func carcass(victim: Unit) -> void:
 	var got: Dictionary = w.content.enemies[victim.type_id].get("yields", {}).duplicate()
 	for b in w.buildings:
 		var prize: Dictionary = w.content.buildings[b["type"]].get("prize", {})
-		if prize.is_empty() or float(b["work_left"]) > 0.0 or not w.content.enemy_has_tag(victim.type_id, prize["tag"]):
+		if prize.is_empty() or float(b["work_left"]) > 0.0 or not w.content.unit_has_tag(victim, prize["tag"]):
 			continue
 		for res: String in prize.get("yields", {}):
 			got[res] = int(got.get(res, 0)) + int(prize["yields"][res])

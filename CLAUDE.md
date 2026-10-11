@@ -67,7 +67,7 @@ When a feature doesn't serve at least one pillar, question it.
   - Automated tests for core simulation logic (e.g. GUT for Godot) and CI (GitHub Actions) that runs them, plus headless export builds.
   - Data-driven content (buildings, heroes, relics, items and enemies defined in resource/data files, not hardcoded) so balancing and modding stay easy.
   - Keep simulation logic separate from presentation, so the auto-resolve phase can run headless for tests and balance simulations.
-  - **Tags (proposed by Yusuf 2026-10-10):** entities carry descriptive tags in their data (e.g. a wolf is `animal`, `sentient`, `beast`), and rules key on a few of them (sentient creatures turn on whoever hits them). Add a tag only when a rule reads it. Every tag a rule reads is explained to players in `data/tags.json`, which hover tooltips show (see docs/DEVELOPMENT.md).
+  - **Tags (proposed by Yusuf 2026-10-10):** entities carry descriptive tags in their data (e.g. a wolf is `animal`, `sentient`, `beast`), and rules key on a few of them (sentient creatures turn on whoever hits them). Descriptive tags are fine (decided 2026-10-11), and upcoming relics, hero abilities, buildings and mechanics will key on tags. A tag only does something when a rule reads it, and every tag a rule reads is explained to players in `data/tags.json`, which hover tooltips show (see docs/DEVELOPMENT.md).
   - Deterministic, seedable RNG, so runs are reproducible for debugging and balancing.
   - Versioned save formats, settings, and input remapping. Plan for the Steamworks integration points (achievements, cloud saves) without building them early.
 - **Yusuf's background:** low familiarity with code. They understand SDLC concepts from years around software projects, but have written very little code and no end-to-end programs. Claude owns build, test, troubleshoot and deploy end to end. Explain technical choices in plain language, never ask Yusuf to debug or edit code, and give one-click or one-command ways to run things.
@@ -76,10 +76,10 @@ When a feature doesn't serve at least one pillar, question it.
 
 **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) is the code map and the habits every change follows.** The short version:
 - `sim/` is the game and runs headless; `game/` only shows it and never changes rules. Content and numbers live in `data/*.json`, read through `Content`, each file with a `_note` explaining its keys.
-- Tags: rules read creature tags via `Content.enemy_has_tag`; a tag that a rule reads gets a player-facing line in `data/tags.json` and a test. A behaviour only one creature has is a specific data key (like `shield`), not a new tag.
+- Tags: any entity (enemy, hero class, trait, townsfolk role, building, item base, relic) can carry descriptive tags, and relics, abilities, buildings and mechanics key on tags rather than ids. Rules read them only via `Content.has_tag` / `unit_has_tag`; a tag a rule reads gets a player-facing line in `data/tags.json` (`tests/test_tags.gd` enforces it).
 - All randomness goes through `SeededRng`. Run records only grow: new fields, bump `RECORD_FORMAT`, update `tools/export_csv.py`.
 - Every rule gets a test; balance-affecting changes report bot win rates; new mechanics are taught to `AutoPlayer`.
-- Setup and tests: `tools/setup_godot.sh`, then `~/godot/godot --headless --path . --import` and `~/godot/godot --headless --path . -s res://tests/run_tests.gd`.
+- Setup and tests: `tools/setup_godot.sh` once, then `tools/test.sh` (also fails on script errors). New behaviour goes in the matching `World` part (`FolkAI`, `HeroAI`, `Market`, `EnemyAI`) and new UI in its own `game/` file.
 
 ## Fast iteration (dev-cycle priority)
 

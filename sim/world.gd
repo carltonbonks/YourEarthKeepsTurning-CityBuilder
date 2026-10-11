@@ -413,7 +413,7 @@ func damage(attacker: Unit, victim: Unit, amount: float) -> void:
 	victim.hp -= amount
 	if victim.hp > 0.0:
 		# Sentient creatures turn on whoever hurt them.
-		if victim.is_enemy() and attacker != null and content.enemy_has_tag(victim.type_id, "sentient"):
+		if victim.is_enemy() and attacker != null and content.unit_has_tag(victim, "sentient"):
 			victim.target = attacker
 			victim.grudge_until = time + 8.0
 		return

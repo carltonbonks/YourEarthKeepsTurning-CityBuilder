@@ -36,8 +36,8 @@ A handful of people around a fire, in the middle of a map. Resources ring the ca
 Engine: Godot 4.7.1 (GDScript). Read [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) first. `tools/setup_godot.sh` downloads Godot to `~/godot/godot` (Linux); the CI workflow in `.github/workflows/ci.yml` shows the exact commands.
 
 ```sh
-godot --headless --path . --import                       # first time / after adding files
-godot --headless --path . -s res://tests/run_tests.gd    # run tests
+tools/setup_godot.sh                                     # get Godot (Linux), once
+tools/test.sh                                            # import and run every test
 godot --headless --path . --export-release "Web" build/web/index.html
 godot --headless --path . -s res://tools/balance_run.gd -- runs=50 style=balanced   # balance report
 ```

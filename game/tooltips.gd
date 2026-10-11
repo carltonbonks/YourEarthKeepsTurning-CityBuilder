@@ -63,15 +63,16 @@ static func enemy(run: RunState, type_id: String, u: Unit = null) -> Dictionary:
 	var yields: Dictionary = def.get("yields", {})
 	if not yields.is_empty():
 		t["lines"].append("Carcass gives %s" % _goods(yields))
-	t["tags"] = tag_notes(run, type_id)
+	t["tags"] = tag_notes(run, "enemy", type_id)
 	return t
 
 
-## Each tag of a creature type with what it does here, e.g. "beast: the hunting lodge pays 3 shells per kill".
-static func tag_notes(run: RunState, type_id: String) -> Array[String]:
+## Each tag of an entity (see Content.TAG_KINDS) with what it does here,
+## e.g. "beast: the hunting lodge pays 3 shells per kill". Tags no rule reads show by name.
+static func tag_notes(run: RunState, kind: String, id: String) -> Array[String]:
 	var c := run.content
 	var out: Array[String] = []
-	for tag: String in c.enemies[type_id].get("tags", []):
+	for tag: String in c.tags_of(kind, id):
 		var notes := PackedStringArray()
 		if str(c.tags.get(tag, "")) != "":
 			notes.append(c.tags[tag])
