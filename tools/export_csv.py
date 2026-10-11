@@ -16,7 +16,7 @@ import json
 import os
 import sys
 
-RESOURCES = ["food", "fuel", "wood", "stone", "shells"]
+RESOURCES = ["food", "fuel", "wood", "stone", "shells", "flint", "hides", "bone", "obsidian"]
 ROLES = ["tribesperson", "warrior", "craftsperson"]
 
 
@@ -65,7 +65,7 @@ def main(raw_folder, out_folder):
     records = load_records(raw_folder)
     tables = {name: [] for name in
               ["runs", "rounds", "picks", "builds", "wave_enemies", "deaths", "nights", "relic_offers", "heroes",
-               "loot", "whims"]}
+               "loot", "whims", "market_sales", "crafted"]}
 
     for r in records:
         rid = r["_run_id"]
@@ -117,7 +117,14 @@ def main(raw_folder, out_folder):
                 "items_sold": len(rd.get("sales", [])),
                 "sales_town_cut": sum(s.get("town_cut", 0) for s in rd.get("sales", [])),
                 "hero_spending_lodging": rd.get("hero_spending", {}).get("tavern", 0),
-                "hero_spending_carousing": rd.get("hero_spending", {}).get("carousing", 0), "survived": 1 if "relic_pick" in rd or (r.get("result") == "won" and rn == r.get("round_reached")) else 0,
+                "hero_spending_carousing": rd.get("hero_spending", {}).get("carousing", 0),
+                "market_goods_sold": len(rd.get("market", [])),
+                "market_shells": sum(m.get("price", 0) for m in rd.get("market", [])),
+                "goods_crafted": sum(rd.get("crafted", {}).values()),
+                "prize_shells": rd.get("prizes", 0), "obsidian_bought": rd.get("obsidian", 0),
+                **{"yield_" + k: rd.get("yields", {}).get(k, 0) for k in ["hides", "bone"]},
+                **{"price_" + k: rd.get("prices", {}).get(k, "") for k in ["arms", "hides", "charms", "provisions"]},
+                "survived": 1 if "relic_pick" in rd or (r.get("result") == "won" and rn == r.get("round_reached")) else 0,
                 **{"start_" + k: folk_start.get(k, 0) for k in ROLES},
                 **{"stock_start_" + k: rd.get("stock_start", {}).get(k, "") for k in RESOURCES},
                 **{"stock_end_" + k: rd.get("stock_end", {}).get(k, "") for k in RESOURCES},
@@ -157,6 +164,11 @@ def main(raw_folder, out_folder):
                     "tier": item.get("tier", ""), "affixes": "+".join(item.get("affixes", [])),
                     "value": item.get("value", ""), "worn": 1 if item.get("equipped") else 0,
                 })
+            for m in rd.get("market", []):
+                tables["market_sales"].append({"run_id": rid, "round": rn, **{k: m.get(k, "") for k in
+                                               ["day", "hero", "trait", "recipe", "tier", "price", "stall"]}})
+            for recipe, count in rd.get("crafted", {}).items():
+                tables["crafted"].append({"run_id": rid, "round": rn, "recipe": recipe, "count": count})
             for w in rd.get("whims", []):
                 tables["whims"].append({"run_id": rid, "round": rn, "day": w.get("day", ""),
                                         "hero": w.get("hero", ""), "whim": w.get("whim", "")})
@@ -177,6 +189,8 @@ def main(raw_folder, out_folder):
                    "gold", "max_hp", "energy", "lodging"],
         "loot": ["run_id", "round", "day", "hero", "trait", "base", "slot", "tier", "affixes", "value", "worn"],
         "whims": ["run_id", "round", "day", "hero", "whim"],
+        "market_sales": ["run_id", "round", "day", "hero", "trait", "recipe", "tier", "price", "stall"],
+        "crafted": ["run_id", "round", "recipe", "count"],
     }
     for table, rows in tables.items():
         count = write(out_folder, table, columns[table], rows)

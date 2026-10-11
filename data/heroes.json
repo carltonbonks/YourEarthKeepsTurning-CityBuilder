@@ -1,5 +1,5 @@
 {
-	"_note": "Hero classes, personality traits, names, whims and the traders' gear. wilds = how keen a hero is to hunt at the dens by day (0 = stays home). Traits also drive retreat, target choice, where heroes like to sleep (lodging, first match wins), when they feel tired (tired_at, energy 0-100), how they rate items (likes: weight per item stat) and how likely each whim is (whims: weights).",
+	"_note": "Hero classes, personality traits, names and whims. wilds = how keen a hero is to hunt at the dens by day (0 = stays home). Traits also drive retreat, target choice, where heroes like to sleep (lodging, first match wins), when they feel tired (tired_at, energy 0-100), how they rate items (likes: weight per item stat) and how likely each whim is (whims: weights). max_markup = the dearest stall price a hero will pay (1.5 = Dear).",
 	"classes": {
 		"hunter": {
 			"name": "Hunter",
@@ -38,6 +38,7 @@
 			"caution": 0.45,
 			"prefers": "weapon",
 			"hoard": 1.0,
+			"max_markup": 1.5,
 			"wilds": 1.0,
 			"lodging": [
 				"tavern",
@@ -58,7 +59,8 @@
 				"trophy": 2,
 				"guard": 1,
 				"lie_in": 0.5,
-				"carouse": 1
+				"carouse": 1,
+				"browse": 0.5
 			}
 		},
 		"cautious": {
@@ -69,6 +71,7 @@
 			"caution": 1.6,
 			"prefers": "armor",
 			"hoard": 1.0,
+			"max_markup": 1.5,
 			"wilds": 0.3,
 			"lodging": [
 				"shrine",
@@ -89,7 +92,8 @@
 				"trophy": 0,
 				"guard": 3,
 				"lie_in": 2,
-				"carouse": 0.5
+				"carouse": 0.5,
+				"browse": 0.5
 			}
 		},
 		"greedy": {
@@ -100,6 +104,7 @@
 			"caution": 0.7,
 			"prefers": "weapon",
 			"hoard": 2.0,
+			"max_markup": 1.0,
 			"wilds": 0.9,
 			"lodging": [
 				"tavern"
@@ -119,7 +124,8 @@
 				"trophy": 1,
 				"guard": 0,
 				"lie_in": 1,
-				"carouse": 3
+				"carouse": 3,
+				"browse": 2
 			}
 		},
 		"dutiful": {
@@ -130,6 +136,7 @@
 			"caution": 0.8,
 			"prefers": "armor",
 			"hoard": 1.0,
+			"max_markup": 1.5,
 			"wilds": 0.45,
 			"lodging": [
 				"shrine",
@@ -150,7 +157,8 @@
 				"trophy": 0,
 				"guard": 4,
 				"lie_in": 0.5,
-				"carouse": 0
+				"carouse": 0,
+				"browse": 0.3
 			}
 		}
 	},
@@ -180,24 +188,6 @@
 		"Yrsa",
 		"Zev"
 	],
-	"gear": {
-		"weapon": {
-			"base": "flint_blade",
-			"costs": [
-				15,
-				30,
-				50
-			]
-		},
-		"armor": {
-			"base": "hide_armour",
-			"costs": [
-				15,
-				30,
-				50
-			]
-		}
-	},
 	"whims": {
 		"none": {
 			"name": "",
@@ -230,6 +220,12 @@
 			"needs": "tavern",
 			"from": 0.5,
 			"spend": 3
+		},
+		"browse": {
+			"name": "browsing the stalls",
+			"text": "Comes back to the market whenever they have shells to spend (needs a market).",
+			"needs": "market",
+			"shop_anywhere": true
 		}
 	}
 }

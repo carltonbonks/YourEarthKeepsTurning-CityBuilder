@@ -6,6 +6,9 @@ extends RefCounted
 ## "balanced": huts as needed, a longhouse early, then watch posts; picks by need.
 ## "workers": never takes heroes or builds the longhouse; picks townsfolk only.
 ## "heroes": rushes the longhouse and takes every hero card it can afford.
+## "market": like balanced, but builds every workshop and stall early and the hunting lodge.
+## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
+## since the market is now the only place heroes can buy gear.
 var style := "balanced"
 
 
@@ -28,10 +31,17 @@ func build(run: RunState) -> void:
 		run.build("longhouse")
 	if style == "heroes" and run.round_number >= 2:
 		run.build("tavern")
-	if style != "workers" and run.round_number >= (3 if style == "heroes" else 4):
-		run.build("shrine")
 	if run.housing() - run.population() <= 2:
 		run.build("hut")
+	if style == "market" and run.round_number >= 2:
+		for type: String in ["market", "arms_stall", "knapper", "hide_stall", "hide_rack", "hunting_lodge",
+				"charm_stall", "bone_carver", "provisions_stall", "smoke_hut"]:
+			run.build(type)
+	elif style != "workers" and run.round_number >= 3:
+		for type: String in ["market", "arms_stall", "knapper", "hide_stall", "hide_rack"]:
+			run.build(type)
+	if style != "workers" and run.round_number >= (3 if style == "heroes" else 4):
+		run.build("shrine")
 	if run.round_number >= 3:
 		run.build("drying_rack")
 	if run.round_number >= 2:
@@ -57,7 +67,9 @@ func pick(run: RunState) -> int:
 				score = 3.0 - run.count_role("warrior") * 0.8
 			"craftsperson":
 				var pending := run.world.buildings.any(func(b: Dictionary) -> bool: return float(b["work_left"]) > 0.0)
-				score = (4.0 if pending else 1.0) - run.count_role("craftsperson") * 1.5
+				var benches := run.world.buildings.filter(func(b: Dictionary) -> bool:
+					return run.content.buildings[b["type"]].has("workshop")).size()
+				score = (4.0 if pending else 1.0) + benches * 1.2 - run.count_role("craftsperson") * 1.5
 		if score > best_score:
 			best_score = score
 			best = i

@@ -10,7 +10,7 @@ extends RefCounted
 
 enum Phase { BUILD, PICK, SIM, RELIC, WON, LOST }
 
-const RESOURCES := ["food", "fuel", "wood", "stone", "shells"]
+const RESOURCES := ["food", "fuel", "wood", "stone", "shells", "flint", "hides", "bone", "obsidian"]
 
 var content: Content
 var run_seed: int
@@ -33,6 +33,8 @@ var next_wave: Array[String] = []
 var story: Array[String] = []
 ## The last night's report, shown at the next decision (see World.night_report).
 var last_night := {}
+## Price level per stall kind ("cheap", "fair" or "dear"; see data/recipes.json), set while building.
+var prices := {}
 
 ## Machine-readable history of this run for stats and debugging (see to_record()).
 ## Format changes bump RECORD_FORMAT so old saved runs can still be read.
@@ -40,7 +42,9 @@ var last_night := {}
 ## 3: small raids on early nights, a report per night ("nights").
 ## 4: hero energy, lodgings, whims and items ("whims", "loot", "sales", "hero_spending"; hero items).
 ## 5: each night's report also lists who walked away hungry ("left").
-const RECORD_FORMAT := 5
+## 6: the marketplace: "prices", "crafted", "market" (stall sales), "prizes", "obsidian", "yields"; hero "pack";
+##    "sales" are now made at the market and there are no trader purchases.
+const RECORD_FORMAT := 6
 var record_rounds: Array[Dictionary] = []
 var _round_entry := {}
 
@@ -54,6 +58,10 @@ func _init(game_content: Content, seed_value: int) -> void:
 	_hero_rng = SeededRng.stream(run_seed, "heroes")
 	for r in RESOURCES:
 		stock[r] = int(content.balance["start_stock"].get(r, 0))
+	var kinds: Array = content.market["stall_names"].keys()
+	kinds.sort()
+	for kind: String in kinds:
+		prices[kind] = "fair"
 	world = World.new(self)
 	var start_people: Dictionary = content.balance["start_people"]
 	var roles := start_people.keys()
@@ -117,8 +125,10 @@ func can_afford(cost: Dictionary) -> bool:
 
 func can_build(type: String) -> bool:
 	var def: Dictionary = content.buildings[type]
+	var needs: String = def.get("requires", "")
 	return phase == Phase.BUILD and can_afford(def["cost"]) and world.free_plot() >= 0 \
-		and world.count_buildings(type, false) < int(def.get("max", 99))
+		and world.count_buildings(type, false) < int(def.get("max", 99)) \
+		and (needs == "" or world.count_buildings(needs, false) > 0)
 
 
 func build(type: String) -> bool:
@@ -130,6 +140,34 @@ func build(type: String) -> bool:
 	world.add_building(type)
 	_round_entry["actions"].append({"kind": "build", "building": type})
 	return true
+
+
+# --- Market prices ----------------------------------------------------------
+
+## Sets a stall kind's price level for the coming round ("cheap", "fair" or "dear").
+func set_price(kind: String, level: String) -> void:
+	if phase != Phase.BUILD or not prices.has(kind) or not content.market["price_levels"].has(level) or prices[kind] == level:
+		return
+	prices[kind] = level
+	_round_entry["actions"].append({"kind": "price", "stall": kind, "level": level})
+
+
+func price_markup(kind: String) -> float:
+	return float(content.market["price_levels"][prices.get(kind, "fair")])
+
+
+## What a hero pays for a good: the recipe's price per tier x the stall's level, less relic discounts.
+func price_of(good: Dictionary) -> int:
+	var r: Dictionary = content.market["recipes"][good["recipe"]]
+	var discount := clampf(mod("gear_discount"), 0.0, 0.9) if r.has("item") else 0.0
+	return maxi(1, roundi(float(r["price"]) * int(good.get("tier", 1)) * price_markup(r["stall"]) * (1.0 - discount)))
+
+
+## Tier a workshop makes a recipe at this round.
+func craft_tier(recipe_id: String) -> int:
+	var r: Dictionary = content.market["recipes"][recipe_id]
+	var tier := 1 + (round_number - 1) / int(content.market["tier_every_rounds"])
+	return clampi(tier, int(r.get("min_tier", 1)), int(r.get("max_tier", 1)))
 
 
 ## Ends the build phase; the first dawn of the round follows.
@@ -255,9 +293,15 @@ func most_needed_resource() -> String:
 		"wood": 12.0,
 		"stone": 6.0,
 	}
+	# Knappers need flint, and the smoke hut eats food and fuel.
+	if world.count_buildings("knapper") > 0:
+		wants["flint"] = 6.0 * world.count_buildings("knapper")
+	if world.count_buildings("smoke_hut") > 0:
+		wants["food"] += 4.0
+		wants["fuel"] += 2.0
 	var best := "food"
 	var best_gap := -INF
-	for r: String in ["food", "fuel", "wood", "stone"]:
+	for r: String in wants:
 		var gap: float = (wants[r] - float(stock[r])) / maxf(wants[r], 1.0)
 		if gap > best_gap:
 			best_gap = gap
@@ -303,7 +347,7 @@ func _finish_round() -> void:
 		_end_round_entry()
 		return
 	_heal_heroes()
-	_heroes_go_shopping()
+	_heroes_sell_finds()
 	relic_offer = _roll_relic_offer()
 	_round_entry["relic_offer"] = relic_offer.duplicate()
 	phase = Phase.RELIC
@@ -460,6 +504,7 @@ func to_record() -> Dictionary:
 		"townsfolk": _folk_counts(),
 		"townsfolk_lost": fallen_folk,
 		"relics": relics.duplicate(),
+		"prices": prices.duplicate(),
 		"heroes": heroes.map(_hero_snapshot),
 		"fallen": fallen.map(_hero_snapshot),
 		"rounds": rounds,
@@ -478,7 +523,8 @@ func _begin_round_entry() -> void:
 	_round_entry = {"round": round_number, "stock_start": stock.duplicate(), "keep_hp_start": roundi(world.hearth_hp),
 		"wave": wave_counts(), "wave_sides": world.side_names(), "townsfolk_start": _folk_counts(),
 		"heroes_start": living_heroes().size(), "actions": [], "picks": [],
-		"whims": [], "loot": [], "sales": [], "hero_spending": {}}
+		"whims": [], "loot": [], "sales": [], "hero_spending": {},
+		"prices": prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {}}
 
 
 func _end_round_entry() -> void:
@@ -497,7 +543,7 @@ func _hero_snapshot(hero: Unit) -> Dictionary:
 		"hp": roundi(hero.hp), "max_hp": roundi(hero.max_hp), "gold": hero.gold,
 		"weapon": int(hero.items.get("weapon", {}).get("tier", 0)), "armor": int(hero.items.get("armor", {}).get("tier", 0)),
 		"charm": int(hero.items.get("charm", {}).get("tier", 0)), "items": items,
-		"energy": roundi(hero.energy), "lodging": world.buildings[hero.lodging]["type"] if hero.lodging >= 0 else "",
+		"energy": roundi(hero.energy), "pack": hero.pack.duplicate(), "lodging": world.buildings[hero.lodging]["type"] if hero.lodging >= 0 else "",
 		"kills": hero.kills, "alive": hero.alive}
 
 
@@ -522,6 +568,28 @@ func note_loot(hero: Unit, item: Dictionary, equipped: bool) -> void:
 func note_hero_spending(reason: String, shells: int) -> void:
 	if _round_entry.has("hero_spending"):
 		_round_entry["hero_spending"][reason] = int(_round_entry["hero_spending"].get(reason, 0)) + shells
+
+
+func note_crafted(recipe_id: String) -> void:
+	if _round_entry.has("crafted"):
+		_round_entry["crafted"][recipe_id] = int(_round_entry["crafted"].get(recipe_id, 0)) + 1
+
+
+func note_market_sale(hero: Unit, good: Dictionary, price: int) -> void:
+	if _round_entry.has("market"):
+		_round_entry["market"].append({"day": world.day_index() + 1, "hero": hero.display_name, "trait": hero.trait_id,
+			"recipe": good["recipe"], "tier": int(good.get("tier", 1)), "price": price,
+			"stall": content.market["recipes"][good["recipe"]]["stall"]})
+
+
+## Goods the settlement got from carcasses, prize shells paid and obsidian shards bought.
+func note_economy(key: String, amount: int, what := "") -> void:
+	if not _round_entry.has(key):
+		return
+	if key == "yields":
+		_round_entry["yields"][what] = int(_round_entry["yields"].get(what, 0)) + amount
+	else:
+		_round_entry[key] = int(_round_entry[key]) + amount
 
 
 # --- Internals -------------------------------------------------------------
@@ -595,53 +663,28 @@ func _heal_heroes() -> void:
 		unit.hp = minf(unit.max_hp, unit.hp + unit.max_hp * content.num("between_round_heal"))
 
 
-## Between rounds traders pass through. Heroes sell the loot they carry (the
-## settlement takes a cut), then buy gear with their own shells if they like it
-## better than what they wear. The player doesn't choose.
-func _heroes_go_shopping() -> void:
-	var discount := clampf(mod("gear_discount"), 0.0, 0.9)
+## Between rounds heroes sell the loot they carry (the settlement takes a cut).
+## Gear and provisions are only bought at the market's stalls, by day (see World).
+func _heroes_sell_finds() -> void:
 	var tax_rate := float(content.items["sell_tax"])
+	var where := "at the market" if world.count_buildings("market") > 0 else "to passing traders"
 	for hero in heroes:
-		if not hero.spares.is_empty():
-			var total := 0
-			var tax := 0
-			for item in hero.spares:
-				var v := Loot.value(content, item)
-				var cut := roundi(v * tax_rate)
-				total += v
-				tax += cut
-				_round_entry["sales"].append({"hero": hero.display_name, "base": item["base"], "tier": item["tier"],
-					"affixes": item["affixes"].duplicate(), "value": v, "town_cut": cut})
-			hero.gold += total - tax
-			stock["shells"] = int(stock["shells"]) + tax
-			tell("%s sells %d found item%s for %d shells; the settlement keeps %d." % [hero.display_name,
-				hero.spares.size(), "" if hero.spares.size() == 1 else "s", total, tax])
-			hero.spares.clear()
-		var t: Dictionary = content.traits[hero.trait_id]
-		var likes: Dictionary = t.get("likes", {})
-		var order := ["weapon", "armor"] if t["prefers"] == "weapon" else ["armor", "weapon"]
-		var bought := true
-		while bought:
-			bought = false
-			for slot: String in order:
-				var current: Dictionary = hero.items.get(slot, {})
-				var tier: int = 1 if current.is_empty() else int(current["tier"]) + 1
-				var costs: Array = content.gear[slot]["costs"]
-				if tier > costs.size():
-					continue
-				var offer := Loot.make(content.gear[slot]["base"], tier)
-				if not current.is_empty() and Loot.score(content, offer, likes) <= Loot.score(content, current, likes):
-					continue
-				var cost := int(round(float(costs[tier - 1]) * (1.0 - discount)))
-				# Hoarders only buy when they have plenty left over.
-				if hero.gold < cost * float(t["hoard"]):
-					continue
-				hero.gold -= cost
-				hero.items[slot] = offer
-				world.apply_hero_stats(hero)
-				tell("%s trades for a %s (%d shells)." % [hero.display_name, Loot.describe(content, offer), cost])
-				bought = true
-				break
+		if hero.spares.is_empty():
+			continue
+		var total := 0
+		var tax := 0
+		for item in hero.spares:
+			var v := Loot.value(content, item)
+			var cut := roundi(v * tax_rate)
+			total += v
+			tax += cut
+			_round_entry["sales"].append({"hero": hero.display_name, "base": item["base"], "tier": item["tier"],
+				"affixes": item["affixes"].duplicate(), "value": v, "town_cut": cut})
+		hero.gold += total - tax
+		stock["shells"] = int(stock["shells"]) + tax
+		tell("%s sells %d found item%s %s for %d shells; the settlement keeps %d." % [hero.display_name,
+			hero.spares.size(), "" if hero.spares.size() == 1 else "s", where, total, tax])
+		hero.spares.clear()
 
 
 func _roll_relic_offer() -> Array[String]:

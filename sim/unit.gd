@@ -47,6 +47,10 @@ var caroused := -1
 var woke_night := -1
 ## Items carried to sell.
 var spares: Array[Dictionary] = []
+## Provisions bought at the market (recipe ids, e.g. "smoked_meat"), used up in the field.
+var pack: Array[String] = []
+## Building index of the stall a hero is walking to, or -1.
+var shop_stall := -1
 
 # Townsfolk work.
 var task := ""  ## e.g. "gather", "return", "build", "repair", "home".

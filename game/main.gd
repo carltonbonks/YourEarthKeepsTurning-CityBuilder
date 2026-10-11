@@ -1,10 +1,12 @@
 extends Control
-## Slice 3 screen: the settlement map in the middle, decisions on the left,
+## Slice 4 screen: the settlement map in the middle, decisions on the left,
 ## heroes and the story underneath. UI is built in code for now (placeholder
 ## layout); all rules live in sim/.
 
 const SPEEDS := [1, 2, 4, 8]
-const RESOURCE_COLORS := {"food": "#d98aa8", "fuel": "#e0b050", "wood": "#7fbf6a", "stone": "#b0b4bc", "shells": "#ffd24a"}
+const RESOURCE_COLORS := {"food": "#d98aa8", "fuel": "#e0b050", "wood": "#7fbf6a", "stone": "#b0b4bc", "shells": "#ffd24a",
+	"flint": "#8fa0b8", "hides": "#c09060", "bone": "#e0d8c0", "obsidian": "#b08ad8"}
+const PRICE_LEVELS := ["cheap", "fair", "dear"]
 
 var content: Content
 var run: RunState
@@ -18,6 +20,8 @@ var _run_id := ""
 var _status: RichTextLabel
 var _build_box: VBoxContainer
 var _build_list: VBoxContainer
+var _price_box: VBoxContainer
+var _market_label: RichTextLabel
 var _wave_label: RichTextLabel
 var _begin_btn: Button
 var _sim_box: VBoxContainer
@@ -69,6 +73,11 @@ func _new_run(seed_value: int) -> void:
 
 func _build(type: String) -> void:
 	run.build(type)
+	_refresh()
+
+
+func _set_price(kind: String, level: String) -> void:
+	run.set_price(kind, level)
 	_refresh()
 
 
@@ -149,12 +158,17 @@ func _refresh_build() -> void:
 		var btn := Button.new()
 		btn.text = "%s  (%s)%s" % [def["name"], ", ".join(cost), "  [%d/%d]" % [owned, def["max"]] if def.has("max") else ("  [%d]" % owned if owned > 0 else "")]
 		btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], def["work"]]
+		var needs: String = def.get("requires", "")
+		if needs != "" and run.world.count_buildings(needs, false) == 0:
+			btn.tooltip_text += "\nNeeds a %s first." % content.buildings[needs]["name"].to_lower()
 		btn.disabled = not run.can_build(type)
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn.pressed.connect(_build.bind(type))
 		_build_list.add_child(btn)
 		var note := Label.new()
 		note.text = def["text"]
+		if needs != "" and run.world.count_buildings(needs, false) == 0:
+			note.text += " Needs a %s first." % content.buildings[needs]["name"].to_lower()
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD
 		note.add_theme_font_size_override("font_size", 11)
 		note.add_theme_color_override("font_color", Color("#9aa"))
@@ -167,6 +181,7 @@ func _refresh_build() -> void:
 		warn.add_theme_color_override("font_color", Color("#e0a050"))
 		_build_list.add_child(warn)
 
+	_refresh_prices()
 	var counts := run.wave_counts()
 	var ids := counts.keys()
 	ids.sort()
@@ -176,6 +191,74 @@ func _refresh_build() -> void:
 	_wave_label.text = "[b]Night %d attack[/b] from the [color=#ff7060]%s[/color]:\n%s" % [
 		content.int_num("days_per_round"), " and ".join(run.world.side_names()), ", ".join(parts)]
 	_begin_btn.text = "Begin round %d" % run.round_number
+
+
+## Cheap / Fair / Dear buttons for each stall kind you have ordered.
+func _refresh_prices() -> void:
+	for child in _price_box.get_children():
+		child.queue_free()
+	var kinds: Array = run.prices.keys()
+	kinds.sort()
+	var any := false
+	for kind: String in kinds:
+		if not run.world.buildings.any(func(b: Dictionary) -> bool:
+				return content.buildings[b["type"]].get("stall", {}).get("sells", "") == kind):
+			continue
+		if not any:
+			_heading(_price_box, "Stall prices this round")
+			var hint := Label.new()
+			hint.text = "Cheap makes heroes stronger now. Dear brings in more shells, but greedy heroes won't pay it."
+			hint.autowrap_mode = TextServer.AUTOWRAP_WORD
+			hint.add_theme_font_size_override("font_size", 12)
+			hint.add_theme_color_override("font_color", Color("#9aa"))
+			_price_box.add_child(hint)
+			any = true
+		var row := HBoxContainer.new()
+		_price_box.add_child(row)
+		var label := Label.new()
+		label.text = content.market["stall_names"][kind]
+		label.custom_minimum_size.x = 90
+		row.add_child(label)
+		var group := ButtonGroup.new()
+		for level: String in PRICE_LEVELS:
+			var b := Button.new()
+			b.text = "%s x%s" % [level.capitalize(), str(content.market["price_levels"][level])]
+			b.toggle_mode = true
+			b.button_group = group
+			b.button_pressed = run.prices[kind] == level
+			b.pressed.connect(_set_price.bind(kind, level))
+			row.add_child(b)
+
+
+## What the stalls hold and what the workshops are making.
+func _market_text() -> String:
+	var w := run.world
+	var lines := PackedStringArray()
+	for b in w.buildings:
+		var def: Dictionary = content.buildings[b["type"]]
+		if float(b["work_left"]) > 0.0:
+			continue
+		if def.has("stall"):
+			var kind: String = def["stall"]["sells"]
+			var goods := PackedStringArray()
+			for g: Dictionary in b["goods"]:
+				goods.append("%s t%d (%d)" % [content.recipe_name(g["recipe"]), int(g["tier"]), run.price_of(g)])
+			lines.append("[color=#ffd24a]%s[/color] %s, %d/%d: %s" % [def["name"], run.prices[kind].capitalize(), b["goods"].size(),
+				content.market["stall_capacity"], ", ".join(goods) if not goods.is_empty() else "[color=#888]empty[/color]"])
+		elif def.has("workshop"):
+			var doing := "making a %s" % content.recipe_name(b["craft"]) if b["craft"] != "" else "[color=#888]idle[/color]"
+			var why := ""
+			if b["craft"] == "":
+				var kinds := PackedStringArray()
+				for id in content.recipes_for(b["type"]):
+					var k: String = content.market["recipes"][id]["stall"]
+					if w.stall_index(k) < 0 and not kinds.has(content.market["stall_names"][k]):
+						kinds.append(content.market["stall_names"][k])
+				why = " (no %s stall)" % "/".join(kinds) if not kinds.is_empty() else ""
+			lines.append("%s: %s%s" % [def["name"], doing, why])
+	if lines.is_empty():
+		return ""
+	return "[b]Market[/b]\n" + "\n".join(lines)
 
 
 ## Parts that change every frame while the sim runs.
@@ -229,14 +312,19 @@ func _refresh_live() -> void:
 		for slot: String in Loot.SLOTS:
 			if hero.items.has(slot):
 				gear.append(Loot.describe(content, hero.items[slot]))
-		if not gear.is_empty() or not hero.spares.is_empty():
-			text += "    [color=#c8b88a]%s%s[/color]\n" % [", ".join(gear) if not gear.is_empty() else "no gear",
-				"  ·  %d to sell" % hero.spares.size() if not hero.spares.is_empty() else ""]
+		var pack := PackedStringArray()
+		for id in hero.pack:
+			pack.append(content.recipe_name(id))
+		if not gear.is_empty() or not hero.spares.is_empty() or not pack.is_empty():
+			text += "    [color=#c8b88a]%s%s%s[/color]\n" % [", ".join(gear) if not gear.is_empty() else "no gear",
+				"  ·  %d to sell" % hero.spares.size() if not hero.spares.is_empty() else "",
+				"  ·  pack: " + ", ".join(pack) if not pack.is_empty() else ""]
 		if hero.intent != "" and run.phase == RunState.Phase.SIM:
 			text += "    [color=#9aa]%s[/color]\n" % hero.intent
 	for hero in run.fallen:
 		text += "[color=#666666]%s (fallen)[/color]\n" % hero.display_name
 	_heroes_label.text = text
+	_market_label.text = _market_text()
 	_append_story()
 
 
@@ -461,6 +549,63 @@ func _show_history() -> void:
 	_overlay.show()
 
 
+## Dev panel: change recipe prices and work times and the price levels live.
+## Changes last until the page reloads; "Copy values" puts them on the clipboard to send.
+func _show_tuning() -> void:
+	_clear_overlay()
+	_overlay_title("Tune the market (dev)")
+	var grid := GridContainer.new()
+	grid.columns = 3
+	_overlay_box.add_child(grid)
+	for header: String in ["Recipe", "Price per tier", "Work (seconds)"]:
+		var l := Label.new()
+		l.text = header
+		l.add_theme_color_override("font_color", Color("#e8d9a8"))
+		grid.add_child(l)
+	var ids: Array = content.market["recipes"].keys()
+	ids.sort()
+	for id: String in ids:
+		var r: Dictionary = content.market["recipes"][id]
+		var l := Label.new()
+		l.text = content.recipe_name(id)
+		grid.add_child(l)
+		for key: String in ["price", "work"]:
+			var spin := SpinBox.new()
+			spin.min_value = 1
+			spin.max_value = 200
+			spin.value = float(r[key])
+			spin.value_changed.connect(func(v: float) -> void: r[key] = v)
+			grid.add_child(spin)
+	for level: String in PRICE_LEVELS:
+		var l := Label.new()
+		l.text = "%s price x" % level.capitalize()
+		grid.add_child(l)
+		var spin := SpinBox.new()
+		spin.min_value = 0.1
+		spin.max_value = 5.0
+		spin.step = 0.1
+		spin.value = float(content.market["price_levels"][level])
+		spin.value_changed.connect(func(v: float) -> void: content.market["price_levels"][level] = v)
+		grid.add_child(spin)
+		grid.add_child(Control.new())
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	_overlay_box.add_child(buttons)
+	var copy := Button.new()
+	copy.text = "Copy values"
+	copy.pressed.connect(func() -> void:
+		DisplayServer.clipboard_set(JSON.stringify({"price_levels": content.market["price_levels"], "recipes": content.market["recipes"]}))
+		copy.text = "Copied!")
+	buttons.add_child(copy)
+	var close := Button.new()
+	close.text = "Back"
+	close.pressed.connect(func() -> void:
+		_refresh()
+		_show_phase_overlay())
+	buttons.add_child(close)
+	_overlay.show()
+
+
 func _clear_overlay() -> void:
 	for child in _overlay_box.get_children():
 		child.queue_free()
@@ -536,6 +681,8 @@ func _build_ui() -> void:
 	_build_list = VBoxContainer.new()
 	_build_box.add_child(_build_list)
 	_build_box.add_child(HSeparator.new())
+	_price_box = VBoxContainer.new()
+	_build_box.add_child(_price_box)
 	_wave_label = _rich(_build_box, 0)
 	_wave_label.fit_content = true
 	_begin_btn = _button(_build_box, "", _begin_round)
@@ -559,6 +706,11 @@ func _build_ui() -> void:
 		_button(_sim_box, "Skip to the next decision (dev)", _skip_ahead)
 
 	left.add_child(HSeparator.new())
+	_market_label = _rich(left, 0)
+	_market_label.fit_content = true
+	_market_label.add_theme_font_size_override("normal_font_size", 12)
+	_market_label.add_theme_font_size_override("bold_font_size", 13)
+	left.add_child(HSeparator.new())
 	_relic_label = _rich(left, 0)
 	_relic_label.fit_content = true
 
@@ -575,6 +727,8 @@ func _build_ui() -> void:
 		_new_run(int(_seed_edit.text) if _seed_edit.text.is_valid_int() else _random_seed()))
 	seed_row.add_child(restart)
 	_button(left, "Run history", _show_history)
+	if _dev_mode():
+		_button(left, "Tune market (dev)", _show_tuning)
 
 	# Right: clock line, map, then heroes + story.
 	var right := VBoxContainer.new()
