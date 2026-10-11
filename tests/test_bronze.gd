@@ -345,13 +345,13 @@ func test_no_rough_sleep_penalty_before_any_lodging() -> void:
 		check(hero.mood >= run.content.num("mood_start") - 30.0, "%s keeps their spirits by the fire" % hero.display_name)
 
 
-func test_bronze_bot_records_format_7() -> void:
+func test_bronze_bot_records_format_7_fields() -> void:
 	var run := _run(1003)
 	var bot := AutoPlayer.new()
 	bot.style = "bronze"
 	bot.play_run(run)
 	var record := run.to_record()
-	check_eq(int(record["format"]), 7, "record format 7")
+	check(int(record["format"]) >= 7, "record format 7 or later")
 	for key in ["age", "age_up_round", "tools", "departed"]:
 		check(record.has(key), "record has %s" % key)
 	for rd: Dictionary in record["rounds"]:

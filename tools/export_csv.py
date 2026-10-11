@@ -119,7 +119,13 @@ def main(raw_folder, out_folder):
                 "townsfolk_deaths": sum(1 for d in deaths if not d.get("hero")),
                 "heroes_start": rd.get("heroes_start", ""),
                 "townsfolk_start": sum(folk_start.values()), "townsfolk_end": sum(folk_end.values()) if folk_end else "",
-                "buildings_ordered": len(rd.get("actions", [])), "left_hungry": rd.get("left_hungry", 0),
+                "buildings_ordered": sum(1 for a in rd.get("actions", []) if a.get("kind", "build") == "build"),
+                "left_hungry": rd.get("left_hungry", 0),
+                "roads_staked": sum(1 for a in rd.get("actions", []) if a.get("kind") == "road"),
+                "staked_squares": rd.get("town", {}).get("staked", ""),
+                "trail_squares": rd.get("town", {}).get("trails", ""),
+                "paving_stone": rd.get("paving", {}).get("stone", 0),
+                **{"paved_" + k: rd.get("town", {}).get("paved", {}).get(k, 0) for k in ["stone_path", "cobbled_road"]},
                 "relic_pick": rd.get("relic_pick", ""),
                 "loot_found": len(rd.get("loot", [])),
                 "loot_worn": sum(1 for i in rd.get("loot", []) if i.get("equipped")),
@@ -153,6 +159,8 @@ def main(raw_folder, out_folder):
                     "taken": taken or "(skipped)", "taken_kind": "hero" if taken.startswith("hero:") else ("none" if not taken else "townsfolk"),
                 })
             for a in rd.get("actions", []):
+                if a.get("kind", "build") not in ("build", "price"):
+                    continue
                 tables["builds"].append({"run_id": rid, "round": rn, "building": a.get("building", a.get("kind", ""))})
             for enemy, count in wave.items():
                 tables["wave_enemies"].append({"run_id": rid, "round": rn, "enemy": enemy, "count": count})

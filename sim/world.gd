@@ -15,10 +15,6 @@ const HOME_RADIUS := 60.0
 const HEAL_UNTIL := 0.85
 const TARGET_STICKINESS := 3.0
 const FLEE_DISTANCE := 70.0
-## Building plots: rings around the hearth, spaced so footprints never overlap.
-const PLOT_RINGS := [70.0, 115.0, 160.0]
-const PLOT_SPACING := 42.0
-const BUILDING_SIZE := 26.0
 
 enum Pause { NONE, DAWN, ROUND_OVER, HEARTH_LOST }
 
@@ -31,7 +27,9 @@ var hearth_hp := 0.0
 var hearth_cooldown_left := 0.0
 var nodes: Array[Dictionary] = []  ## {type, gives, pos, amount, max, heroes_only, wild, age}
 var dens: Array[Dictionary] = []  ## {type, spawns, pos, respawn_left}
-var plots: Array[Vector2] = []
+## The ground and how units find their way (see Pathing), and the town's plots and roads (see Town).
+var pathing: Pathing
+var town: Town
 ## {type, plot, pos, work_left, cooldown_left, goods (stalls), craft, craft_left, craft_tier, made (workshops)}
 var buildings: Array[Dictionary] = []
 
@@ -74,13 +72,8 @@ func _init(run_state: RunState) -> void:
 	rng = SeededRng.stream(run.run_seed, "world")
 	dt = 1.0 / content.num("ticks_per_second")
 	hearth_hp = run.hearth_max_hp()
-	for ring in PLOT_RINGS.size():
-		var r: float = PLOT_RINGS[ring]
-		var count := int(TAU * r / PLOT_SPACING)
-		for i in count:
-			# Every other ring is turned half a step so plots don't line up.
-			var angle := TAU * (i + 0.5 * (ring % 2)) / count
-			plots.append(Vector2.from_angle(angle) * r)
+	pathing = Pathing.new(content)
+	town = Town.new(self)
 	_place_nodes()
 	_place_dens()
 	_place_den_nodes()
@@ -243,6 +236,7 @@ func _dawn() -> void:
 	enemies = enemies.filter(func(e: Unit) -> bool: return not e.is_probe)
 	for node in nodes:
 		node["amount"] = mini(int(node["max"]), int(node["amount"]) + content.int_num("node_regrow_per_day"))
+	pathing.wear_trails()
 	run.daily_upkeep()
 	pause = Pause.DAWN
 
@@ -324,20 +318,16 @@ func _place_dens() -> void:
 			"pos": Vector2.from_angle(angle) * dist, "respawn_left": 0.0})
 
 
-func free_plot() -> int:
-	for i in plots.size():
-		if not buildings.any(func(b: Dictionary) -> bool: return b["plot"] == i):
-			return i
-	return -1
-
-
-func add_building(type: String) -> void:
-	var plot := free_plot()
+## Orders a building: it goes on the free plot that suits it (see Town.choose_plot). False if none is left.
+func add_building(type: String) -> bool:
+	var plot := town.choose_plot(type)
 	if plot < 0:
-		return
-	buildings.append({"type": type, "plot": plot, "pos": plots[plot],
+		return false
+	town.occupy(plot, buildings.size())
+	buildings.append({"type": type, "plot": plot, "pos": town.plots[plot]["pos"],
 		"work_left": float(content.buildings[type]["work"]), "cooldown_left": 0.0,
 		"goods": [], "craft": "", "craft_left": 0.0, "craft_tier": 1, "made": 0})
+	return true
 
 
 func count_buildings(type: String, built_only := true) -> int:
@@ -358,16 +348,21 @@ func first_built(type: String) -> int:
 
 # --- Shared: movement, combat and lookups used by every part ---------------
 
-## Moves toward a goal; returns true once within `close` of it.
+## Moves toward a goal along a route round buildings, faster on trails and roads;
+## returns true once within `close` of it. Townsfolk and heroes wear trails as they go.
 func walk_toward(unit: Unit, goal: Vector2, close := 2.0) -> bool:
 	var to_goal := goal - unit.pos
 	if to_goal.length() <= close:
 		return true
-	var step_len := unit.speed * dt
-	if to_goal.length() - close <= step_len:
+	var step_len := unit.speed * dt * pathing.speed_at(unit.pos)
+	if not unit.is_enemy():
+		pathing.tread(unit.pos, dt)
+	var aim := pathing.next_point(unit, goal)
+	if aim == goal and to_goal.length() - close <= step_len:
 		unit.pos = goal - to_goal.normalized() * close
 		return true
-	unit.pos += to_goal.normalized() * step_len
+	var to_aim := aim - unit.pos
+	unit.pos += to_aim.normalized() * minf(step_len, to_aim.length()) if to_aim.length() > 0.0 else Vector2.ZERO
 	unit.pos = unit.pos.limit_length(content.num("world_radius"))
 	return false
 
@@ -519,3 +514,4 @@ func dispose() -> void:
 	hero_ai = null
 	market = null
 	enemy_ai = null
+	town = null

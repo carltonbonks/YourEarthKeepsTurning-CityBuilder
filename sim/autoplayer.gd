@@ -10,6 +10,9 @@ extends RefCounted
 ## "bronze": like market, then raises the Bronze moot as soon as it can, the smelter and bronzesmith,
 ## buys tool sets (picks, chisels, then spears) and some tin from the caravan.
 ## Every style takes a Promote card when one is offered and affordable.
+## Every style stakes roads in round 1 from the hearth to the nearest fuel and wood,
+## and from round 3 builds the stone-layers' yard so craftspeople pave them.
+## (Roads to all four everyday resources did worse: raiders use roads too.)
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
 ## since the market is now the only place heroes can buy gear.
 var style := "balanced"
@@ -30,6 +33,7 @@ func play_run(run: RunState) -> void:
 
 
 func build(run: RunState) -> void:
+	_roads(run)
 	if style != "workers" and (run.round_number >= 2 or style == "heroes"):
 		run.build("longhouse")
 	# Heroes without a bed sulk and leave, so add lodging when the beds run out.
@@ -63,6 +67,23 @@ func build(run: RunState) -> void:
 		run.build("drying_rack")
 	if run.round_number >= 2:
 		run.build("watch_post")
+
+
+## Roads out to the nearest fuel and wood, then a yard to pave them.
+func _roads(run: RunState) -> void:
+	if run.round_number == 1 and run.world.town.roads.is_empty():
+		for good: String in ["fuel", "wood"]:
+			var best := Vector2.ZERO
+			for node in run.world.nodes:
+				if node["gives"] == good and not node["heroes_only"] and not node["wild"] and run.world.node_active(node) \
+						and (best == Vector2.ZERO or (node["pos"] as Vector2).length() < best.length()):
+					best = node["pos"]
+			if best != Vector2.ZERO:
+				run.stake_road([Vector2.ZERO, best])
+	if run.round_number >= 3:
+		for b in run.content.buildings:
+			if run.content.buildings[b].get("paves", false):
+				run.build(b)
 
 
 func _bronze(run: RunState) -> void:

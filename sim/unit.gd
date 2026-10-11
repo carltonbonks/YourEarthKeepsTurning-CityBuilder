@@ -58,6 +58,12 @@ var slept := ""
 ## What pleased the hero since the last dawn: {"bought": 1, "prize": n}.
 var mood_events := {}
 
+# Walking: the cached route (see Pathing.next_point).
+var path := PackedVector2Array()
+var path_index := 0
+var path_goal := Vector2.ZERO
+var path_version := -1
+
 # Townsfolk work.
 var task := ""  ## e.g. "gather", "return", "build", "repair", "home".
 var task_index := -1  ## Node or building index the task is about.
