@@ -82,6 +82,25 @@ static func report(runs: Array) -> PackedStringArray:
 	for n in rounds:
 		dmg.append("r%d %d" % [n, roundi(keep_damage[n] / keep_damage_n[n])])
 	out.append("Average keep damage per wave: %s" % ", ".join(dmg))
+	# Format 7 and later: ages, promotions and heroes who walked away.
+	var aged := 0
+	var aged_won := 0
+	var aged_round := 0.0
+	var promoted := 0
+	var departed := 0
+	for r: Dictionary in finished:
+		departed += r.get("departed", []).size()
+		for rd: Dictionary in r["rounds"]:
+			promoted += rd.get("promotions", []).size()
+		if int(r.get("age_up_round", 0)) > 0:
+			aged += 1
+			aged_round += float(r["age_up_round"])
+			aged_won += 1 if r["result"] == "won" else 0
+	if not finished.is_empty():
+		out.append("Reached the bronze age: %d runs%s" % [aged,
+			" (average round %.1f, %d won)" % [aged_round / aged, aged_won] if aged > 0 else ""])
+		out.append("Promotions per run: %.1f   Heroes who left unhappy per run: %.1f" % [
+			float(promoted) / finished.size(), float(departed) / finished.size()])
 	var relic_ids := picked.keys()
 	relic_ids.sort_custom(func(a: String, b: String) -> bool: return picked[a] > picked[b])
 	out.append("Relics (times taken, win rate when taken):")

@@ -16,7 +16,8 @@ import json
 import os
 import sys
 
-RESOURCES = ["food", "fuel", "wood", "stone", "shells", "flint", "hides", "bone", "obsidian"]
+RESOURCES = ["food", "fuel", "wood", "stone", "shells", "flint", "hides", "bone", "obsidian",
+             "copper", "cassiterite", "tin", "bronze"]
 ROLES = ["tribesperson", "warrior", "craftsperson"]
 
 
@@ -65,7 +66,7 @@ def main(raw_folder, out_folder):
     records = load_records(raw_folder)
     tables = {name: [] for name in
               ["runs", "rounds", "picks", "builds", "wave_enemies", "deaths", "nights", "relic_offers", "heroes",
-               "loot", "whims", "market_sales", "crafted"]}
+               "loot", "whims", "market_sales", "crafted", "promotions"]}
 
     for r in records:
         rid = r["_run_id"]
@@ -86,12 +87,20 @@ def main(raw_folder, out_folder):
             "huts": r.get("buildings", []).count("hut"),
             "watch_posts": r.get("buildings", []).count("watch_post"),
             "deaths_total": len(all_deaths), "source_file": r["_source_file"],
+            "age_end": r.get("age", "neolithic"), "age_up_round": r.get("age_up_round", 0),
+            "tools": "+".join(r.get("tools", [])), "heroes_departed": len(r.get("departed", [])),
+            "promotions": sum(len(rd.get("promotions", [])) for rd in rounds),
             **{"stock_end_" + k: r.get("stock", {}).get(k, "") for k in RESOURCES},
         })
         for h in r.get("heroes", []) + r.get("fallen", []):
             tables["heroes"].append({"run_id": rid, "items": len(h.get("items", [])), **{k: h.get(k, "") for k in
                                      ["name", "class", "trait", "level", "kills", "alive", "weapon", "armor", "charm",
-                                      "gold", "max_hp", "energy", "lodging"]}})
+                                      "gold", "max_hp", "energy", "lodging", "mood"]},
+                                     "departed": 0})
+        for h in r.get("departed", []):
+            tables["heroes"].append({"run_id": rid, "items": len(h.get("items", [])), "departed": 1, **{k: h.get(k, "") for k in
+                                     ["name", "class", "trait", "level", "kills", "alive", "weapon", "armor", "charm",
+                                      "gold", "max_hp", "energy", "lodging", "mood"]}})
 
         for rd in rounds:
             rn = rd.get("round", "")
@@ -122,6 +131,9 @@ def main(raw_folder, out_folder):
                 "market_shells": sum(m.get("price", 0) for m in rd.get("market", [])),
                 "goods_crafted": sum(rd.get("crafted", {}).values()),
                 "prize_shells": rd.get("prizes", 0), "obsidian_bought": rd.get("obsidian", 0),
+                "age": rd.get("age", "neolithic"), "cassiterite_bought": rd.get("cassiterite", 0),
+                "promotions": len(rd.get("promotions", [])), "heroes_left_unhappy": len(rd.get("heroes_left", [])),
+                **{"traded_" + k: rd.get("trades", {}).get(k, 0) for k in ["tin", "cassiterite"]},
                 **{"yield_" + k: rd.get("yields", {}).get(k, 0) for k in ["hides", "bone"]},
                 **{"price_" + k: rd.get("prices", {}).get(k, "") for k in ["arms", "hides", "charms", "provisions"]},
                 "survived": 1 if "relic_pick" in rd or (r.get("result") == "won" and rn == r.get("round_reached")) else 0,
@@ -154,7 +166,9 @@ def main(raw_folder, out_folder):
                 tables["nights"].append({
                     "run_id": rid, "round": rn, "night": night.get("night", ""), "raiders": night.get("raiders", ""),
                     "kills": night.get("kills", ""), "hearth_damage": night.get("hearth_damage", ""),
-                    "deaths": len(night.get("deaths", [])), "left_hungry": len(night.get("left", [])),
+                    "deaths": len(night.get("deaths", [])),
+                    "left_hungry": len(night.get("left", [])) - len(night.get("heroes_left", [])),
+                    "left_unhappy": len(night.get("heroes_left", [])), "cold": 1 if night.get("cold") else 0,
                     "wave_night": 1 if night.get("night") == 3 else 0,
                 })
             for item in rd.get("loot", []):
@@ -167,6 +181,9 @@ def main(raw_folder, out_folder):
             for m in rd.get("market", []):
                 tables["market_sales"].append({"run_id": rid, "round": rn, **{k: m.get(k, "") for k in
                                                ["day", "hero", "trait", "recipe", "tier", "price", "stall"]}})
+            for pr in rd.get("promotions", []):
+                tables["promotions"].append({"run_id": rid, "round": rn, **{k: pr.get(k, "") for k in
+                                             ["day", "role", "name", "became", "trait", "joined_round"]}})
             for recipe, count in rd.get("crafted", {}).items():
                 tables["crafted"].append({"run_id": rid, "round": rn, "recipe": recipe, "count": count})
             for w in rd.get("whims", []):
@@ -183,14 +200,16 @@ def main(raw_folder, out_folder):
         "builds": ["run_id", "round", "building"],
         "wave_enemies": ["run_id", "round", "enemy", "count"],
         "deaths": ["run_id", "round", "day", "at_night", "name", "role", "is_hero", "killer"],
-        "nights": ["run_id", "round", "night", "raiders", "kills", "hearth_damage", "deaths", "left_hungry", "wave_night"],
+        "nights": ["run_id", "round", "night", "raiders", "kills", "hearth_damage", "deaths", "left_hungry", "left_unhappy", "cold",
+                   "wave_night"],
         "relic_offers": ["run_id", "round", "relic", "picked"],
         "heroes": ["run_id", "name", "class", "trait", "level", "kills", "alive", "weapon", "armor", "charm", "items",
-                   "gold", "max_hp", "energy", "lodging"],
+                   "gold", "max_hp", "energy", "lodging", "mood", "departed"],
         "loot": ["run_id", "round", "day", "hero", "trait", "base", "slot", "tier", "affixes", "value", "worn"],
         "whims": ["run_id", "round", "day", "hero", "whim"],
         "market_sales": ["run_id", "round", "day", "hero", "trait", "recipe", "tier", "price", "stall"],
         "crafted": ["run_id", "round", "recipe", "count"],
+        "promotions": ["run_id", "round", "day", "role", "name", "became", "trait", "joined_round"],
     }
     for table, rows in tables.items():
         count = write(out_folder, table, columns[table], rows)

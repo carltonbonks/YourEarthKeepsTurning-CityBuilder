@@ -81,6 +81,8 @@ func _draw() -> void:
 
 	# Resource nodes: size shows how much is left.
 	for node in w.nodes:
+		if not w.node_active(node):
+			continue
 		var def: Dictionary = content.world["nodes"][node["type"]]
 		var p := _to_screen(node["pos"])
 		var left := float(node["amount"]) / float(node["max"])

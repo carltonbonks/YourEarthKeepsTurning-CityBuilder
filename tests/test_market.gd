@@ -217,7 +217,7 @@ func test_market_bot_run_records_the_economy() -> void:
 	bot.style = "market"
 	bot.play_run(run)
 	var record := run.to_record()
-	check_eq(int(record["format"]), 6, "record format 6")
+	check_eq(int(record["format"]), RunState.RECORD_FORMAT, "current record format")
 	check(record.has("prices"), "prices in the record")
 	var crafted := 0
 	var sold := 0

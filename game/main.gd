@@ -5,7 +5,10 @@ extends Control
 
 const SPEEDS := [1, 2, 4, 8]
 const RESOURCE_COLORS := {"food": "#d98aa8", "fuel": "#e0b050", "wood": "#7fbf6a", "stone": "#b0b4bc", "shells": "#ffd24a",
-	"flint": "#8fa0b8", "hides": "#c09060", "bone": "#e0d8c0", "obsidian": "#b08ad8"}
+	"flint": "#8fa0b8", "hides": "#c09060", "bone": "#e0d8c0", "obsidian": "#b08ad8",
+	"copper": "#d08850", "cassiterite": "#9a9090", "tin": "#c8d0d8", "bronze": "#e0a860"}
+## Shown in the stock line from the start; later goods appear once you have some.
+const STONE_AGE_RESOURCES := ["food", "fuel", "wood", "stone", "shells", "flint", "hides", "bone", "obsidian"]
 const PRICE_LEVELS := ["cheap", "fair", "dear"]
 
 var content: Content
@@ -73,6 +76,16 @@ func _new_run(seed_value: int) -> void:
 
 func _build(type: String) -> void:
 	run.build(type)
+	_refresh()
+
+
+func _buy_tools(id: String) -> void:
+	run.buy_tools(id)
+	_refresh()
+
+
+func _trade(good: String) -> void:
+	run.trade(good)
 	_refresh()
 
 
@@ -159,16 +172,17 @@ func _refresh_build() -> void:
 		btn.text = "%s  (%s)%s" % [def["name"], ", ".join(cost), "  [%d/%d]" % [owned, def["max"]] if def.has("max") else ("  [%d]" % owned if owned > 0 else "")]
 		btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], def["work"]]
 		var needs: String = def.get("requires", "")
-		if needs != "" and run.world.count_buildings(needs, false) == 0:
-			btn.tooltip_text += "\nNeeds a %s first." % content.buildings[needs]["name"].to_lower()
+		var blocked := _build_blocker(def)
+		if blocked != "":
+			btn.tooltip_text += "\n" + blocked
 		btn.disabled = not run.can_build(type)
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn.pressed.connect(_build.bind(type))
 		_build_list.add_child(btn)
 		var note := Label.new()
 		note.text = def["text"]
-		if needs != "" and run.world.count_buildings(needs, false) == 0:
-			note.text += " Needs a %s first." % content.buildings[needs]["name"].to_lower()
+		if blocked != "":
+			note.text += " " + blocked
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD
 		note.add_theme_font_size_override("font_size", 11)
 		note.add_theme_color_override("font_color", Color("#9aa"))
@@ -181,6 +195,7 @@ func _refresh_build() -> void:
 		warn.add_theme_color_override("font_color", Color("#e0a050"))
 		_build_list.add_child(warn)
 
+	_refresh_bronze()
 	_refresh_prices()
 	var counts := run.wave_counts()
 	var ids := counts.keys()
@@ -191,6 +206,57 @@ func _refresh_build() -> void:
 	_wave_label.text = "[b]Night %d attack[/b] from the [color=#ff7060]%s[/color]:\n%s" % [
 		content.int_num("days_per_round"), " and ".join(run.world.side_names()), ", ".join(parts)]
 	_begin_btn.text = "Begin round %d" % run.round_number
+
+
+## Why a building can't be ordered yet, beyond its cost ("" if nothing).
+func _build_blocker(def: Dictionary) -> String:
+	var out := PackedStringArray()
+	var needs: String = def.get("requires", "")
+	if needs != "" and run.world.count_buildings(needs, false) == 0:
+		out.append("Needs a %s first." % content.buildings[needs]["name"].to_lower())
+	if not content.age_reached(run.age, def.get("age", "")):
+		out.append("Needs the %s (raise the Bronze moot)." % content.age_name(def["age"]).to_lower())
+	if run.population() < int(def.get("min_people", 0)):
+		out.append("Needs %d people (you have %d)." % [def["min_people"], run.population()])
+	if def.has("ages_up") and content.age_reached(run.age, def["ages_up"]):
+		out.append("Already raised.")
+	return " ".join(out)
+
+
+## Bronze-age choices while building: tool sets for townsfolk and the southern caravan.
+func _refresh_bronze() -> void:
+	if not content.age_reached(run.age, "bronze"):
+		return
+	_heading(_build_list, "Bronze tool sets (once each)")
+	var hint := Label.new()
+	hint.text = "Bronze ingots: %d. Every ingot here is one the bronzesmith can't turn into hero gear." % run.stock["bronze"]
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
+	hint.add_theme_font_size_override("font_size", 12)
+	hint.add_theme_color_override("font_color", Color("#9aa"))
+	_build_list.add_child(hint)
+	for id: String in content.ages["tools"]:
+		var def: Dictionary = content.ages["tools"][id]
+		var cost := PackedStringArray()
+		for r: String in def["cost"]:
+			cost.append("%d %s" % [def["cost"][r], r])
+		var btn := _button(_build_list, "%s  (%s)%s" % [def["name"], ", ".join(cost), "  [owned]" if run.tools.has(id) else ""], _buy_tools.bind(id))
+		btn.tooltip_text = def["text"]
+		btn.disabled = not run.can_buy_tools(id)
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	if run.trader_stock.is_empty():
+		return
+	var trader: Dictionary = content.ages["trader"]
+	_heading(_build_list, trader["name"])
+	var t := Label.new()
+	t.text = trader["text"]
+	t.autowrap_mode = TextServer.AUTOWRAP_WORD
+	t.add_theme_font_size_override("font_size", 12)
+	t.add_theme_color_override("font_color", Color("#9aa"))
+	_build_list.add_child(t)
+	for good: String in run.trader_stock:
+		var btn := _button(_build_list, "Buy 1 %s for %d shells  [%d left]" % [good, run.trader_price(good), run.trader_stock[good]], _trade.bind(good))
+		btn.disabled = not run.can_trade(good)
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 
 
 ## Cheap / Fair / Dear buttons for each stall kind you have ordered.
@@ -266,12 +332,14 @@ func _refresh_live() -> void:
 	var w := run.world
 	var stock := PackedStringArray()
 	for r: String in RunState.RESOURCES:
+		if not STONE_AGE_RESOURCES.has(r) and int(run.stock[r]) == 0 and not content.age_reached(run.age, "bronze"):
+			continue
 		stock.append("[color=%s]%s %d[/color]" % [RESOURCE_COLORS[r], r.capitalize(), run.stock[r]])
 	var folk := PackedStringArray()
 	for role: String in content.townsfolk:
 		folk.append("%s %d" % [content.townsfolk[role]["name"], run.count_role(role)])
-	_status.text = "[b]Round %d / %d[/b]   Seed %d\nHearth: %d / %d HP\n%s\nPeople %d / %d housing  (%s, heroes %d)\nUpkeep: %d food per day, %d fuel per night" % [
-		run.round_number, content.int_num("rounds_to_win"), run.run_seed, maxi(0, int(w.hearth_hp)), int(run.hearth_max_hp()),
+	_status.text = "[b]Round %d / %d[/b]   Seed %d   %s\nHearth: %d / %d HP\n%s\nPeople %d / %d housing  (%s, heroes %d)\nUpkeep: %d food per day, %d fuel per night" % [
+		run.round_number, content.int_num("rounds_to_win"), run.run_seed, content.age_name(run.age), maxi(0, int(w.hearth_hp)), int(run.hearth_max_hp()),
 		"  ".join(stock), run.population(), run.housing(), ", ".join(folk), run.living_heroes().size(),
 		_food_per_day(), run.fuel_needed_tonight()]
 	_status.text += "\n" + _fuel_line()
@@ -297,9 +365,10 @@ func _refresh_live() -> void:
 		var c: Dictionary = content.hero_classes[hero.type_id]
 		var name_color: String = c["color"] if hero.alive else "#666666"
 		var energy_color := "#7fd0ff" if hero.energy > 40.0 else ("#e0a050" if hero.energy > 0.0 else "#e05050")
-		text += "[color=%s][b]%s[/b][/color] %s %s  Lv%d  HP %d/%d  [color=%s]Energy %d[/color]  %d shells  kills %d%s\n" % [
+		var mood_color := "#a8d890" if hero.mood > content.num("mood_grumble_at") else ("#e0a050" if hero.mood > content.num("mood_leave_at") else "#e05050")
+		text += "[color=%s][b]%s[/b][/color] %s %s  Lv%d  HP %d/%d  [color=%s]Energy %d[/color]  [color=%s]Mood %d[/color]  %d shells  kills %d%s\n" % [
 			name_color, hero.display_name, content.traits[hero.trait_id]["name"], c["name"], hero.level,
-			int(hero.hp), int(hero.max_hp), energy_color, int(hero.energy), hero.gold, hero.kills,
+			int(hero.hp), int(hero.max_hp), energy_color, int(hero.energy), mood_color, int(hero.mood), hero.gold, hero.kills,
 			"" if hero.alive else "  [color=#e05050]fallen[/color]"]
 		if not hero.alive:
 			continue
@@ -323,6 +392,17 @@ func _refresh_live() -> void:
 			text += "    [color=#9aa]%s[/color]\n" % hero.intent
 	for hero in run.fallen:
 		text += "[color=#666666]%s (fallen)[/color]\n" % hero.display_name
+	for hero in run.departed:
+		text += "[color=#666666]%s (left, unhappy)[/color]\n" % hero.display_name
+	var named := PackedStringArray()
+	for u in w.folk:
+		if u.master_of != "":
+			named.append("%s, %s master of the %s (made %d)" % [u.display_name, run.craft_trait(u)["name"].to_lower(),
+				content.buildings[u.master_of]["name"].to_lower(), int(u.made.get(u.master_of, 0))])
+		elif u.type_id == "warrior" and u.kills >= int(content.promotions["warrior"]["kills"]):
+			named.append("a veteran warrior (%d kills) is ready for promotion" % u.kills)
+	if not named.is_empty():
+		text += "[color=#c8b88a]Townsfolk of note: %s[/color]\n" % "; ".join(named)
 	_heroes_label.text = text
 	_market_label.text = _market_text()
 	_append_story()
@@ -377,7 +457,9 @@ func _show_pick() -> void:
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(230, 170)
 		btn.autowrap_mode = TextServer.AUTOWRAP_WORD
-		if card["kind"] == "hero":
+		if card["kind"] == "promote":
+			btn.text = _promote_text(card)
+		elif card["kind"] == "hero":
 			var hero: Unit = card["hero"]
 			var c: Dictionary = content.hero_classes[hero.type_id]
 			var likes: Array = content.traits[hero.trait_id].get("lodging", [])
@@ -399,6 +481,19 @@ func _show_pick() -> void:
 	_overlay.show()
 
 
+func _promote_text(card: Dictionary) -> String:
+	var u: Unit = card["unit"]
+	if card["role"] == "warrior":
+		var hero: Unit = card["hero"]
+		return "PROMOTE a veteran warrior\n(%d kills, here since round %d)\nbecomes %s, %s %s, level %d\nNeeds a bed like any hero.\nCosts %d shells" % [
+			u.kills, u.joined_round, hero.display_name, content.traits[hero.trait_id]["name"],
+			content.hero_classes[hero.type_id]["name"], hero.level, card["cost"]]
+	var t: Dictionary = content.promotions["craftsperson"]["traits"][card["trait"]]
+	return "PROMOTE a craftsperson\n(%d goods made at the %s)\nbecomes %s, master of the %s\n%s: %s\nCosts %d shells" % [
+		int(u.made[card["workshop"]]), content.buildings[card["workshop"]]["name"].to_lower(), card["name"],
+		content.buildings[card["workshop"]]["name"].to_lower(), t["name"], t["text"], card["cost"]]
+
+
 func _trait_hint(trait_id: String) -> String:
 	var t: Dictionary = content.traits[trait_id]
 	var wilds := "hunts far out at the dens by day" if float(t["wilds"]) > 0.6 else ("stays near the camp" if float(t["wilds"]) < 0.2 else "ventures out sometimes")
@@ -418,8 +513,9 @@ func _night_summary() -> void:
 	var lost := PackedStringArray()
 	for name: String in deaths:
 		lost.append("%s (killed)" % name)
+	var unhappy: Array = n.get("heroes_left", [])
 	for name: String in left:
-		lost.append("%s (left hungry)" % name)
+		lost.append("%s (%s)" % [name, "left unhappy" if unhappy.has(name) else "left hungry"])
 	text += "Lost: %s." % ", ".join(lost) if not lost.is_empty() else "Nobody was lost."
 	var label := Label.new()
 	label.text = text

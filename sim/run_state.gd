@@ -10,7 +10,8 @@ extends RefCounted
 
 enum Phase { BUILD, PICK, SIM, RELIC, WON, LOST }
 
-const RESOURCES := ["food", "fuel", "wood", "stone", "shells", "flint", "hides", "bone", "obsidian"]
+const RESOURCES := ["food", "fuel", "wood", "stone", "shells", "flint", "hides", "bone", "obsidian",
+	"copper", "cassiterite", "tin", "bronze"]
 
 var content: Content
 var run_seed: int
@@ -35,6 +36,16 @@ var story: Array[String] = []
 var last_night := {}
 ## Price level per stall kind ("cheap", "fair" or "dear"; see data/recipes.json), set while building.
 var prices := {}
+## The town's tech age (an id from data/ages.json) and the round it was reached (0 = the start).
+var age := ""
+var age_up_round := 0
+## Tool sets bought for townsfolk groups (ids from "tools" in data/ages.json).
+var tools: Array[String] = []
+## What the trader still has for sale this round: good -> count. Empty when no trader is here.
+var trader_stock := {}
+## Heroes who left town unhappy.
+var departed: Array[Unit] = []
+var _hungry_today := false
 
 ## Machine-readable history of this run for stats and debugging (see to_record()).
 ## Format changes bump RECORD_FORMAT so old saved runs can still be read.
@@ -44,7 +55,9 @@ var prices := {}
 ## 5: each night's report also lists who walked away hungry ("left").
 ## 6: the marketplace: "prices", "crafted", "market" (stall sales), "prizes", "obsidian", "yields"; hero "pack";
 ##    "sales" are now made at the market and there are no trader purchases.
-const RECORD_FORMAT := 6
+## 7: ages and promotions: "age", "age_up_round", "tools", "departed" (heroes who left unhappy), hero "mood";
+##    per round "promotions", "trades", "cassiterite", "heroes_left"; per night "heroes_left", "hero_deaths", "cold".
+const RECORD_FORMAT := 7
 var record_rounds: Array[Dictionary] = []
 var _round_entry := {}
 
@@ -56,6 +69,7 @@ func _init(game_content: Content, seed_value: int) -> void:
 	content = game_content
 	run_seed = seed_value
 	_hero_rng = SeededRng.stream(run_seed, "heroes")
+	age = content.ages["order"][0]
 	for r in RESOURCES:
 		stock[r] = int(content.balance["start_stock"].get(r, 0))
 	var kinds: Array = content.market["stall_names"].keys()
@@ -128,7 +142,8 @@ func can_build(type: String) -> bool:
 	var needs: String = def.get("requires", "")
 	return phase == Phase.BUILD and can_afford(def["cost"]) and world.free_plot() >= 0 \
 		and world.count_buildings(type, false) < int(def.get("max", 99)) \
-		and (needs == "" or world.count_buildings(needs, false) > 0)
+		and (needs == "" or world.count_buildings(needs, false) > 0) \
+		and content.age_reached(age, def.get("age", "")) and population() >= int(def.get("min_people", 0))
 
 
 func build(type: String) -> bool:
@@ -180,6 +195,69 @@ func begin_round() -> void:
 func on_building_done(type: String) -> void:
 	if content.buildings[type].has("lodging"):
 		world.assign_lodgings()
+	var next_age: String = content.buildings[type].get("ages_up", "")
+	if next_age != "" and not content.age_reached(age, next_age):
+		age = next_age
+		age_up_round = round_number
+		_round_entry["aged_up"] = next_age
+		tell("The %s is raised. The %s begins: copper in the hills, tin by the dens, and traders from the south." % [
+			content.buildings[type]["name"], content.age_name(age)])
+
+
+# --- Ages: tool sets and the trader -----------------------------------------
+
+func can_buy_tools(id: String) -> bool:
+	var def: Dictionary = content.ages["tools"][id]
+	return phase == Phase.BUILD and not tools.has(id) and content.age_reached(age, def.get("age", "")) and can_afford(def["cost"])
+
+
+## Buys a tool set: a lasting upgrade for one townsfolk group.
+func buy_tools(id: String) -> bool:
+	if not can_buy_tools(id):
+		return false
+	var def: Dictionary = content.ages["tools"][id]
+	for r: String in def["cost"]:
+		stock[r] = int(stock[r]) - int(def["cost"][r])
+	tools.append(id)
+	for u in world.folk:
+		world.apply_folk_stats(u)
+	_round_entry["actions"].append({"kind": "tools", "tools": id})
+	tell("%s for the %ss." % [def["name"], content.townsfolk[def["role"]]["name"].to_lower()])
+	return true
+
+
+## Sum of one tool-set bonus for a townsfolk role (0 if none).
+func tool_bonus(role: String, key: String) -> float:
+	var total := 0.0
+	for id in tools:
+		var def: Dictionary = content.ages["tools"][id]
+		if def["role"] == role:
+			total += float(def.get(key, 0.0))
+	return total
+
+
+func has_metal_tools(role: String) -> bool:
+	return tools.any(func(id: String) -> bool:
+		return content.ages["tools"][id]["role"] == role and content.ages["tools"][id].get("metal", false))
+
+
+func trader_price(good: String) -> int:
+	return int(content.ages["trader"]["goods"][good]["price"])
+
+
+func can_trade(good: String) -> bool:
+	return phase == Phase.BUILD and int(trader_stock.get(good, 0)) > 0 and int(stock["shells"]) >= trader_price(good)
+
+
+## Buys one of a good from the visiting trader.
+func trade(good: String) -> bool:
+	if not can_trade(good):
+		return false
+	stock["shells"] = int(stock["shells"]) - trader_price(good)
+	stock[good] = int(stock[good]) + 1
+	trader_stock[good] = int(trader_stock[good]) - 1
+	_round_entry["trades"][good] = int(_round_entry["trades"].get(good, 0)) + 1
+	return true
 
 
 # --- Dawn picks ------------------------------------------------------------
@@ -188,7 +266,7 @@ func can_take_pick(index: int) -> bool:
 	if phase != Phase.PICK or index < 0 or index >= pick_offer.size():
 		return false
 	var card := pick_offer[index]
-	return population() < housing() and int(stock["shells"]) >= int(card["cost"])
+	return (card["kind"] == "promote" or population() < housing()) and int(stock["shells"]) >= int(card["cost"])
 
 
 ## Takes a dawn card (-1 skips), then lets the day begin.
@@ -203,6 +281,9 @@ func choose_pick(index: int) -> void:
 			_add_hero(hero)
 			taken = "hero:" + hero.type_id
 			tell("%s arrives and sleeps in %s." % [describe(hero), world.bed_name(hero.lodging)])
+		elif card["kind"] == "promote":
+			_promote(card)
+			taken = _card_label(card)
 		else:
 			world.add_folk(card["role"])
 			taken = card["role"]
@@ -225,15 +306,88 @@ func _offer_picks() -> void:
 	if world.count_lodgings() > 0:
 		pool.append({"kind": "hero", "role": "hero", "cost": content.int_num("hero_card_cost"), "hero": _make_hero(true)})
 	pick_offer = []
-	while pick_offer.size() < content.int_num("pick_choices") and not pool.is_empty():
+	var promote := _promotion_card(rng)
+	var slots := content.int_num("pick_choices") - (0 if promote.is_empty() else 1)
+	while pick_offer.size() < slots and not pool.is_empty():
 		var card: Dictionary = rng.pick(pool)
 		pool.erase(card)
 		pick_offer.append(card)
+	if not promote.is_empty():
+		pick_offer.append(promote)
 	phase = Phase.PICK
 
 
 func _card_label(card: Dictionary) -> String:
+	if card["kind"] == "promote":
+		return "promote:" + card["role"]
 	return "hero:" + card["hero"].type_id if card["kind"] == "hero" else card["role"]
+
+
+# --- Promotions -------------------------------------------------------------
+
+## A Promote card for one townsperson who has earned it, or {} if nobody has.
+## The outcome (name, class, trait) is rolled now so the card can show it.
+func _promotion_card(rng: SeededRng) -> Dictionary:
+	var rules := content.promotions
+	var candidates: Array[Dictionary] = []
+	for u in world.folk:
+		if u.type_id == "warrior" and u.kills >= int(rules["warrior"]["kills"]) and world.count_lodgings() > 0:
+			candidates.append({"kind": "promote", "role": "warrior", "cost": int(rules["warrior"]["cost"]), "unit": u})
+		elif u.type_id == "craftsperson" and u.master_of == "":
+			var best := ""
+			var shops := u.made.keys()
+			shops.sort()
+			for shop: String in shops:
+				if int(u.made[shop]) >= int(rules["craftsperson"]["made"]) and (best == "" or int(u.made[shop]) > int(u.made[best])):
+					best = shop
+			if best != "":
+				candidates.append({"kind": "promote", "role": "craftsperson", "cost": int(rules["craftsperson"]["cost"]),
+					"unit": u, "workshop": best})
+	if candidates.is_empty():
+		return {}
+	var card: Dictionary = rng.pick(candidates)
+	if card["role"] == "warrior":
+		var hero := _make_hero()
+		hero.type_id = rules["warrior"]["becomes"]
+		hero.level = int(rules["warrior"]["start_level"])
+		world.apply_hero_stats(hero)
+		hero.hp = hero.max_hp
+		card["hero"] = hero
+	else:
+		var traits: Array = rules["craftsperson"]["traits"].keys()
+		traits.sort()
+		card["trait"] = rng.pick(traits)
+		card["name"] = _unused_name()
+	return card
+
+
+func _promote(card: Dictionary) -> void:
+	var u: Unit = card["unit"]
+	var since := "round %d" % u.joined_round if u.joined_round > 1 else "the first fire"
+	var entry := {"day": world.day_index() + 1, "role": card["role"], "joined_round": u.joined_round}
+	if card["role"] == "warrior":
+		var hero: Unit = card["hero"]
+		hero.kills = u.kills
+		world.folk.erase(u)
+		_add_hero(hero)
+		tell("A warrior who has stood watch since %s and killed %d foes is raised up: %s." % [since, u.kills, describe(hero)])
+		entry.merge({"name": hero.display_name, "became": hero.type_id, "trait": hero.trait_id, "kills": u.kills})
+	else:
+		u.display_name = card["name"]
+		u.master_of = card["workshop"]
+		u.craft_trait = card["trait"]
+		var t: Dictionary = content.promotions["craftsperson"]["traits"][u.craft_trait]
+		tell("%s, a craftsperson since %s, becomes master of the %s (%s)." % [u.display_name, since,
+			content.buildings[u.master_of]["name"].to_lower(), t["name"]])
+		entry.merge({"name": u.display_name, "became": "master_" + u.master_of, "trait": u.craft_trait, "made": int(u.made[u.master_of])})
+	_round_entry["promotions"].append(entry)
+
+
+## A master crafter's trait numbers ({} for an ordinary craftsperson).
+func craft_trait(unit: Unit) -> Dictionary:
+	if unit.craft_trait == "":
+		return {}
+	return content.promotions["craftsperson"]["traits"][unit.craft_trait]
 
 
 # --- Simulation ------------------------------------------------------------
@@ -245,6 +399,7 @@ func step() -> void:
 	match world.pause:
 		World.Pause.DAWN:
 			_bury_heroes()
+			_update_moods()
 			_close_night()
 			_offer_picks()
 		World.Pause.ROUND_OVER:
@@ -270,6 +425,7 @@ func daily_upkeep() -> void:
 		stock["food"] = int(stock["food"]) - need
 		return
 	stock["food"] = 0
+	_hungry_today = true
 	if not world.folk.is_empty():
 		var leaver: Unit = world.folk[SeededRng.stream(run_seed, "hunger", round_number * 10 + world.day_index()).randi_range(0, world.folk.size() - 1)]
 		world.folk.erase(leaver)
@@ -287,6 +443,11 @@ func fuel_needed_tonight() -> int:
 
 ## What gatherers should fetch next: whatever is shortest against two days of need.
 func most_needed_resource() -> String:
+	return needed_resources()[0]
+
+
+## Gatherable goods, most needed first (shortest against two days of need).
+func needed_resources() -> Array[String]:
 	var wants := {
 		"food": population() * content.num("food_per_person_per_day") * 2.0,
 		"fuel": fuel_needed_tonight() * 2.0,
@@ -299,14 +460,18 @@ func most_needed_resource() -> String:
 	if world.count_buildings("smoke_hut") > 0:
 		wants["food"] += 4.0
 		wants["fuel"] += 2.0
-	var best := "food"
-	var best_gap := -INF
+	# The smelter wants copper and cassiterite, and burns fuel.
+	if world.count_buildings("smelter") > 0:
+		wants["copper"] = 8.0
+		wants["cassiterite"] = 4.0
+		wants["fuel"] += 3.0
+	var gaps := {}
 	for r: String in wants:
-		var gap: float = (wants[r] - float(stock[r])) / maxf(wants[r], 1.0)
-		if gap > best_gap:
-			best_gap = gap
-			best = r
-	return best
+		gaps[r] = (wants[r] - float(stock[r])) / maxf(wants[r], 1.0)
+	var out: Array[String] = []
+	out.assign(wants.keys())
+	out.sort_custom(func(a: String, b: String) -> bool: return gaps[a] > gaps[b] or (gaps[a] == gaps[b] and a < b))
+	return out
 
 
 ## Files the night's report in the round record and keeps it for the UI.
@@ -322,8 +487,9 @@ func _close_night() -> void:
 
 
 func _finish_round() -> void:
-	_close_night()
 	_bury_heroes()
+	_update_moods()
+	_close_night()
 	world.release()
 	var stats := world.wave_stats
 	_round_entry["battle"] = {
@@ -397,6 +563,12 @@ func _enter_build() -> void:
 	phase = Phase.BUILD
 	next_wave = generate_wave(round_number)
 	world.roll_wave_sides()
+	trader_stock = {}
+	var trader: Dictionary = content.ages["trader"]
+	if world.count_buildings(trader["needs"]) > 0:
+		for good: String in trader["goods"]:
+			trader_stock[good] = int(trader["goods"][good]["stock"])
+		tell("The %s has come with %s." % [trader["name"].to_lower(), ", ".join(trader_stock.keys())])
 	_begin_round_entry()
 
 
@@ -505,8 +677,12 @@ func to_record() -> Dictionary:
 		"townsfolk_lost": fallen_folk,
 		"relics": relics.duplicate(),
 		"prices": prices.duplicate(),
+		"age": age,
+		"age_up_round": age_up_round,
+		"tools": tools.duplicate(),
 		"heroes": heroes.map(_hero_snapshot),
 		"fallen": fallen.map(_hero_snapshot),
+		"departed": departed.map(_hero_snapshot),
 		"rounds": rounds,
 		"story": story.duplicate(),
 	}
@@ -524,7 +700,8 @@ func _begin_round_entry() -> void:
 		"wave": wave_counts(), "wave_sides": world.side_names(), "townsfolk_start": _folk_counts(),
 		"heroes_start": living_heroes().size(), "actions": [], "picks": [],
 		"whims": [], "loot": [], "sales": [], "hero_spending": {},
-		"prices": prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {}}
+		"prices": prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
+		"age": age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": []}
 
 
 func _end_round_entry() -> void:
@@ -544,7 +721,7 @@ func _hero_snapshot(hero: Unit) -> Dictionary:
 		"weapon": int(hero.items.get("weapon", {}).get("tier", 0)), "armor": int(hero.items.get("armor", {}).get("tier", 0)),
 		"charm": int(hero.items.get("charm", {}).get("tier", 0)), "items": items,
 		"energy": roundi(hero.energy), "pack": hero.pack.duplicate(), "lodging": world.buildings[hero.lodging]["type"] if hero.lodging >= 0 else "",
-		"kills": hero.kills, "alive": hero.alive}
+		"kills": hero.kills, "alive": hero.alive, "mood": roundi(hero.mood)}
 
 
 func _item_record(item: Dictionary) -> Dictionary:
@@ -614,6 +791,7 @@ func _make_hero(drawn_by_lodging := false) -> Unit:
 	else:
 		hero.trait_id = _hero_rng.pick(trait_ids)
 	hero.display_name = _unused_name()
+	hero.mood = content.num("mood_start")
 	world.apply_hero_stats(hero)
 	hero.hp = hero.max_hp
 	return hero
@@ -635,12 +813,70 @@ func _bury_heroes() -> void:
 
 func _unused_name() -> String:
 	var taken := {}
-	for h in heroes + fallen:
+	for h in heroes + fallen + departed:
 		taken[h.display_name] = true
+	for u in world.folk:
+		taken[u.display_name] = true
 	var free := content.hero_names.filter(func(n: String) -> bool: return not taken.has(n))
 	if free.is_empty():
 		return "Wanderer %d" % _next_id
 	return _hero_rng.pick(free)
+
+
+# --- Hero mood --------------------------------------------------------------
+
+## Moves each hero's mood by what happened since the last dawn, then lets the
+## unhappiest walk away. Called at each dawn and at the end of each round.
+func _update_moods() -> void:
+	var report := world.night_report
+	var comrades := int(report.get("hero_deaths", 0))
+	for hero in living_heroes():
+		var changes := {}
+		match hero.slept:
+			"favourite":
+				changes["slept in their favourite lodging"] = content.num("mood_slept_favourite")
+			"other":
+				changes["slept somewhere they don't like"] = content.num("mood_slept_other")
+			"rough":
+				changes["slept rough by the hearth"] = content.num("mood_slept_rough")
+		if hero.mood_events.has("bought"):
+			changes["bought something they wanted"] = content.num("mood_bought")
+		if int(hero.mood_events.get("prize", 0)) > 0:
+			changes["won prizes"] = content.num("mood_prize")
+		if comrades > 0:
+			changes["lost comrades"] = content.num("mood_comrade_died") * comrades
+		if _hungry_today:
+			changes["went hungry"] = content.num("mood_hungry")
+		if report.get("cold", false):
+			changes["shivered through a cold night"] = content.num("mood_cold")
+		var before := hero.mood
+		for why: String in changes:
+			hero.mood += float(changes[why])
+		hero.mood = clampf(hero.mood, 0.0, 100.0)
+		hero.slept = ""
+		hero.mood_events = {}
+		var worst := ""
+		for why: String in changes:
+			if float(changes[why]) < 0.0 and (worst == "" or float(changes[why]) < float(changes[worst])):
+				worst = why
+		if hero.mood <= content.num("mood_leave_at"):
+			_hero_leaves(hero, worst)
+		elif hero.mood <= content.num("mood_grumble_at") and hero.mood < before and worst != "":
+			tell("%s grumbles: they %s. They may leave if this goes on." % [hero.display_name, worst])
+	_hungry_today = false
+
+
+func _hero_leaves(hero: Unit, why: String) -> void:
+	heroes.erase(hero)
+	departed.append(hero)
+	hero.target = null
+	world.night_report["left"].append(hero.display_name)
+	world.night_report["heroes_left"].append(hero.display_name)
+	if _round_entry.has("heroes_left"):
+		_round_entry["heroes_left"].append({"day": world.day_index() + 1, "hero": hero.display_name, "trait": hero.trait_id,
+			"mood": roundi(hero.mood), "why": why})
+	tell("%s has had enough%s and leaves town with their gear." % [describe(hero), " (%s)" % why if why != "" else ""])
+	world.assign_lodgings()
 
 
 func _level_up(hero: Unit) -> void:
