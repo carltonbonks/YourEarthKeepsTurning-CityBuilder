@@ -1,7 +1,7 @@
 {
 	"_note": "Map features. Resource nodes are placed in a ring around the hearth (min_distance/max_distance override the ring); dens far out in the wilds. heroes_only nodes are out in hero territory: townsfolk never gather them, heroes pick them up and sell them to the settlement once the buyer building stands, for price shells each, while it holds fewer than buy_until. wild nodes sit by the dens: heroes fetch them the same way, and townsfolk only go when no monster is within wild_safe_radius (so once heroes have cleared the den nearby). age = the node only counts once the town reaches that age.",
 	"nodes": {
-		"brush": {"name": "Dry brush", "gives": "fuel", "amount": 14, "count": 5, "color": "#b3a25a"},
+		"brush": {"name": "Dry brush", "gives": "fuel", "amount": 16, "count": 6, "color": "#b3a25a"},
 		"berries": {"name": "Berry thicket", "gives": "food", "amount": 12, "count": 5, "color": "#9a4b7a"},
 		"grove": {"name": "Grove", "gives": "wood", "amount": 24, "count": 4, "color": "#3f7a46"},
 		"rocks": {"name": "Rocks", "gives": "stone", "amount": 16, "count": 3, "color": "#8c8c8c"},

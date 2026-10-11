@@ -3,7 +3,7 @@
 	"rounds_to_win": 10,
 	"days_per_round": 3,
 	"day_seconds": 32,
-	"night_seconds": 16,
+	"night_seconds": 14,
 	"dusk_seconds": 5,
 	"ticks_per_second": 10,
 
@@ -83,6 +83,6 @@
 	"mood_bought": 4,
 	"mood_prize": 3,
 	"mood_comrade_died": -10,
-	"mood_hungry": -8,
+	"mood_hungry": -5,
 	"mood_cold": -6
 }
