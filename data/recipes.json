@@ -1,13 +1,12 @@
 {
-	"_note": "What workshops make and stalls sell. A recipe uses up its needs from the settlement's stock when a craftsperson starts it, takes work craftsperson-seconds, and puts one good on a stall that sells its stall kind. Gear is an item from data/items.json; its tier is 1 + (round - 1) / tier_every_rounds, kept between min_tier and max_tier. price = shells per tier at a Fair price; price_levels scale it. Heroes buy gear they like better than what they wear and carry up to pack_limit of each provision. obsidian_price = shells the settlement pays a hero per shard; hero_carry = shards a hero can carry.",
+	"_note": "What workshops make and stalls sell. A recipe uses up its needs from the settlement's stock when a craftsperson starts it, takes work craftsperson-seconds, and puts one good on a stall that sells its stall kind. Gear is an item from data/items.json; its tier is 1 + (round - 1) / tier_every_rounds, kept between min_tier and max_tier. price = shells per tier at a Fair price; price_levels scale it. Heroes buy gear they like better than what they wear and carry up to pack_limit of each provision. hero_carry = how much a hero can carry back from a node out in the wilds (prices are in data/world.json). makes = the recipe puts goods into the settlement's stock instead of on a stall (the smelter), and keep = it stops once the stock holds that many. extra_tier on a recipe adds to its tier.",
 	"price_levels": {"cheap": 0.6, "fair": 1.0, "dear": 1.5},
 	"stall_capacity": 4,
 	"pack_limit": 2,
 	"tier_every_rounds": 3,
 	"affix_chance": 0.15,
-	"obsidian_price": 2,
 	"hero_carry": 3,
-	"stall_names": {"arms": "Arms", "hides": "Hides", "charms": "Charms", "provisions": "Provisions"},
+	"stall_names": {"arms": "Arms", "hides": "Armour", "charms": "Charms", "provisions": "Provisions"},
 	"recipes": {
 		"flint_blade": {"workshop": "knapper", "item": "flint_blade", "max_tier": 3, "needs": {"flint": 2, "wood": 1}, "work": 10, "stall": "arms", "price": 12},
 		"bone_spear": {"workshop": "knapper", "item": "bone_spear", "max_tier": 3, "needs": {"bone": 1, "wood": 2}, "work": 10, "stall": "arms", "price": 10},
@@ -17,7 +16,13 @@
 		"claw_necklace": {"workshop": "bone_carver", "item": "claw_necklace", "max_tier": 3, "needs": {"bone": 2}, "work": 10, "stall": "charms", "price": 10},
 		"antler_charm": {"workshop": "bone_carver", "item": "antler_charm", "max_tier": 3, "needs": {"bone": 2, "wood": 1}, "work": 10, "stall": "charms", "price": 10},
 		"smoked_meat": {"workshop": "smoke_hut", "provision": "smoked_meat", "needs": {"food": 2, "fuel": 1}, "work": 6, "stall": "provisions", "price": 4},
-		"poultice": {"workshop": "smoke_hut", "provision": "poultice", "needs": {"food": 1, "fuel": 1}, "work": 6, "stall": "provisions", "price": 5}
+		"poultice": {"workshop": "smoke_hut", "provision": "poultice", "needs": {"food": 1, "fuel": 1}, "work": 6, "stall": "provisions", "price": 5},
+		"tin": {"workshop": "smelter", "makes": {"tin": 1}, "keep": 6, "needs": {"cassiterite": 2, "fuel": 1}, "work": 8},
+		"bronze": {"workshop": "smelter", "makes": {"bronze": 1}, "keep": 8, "needs": {"copper": 2, "tin": 1, "fuel": 1}, "work": 10},
+		"bronze_sword": {"workshop": "bronzesmith", "item": "bronze_sword", "min_tier": 2, "max_tier": 4, "needs": {"bronze": 1, "wood": 1}, "work": 14, "stall": "arms", "price": 13},
+		"bronze_axe": {"workshop": "bronzesmith", "item": "bronze_axe", "min_tier": 2, "max_tier": 4, "needs": {"bronze": 1, "wood": 2}, "work": 14, "stall": "arms", "price": 13},
+		"bronze_scale": {"workshop": "bronzesmith", "item": "bronze_scale", "min_tier": 2, "max_tier": 4, "needs": {"bronze": 2, "hides": 1}, "work": 18, "stall": "hides", "price": 14},
+		"bronze_torc": {"workshop": "bronzesmith", "item": "bronze_torc", "min_tier": 2, "max_tier": 4, "needs": {"bronze": 1}, "work": 10, "stall": "charms", "price": 12}
 	},
 	"provisions": {
 		"smoked_meat": {"name": "smoked meat", "energy": 40},

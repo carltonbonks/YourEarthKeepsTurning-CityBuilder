@@ -55,12 +55,15 @@ static func score(content: Content, item: Dictionary, likes: Dictionary) -> floa
 
 
 ## A random dropped item. Tier grows with the round; some get one or two affixes.
-static func roll(content: Content, rng: SeededRng, round_number: int) -> Dictionary:
+## Bases from a later age only drop once the town has reached it.
+static func roll(content: Content, rng: SeededRng, round_number: int, age := "") -> Dictionary:
 	var drops: Dictionary = content.items["drops"]
 	var tier := clampi(1 + (round_number - 1) / int(drops["tier_every_rounds"]) + (1 if rng.randf() < 0.25 else 0),
 		1, int(drops["max_tier"]))
 	var bases: Array = content.items["bases"].keys().filter(func(id: String) -> bool:
-		return int(content.items["bases"][id].get("min_tier", 1)) <= tier)
+		return int(content.items["bases"][id].get("min_tier", 1)) <= tier \
+			and (age == "" or content.age_reached(age, content.items["bases"][id].get("age", ""))) \
+			and (age != "" or not content.items["bases"][id].has("age")))
 	bases.sort()
 	var affix_ids: Array = content.items["affixes"].keys()
 	affix_ids.sort()

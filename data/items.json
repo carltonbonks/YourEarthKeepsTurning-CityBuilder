@@ -1,5 +1,5 @@
 {
-	"_note": "Items heroes find, buy, keep or sell. A base names the slot and its stats per tier (an item's stats are base x tier, plus each affix). Affixes are item traits. Stats: attack, hp, speed, energy (cuts how fast energy drains: 0.2 = 20% slower), loot (extra shells per kill), rest_heal (extra HP per second while resting). value = shells a trader pays: value_per_tier x tier + value_per_affix x affixes. drops: chance a kill drops an item (den wanderers are where the loot is).",
+	"_note": "Items heroes find, buy, keep or sell. A base names the slot and its stats per tier (an item's stats are base x tier, plus each affix). Affixes are item traits. Stats: attack, hp, speed, energy (cuts how fast energy drains: 0.2 = 20% slower), loot (extra shells per kill), rest_heal (extra HP per second while resting). metal = hits pierce bronze shields. age = only made or dropped once the town reaches that age. value = shells a trader pays: value_per_tier x tier + value_per_affix x affixes. drops: chance a kill drops an item (den wanderers are where the loot is).",
 	"bases": {
 		"flint_blade": {"name": "flint blade", "slot": "weapon", "attack": 3},
 		"bone_spear": {"name": "bone spear", "slot": "weapon", "attack": 2, "speed": 6},
@@ -8,7 +8,11 @@
 		"fur_cloak": {"name": "fur cloak", "slot": "armor", "hp": 10, "energy": 0.1},
 		"claw_necklace": {"name": "claw necklace", "slot": "charm", "loot": 1},
 		"antler_charm": {"name": "antler charm", "slot": "charm", "energy": 0.12},
-		"amber_amulet": {"name": "amber amulet", "slot": "charm", "rest_heal": 1.0}
+		"amber_amulet": {"name": "amber amulet", "slot": "charm", "rest_heal": 1.0},
+		"bronze_sword": {"name": "bronze sword", "slot": "weapon", "attack": 4, "metal": true, "age": "bronze", "min_tier": 2},
+		"bronze_axe": {"name": "bronze axe", "slot": "weapon", "attack": 5, "speed": -4, "metal": true, "age": "bronze", "min_tier": 2},
+		"bronze_scale": {"name": "bronze scale", "slot": "armor", "hp": 20, "speed": -3, "age": "bronze", "min_tier": 2},
+		"bronze_torc": {"name": "bronze torc", "slot": "charm", "loot": 1, "rest_heal": 0.6, "age": "bronze", "min_tier": 2}
 	},
 	"affixes": {
 		"keen": {"name": "Keen", "attack": 2},

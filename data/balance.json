@@ -71,5 +71,18 @@
 	"rough_wake_radius": 150,
 
 	"enemy_aggro": 50,
-	"warrior_answer_radius": 260
+	"warrior_answer_radius": 260,
+
+	"_mood_note": "Hero mood, 0-100. Each dawn (and at the end of a round) a hero's mood moves by what happened since the last one: where they slept (sleeping rough by the hearth only counts once the town has a lodging), whether they bought something, prizes earned, comrades lost, hunger and cold. A hero whose mood falls to mood_leave_at or below leaves town with their gear. mood_grumble_at: the story warns you first.",
+	"mood_start": 60,
+	"mood_leave_at": 15,
+	"mood_grumble_at": 30,
+	"mood_slept_favourite": 6,
+	"mood_slept_other": 0,
+	"mood_slept_rough": -5,
+	"mood_bought": 4,
+	"mood_prize": 3,
+	"mood_comrade_died": -10,
+	"mood_hungry": -8,
+	"mood_cold": -6
 }

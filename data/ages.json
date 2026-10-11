@@ -1,0 +1,22 @@
+{
+	"_note": "Tech ages in order. The run starts in the first; raising a building with ages_up (the Bronze moot) moves the town into the next. Buildings, map nodes, item bases and tool sets with an age only appear once the town has reached it. tools = group upgrades bought with goods while building (one each per run): gather_mult speeds gathering, carry adds to what a gatherer brings back, build_rate adds to craftsperson work speed, attack/hp add to each member's stats, metal means their hits pierce bronze shields. trader = a caravan that visits during the build phase once its building stands; each good has a price in shells and how many it brings each round.",
+	"order": ["neolithic", "bronze"],
+	"ages": {
+		"neolithic": {"name": "Stone age"},
+		"bronze": {"name": "Bronze age"}
+	},
+	"tools": {
+		"bronze_picks": {"name": "Bronze picks and sickles", "text": "Tribespeople gather 50% faster and carry 1 more.", "role": "tribesperson", "age": "bronze", "cost": {"bronze": 3}, "gather_mult": 0.5, "carry": 1},
+		"bronze_chisels": {"name": "Bronze chisels and adzes", "text": "Craftspeople build and craft 50% faster.", "role": "craftsperson", "age": "bronze", "cost": {"bronze": 3}, "build_rate": 0.5},
+		"bronze_spears": {"name": "Bronze spears and shields", "text": "Warriors hit 3 harder, have 12 more HP, and pierce bronze shields.", "role": "warrior", "age": "bronze", "cost": {"bronze": 4}, "attack": 3, "hp": 12, "metal": true}
+	},
+	"trader": {
+		"needs": "bronze_moot",
+		"name": "Southern caravan",
+		"text": "Traders from the south sell tin and a little cassiterite, at a steep markup over what your own people bring in.",
+		"goods": {
+			"tin": {"price": 9, "stock": 3},
+			"cassiterite": {"price": 5, "stock": 1}
+		}
+	}
+}

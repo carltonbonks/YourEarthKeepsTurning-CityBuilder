@@ -19,6 +19,8 @@ var townsfolk: Dictionary
 var buildings: Dictionary
 var world: Dictionary
 var market: Dictionary  ## data/recipes.json: recipes, provisions and market numbers.
+var ages: Dictionary  ## data/ages.json: the tech ages in order, tool sets and the trader.
+var promotions: Dictionary  ## data/promotions.json: when townsfolk can be promoted and into what.
 
 
 static func load_default() -> Content:
@@ -36,6 +38,8 @@ static func load_default() -> Content:
 	c.buildings = _strip(_read("buildings.json"))
 	c.world = _strip(_read("world.json"))
 	c.market = _strip(_read("recipes.json"))
+	c.ages = _strip(_read("ages.json"))
+	c.promotions = _strip(_read("promotions.json"))
 	return c
 
 
@@ -50,6 +54,17 @@ func int_num(key: String) -> int:
 ## True if an enemy type carries a tag (see "tags" in data/enemies.json).
 func enemy_has_tag(type_id: String, tag: String) -> bool:
 	return tag in enemies[type_id].get("tags", [])
+
+
+## True once a town in age `current` has reached age `needed` ("" needs nothing).
+func age_reached(current: String, needed: String) -> bool:
+	if needed == "":
+		return true
+	return ages["order"].find(current) >= ages["order"].find(needed)
+
+
+func age_name(id: String) -> String:
+	return ages["ages"][id]["name"]
 
 
 ## Recipe ids a workshop type can make, sorted.
@@ -67,6 +82,8 @@ func recipe_name(id: String) -> String:
 	var r: Dictionary = market["recipes"][id]
 	if r.has("item"):
 		return items["bases"][r["item"]]["name"]
+	if r.has("makes"):
+		return "%s ingot" % id if id == "bronze" else id
 	return market["provisions"][r["provision"]]["name"]
 
 

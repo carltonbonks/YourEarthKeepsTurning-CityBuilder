@@ -29,7 +29,7 @@ var intent := ""
 var level := 1
 var xp := 0.0
 var gold := 0  ## Shells the hero carries (named gold in older run records).
-var kills := 0
+var kills := 0  ## Heroes and warriors both count kills (warriors for promotion).
 var retreating := false
 ## 0 (exhausted) to hero_energy_max. Drains while awake, comes back while resting.
 var energy := 100.0
@@ -51,6 +51,12 @@ var spares: Array[Dictionary] = []
 var pack: Array[String] = []
 ## Building index of the stall a hero is walking to, or -1.
 var shop_stall := -1
+## 0-100. Too low and the hero leaves town at dawn (see "_mood_note" in data/balance.json).
+var mood := 60.0
+## Where the hero slept last night: "favourite", "other", "rough" or "" (stayed up).
+var slept := ""
+## What pleased the hero since the last dawn: {"bought": 1, "prize": n}.
+var mood_events := {}
 
 # Townsfolk work.
 var task := ""  ## e.g. "gather", "return", "build", "repair", "home".
@@ -59,6 +65,12 @@ var task_timer := 0.0
 var carrying := ""
 var carry_amount := 0
 var home := Vector2.ZERO
+var joined_round := 1
+## Goods finished at each workshop type, e.g. {"knapper": 5}.
+var made := {}
+## A promoted craftsperson: the workshop type they master and their craft trait (data/promotions.json).
+var master_of := ""
+var craft_trait := ""
 
 # Enemy-only.
 var spawn_time := 0.0
