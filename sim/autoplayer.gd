@@ -16,7 +16,7 @@ extends RefCounted
 ## since the market is now the only place heroes can buy gear.
 var style := "balanced"
 ## Gates: how many it orders at most (after everything else, when a plot fits) and from which round.
-## Two from round 3 was worth about 2 points; free gates about 11, so the cost is what holds them back.
+## Free gates were worth about 11 points; ordered last it rarely has 6 wood spare, so it builds few.
 ## balance_run.gd sets these with gates= and gate_round=.
 var gates := 2
 var gate_round := 3
