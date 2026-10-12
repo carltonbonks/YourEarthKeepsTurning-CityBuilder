@@ -37,7 +37,6 @@ func play_run(run: RunState) -> void:
 
 func build(run: RunState) -> void:
 	_paving(run)
-	_gates(run)
 	if style != "workers" and (run.round_number >= 2 or style == "heroes"):
 		run.build("longhouse")
 	# Heroes without a bed sulk and leave, so add lodging when the beds run out.
@@ -71,6 +70,8 @@ func build(run: RunState) -> void:
 		run.build("drying_rack")
 	if run.round_number >= 2:
 		run.build("watch_post")
+	# Gates last, with whatever is left over.
+	_gates(run)
 
 
 ## From round 3, a yard so craftspeople pave the busiest paths.
