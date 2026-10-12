@@ -62,7 +62,9 @@ var _hungry_today := false
 ##    "plots" (each building's ring and sector) in the run record.
 ## 9: palisades: "wall" / "unstake_wall" actions, per round "walling" (goods spent on palisades) and
 ##    "breaches" (palisade squares raiders broke), and "walls" in the round's "town" (squares staked, standing, gates).
-const RECORD_FORMAT := 9
+## 10: per round "power" when the wave comes: the town's power level by part (heroes, fighters, defences, total)
+##     and the wave's ("wave"), on the same scale (sim/power.gd).
+const RECORD_FORMAT := 10
 var record_rounds: Array[Dictionary] = []
 var _round_entry := {}
 
@@ -821,6 +823,12 @@ func note_loot(hero: Unit, item: Dictionary, equipped: bool) -> void:
 func note_hero_spending(reason: String, shells: int) -> void:
 	if _round_entry.has("hero_spending"):
 		_round_entry["hero_spending"][reason] = int(_round_entry["hero_spending"].get(reason, 0)) + shells
+
+
+## The town's and the wave's power levels as the wave comes (see Power).
+func note_power(wave_types: Array) -> void:
+	if not _round_entry.is_empty():
+		_round_entry["power"] = {"town": Power.town(world), "wave": snappedf(Power.wave(content, wave_types), 0.1)}
 
 
 func note_crafted(recipe_id: String) -> void:
