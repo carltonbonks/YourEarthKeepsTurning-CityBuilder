@@ -62,7 +62,10 @@ var _hungry_today := false
 ##    "plots" (each building's ring and sector) in the run record.
 ## 9: palisades: "wall" / "unstake_wall" actions, per round "walling" (goods spent on palisades) and
 ##    "breaches" (palisade squares raiders broke), and "walls" in the round's "town" (squares staked, standing, gates).
-const RECORD_FORMAT := 9
+## 10: roads and palisades are no longer staked (no "road" / "wall" actions, no "walling"); the round's
+##    "town" drops "staked" and "walls" and adds "paths" (worn path squares) and "gates" ({built, broken});
+##    "breaches" now counts gate squares raiders broke. Stone-layers pave the busiest worn paths.
+const RECORD_FORMAT := 10
 var record_rounds: Array[Dictionary] = []
 var _round_entry := {}
 
@@ -162,50 +165,9 @@ func build(type: String) -> bool:
 	return true
 
 
-# --- Roads (start of round) ---------------------------------------------------
+# --- Paving and gates ---------------------------------------------------------
 
-## Stakes out a road through these waypoints (world points; the road bends round
-## whatever stands in the way). Staking is free; buildings never go on a staked road,
-## and once a stone-layers' yard stands, craftspeople pave it a stretch at a time.
-func stake_road(points: Array) -> bool:
-	if phase != Phase.BUILD or not world.town.stake(points):
-		return false
-	var cells: int = world.town.roads[-1]["cells"].size()
-	_round_entry["actions"].append({"kind": "road", "points": points.map(func(p: Vector2) -> Array: return [roundi(p.x), roundi(p.y)]),
-		"cells": cells})
-	tell("A road is staked out, %d paces long." % cells)
-	return true
-
-
-## Pulls up the last staked road's stakes (paved stretches stay).
-func unstake_road() -> bool:
-	if phase != Phase.BUILD or not world.town.unstake_last():
-		return false
-	_round_entry["actions"].append({"kind": "unstake"})
-	return true
-
-
-## Stakes out a palisade along these waypoints (straight lines between them). Staking is
-## free; craftspeople raise it for wood. Where a staked road crosses it there is a gate.
-func stake_wall(points: Array) -> bool:
-	if phase != Phase.BUILD or not world.town.stake_wall(points):
-		return false
-	var cells: int = world.town.walls[-1]["cells"].size()
-	_round_entry["actions"].append({"kind": "wall", "points": points.map(func(p: Vector2) -> Array: return [roundi(p.x), roundi(p.y)]),
-		"cells": cells})
-	tell("A palisade is staked out, %d paces long." % cells)
-	return true
-
-
-## Pulls up the last staked palisade (and whatever of it stands).
-func unstake_wall() -> bool:
-	if phase != Phase.BUILD or not world.town.unstake_last_wall():
-		return false
-	_round_entry["actions"].append({"kind": "unstake_wall"})
-	return true
-
-
-## Goods spent this round on roads ("paving") or palisades ("walling").
+## Goods spent this round on something, e.g. "paving" (roads).
 func note_spend(key: String, cost: Dictionary) -> void:
 	if not _round_entry.has(key):
 		return
@@ -213,7 +175,7 @@ func note_spend(key: String, cost: Dictionary) -> void:
 		_round_entry[key][r] = int(_round_entry[key].get(r, 0)) + int(cost[r])
 
 
-## A raider broke a square of palisade.
+## A raider broke a square of a gate.
 func note_breach() -> void:
 	if _round_entry.has("breaches"):
 		_round_entry["breaches"] = int(_round_entry["breaches"]) + 1
@@ -225,8 +187,8 @@ func _town_snapshot() -> Dictionary:
 	for plot in world.town.plots:
 		if int(plot["building"]) >= 0:
 			rings[str(plot["ring"] + 1)] = int(rings.get(str(plot["ring"] + 1), 0)) + 1
-	return {"staked": world.town.staked_count(), "paved": world.town.paved_counts(),
-		"trails": world.pathing.count_ground(Pathing.TRAIL), "plots_by_ring": rings, "walls": world.town.wall_counts()}
+	return {"paved": world.town.paved_counts(), "trails": world.pathing.count_ground(Pathing.TRAIL),
+		"paths": world.pathing.count_ground(Pathing.PATH), "plots_by_ring": rings, "gates": world.town.gate_counts()}
 
 
 # --- Market prices ----------------------------------------------------------
@@ -776,7 +738,7 @@ func _begin_round_entry() -> void:
 		"whims": [], "loot": [], "sales": [], "hero_spending": {},
 		"prices": prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
 		"age": age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
-		"walling": {}, "breaches": 0}
+		"breaches": 0}
 
 
 func _end_round_entry() -> void:

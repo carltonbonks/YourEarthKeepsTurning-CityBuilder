@@ -3,10 +3,6 @@ extends Control
 ## Draws the settlement map with placeholder shapes. Read-only: it only looks at
 ## the RunState / World and never changes them, so art can be swapped freely.
 ## Mouse wheel zooms, dragging pans, hovering shows a tooltip (see Tooltips).
-## While staking a road or palisade (BuildPanel), clicks add waypoints and right-click removes the
-## last; the plan is previewed, and BuildPanel hands the waypoints to RunState.stake_road / stake_wall.
-
-signal stake_points_changed
 
 const HERO_RADIUS := 9.0
 const FOLK_RADIUS := 5.5
@@ -22,17 +18,9 @@ var _dragging := false
 var _mouse := Vector2(-1, -1)  ## Last mouse position over the map; negative when it is elsewhere.
 var _press_at := Vector2.ZERO
 var _moved := false
-## Road staking: on while the player is placing waypoints.
-var staking := false
-var staking_wall := false  ## Staking a palisade rather than a road.
-var stake_points: Array = []
-var _preview := PackedInt32Array()
-var _preview_fits := false
-## Squares worth drawing (trails, roads, stakes), rebuilt when the ground or the stakes change:
-## [index, ground kind, staked] per square.
+## Squares worth drawing (trails, paths, roads), rebuilt when the ground changes: [index, ground kind].
 var _ground_cache: Array = []
-var _wall_cache := PackedInt32Array()  ## Staked palisade squares.
-var _ground_seen := [-1, -1, null]
+var _ground_seen := [-1, null]
 
 
 func reset_camera() -> void:
@@ -57,48 +45,12 @@ func _gui_input(event: InputEvent) -> void:
 			if mb.pressed:
 				_press_at = mb.position
 				_moved = false
-			elif staking and not _moved:
-				# A click (not a drag) while staking: add a waypoint, or drop the last one.
-				if mb.button_index == MOUSE_BUTTON_LEFT:
-					stake_points.append(_to_world(mb.position))
-				elif not stake_points.is_empty():
-					stake_points.pop_back()
-				_update_preview()
-				accept_event()
 	elif event is InputEventMouseMotion:
 		_mouse = (event as InputEventMouseMotion).position
 		if _dragging and _mouse.distance_to(_press_at) > 5.0:
 			_moved = true
 		if _dragging and _moved:
 			pan -= (event as InputEventMouseMotion).relative / _scale()
-
-
-func start_staking(wall := false) -> void:
-	staking = true
-	staking_wall = wall
-	stake_points = []
-	_update_preview()
-
-
-func stop_staking() -> void:
-	staking = false
-	stake_points = []
-	_update_preview()
-
-
-func _update_preview() -> void:
-	_preview = PackedInt32Array()
-	_preview_fits = false
-	if run != null and stake_points.size() >= 2:
-		var town := run.world.town
-		_preview = town.wall_line(stake_points) if staking_wall else town.route(stake_points)
-		_preview_fits = _preview.size() >= 2
-	stake_points_changed.emit()
-
-
-## True if the waypoints so far make a road or palisade that fits.
-func preview_ok() -> bool:
-	return _preview_fits
 
 
 func _notification(what: int) -> void:
@@ -172,14 +124,22 @@ func _draw() -> void:
 		draw_string(font, p + Vector2(-r, r + 12), def["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#d0a0a0"))
 
 	# Buildings fill their plot: solid when raised, outline plus progress while being built.
-	for b in w.buildings:
+	for bi in w.buildings.size():
+		var b: Dictionary = w.buildings[bi]
 		var def: Dictionary = content.buildings[b["type"]]
 		var p := _to_screen(b["pos"])
 		var half := maxf(4.0, 11.0 * s)
 		var shape := _screen_poly(w.town.plot_outline(b["plot"]))
 		var col := Color(def["color"])
 		var work_left := float(b["work_left"])
-		if work_left <= 0.0:
+		if work_left <= 0.0 and w.town.is_gate_type(b["type"]):
+			# A gate fades as raiders batter it, and shows its health.
+			var whole := w.town.gate_health(bi)
+			draw_colored_polygon(shape, Color(col, 0.35 + 0.65 * whole))
+			draw_polyline(_closed(shape), Color("#e8d9a8"), 1.0)
+			if whole < 1.0:
+				_bar(p + Vector2(-half, half + 3), half * 2.0, whole, Color("#e0a050"))
+		elif work_left <= 0.0:
 			draw_colored_polygon(shape, col)
 			draw_polyline(_closed(shape), Color("#e8d9a8"), 1.0)
 		else:
@@ -240,11 +200,8 @@ func _draw() -> void:
 	var dark := _darkness()
 	if dark > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.12, dark))
-	if staking:
-		_draw_staking(font)
-	var help := "Click to add road waypoints, right-click to undo one, drag to look around" if staking \
-		else "Mouse wheel to zoom, drag to look around, point at anything for details"
-	draw_string(font, Vector2(8, size.y - 8), help, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#ffd27a") if staking else Color("#8a9088"))
+	var help := "Mouse wheel to zoom, drag to look around, point at anything for details"
+	draw_string(font, Vector2(8, size.y - 8), help, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#8a9088"))
 	if _mouse.x >= 0.0 and not _dragging:
 		var tip := hovered(_mouse)
 		if not tip.is_empty():
@@ -278,7 +235,7 @@ func hovered(at: Vector2) -> Dictionary:
 		if w.node_active(node) and _near(node["pos"], at, maxf(3.0, 14.0 * _scale() * 1.6)):
 			return Tooltips.node(run, node)
 	var square := w.pathing.index_of(_to_world(at))
-	if w.pathing.ground[square] != Pathing.PLAIN or w.town.staked[square] > 0 or w.town.wall_staked[square] > 0:
+	if w.pathing.ground[square] != Pathing.PLAIN :
 		return Tooltips.ground(run, square)
 	return {}
 
@@ -366,61 +323,28 @@ func _draw_plots() -> void:
 			draw_polyline(_closed(shape), Color(0.6, 0.65, 0.45, 0.18), 1.0)
 
 
-## Trails, roads, palisades and staked squares.
+## Trails, worn paths and roads.
 func _draw_ground() -> void:
 	var w := run.world
-	var seen := [w.pathing.ground_version, w.town.staked_version, w]
+	var seen := [w.pathing.ground_version, w]
 	if seen != _ground_seen:
 		_ground_seen = seen
 		_ground_cache = []
-		_wall_cache = PackedInt32Array()
 		for i in w.pathing.ground.size():
-			var g := w.pathing.ground[i]
-			if g >= Pathing.TRAIL or w.town.staked[i] > 0:
-				_ground_cache.append([i, g, w.town.staked[i] > 0])
-			if w.town.wall_staked[i] > 0:
-				_wall_cache.append(i)
-	var s := _scale()
-	var cell := w.pathing.cell * s
+			if w.pathing.ground[i] >= Pathing.TRAIL:
+				_ground_cache.append([i, w.pathing.ground[i]])
+	var cell := w.pathing.cell * _scale()
 	var trail := Color(run.content.town["trail"]["color"])
+	var path := Color(run.content.town["path"]["color"])
 	for entry: Array in _ground_cache:
 		var p := _to_screen(w.pathing.center(entry[0]))
 		var g: int = entry[1]
 		if g >= Pathing.FIRST_ROAD:
 			draw_rect(Rect2(p - Vector2(cell, cell) / 2.0, Vector2(cell, cell)), Color(w.town.road_def(g)["color"]))
-		elif g == Pathing.TRAIL:
-			draw_rect(Rect2(p - Vector2(cell, cell) * 0.35, Vector2(cell, cell) * 0.7), Color(trail, 0.8))
-		if entry[2] and g < Pathing.FIRST_ROAD:
-			draw_circle(p, maxf(1.0, cell * 0.18), Color("#e8c070"))
-	# Palisades: standing wall dark, gates lighter, staked or broken stretches as a dotted outline; health shows as fading.
-	var palisade: Dictionary = run.content.town["palisade"]
-	for i in _wall_cache:
-		var p := _to_screen(w.pathing.center(i))
-		var gate := w.town.is_gate(i)
-		var hp := w.pathing.wall_hp[i]
-		var rect := Rect2(p - Vector2(cell, cell) / 2.0, Vector2(cell, cell))
-		if hp > 0.0:
-			var color := Color(palisade["gate_color"] if gate else palisade["color"])
-			draw_rect(rect, Color(color, 0.45 + 0.55 * hp / w.town.max_wall_hp(i)))
+		elif g == Pathing.PATH:
+			draw_rect(Rect2(p - Vector2(cell, cell) * 0.45, Vector2(cell, cell) * 0.9), Color(path, 0.9))
 		else:
-			draw_rect(rect.grow(-cell * 0.15), Color(palisade["gate_color"] if gate else "#c08a50", 0.7), false, 1.0)
-
-
-## The road being staked: waypoints and the planned squares.
-func _draw_staking(font: Font) -> void:
-	var w := run.world
-	var cell := w.pathing.cell * _scale()
-	var color := Color("#e09a5a") if staking_wall else Color("#ffd27a")
-	for i in _preview:
-		var p := _to_screen(w.pathing.center(i))
-		draw_rect(Rect2(p - Vector2(cell, cell) * 0.3, Vector2(cell, cell) * 0.6), color)
-	for n in stake_points.size():
-		var p := _to_screen(stake_points[n])
-		draw_circle(p, 5.0, Color("#ffd27a"))
-		draw_string(font, p + Vector2(6, -6), str(n + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#ffd27a"))
-	if stake_points.size() >= 2 and not _preview_fits:
-		var why := "no palisade fits here" if staking_wall else "no road fits here"
-		draw_string(font, _to_screen(stake_points[-1]) + Vector2(8, 14), why, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#ff8060"))
+			draw_rect(Rect2(p - Vector2(cell, cell) * 0.35, Vector2(cell, cell) * 0.7), Color(trail, 0.8))
 
 
 func _screen_poly(points: PackedVector2Array) -> PackedVector2Array:

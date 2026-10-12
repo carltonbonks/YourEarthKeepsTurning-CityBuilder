@@ -7,41 +7,41 @@ extends RefCounted
 ## a road the stone-layers paved. Units ask for the next point to head for and
 ## follow a cached route; routes are found with Godot's AStarGrid2D (headless and
 ## deterministic) and redone when the ground changes or the goal moves.
-## Feet wear trails: walking adds to a square's traffic, and each dawn the busiest
-## squares turn into trails while unused trails fade.
-## Palisades: a square can hold a stretch of wall (or a gate where a road crosses one).
-## Townsfolk and heroes climb over wall slowly and walk through gates; raiders get their own
-## grid where wall and gates are costly, and batter them down when they walk into one
-## (World.walk_toward).
+## Desire paths: walking adds to a square's traffic, and each dawn busy squares wear from
+## plain ground into a trail and then a worn path, while unused ones fade back.
+## Gates: a square can hold a gate. Townsfolk and heroes walk through; raiders get their own
+## grid where gates are costly, and batter them down when they walk into one (World.walk_toward).
 
 ## Ground kinds. Roads follow, one kind per entry in data/town.json "roads", in order.
 const PLAIN := 0
 const THICKET := 1
 const TRAIL := 2
-const FIRST_ROAD := 3
+const PATH := 3
+const FIRST_ROAD := 4
 ## Goals closer than this are walked to in a straight line.
 const STRAIGHT_RANGE := 20.0
 
 var cell: float
 var cells: int  ## Squares per side.
 var origin: Vector2  ## World position of the corner of square (0, 0).
-var astar := AStarGrid2D.new()  ## Townsfolk and heroes: walls are slow to climb, gates open.
-var enemy_astar := AStarGrid2D.new()  ## Raiders: walls and gates cost extra (time to batter through).
+var astar := AStarGrid2D.new()  ## Townsfolk and heroes: gates are open.
+var enemy_astar := AStarGrid2D.new()  ## Raiders: gates cost extra (time to batter through).
 var solid := PackedByteArray()  ## 1 where a building or obstacle stands.
-var wall_hp := PackedFloat32Array()  ## Health of the wall or gate on each square; 0 = none (or broken).
-var gate := PackedByteArray()  ## 1 where a staked road crosses a staked wall.
-var wall_detour := 0.0  ## Extra squares a raider walks to avoid one point of wall health.
-var climb_speed := 1.0  ## Walking speed multiplier for townsfolk and heroes climbing over a palisade.
+var wall_hp := PackedFloat32Array()  ## Health of the gate on each square; 0 = none (or broken).
+var wall_detour := 0.0  ## Extra squares a raider walks to avoid one point of gate health.
 var ground := PackedByteArray()
 var traffic := PackedFloat32Array()
 var speeds := PackedFloat32Array()  ## Walking speed multiplier per ground kind.
-var kind_ids: Array[String] = ["plain", "thicket", "trail"]  ## Ground kind index -> id (road ids after trail).
+var kind_ids: Array[String] = ["plain", "thicket", "trail", "path"]  ## Ground kind index -> id (road ids after path).
+## Worn paths, busiest first, as of the last dawn (stone-layers pave these).
+var busy_paths := PackedInt32Array()
 ## Bumped whenever a square turns solid or open; cached routes older than this are redone.
 var version := 0
 ## Bumped whenever a square's ground changes (routes still work, just not the fastest; drawing redraws).
 var ground_version := 0
 var _max_speed := 1.0
 var _trail: Dictionary
+var _path: Dictionary
 
 
 func _init(content: Content) -> void:
@@ -62,11 +62,10 @@ func _init(content: Content) -> void:
 	traffic.resize(cells * cells)
 	solid.resize(cells * cells)
 	wall_hp.resize(cells * cells)
-	gate.resize(cells * cells)
-	wall_detour = float(town["palisade"]["raider_detour"])
-	climb_speed = float(town["palisade"]["climb_speed"])
+	wall_detour = float(town["gate"]["raider_detour"])
 	_trail = town["trail"]
-	speeds = PackedFloat32Array([1.0, float(town["thickets"]["speed"]), float(_trail["speed"])])
+	speeds = PackedFloat32Array([1.0, float(town["thickets"]["speed"]), float(_trail["speed"]), float(town["path"]["speed"])])
+	_path = town["path"]
 	for id: String in town["roads"]:
 		kind_ids.append(id)
 		speeds.append(float(town["roads"][id]["speed"]))
@@ -102,24 +101,15 @@ func is_solid(i: int) -> bool:
 	return solid[i] == 1
 
 
-## True if this square stops a walker: anything solid, and for raiders any standing wall or
-## gate (they batter it). Townsfolk and heroes climb over walls instead (see walk_speed).
+## True if this square stops a walker: anything solid, and for raiders a standing gate (they batter it).
 func blocks(i: int, enemy: bool) -> bool:
 	return solid[i] == 1 or (enemy and wall_hp[i] > 0.0)
-
-
-## True if a townsperson or hero has to climb to cross this square (standing wall, not a gate).
-func climb(i: int) -> bool:
-	return wall_hp[i] > 0.0 and gate[i] == 0
 
 
 func set_solid(i: int, value: bool) -> void:
 	if is_solid(i) == value:
 		return
 	solid[i] = 1 if value else 0
-	if value:
-		set_ground(i, PLAIN)
-		traffic[i] = 0.0
 	_sync(i)
 
 
@@ -131,26 +121,23 @@ func set_ground(i: int, kind: int) -> void:
 	ground_version += 1
 
 
-## Puts up (hp > 0) or takes down (hp 0) a stretch of wall on square i; is_gate opens it to townsfolk and heroes.
-func set_wall(i: int, hp: float, is_gate: bool) -> void:
-	var was := [wall_hp[i] > 0.0, gate[i]]
+## Puts up (hp > 0) or takes down (hp 0) a gate on square i.
+func set_wall(i: int, hp: float) -> void:
+	var was := wall_hp[i] > 0.0
 	wall_hp[i] = maxf(0.0, hp)
-	gate[i] = 1 if is_gate else 0
-	if hp > 0.0:
-		traffic[i] = 0.0
-	if was != [wall_hp[i] > 0.0, gate[i]]:
+	if was != (wall_hp[i] > 0.0):
 		_sync(i)
 		ground_version += 1
 
 
-## A raider's blow on the wall at square i. Returns true if it broke.
+## A raider's blow on the gate at square i. Returns true if it broke.
 func hit_wall(i: int, amount: float) -> bool:
 	if wall_hp[i] <= 0.0:
 		return false
 	wall_hp[i] -= amount
 	if wall_hp[i] > 0.0:
 		return false
-	set_wall(i, 0.0, gate[i] == 1)
+	set_wall(i, 0.0)
 	return true
 
 
@@ -165,7 +152,7 @@ func _sync(i: int) -> void:
 func _sync_weights(i: int) -> void:
 	var c := _cell_at(i)
 	var base := _max_speed / speeds[ground[i]]
-	astar.set_point_weight_scale(c, _max_speed / climb_speed if climb(i) else base)
+	astar.set_point_weight_scale(c, base)
 	enemy_astar.set_point_weight_scale(c, base + (wall_hp[i] * wall_detour * _max_speed if wall_hp[i] > 0.0 else 0.0))
 
 
@@ -174,9 +161,9 @@ func speed_at(p: Vector2, enemy := false) -> float:
 	return walk_speed(index_of(p), enemy)
 
 
-## Walking speed multiplier on square i: the ground's, or climbing speed over a palisade for townsfolk and heroes.
-func walk_speed(i: int, enemy: bool) -> float:
-	return climb_speed if not enemy and climb(i) else speeds[ground[i]]
+## Walking speed multiplier on square i.
+func walk_speed(i: int, _enemy: bool) -> float:
+	return speeds[ground[i]]
 
 
 func is_road(i: int) -> bool:
@@ -307,20 +294,15 @@ func _route_time(a: Vector2, route: PackedVector2Array, goal: Vector2, enemy := 
 	return total + at.distance_to(goal) / walk_speed(index_of(goal), enemy)
 
 
-## True if the straight line between two points crosses nothing solid and stays on one kind of ground
-## (a palisade to climb counts as its own kind).
+## True if the straight line between two points crosses nothing solid and stays on one kind of ground.
 func _clear_line(a: Vector2, b: Vector2, enemy := false) -> bool:
-	var kind := _kind(index_of(a), enemy)
+	var kind := ground[index_of(a)]
 	var steps := ceili(a.distance_to(b) / (cell * 0.5))
 	for k in range(1, steps + 1):
 		var i := index_of(a.lerp(b, float(k) / steps))
-		if blocks(i, enemy) or _kind(i, enemy) != kind:
+		if blocks(i, enemy) or ground[i] != kind:
 			return false
 	return true
-
-
-func _kind(i: int, enemy: bool) -> int:
-	return -1 if not enemy and climb(i) else ground[i]
 
 
 # --- Trails --------------------------------------------------------------------
@@ -330,23 +312,37 @@ func tread(p: Vector2, dt: float) -> void:
 	traffic[index_of(p)] += dt
 
 
-## At dawn: busy squares become trails, idle trails fade, and traffic counts decay.
-## Returns how many squares changed.
+## At dawn: busy squares wear one stage (plain ground to trail, trail to worn path), idle ones
+## fade one stage back, and traffic counts decay. Worn paths and roads are listed busiest first
+## in busy_paths. Returns how many squares changed.
 func wear_trails() -> int:
 	var need := float(_trail["traffic"])
+	var path_need := float(_path["traffic"])
 	var decay := float(_trail["decay"])
 	var changed := 0
+	var busy: Array = []
 	for i in traffic.size():
 		var t := traffic[i]
-		if t <= 0.0 and ground[i] != TRAIL:
+		var g := ground[i]
+		if t <= 0.0 and g != TRAIL and g != PATH:
 			continue
-		if t >= need and ground[i] <= TRAIL and ground[i] != TRAIL and not is_solid(i):
+		if g < TRAIL and t >= need and not is_solid(i):
 			set_ground(i, TRAIL)
 			changed += 1
-		elif ground[i] == TRAIL and t < need * 0.25:
+		elif g == TRAIL and t >= path_need:
+			set_ground(i, PATH)
+			changed += 1
+		elif g == PATH and t < path_need * 0.25:
+			set_ground(i, TRAIL)
+			changed += 1
+		elif g == TRAIL and t < need * 0.25:
 			set_ground(i, PLAIN)
 			changed += 1
+		if ground[i] >= PATH:
+			busy.append([t, i])
 		traffic[i] = t * decay
+	busy.sort_custom(func(x: Array, y: Array) -> bool: return x[0] > y[0])
+	busy_paths = PackedInt32Array(busy.map(func(x: Array) -> int: return x[1]))
 	return changed
 
 

@@ -10,19 +10,15 @@ extends RefCounted
 ## "bronze": like market, then raises the Bronze moot as soon as it can, the smelter and bronzesmith,
 ## buys tool sets (picks, chisels, then spears) and some tin from the caravan.
 ## Every style takes a Promote card when one is offered and affordable.
-## Every style stakes roads in round 1 from the hearth to the nearest fuel and wood,
-## and from round 3 builds the stone-layers' yard so craftspeople pave them.
-## (Roads to all four everyday resources did worse: raiders use roads too.)
-## With wall_gates set, it also stakes a palisade ring with that many gates (see below).
+## Every style builds the stone-layers' yard from round 3 so craftspeople pave the busiest paths,
+## and orders up to `gates` gates from `gate_round` (see below).
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
 ## since the market is now the only place heroes can buy gear.
 var style := "balanced"
-## Palisade ring: how many gates (short road spokes) it gets, 0 = no palisade, and the round it is staked.
-## Off by default: a full ring cost the balanced bot 4 to 11 points of win rate in every setting
-## tried (the wood it eats buys little, since raiders mostly go round or use the gates).
-## balance_run.gd sets these with walls= and wall_round=.
-var wall_gates := 0
-var wall_round := 2
+## Gates: how many it orders at most (one a round, when a gap is free) and from which round.
+## balance_run.gd sets these with gates= and gate_round=.
+var gates := 0
+var gate_round := 3
 
 
 func play_run(run: RunState) -> void:
@@ -40,8 +36,8 @@ func play_run(run: RunState) -> void:
 
 
 func build(run: RunState) -> void:
-	_roads(run)
-	_walls(run)
+	_paving(run)
+	_gates(run)
 	if style != "workers" and (run.round_number >= 2 or style == "heroes"):
 		run.build("longhouse")
 	# Heroes without a bed sulk and leave, so add lodging when the beds run out.
@@ -77,35 +73,21 @@ func build(run: RunState) -> void:
 		run.build("watch_post")
 
 
-## Roads out to the nearest fuel and wood, then a yard to pave them.
-func _roads(run: RunState) -> void:
-	if run.round_number == 1 and run.world.town.roads.is_empty():
-		for good: String in ["fuel", "wood"]:
-			var best := Vector2.ZERO
-			for node in run.world.nodes:
-				if node["gives"] == good and not node["heroes_only"] and not node["wild"] and run.world.node_active(node) \
-						and (best == Vector2.ZERO or (node["pos"] as Vector2).length() < best.length()):
-					best = node["pos"]
-			if best != Vector2.ZERO:
-				run.stake_road([Vector2.ZERO, best])
+## From round 3, a yard so craftspeople pave the busiest paths.
+func _paving(run: RunState) -> void:
 	if run.round_number >= 3:
 		for b in run.content.buildings:
 			if run.content.buildings[b].get("paves", false):
 				run.build(b)
 
 
-## A palisade ring in the lane outside the stone-age rings, with gates on short road spokes.
-func _walls(run: RunState) -> void:
-	if wall_gates <= 0 or run.round_number < wall_round or not run.world.town.walls.is_empty():
+## One gate a round across the busiest gap, up to `gates`.
+func _gates(run: RunState) -> void:
+	if run.round_number < gate_round:
 		return
-	var radius := 184.0
-	for n in wall_gates:
-		var dir := Vector2.from_angle(TAU * n / wall_gates + PI / 8.0)
-		run.stake_road([dir * (radius - 6.0), dir * (radius + 6.0)])
-	var ring := []
-	for n in 33:
-		ring.append(Vector2.from_angle(TAU * n / 32.0) * radius)
-	run.stake_wall(ring)
+	for b in run.content.buildings:
+		if run.content.buildings[b].has("gate_hp") and run.world.count_buildings(b, false) < gates:
+			run.build(b)
 
 
 func _bronze(run: RunState) -> void:
