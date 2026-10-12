@@ -15,9 +15,10 @@ extends RefCounted
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
 ## since the market is now the only place heroes can buy gear.
 var style := "balanced"
-## Gates: how many it orders at most (one a round, when a gap is free) and from which round.
+## Gates: how many it orders at most (after everything else, when a plot fits) and from which round.
+## Two from round 3 was worth about 2 points; free gates about 11, so the cost is what holds them back.
 ## balance_run.gd sets these with gates= and gate_round=.
-var gates := 0
+var gates := 2
 var gate_round := 3
 
 

@@ -33,6 +33,15 @@ func _fill(run: RunState, k: int, close_ring: bool) -> void:
 		town._set_plot_solid(n, true)
 
 
+## Takes the seeded boulders and oaks away.
+func _clear(run: RunState) -> void:
+	var town := run.world.town
+	for n in town.plots.size():
+		if town.plots[n]["obstacle"] != "":
+			town.plots[n]["obstacle"] = ""
+			town._set_plot_solid(n, false)
+
+
 ## Many feet across plot k, so the gap there is the busiest.
 func _tread(run: RunState, k: int) -> void:
 	for i in run.world.town.plots[k]["cells"]:
@@ -62,11 +71,7 @@ func test_a_gate_goes_beside_a_building() -> void:
 	var run := _run()
 	var k := _west_plot(run)
 	var town := run.world.town
-	# Clear the seeded boulders out of the way.
-	for n in town.plots.size():
-		if town.plots[n]["obstacle"] != "":
-			town.plots[n]["obstacle"] = ""
-			town._set_plot_solid(n, false)
+	_clear(run)
 	check_eq(town.choose_plot("gate"), -1, "nothing built, nowhere for a gate")
 	check(not run.can_build("gate"), "so it can't be ordered")
 	var side: int = town.ring_neighbours(k)[0]
@@ -78,6 +83,7 @@ func test_a_gate_goes_beside_a_building() -> void:
 func test_gate_prefers_a_gap_then_the_feet() -> void:
 	var run := _run()
 	var town := run.world.town
+	_clear(run)
 	var k := _west_plot(run)
 	_fill(run, k, false)
 	# A second gap on the far side of the ring, with nobody walking through it.
