@@ -10,7 +10,7 @@ extends RefCounted
 ## "bronze": like market, then raises the Bronze moot as soon as it can, the smelter and bronzesmith,
 ## buys tool sets (picks, chisels, then spears) and some tin from the caravan.
 ## Every style takes a Promote card when one is offered and affordable.
-## Every style builds the stone-layers' yard from round 3 so craftspeople pave the busiest paths,
+## Every style builds the stone-layers' yard from round 5 so craftspeople pave the busiest paths,
 ## and orders up to `gates` gates from `gate_round` (see below).
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
 ## since the market is now the only place heroes can buy gear.
@@ -74,9 +74,10 @@ func build(run: RunState) -> void:
 	_gates(run)
 
 
-## From round 3, a yard so craftspeople pave the busiest paths.
+## From round 5, a yard so craftspeople pave the busiest paths (from round 3 cost about 9 points:
+## paving early eats the stone and wood the town needs).
 func _paving(run: RunState) -> void:
-	if run.round_number >= 3:
+	if run.round_number >= 5:
 		for b in run.content.buildings:
 			if run.content.buildings[b].get("paves", false):
 				run.build(b)
