@@ -1,6 +1,6 @@
 class_name BuildPanel
 extends VBoxContainer
-## The build-phase panel on the left: roads to stake out, building orders, bronze
+## The build-phase panel on the left: roads and palisades to stake out, building orders, bronze
 ## tool sets and the caravan, stall prices, the warned attack and the Begin round button.
 ## Every choice goes through RunState; `changed` asks the screen to refresh.
 
@@ -20,8 +20,9 @@ var _begin_btn: Button
 
 
 func _init() -> void:
-	UiKit.heading(self, "Roads")
+	UiKit.heading(self, "Roads and palisades")
 	UiKit.note(self, "Stake out a road by clicking waypoints on the map; it bends round whatever stands in the way. Staking is free, and new buildings leave staked ground clear. Once a stone-layers' yard stands, craftspeople pave it for stone. Everyone walks faster on roads, raiders too.")
+	UiKit.note(self, "A palisade runs straight between its waypoints and craftspeople raise it for wood. Raiders go round or batter through; your people climb over slowly. Where a road crosses it there is a gate your people walk through, and watch posts like to stand over gates.")
 	_road_box = VBoxContainer.new()
 	add_child(_road_box)
 	add_child(HSeparator.new())
@@ -90,20 +91,34 @@ func refresh_roads() -> void:
 	var town := run.world.town
 	if arena != null and arena.staking:
 		var points := arena.stake_points.size()
-		var finish := UiKit.button(_road_box, "Finish road (%d waypoints)" % points, _finish_road)
+		var what := "palisade" if arena.staking_wall else "road"
+		var finish := UiKit.button(_road_box, "Finish %s (%d waypoints)" % [what, points], _finish_road)
 		finish.disabled = not arena.preview_ok()
 		UiKit.button(_road_box, "Cancel", func() -> void:
 			arena.stop_staking()
 			changed.emit())
-		UiKit.note(_road_box, "Click the map to add waypoints (the hearth is a good start), right-click to drop the last one.", 11, Color("#ffd27a"))
+		if arena.staking_wall:
+			UiKit.note(_road_box, "Click the map to add corners, right-click to drop the last one. A road staked across it makes a gate.", 11, Color("#ffd27a"))
+		else:
+			UiKit.note(_road_box, "Click the map to add waypoints (the hearth is a good start), right-click to drop the last one.", 11, Color("#ffd27a"))
 		return
 	var stake := UiKit.button(_road_box, "Stake a road", func() -> void:
 		if arena != null:
-			arena.start_staking()
+			arena.start_staking(false)
 		refresh_roads())
 	stake.disabled = arena == null
 	var undo := UiKit.button(_road_box, "Pull up the last road's stakes", _act.bind(run.unstake_road))
 	undo.disabled = town.roads.is_empty()
+	var stake_wall := UiKit.button(_road_box, "Stake a palisade", func() -> void:
+		if arena != null:
+			arena.start_staking(true)
+		refresh_roads())
+	stake_wall.disabled = arena == null
+	var undo_wall := UiKit.button(_road_box, "Pull up the last palisade", _act.bind(run.unstake_wall))
+	undo_wall.disabled = town.walls.is_empty()
+	if not town.walls.is_empty():
+		var wc := town.wall_counts()
+		UiKit.note(_road_box, "Palisade: %d of %d paces standing, %d gates." % [wc["standing"], wc["staked"], wc["gates"]], 11)
 	var paved := town.paved_counts()
 	var parts := PackedStringArray()
 	for id: String in paved:
@@ -117,7 +132,10 @@ func refresh_roads() -> void:
 func _finish_road() -> void:
 	if arena == null:
 		return
-	run.stake_road(arena.stake_points)
+	if arena.staking_wall:
+		run.stake_wall(arena.stake_points)
+	else:
+		run.stake_road(arena.stake_points)
 	arena.stop_staking()
 	changed.emit()
 

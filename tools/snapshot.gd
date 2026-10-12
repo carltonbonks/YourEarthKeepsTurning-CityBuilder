@@ -2,10 +2,10 @@ extends SceneTree
 ## Saves a picture of the game screen after a bot has played some rounds, to check how the map looks.
 ## Needs a display (not --headless); in a container: xvfb-run ~/godot/godot --path . -s res://tools/snapshot.gd -- seed=4821 round=5 style=market out=/tmp/map.png
 ## mid=1 stops partway through the round's first day instead of at the build phase; zoom= zooms the map;
-## stake=1 shows a road being staked (build phase only).
+## stake=1 shows a road being staked (build phase only); walls=4 has the bot stake a palisade ring with 4 gates.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "stake": "0"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "stake": "0", "walls": "0"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -18,6 +18,7 @@ func _init() -> void:
 	var run: RunState = main.run
 	var bot := AutoPlayer.new()
 	bot.style = args["style"]
+	bot.wall_gates = int(args["walls"])
 	while not run.is_over() and not (run.round_number >= int(args["round"]) and run.phase == RunState.Phase.BUILD):
 		match run.phase:
 			RunState.Phase.BUILD:

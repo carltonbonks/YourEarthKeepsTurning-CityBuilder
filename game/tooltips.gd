@@ -191,12 +191,23 @@ static func obstacle(run: RunState, id: String) -> Dictionary:
 	return t
 
 
-## A square of ground: a trail, a road, a thicket, or a staked road waiting for stone-layers.
+## A square of ground: a palisade or gate, a trail, a road, a thicket, or a staked road waiting for stone-layers.
 static func ground(run: RunState, square: int) -> Dictionary:
 	var c := run.content
 	var w := run.world
 	var g := w.pathing.ground[square]
 	var t: Dictionary
+	if w.town.wall_staked[square] > 0:
+		var pal: Dictionary = c.town["palisade"]
+		var gate := w.town.is_gate(square)
+		t = _tip(pal["gate_name"] if gate else pal["name"])
+		t["lines"].append(pal["gate_text"] if gate else pal["text"])
+		var hp := w.pathing.wall_hp[square]
+		if hp > 0.0:
+			t["lines"].append("Health %d/%d. Patched to full each dawn." % [ceili(hp), roundi(w.town.max_wall_hp(square))])
+		else:
+			t["lines"].append("Staked, not standing yet: craftspeople raise it for %s per %d paces." % [_goods(pal["cost"]), int(pal["stretch_cells"])])
+		return t
 	if g >= Pathing.FIRST_ROAD:
 		var def := w.town.road_def(g)
 		t = _tip(def["name"])
