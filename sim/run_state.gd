@@ -30,6 +30,8 @@ var relic_offer: Array[String] = []
 var pick_offer: Array[Dictionary] = []
 ## Enemy type ids of this round's wave, in spawn order.
 var next_wave: Array[String] = []
+## Raiders held back from this round's scheduled wave by catch-up (see plan_wave).
+var wave_eased := 0
 ## Plain-language story of what happened, newest last.
 var story: Array[String] = []
 ## The last night's report, shown at the next decision (see World.night_report).
@@ -65,7 +67,10 @@ var _hungry_today := false
 ## 10: roads and palisades are no longer staked (no "road" / "wall" actions, no "walling"); the round's
 ##    "town" drops "staked" and "walls" and adds "paths" (worn path squares) and "gates" ({built, broken});
 ##    "breaches" now counts gate squares raiders broke. Stone-layers pave the busiest worn paths.
-const RECORD_FORMAT := 10
+## 11: per round "power" when the wave comes: the town's power level by part (heroes, fighters, defences, total)
+##     and the wave's ("wave", and "wave_scheduled" before catch-up), on the same scale (sim/power.gd);
+##     per round "wave_eased" (raiders catch-up held back from the scheduled wave).
+const RECORD_FORMAT := 11
 var record_rounds: Array[Dictionary] = []
 var _round_entry := {}
 
@@ -595,7 +600,9 @@ func choose_relic(relic_id: String) -> void:
 
 func _enter_build() -> void:
 	phase = Phase.BUILD
-	next_wave = generate_wave(round_number)
+	next_wave = plan_wave(round_number)
+	if wave_eased > 0:
+		tell("Scouts say the warband holds back %d of its number: your camp looks too weak to be worth them all." % wave_eased)
 	world.roll_wave_sides()
 	trader_stock = {}
 	var trader: Dictionary = content.ages["trader"]
@@ -628,6 +635,29 @@ func generate_wave(for_round: int) -> Array[String]:
 		for id: String in ids:
 			if content.enemies[id].get("boss", false):
 				wave.append(id)
+	return wave
+
+
+## The round's warned wave: the scheduled wave, eased off while it would far outmatch the town.
+## Catch-up only ever shrinks a wave, so a town that pulls ahead keeps its lead. Raiders are held
+## back from the end of the list (never the boss) until the wave is at most catch_up_max_ratio
+## times the town's power, keeping at least catch_up_min_share of them.
+func plan_wave(for_round: int) -> Array[String]:
+	var wave := generate_wave(for_round)
+	wave_eased = 0
+	var cap := content.num("catch_up_max_ratio")
+	if cap <= 0.0:
+		return wave
+	var limit := cap * float(Power.town(world)["total"])
+	var keep := ceili(wave.size() * content.num("catch_up_min_share"))
+	while wave.size() > keep and Power.wave(content, wave) > limit:
+		var i := wave.size() - 1
+		while i >= 0 and content.enemies[wave[i]].get("boss", false):
+			i -= 1
+		if i < 0:
+			break
+		wave.remove_at(i)
+		wave_eased += 1
 	return wave
 
 
@@ -738,7 +768,7 @@ func _begin_round_entry() -> void:
 		"whims": [], "loot": [], "sales": [], "hero_spending": {},
 		"prices": prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
 		"age": age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
-		"breaches": 0}
+		"breaches": 0, "wave_eased": wave_eased}
 
 
 func _end_round_entry() -> void:
@@ -783,6 +813,13 @@ func note_loot(hero: Unit, item: Dictionary, equipped: bool) -> void:
 func note_hero_spending(reason: String, shells: int) -> void:
 	if _round_entry.has("hero_spending"):
 		_round_entry["hero_spending"][reason] = int(_round_entry["hero_spending"].get(reason, 0)) + shells
+
+
+## The town's and the wave's power levels as the wave comes (see Power).
+func note_power(wave_types: Array) -> void:
+	if not _round_entry.is_empty():
+		_round_entry["power"] = {"town": Power.town(world), "wave": snappedf(Power.wave(content, wave_types), 0.1),
+			"wave_scheduled": snappedf(Power.wave(content, generate_wave(round_number)), 0.1)}
 
 
 func note_crafted(recipe_id: String) -> void:

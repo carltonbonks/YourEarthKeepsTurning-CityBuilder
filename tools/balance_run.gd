@@ -31,6 +31,7 @@ func _init() -> void:
 	var deaths_total := 0
 	var folk_lost := 0
 	var lost_on := {}
+	var power_by_round := {}  # round -> [runs, town total, wave total, wave/town total]
 	for s in runs:
 		var run := RunState.new(content, 1000 + s)
 		var bot := AutoPlayer.new()
@@ -47,6 +48,15 @@ func _init() -> void:
 			record["id"] = "%s-%s-%d" % [label, style, run.run_seed]
 			record["game_version"] = label
 			out_file.store_line(JSON.stringify(record))
+		for rd: Dictionary in run.record_rounds:
+			if rd.has("power"):
+				var p: Array = power_by_round.get(rd["round"], [0, 0.0, 0.0, 0.0])
+				var town := float(rd["power"]["town"]["total"])
+				p[0] += 1
+				p[1] += town
+				p[2] += float(rd["power"]["wave"])
+				p[3] += float(rd["power"]["wave"]) / maxf(town, 1.0)
+				power_by_round[rd["round"]] = p
 		if run.phase == RunState.Phase.WON:
 			wins += 1
 		else:
@@ -63,4 +73,11 @@ func _init() -> void:
 	keys.sort()
 	for r in keys:
 		print("  lost in round %d: %d runs" % [r, lost_on[r]])
+	print("Power level when the wave comes (average; see sim/power.gd):")
+	print("  round  town  wave  wave/town  lost here")
+	var power_rounds := power_by_round.keys()
+	power_rounds.sort()
+	for r in power_rounds:
+		var p: Array = power_by_round[r]
+		print("  %5d %5.0f %5.0f %10.2f %10d" % [r, p[1] / p[0], p[2] / p[0], p[3] / p[0], int(lost_on.get(r, 0))])
 	quit()

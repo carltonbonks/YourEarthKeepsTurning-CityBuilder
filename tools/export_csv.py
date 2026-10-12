@@ -134,6 +134,13 @@ def main(raw_folder, out_folder):
                 "gates": rd.get("town", {}).get("walls", {}).get("gates", "") if "walls" in rd.get("town", {}) else rd.get("town", {}).get("gates", {}).get("built", ""),
                 "palisade_wood": rd.get("walling", {}).get("wood", 0),
                 "palisade_breaches": rd.get("breaches", 0),
+                **{"town_power_" + k: rd.get("power", {}).get("town", {}).get(k, "")
+                   for k in ["heroes", "fighters", "defences", "total"]},
+                "wave_power": rd.get("power", {}).get("wave", ""),
+                "wave_power_scheduled": rd.get("power", {}).get("wave_scheduled", ""),
+                "wave_eased": rd.get("wave_eased", 0),
+                "wave_to_town_power": round(rd["power"]["wave"] / rd["power"]["town"]["total"], 2)
+                if rd.get("power", {}).get("town", {}).get("total") else "",
                 "relic_pick": rd.get("relic_pick", ""),
                 "loot_found": len(rd.get("loot", [])),
                 "loot_worn": sum(1 for i in rd.get("loot", []) if i.get("equipped")),

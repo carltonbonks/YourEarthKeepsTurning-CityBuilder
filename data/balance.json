@@ -36,6 +36,9 @@
 	"wave_budget_per_round": 8,
 	"wave_spawn_interval": 0.8,
 	"wave_two_sides_from_round": 5,
+	"_catch_up_note": "Catch-up only ever eases a wave, never grows one: a town that pulls ahead keeps its lead. When the round's scheduled wave would be more than catch_up_max_ratio times the town's power level (sim/power.gd, measured as the round starts), raiders are held back until it is not, but the wave keeps at least catch_up_min_share of its scheduled raiders. 0 turns it off.",
+	"catch_up_max_ratio": 1.6,
+	"catch_up_min_share": 0.6,
 	"probe_budget_base": 1,
 	"probe_budget_per_round": 1.5,
 

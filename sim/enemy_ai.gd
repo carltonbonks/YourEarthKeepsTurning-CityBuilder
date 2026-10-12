@@ -69,7 +69,8 @@ func _wander(enemy: Unit) -> void:
 func spawn_wave() -> void:
 	w.wave_spawned = true
 	w.wave_stats["hearth_hp_before"] = w.hearth_hp
-	var types := w.run.generate_wave(w.run.round_number)
+	var types := w.run.next_wave
+	w.run.note_power(types)
 	var interval := w.content.num("wave_spawn_interval")
 	w.night_report["raiders"] = int(w.night_report["raiders"]) + types.size()
 	for i in types.size():
