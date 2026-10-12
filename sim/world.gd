@@ -237,6 +237,7 @@ func _dawn() -> void:
 	for node in nodes:
 		node["amount"] = mini(int(node["max"]), int(node["amount"]) + content.int_num("node_regrow_per_day"))
 	pathing.wear_trails()
+	town.patch_walls()
 	run.daily_upkeep()
 	pause = Pause.DAWN
 
@@ -348,13 +349,15 @@ func first_built(type: String) -> int:
 
 # --- Shared: movement, combat and lookups used by every part ---------------
 
-## Moves toward a goal along a route round buildings, faster on trails and roads;
-## returns true once within `close` of it. Townsfolk and heroes wear trails as they go.
+## Moves toward a goal along a route round buildings, faster on trails and roads; returns true
+## once within `close` of it. Townsfolk and heroes wear trails as they go, and climb palisades
+## slowly (or use a gate). A raider that walks into a palisade or gate stops to batter it instead.
 func walk_toward(unit: Unit, goal: Vector2, close := 2.0) -> bool:
 	var to_goal := goal - unit.pos
 	if to_goal.length() <= close:
 		return true
-	var step_len := unit.speed * dt * pathing.speed_at(unit.pos)
+	var step_len := unit.speed * dt * pathing.speed_at(unit.pos, unit.is_enemy())
+	var here := pathing.index_of(unit.pos)
 	if not unit.is_enemy():
 		pathing.tread(unit.pos, dt)
 	var aim := pathing.next_point(unit, goal)
@@ -362,9 +365,27 @@ func walk_toward(unit: Unit, goal: Vector2, close := 2.0) -> bool:
 		unit.pos = goal - to_goal.normalized() * close
 		return true
 	var to_aim := aim - unit.pos
-	unit.pos += to_aim.normalized() * minf(step_len, to_aim.length()) if to_aim.length() > 0.0 else Vector2.ZERO
-	unit.pos = unit.pos.limit_length(content.num("world_radius"))
+	var next := unit.pos + (to_aim.normalized() * minf(step_len, to_aim.length()) if to_aim.length() > 0.0 else Vector2.ZERO)
+	if unit.is_enemy():
+		var ahead := pathing.index_of(next)
+		if ahead != here and pathing.wall_hp[ahead] > 0.0:
+			_batter(unit, ahead)
+			return false
+	unit.pos = next.limit_length(content.num("world_radius"))
 	return false
+
+
+## A raider strikes the palisade or gate in its way.
+func _batter(unit: Unit, square: int) -> void:
+	if unit.cooldown_left > 0.0:
+		return
+	unit.cooldown_left = unit.cooldown
+	shots.append({"from": unit.pos, "to": pathing.center(square), "ranged": false, "time": time})
+	if pathing.hit_wall(square, unit.attack * enemy_ai.war_chant()):
+		run.note_breach()
+		if not bool(night_report.get("breached", false)):
+			night_report["breached"] = true
+			run.tell("Raiders break through the palisade.")
 
 
 func fight(unit: Unit, foe: Unit) -> void:

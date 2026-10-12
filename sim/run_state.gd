@@ -60,7 +60,9 @@ var _hungry_today := false
 ## 8: the ring town and roads: "road" actions (waypoints, squares), per round "paving" (goods spent on roads) and
 ##    "town" at the round's end (squares staked, paved per road kind, trail squares, plots built per ring);
 ##    "plots" (each building's ring and sector) in the run record.
-const RECORD_FORMAT := 8
+## 9: palisades: "wall" / "unstake_wall" actions, per round "walling" (goods spent on palisades) and
+##    "breaches" (palisade squares raiders broke), and "walls" in the round's "town" (squares staked, standing, gates).
+const RECORD_FORMAT := 9
 var record_rounds: Array[Dictionary] = []
 var _round_entry := {}
 
@@ -183,12 +185,38 @@ func unstake_road() -> bool:
 	return true
 
 
-## Goods spent paving roads this round.
-func note_paving(cost: Dictionary) -> void:
-	if not _round_entry.has("paving"):
+## Stakes out a palisade along these waypoints (straight lines between them). Staking is
+## free; craftspeople raise it for wood. Where a staked road crosses it there is a gate.
+func stake_wall(points: Array) -> bool:
+	if phase != Phase.BUILD or not world.town.stake_wall(points):
+		return false
+	var cells: int = world.town.walls[-1]["cells"].size()
+	_round_entry["actions"].append({"kind": "wall", "points": points.map(func(p: Vector2) -> Array: return [roundi(p.x), roundi(p.y)]),
+		"cells": cells})
+	tell("A palisade is staked out, %d paces long." % cells)
+	return true
+
+
+## Pulls up the last staked palisade (and whatever of it stands).
+func unstake_wall() -> bool:
+	if phase != Phase.BUILD or not world.town.unstake_last_wall():
+		return false
+	_round_entry["actions"].append({"kind": "unstake_wall"})
+	return true
+
+
+## Goods spent this round on roads ("paving") or palisades ("walling").
+func note_spend(key: String, cost: Dictionary) -> void:
+	if not _round_entry.has(key):
 		return
 	for r: String in cost:
-		_round_entry["paving"][r] = int(_round_entry["paving"].get(r, 0)) + int(cost[r])
+		_round_entry[key][r] = int(_round_entry[key].get(r, 0)) + int(cost[r])
+
+
+## A raider broke a square of palisade.
+func note_breach() -> void:
+	if _round_entry.has("breaches"):
+		_round_entry["breaches"] = int(_round_entry["breaches"]) + 1
 
 
 ## How the town's ground looks now, for the round record.
@@ -198,7 +226,7 @@ func _town_snapshot() -> Dictionary:
 		if int(plot["building"]) >= 0:
 			rings[str(plot["ring"] + 1)] = int(rings.get(str(plot["ring"] + 1), 0)) + 1
 	return {"staked": world.town.staked_count(), "paved": world.town.paved_counts(),
-		"trails": world.pathing.count_ground(Pathing.TRAIL), "plots_by_ring": rings}
+		"trails": world.pathing.count_ground(Pathing.TRAIL), "plots_by_ring": rings, "walls": world.town.wall_counts()}
 
 
 # --- Market prices ----------------------------------------------------------
@@ -747,7 +775,8 @@ func _begin_round_entry() -> void:
 		"heroes_start": living_heroes().size(), "actions": [], "picks": [],
 		"whims": [], "loot": [], "sales": [], "hero_spending": {},
 		"prices": prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
-		"age": age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {}}
+		"age": age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
+		"walling": {}, "breaches": 0}
 
 
 func _end_round_entry() -> void:

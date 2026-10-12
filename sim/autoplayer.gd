@@ -13,9 +13,16 @@ extends RefCounted
 ## Every style stakes roads in round 1 from the hearth to the nearest fuel and wood,
 ## and from round 3 builds the stone-layers' yard so craftspeople pave them.
 ## (Roads to all four everyday resources did worse: raiders use roads too.)
+## With wall_gates set, it also stakes a palisade ring with that many gates (see below).
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
 ## since the market is now the only place heroes can buy gear.
 var style := "balanced"
+## Palisade ring: how many gates (short road spokes) it gets, 0 = no palisade, and the round it is staked.
+## Off by default: a full ring cost the balanced bot 4 to 11 points of win rate in every setting
+## tried (the wood it eats buys little, since raiders mostly go round or use the gates).
+## balance_run.gd sets these with walls= and wall_round=.
+var wall_gates := 0
+var wall_round := 2
 
 
 func play_run(run: RunState) -> void:
@@ -34,6 +41,7 @@ func play_run(run: RunState) -> void:
 
 func build(run: RunState) -> void:
 	_roads(run)
+	_walls(run)
 	if style != "workers" and (run.round_number >= 2 or style == "heroes"):
 		run.build("longhouse")
 	# Heroes without a bed sulk and leave, so add lodging when the beds run out.
@@ -84,6 +92,20 @@ func _roads(run: RunState) -> void:
 		for b in run.content.buildings:
 			if run.content.buildings[b].get("paves", false):
 				run.build(b)
+
+
+## A palisade ring in the lane outside the stone-age rings, with gates on short road spokes.
+func _walls(run: RunState) -> void:
+	if wall_gates <= 0 or run.round_number < wall_round or not run.world.town.walls.is_empty():
+		return
+	var radius := 184.0
+	for n in wall_gates:
+		var dir := Vector2.from_angle(TAU * n / wall_gates + PI / 8.0)
+		run.stake_road([dir * (radius - 6.0), dir * (radius + 6.0)])
+	var ring := []
+	for n in 33:
+		ring.append(Vector2.from_angle(TAU * n / 32.0) * radius)
+	run.stake_wall(ring)
 
 
 func _bronze(run: RunState) -> void:

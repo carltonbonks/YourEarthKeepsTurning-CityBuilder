@@ -9,6 +9,9 @@ extends RefCounted
 ## land on a staked road and never where they would cut the hearth off from the
 ## wilds. Staking a road is free; stone-layers (craftspeople, once a building with
 ## "paves" stands) pave it a stretch at a time for stone. See data/town.json.
+## Palisades are staked the same way (straight lines between waypoints) and craftspeople
+## raise them for wood. Where a staked road crosses a staked palisade there is a gate:
+## townsfolk and heroes walk through (they climb the rest slowly), raiders batter it down.
 
 var w: World
 var pathing: Pathing
@@ -25,6 +28,13 @@ var staked := PackedByteArray()
 var staked_version := 0
 ## Squares of road already paid for, per road kind (each payment covers a stretch).
 var _paid := {}
+## Staked palisades in the order they were staked: {points: Array of Vector2, cells: PackedInt32Array}.
+var walls: Array[Dictionary] = []
+## How many staked palisades cross each square.
+var wall_staked := PackedByteArray()
+var _wall_paid := 0  ## Squares of palisade already paid for.
+## Squares where a staked road crosses a staked palisade, kept up to date by _refresh_gates.
+var gates := PackedInt32Array()
 var _plot_of := PackedInt32Array()  ## Square -> plot index, or -1.
 var _planner := AStarGrid2D.new()
 var _planner_seen := [-1, -1]  ## pathing.version and staked_version the planner was last set up for.
@@ -34,6 +44,7 @@ func _init(world: World) -> void:
 	w = world
 	pathing = w.pathing
 	staked.resize(pathing.cells * pathing.cells)
+	wall_staked.resize(pathing.cells * pathing.cells)
 	_plot_of.resize(pathing.cells * pathing.cells)
 	_plot_of.fill(-1)
 	_planner.region = pathing.astar.region
@@ -133,7 +144,7 @@ func plot_free(k: int) -> bool:
 	if plot["obstacle"] != "" or int(plot["building"]) >= 0 or not ring_open(plot):
 		return false
 	for i in plot["cells"]:
-		if staked[i] > 0:
+		if staked[i] > 0 or wall_staked[i] > 0:
 			return false
 	return true
 
@@ -174,6 +185,11 @@ func _plot_score(type: String, k: int) -> float:
 			for side in w.wave_sides:
 				best = minf(best, absf(angle_difference(side, (plot["pos"] as Vector2).angle())))
 			score += best * 80.0
+			# Watch posts like to stand over a gate.
+			for i in gates:
+				if (plot["pos"] as Vector2).distance_to(pathing.center(i)) < float(w.content.town["palisade"]["guard_gate_within"]):
+					score -= 120.0
+					break
 		_:
 			var best := ring * 60.0 + 200.0
 			for b in w.buildings:
@@ -261,6 +277,10 @@ func _refresh_planner() -> void:
 				_planner.set_point_solid(c, true)
 			elif staked[i] == 0:
 				_planner.set_point_weight_scale(c, 3.0)
+	# Roads cross palisades rather than run along them: each square they share is a gate.
+	for wall in walls:
+		for i in wall["cells"]:
+			_planner.set_point_weight_scale(Vector2i(i % pathing.cells, i / pathing.cells), 4.0)
 	for road in roads:
 		for i in road["cells"]:
 			_planner.set_point_weight_scale(Vector2i(i % pathing.cells, i / pathing.cells), 0.6)
@@ -275,6 +295,7 @@ func stake(points: Array) -> bool:
 	for i in cells:
 		staked[i] = mini(255, staked[i] + 1)
 	staked_version += 1
+	_refresh_gates()
 	return true
 
 
@@ -286,6 +307,7 @@ func unstake_last() -> bool:
 	for i in road["cells"]:
 		staked[i] = maxi(0, staked[i] - 1)
 	staked_version += 1
+	_refresh_gates()
 	return true
 
 
@@ -348,8 +370,7 @@ func can_afford_paving() -> bool:
 	return kind >= 0 and (int(_paid.get(kind, 0)) > 0 or _can_pay(road_def(kind)["cost"]))
 
 
-func _can_pay(cost: Dictionary) -> bool:
-	var keep := int(w.content.town["keep_in_stock"])
+func _can_pay(cost: Dictionary, keep := int(w.content.town["keep_in_stock"])) -> bool:
 	for r: String in cost:
 		if int(w.run.stock.get(r, 0)) < int(cost[r]) + keep:
 			return false
@@ -373,7 +394,7 @@ func pave(i: int) -> bool:
 			return false
 		for r: String in cost:
 			w.run.stock[r] = int(w.run.stock[r]) - int(cost[r])
-		w.run.note_paving(cost)
+		w.run.note_spend("paving", cost)
 		_paid[kind] = int(w.content.town["stretch_cells"])
 	_paid[kind] = int(_paid[kind]) - 1
 	pathing.set_ground(i, kind)
@@ -387,4 +408,140 @@ func paved_counts() -> Dictionary:
 		var n := pathing.count_ground(Pathing.FIRST_ROAD + j)
 		if n > 0:
 			out[pathing.kind_ids[Pathing.FIRST_ROAD + j]] = n
+	return out
+
+
+# --- Palisades -----------------------------------------------------------------
+
+func palisade() -> Dictionary:
+	return w.content.town["palisade"]
+
+
+## The squares a palisade through these waypoints would cover: straight lines between them,
+## square edge to square edge so nothing slips through a corner. Squares where something
+## already stands are left out (it is wall enough), and so is the ground round the hearth.
+func wall_line(points: Array) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	var keep_clear := World.HEARTH_RADIUS + pathing.cell * 2.0
+	for n in points.size() - 1:
+		var a := pathing.cell_of(points[n])
+		var b := pathing.cell_of(points[n + 1])
+		var d := b - a
+		var c := a
+		var steps := Vector2i.ZERO
+		while true:
+			var i := c.y * pathing.cells + c.x
+			if not pathing.is_solid(i) and pathing.center(i).length() > keep_clear and (out.is_empty() or out[-1] != i) and not out.has(i):
+				out.append(i)
+			if c == b:
+				break
+			# Step along x or y, whichever keeps closer to the straight line.
+			if d.y == 0 or (d.x != 0 and (1 + 2 * steps.x) * absi(d.y) < (1 + 2 * steps.y) * absi(d.x)):
+				c.x += signi(d.x)
+				steps.x += 1
+			else:
+				c.y += signi(d.y)
+				steps.y += 1
+	return out
+
+
+## Stakes out a palisade through the waypoints. Returns false if none fits.
+func stake_wall(points: Array) -> bool:
+	var cells := wall_line(points)
+	if cells.size() < 2:
+		return false
+	walls.append({"points": points.duplicate(), "cells": cells})
+	for i in cells:
+		wall_staked[i] = mini(255, wall_staked[i] + 1)
+	staked_version += 1
+	_refresh_gates()
+	return true
+
+
+## Pulls up the stakes of the last palisade; any of it already standing comes down.
+func unstake_last_wall() -> bool:
+	if walls.is_empty():
+		return false
+	var wall: Dictionary = walls.pop_back()
+	for i in wall["cells"]:
+		wall_staked[i] = maxi(0, wall_staked[i] - 1)
+		if wall_staked[i] == 0:
+			pathing.set_wall(i, 0.0, false)
+	staked_version += 1
+	_refresh_gates()
+	return true
+
+
+func is_gate(i: int) -> bool:
+	return wall_staked[i] > 0 and staked[i] > 0
+
+
+func max_wall_hp(i: int) -> float:
+	return float(palisade()["gate_hp"] if is_gate(i) else palisade()["hp"])
+
+
+## Keeps the gate list and any standing gates in step with the stakes.
+func _refresh_gates() -> void:
+	gates = PackedInt32Array()
+	for wall in walls:
+		for i in wall["cells"]:
+			if is_gate(i) and not gates.has(i):
+				gates.append(i)
+			if pathing.wall_hp[i] > 0.0 and (pathing.gate[i] == 1) != is_gate(i):
+				pathing.set_wall(i, max_wall_hp(i), is_gate(i))
+
+
+## The next staked palisade square with no wall standing (unbuilt or broken), skipping `taken`; -1 if none.
+func next_wall(taken: Array) -> int:
+	for wall in walls:
+		for i in wall["cells"]:
+			if pathing.wall_hp[i] <= 0.0 and wall_staked[i] > 0 and not pathing.is_solid(i) and not taken.has(i):
+				return i
+	return -1
+
+
+## True if the next stretch of palisade is paid for or the town can pay and keep the palisade's "keep_in_stock"
+## (more than roads keep, since wood also feeds the fire).
+func can_afford_wall() -> bool:
+	return _wall_paid > 0 or _can_pay(palisade()["cost"], int(palisade()["keep_in_stock"]))
+
+
+## Seconds of work one square of palisade takes.
+func wall_work() -> float:
+	return float(palisade()["work"])
+
+
+## Raises the palisade (or gate) on square i, paying for a new stretch when needed. False if the town can't pay.
+func build_wall(i: int) -> bool:
+	if pathing.wall_hp[i] > 0.0 or wall_staked[i] == 0:
+		return true
+	if _wall_paid <= 0:
+		var cost: Dictionary = palisade()["cost"]
+		if not _can_pay(cost, int(palisade()["keep_in_stock"])):
+			return false
+		for r: String in cost:
+			w.run.stock[r] = int(w.run.stock[r]) - int(cost[r])
+		w.run.note_spend("walling", cost)
+		_wall_paid = int(palisade()["stretch_cells"])
+	_wall_paid -= 1
+	pathing.set_wall(i, max_wall_hp(i), is_gate(i))
+	return true
+
+
+## At dawn every standing stretch is patched back to full health (broken ones wait for craftspeople).
+func patch_walls() -> void:
+	for wall in walls:
+		for i in wall["cells"]:
+			if pathing.wall_hp[i] > 0.0:
+				pathing.wall_hp[i] = max_wall_hp(i)
+
+
+## {staked, standing, gates} square counts, for the round record and the build panel.
+func wall_counts() -> Dictionary:
+	var out := {"staked": 0, "standing": 0, "gates": gates.size()}
+	for i in wall_staked.size():
+		if wall_staked[i] > 0:
+			out["staked"] += 1
+			if pathing.wall_hp[i] > 0.0:
+				out["standing"] += 1
 	return out
