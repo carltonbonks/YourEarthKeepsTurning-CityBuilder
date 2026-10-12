@@ -30,7 +30,7 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `sim/loot.gd` | `Loot`: items as plain data `{base, tier, affixes}`; rolling, stats, how a hero rates an item. |
 | `sim/seeded_rng.gd` | `SeededRng`: every random roll goes through one of these. |
 | `sim/autoplayer.gd` | `AutoPlayer`: scripted player for tests and balance runs (styles: balanced, workers, heroes, market, bronze). |
-| `sim/power.gd` | `Power`: power levels. A fighter rates sqrt(effective HP x damage per second); the town (heroes, `fighter` townsfolk, hearth and towers) and a wave are sums on the same scale. Logged per round as `power`; nothing keys on it yet. |
+| `sim/power.gd` | `Power`: power levels. A fighter rates sqrt(effective HP x damage per second); the town (heroes, `fighter` townsfolk, hearth and towers) and a wave are sums on the same scale. Logged per round as `power`. `RunState.plan_wave` uses it for catch-up: a wave that far outmatches the town is eased (never grown). |
 | `sim/run_stats.gd` | Plain-language stats from run records (Run history screen and `tools/run_report.gd`). |
 | `game/main.gd` | The one screen: runs the flow (new run, ticking, pausing for decisions) and lays out the panels. UI built in code (placeholder). |
 | `game/build_panel.gd` | `BuildPanel`: build-phase choices (orders, tool sets, caravan, stall prices, the warned attack, Begin round). |

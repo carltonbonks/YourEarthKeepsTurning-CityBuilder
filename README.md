@@ -19,7 +19,7 @@ A handful of people around a fire, in the middle of a map. Resources ring the ca
 4. **Heroes run on energy and mood.** They tire as they work and fight, go to bed when tired and at nightfall, and only wake when an enemy comes close. Each personality has a favourite lodging. Hunger, cold, sleeping rough and comrades dying sour their mood; a favourite bed, shopping and prizes lift it. An unhappy hero walks away.
 5. **The market.** Stalls (arms, armour, charms, provisions) sell to heroes, fed by workshops (knapper, hide rack, bone carver, smoke hut) that craftspeople staff. You set each stall's price (Cheap, Fair or Dear). A hunting lodge pays heroes a prize for every beast.
 6. **The bronze age.** Raise the Bronze moot (costly, your choice when) to unlock copper seams, the smelter, the bronzesmith, bronze tool sets for townsfolk groups and a caravan selling tin. Heroes fetch cassiterite from near the dens. Bronze reavers arrive from round 6 and shrug off stone blows.
-7. **Night 3 brings the warned attack.** Survive it, then **pick a relic** (1 of 3).
+7. **Night 3 brings the warned attack.** Survive it, then **pick a relic** (1 of 3). Attacks grow every round on a fixed schedule; if your town has fallen far behind, the warband holds some raiders back (the story tells you), but a strong town never faces a bigger attack for being strong.
 
 ## Layout
 

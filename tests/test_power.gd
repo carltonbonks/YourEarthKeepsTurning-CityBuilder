@@ -67,3 +67,39 @@ func test_round_record_logs_power_when_the_wave_comes() -> void:
 	check(r1.has("power"), "round 1 logs power")
 	check(float(r1["power"]["wave"]) > 0.0, "wave power logged")
 	check(float(r1["power"]["town"]["total"]) > 0.0, "town power logged")
+
+
+## Leaves the town with no heroes or fighters: only the hearth.
+func _weaken(run: RunState) -> void:
+	for hero in run.heroes:
+		hero.alive = false
+	for u in run.world.folk:
+		u.alive = false
+
+
+func test_catch_up_eases_a_wave_that_far_outmatches_the_town() -> void:
+	var run := _run()
+	_weaken(run)
+	var scheduled := run.generate_wave(8)
+	var planned := run.plan_wave(8)
+	check(planned.size() < scheduled.size(), "a weak town faces fewer raiders")
+	check_eq(run.wave_eased, scheduled.size() - planned.size(), "held-back raiders are counted")
+	check(planned.size() >= ceili(scheduled.size() * run.content.num("catch_up_min_share")), "never below the minimum share")
+	check_eq(planned, scheduled.slice(0, planned.size()), "raiders are held back from the end of the list")
+
+
+func test_catch_up_never_grows_a_wave() -> void:
+	var run := _run()
+	for i in 40:
+		run.world.folk_ai.add_folk("warrior")
+	check_eq(run.plan_wave(3), run.generate_wave(3), "a strong town gets exactly the scheduled wave")
+	check_eq(run.wave_eased, 0, "nothing held back")
+
+
+func test_catch_up_keeps_the_boss_and_can_be_turned_off() -> void:
+	var run := _run()
+	_weaken(run)
+	var last := run.content.int_num("rounds_to_win")
+	check(run.plan_wave(last).has("antlered_king"), "the boss always comes")
+	run.content.balance["catch_up_max_ratio"] = 0
+	check_eq(run.plan_wave(8), run.generate_wave(8), "0 turns catch-up off")

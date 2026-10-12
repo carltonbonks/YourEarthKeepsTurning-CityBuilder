@@ -135,6 +135,8 @@ def main(raw_folder, out_folder):
                 **{"town_power_" + k: rd.get("power", {}).get("town", {}).get(k, "")
                    for k in ["heroes", "fighters", "defences", "total"]},
                 "wave_power": rd.get("power", {}).get("wave", ""),
+                "wave_power_scheduled": rd.get("power", {}).get("wave_scheduled", ""),
+                "wave_eased": rd.get("wave_eased", 0),
                 "wave_to_town_power": round(rd["power"]["wave"] / rd["power"]["town"]["total"], 2)
                 if rd.get("power", {}).get("town", {}).get("total") else "",
                 "relic_pick": rd.get("relic_pick", ""),
