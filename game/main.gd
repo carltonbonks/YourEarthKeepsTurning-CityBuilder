@@ -62,7 +62,6 @@ func _new_run(seed_value: int) -> void:
 	_arena.run = run
 	_arena.reset_camera()
 	_build_panel.run = run
-	_arena.stop_staking()
 	_overlays.run = run
 	_shown_story = 0
 	_story_label.clear()
@@ -74,7 +73,6 @@ func _new_run(seed_value: int) -> void:
 func _begin_round() -> void:
 	if run.phase != RunState.Phase.BUILD:
 		return
-	_arena.stop_staking()
 	run.begin_round()
 	_tick_acc = 0.0
 	_on_pause()
@@ -254,8 +252,6 @@ func _build_ui() -> void:
 	_arena.size_flags_stretch_ratio = 2.6
 	_arena.clip_contents = true
 	right.add_child(_arena)
-	_build_panel.arena = _arena
-	_arena.stake_points_changed.connect(func() -> void: _build_panel.refresh_roads())
 	var bottom := HBoxContainer.new()
 	bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(bottom)

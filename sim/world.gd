@@ -27,7 +27,7 @@ var hearth_hp := 0.0
 var hearth_cooldown_left := 0.0
 var nodes: Array[Dictionary] = []  ## {type, gives, pos, amount, max, heroes_only, wild, age}
 var dens: Array[Dictionary] = []  ## {type, spawns, pos, respawn_left}
-## The ground and how units find their way (see Pathing), and the town's plots and roads (see Town).
+## The ground and how units find their way (see Pathing), and the town's plots, gates and paving (see Town).
 var pathing: Pathing
 var town: Town
 ## {type, plot, pos, work_left, cooldown_left, goods (stalls), craft, craft_left, craft_tier, made (workshops)}
@@ -324,10 +324,10 @@ func add_building(type: String) -> bool:
 	var plot := town.choose_plot(type)
 	if plot < 0:
 		return false
-	town.occupy(plot, buildings.size())
 	buildings.append({"type": type, "plot": plot, "pos": town.plots[plot]["pos"],
 		"work_left": float(content.buildings[type]["work"]), "cooldown_left": 0.0,
 		"goods": [], "craft": "", "craft_left": 0.0, "craft_tier": 1, "made": 0})
+	town.occupy(plot, buildings.size() - 1)
 	return true
 
 
@@ -350,8 +350,8 @@ func first_built(type: String) -> int:
 # --- Shared: movement, combat and lookups used by every part ---------------
 
 ## Moves toward a goal along a route round buildings, faster on trails and roads; returns true
-## once within `close` of it. Townsfolk and heroes wear trails as they go, and climb palisades
-## slowly (or use a gate). A raider that walks into a palisade or gate stops to batter it instead.
+## once within `close` of it. Townsfolk and heroes wear desire paths as they go and walk
+## through gates; a raider that walks into a gate stops to batter it instead.
 func walk_toward(unit: Unit, goal: Vector2, close := 2.0) -> bool:
 	var to_goal := goal - unit.pos
 	if to_goal.length() <= close:
@@ -375,7 +375,7 @@ func walk_toward(unit: Unit, goal: Vector2, close := 2.0) -> bool:
 	return false
 
 
-## A raider strikes the palisade or gate in its way.
+## A raider strikes the gate in its way.
 func _batter(unit: Unit, square: int) -> void:
 	if unit.cooldown_left > 0.0:
 		return
@@ -385,7 +385,7 @@ func _batter(unit: Unit, square: int) -> void:
 		run.note_breach()
 		if not bool(night_report.get("breached", false)):
 			night_report["breached"] = true
-			run.tell("Raiders break through the palisade.")
+			run.tell("Raiders break through a gate.")
 
 
 func fight(unit: Unit, foe: Unit) -> void:

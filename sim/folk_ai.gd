@@ -124,6 +124,7 @@ func _worker_tick(unit: Unit) -> void:
 				if float(site["work_left"]) <= 0.0:
 					w.run.tell("A %s is finished." % w.content.buildings[site["type"]]["name"].to_lower())
 					w.run.on_building_done(site["type"])
+					w.town.on_built(unit.task_index)
 					unit.task = ""
 		"craft":
 			if unit.task_index >= w.buildings.size():
@@ -154,17 +155,6 @@ func _worker_tick(unit: Unit) -> void:
 				unit.task_timer -= work_rate(unit) * w.dt
 				if unit.task_timer <= 0.0:
 					w.town.pave(square)
-					unit.task = ""
-		"wall":
-			var square := unit.task_index
-			if w.pathing.wall_hp[square] > 0.0 or w.town.wall_staked[square] == 0 or w.pathing.is_solid(square):
-				unit.task = ""
-				return
-			unit.intent = "raising the palisade"
-			if w.walk_toward(unit, w.pathing.center(square), 3.0):
-				unit.task_timer -= work_rate(unit) * w.dt
-				if unit.task_timer <= 0.0:
-					w.town.build_wall(square)
 					unit.task = ""
 		"repair":
 			unit.intent = "patching the hearth"
@@ -209,14 +199,6 @@ func _choose_work(unit: Unit) -> void:
 			unit.task = "craft"
 			unit.task_index = shop
 			return
-		if w.town.can_afford_wall():
-			var taken := w.folk.filter(func(u: Unit) -> bool: return u != unit and u.task == "wall").map(func(u: Unit) -> int: return u.task_index)
-			var square := w.town.next_wall(taken)
-			if square >= 0:
-				unit.task = "wall"
-				unit.task_index = square
-				unit.task_timer = w.town.wall_work()
-				return
 		if w.town.can_pave() and w.town.can_afford_paving():
 			var taken := w.folk.filter(func(u: Unit) -> bool: return u != unit and u.task == "pave").map(func(u: Unit) -> int: return u.task_index)
 			var square := w.town.next_to_pave(taken)

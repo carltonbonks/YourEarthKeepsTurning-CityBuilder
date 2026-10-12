@@ -109,6 +109,9 @@ static func building(run: RunState, index: int) -> Dictionary:
 		t["lines"].append("Price: %s" % str(run.prices.get(kind, "fair")).capitalize())
 	if def.has("workshop") and b["craft"] != "":
 		t["lines"].append("Making: %s" % c.recipe_name(b["craft"]))
+	if def.has("gate_hp") and work_left <= 0.0:
+		var whole := run.world.town.gate_health(index)
+		t["lines"].append("Health %d%%. Mended to full each dawn." % roundi(100.0 * whole) if whole > 0.0 else "Broken through! Mended at dawn.")
 	t["warnings"] = warnings(run, b["type"])
 	return t
 
@@ -191,46 +194,28 @@ static func obstacle(run: RunState, id: String) -> Dictionary:
 	return t
 
 
-## A square of ground: a palisade or gate, a trail, a road, a thicket, or a staked road waiting for stone-layers.
+## A square of ground: a trail, a worn path, a road or a thicket.
 static func ground(run: RunState, square: int) -> Dictionary:
 	var c := run.content
 	var w := run.world
 	var g := w.pathing.ground[square]
 	var t: Dictionary
-	if w.town.wall_staked[square] > 0:
-		var pal: Dictionary = c.town["palisade"]
-		var gate := w.town.is_gate(square)
-		t = _tip(pal["gate_name"] if gate else pal["name"])
-		t["lines"].append(pal["gate_text"] if gate else pal["text"])
-		var hp := w.pathing.wall_hp[square]
-		if hp > 0.0:
-			t["lines"].append("Health %d/%d. Patched to full each dawn." % [ceili(hp), roundi(w.town.max_wall_hp(square))])
-		else:
-			t["lines"].append("Staked, not standing yet: craftspeople raise it for %s per %d paces." % [_goods(pal["cost"]), int(pal["stretch_cells"])])
-		return t
 	if g >= Pathing.FIRST_ROAD:
 		var def := w.town.road_def(g)
 		t = _tip(def["name"])
 		t["lines"].append(def["text"])
-	elif g == Pathing.TRAIL:
-		t = _tip(c.town["trail"]["name"])
-		t["lines"].append(c.town["trail"]["text"])
-	elif g == Pathing.THICKET:
+	elif g == Pathing.PATH or g == Pathing.TRAIL:
+		var def: Dictionary = c.town["path" if g == Pathing.PATH else "trail"]
+		t = _tip(def["name"])
+		t["lines"].append(def["text"])
+		if g == Pathing.PATH and g < w.town.best_road():
+			if w.town.can_pave():
+				t["lines"].append("Stone-layers will pave it into a %s if it stays busy." % w.town.road_def(w.town.best_road())["name"].to_lower())
+			else:
+				t["lines"].append("A %s would pave it." % w.town.paver_name())
+	else:
 		t = _tip(c.town["thickets"]["name"])
 		t["lines"].append(c.town["thickets"]["text"])
-	else:
-		t = _tip("Staked road")
-	if w.town.staked[square] > 0:
-		var best := w.town.best_road()
-		if g < best:
-			t["lines"].append("Staked out: nothing will be built here.")
-			if not w.town.can_pave():
-				t["warnings"].append("Nobody paves it yet: build a %s." % w.town.paver_name())
-			else:
-				var def := w.town.road_def(best)
-				t["lines"].append("Stone-layers will pave it into a %s." % def["name"].to_lower())
-		else:
-			t["lines"].append("Staked out: nothing will be built here.")
 	return t
 
 
