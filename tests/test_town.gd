@@ -67,31 +67,34 @@ func test_outer_ring_opens_with_the_bronze_age() -> void:
 	check(town.ring_open(bronze_ring[0]), "it opens in the bronze age")
 
 
-func test_staked_road_keeps_its_ground_clear() -> void:
+func test_buildings_keep_off_paved_ground() -> void:
 	var run := _run()
 	_rich(run)
-	check(run.stake_road([Vector2.ZERO, Vector2(260, 0)]), "a road can be staked")
-	while run.build("hut"):
-		pass
 	var town := run.world.town
-	for b in run.world.buildings:
-		for i in town.plots[b["plot"]]["cells"]:
-			check(town.staked[i] == 0, "no building stands on the staked road")
-	check(run.unstake_road(), "the stakes can be pulled up")
-	check_eq(town.staked_count(), 0, "no stakes left")
+	# Pave every inner-ring plot: a hut, which likes the inner ring, goes further out instead.
+	for k in town.plots.size():
+		if int(town.plots[k]["ring"]) == 0:
+			for i in town.plots[k]["cells"]:
+				run.world.pathing.set_ground(i, Pathing.FIRST_ROAD)
+	check(run.build("hut"), "a hut can be ordered")
+	check(int(town.plots[run.world.buildings[0]["plot"]]["ring"]) > 0, "it keeps off the paved inner ring")
 
 
-func test_road_bends_round_buildings() -> void:
+func test_building_over_paving_lifts_the_stones() -> void:
 	var run := _run()
 	_rich(run)
-	for n in 6:
-		run.build("hut")
-	var b: Dictionary = run.world.buildings[0]
-	var far: Vector2 = (b["pos"] as Vector2).normalized() * 260.0
-	var cells := run.world.town.route([Vector2.ZERO, far])
-	check(cells.size() > 2, "a route is found")
-	for i in cells:
-		check(not run.world.pathing.is_solid(i), "the route never crosses a building")
+	var town := run.world.town
+	for k in town.plots.size():
+		for i in town.plots[k]["cells"]:
+			if not run.world.pathing.is_solid(i):
+				run.world.pathing.set_ground(i, Pathing.FIRST_ROAD)
+	var stone := int(run.stock["stone"])
+	var cost := int(run.content.buildings["hut"]["cost"].get("stone", 0))
+	check(run.build("hut"), "with nothing else free, the hut goes on paving")
+	var plot: Dictionary = town.plots[run.world.buildings[0]["plot"]]
+	check(int(run.stock["stone"]) > stone - cost, "the lifted stone goes back into stock (%d -> %d)" % [stone, run.stock["stone"]])
+	for i in plot["cells"]:
+		check(not run.world.pathing.is_road(i), "no road under the hut")
 
 
 func test_walkers_go_round_buildings() -> void:
@@ -120,9 +123,9 @@ func test_roads_are_faster() -> void:
 	var times := []
 	for paved in [false, true]:
 		if paved:
-			check(run.stake_road([Vector2(-200, 300), Vector2(200, 300)]), "staked a test road")
-			for i in w.town.roads[-1]["cells"]:
-				w.pathing.set_ground(i, Pathing.FIRST_ROAD)
+			for x in range(-210, 211, 4):
+				for y in [292, 300, 308]:
+					w.pathing.set_ground(w.pathing.index_of(Vector2(x, y)), Pathing.FIRST_ROAD)
 		var u := Unit.new()
 		u.team = Unit.Team.FOLK
 		u.speed = 50.0
@@ -134,11 +137,21 @@ func test_roads_are_faster() -> void:
 	check(times[1] < times[0] * 0.8, "the paved road is quicker (%d vs %d ticks)" % [times[1], times[0]])
 
 
-func test_stone_layers_pave_staked_roads() -> void:
+## Wears a worn path from the hearth out to (0, 240), as if many feet had walked it.
+func _wear_path(run: RunState) -> void:
+	var p := run.world.pathing
+	for y in range(30, 240, 4):
+		p.tread(Vector2(0, y), 100.0)
+	p.wear_trails()
+	p.wear_trails()
+
+
+func test_stone_layers_pave_busy_paths() -> void:
 	for with_yard in [false, true]:
 		var run := _run()
 		_rich(run)
-		check(run.stake_road([Vector2.ZERO, Vector2(0, 240)]), "staked a road")
+		_wear_path(run)
+		check(run.world.pathing.busy_paths.size() > 0, "the busy path is listed")
 		run.world.folk_ai.add_folk("craftsperson")
 		if with_yard:
 			check(run.build("stone_yard"), "the yard can be ordered")
@@ -148,7 +161,7 @@ func test_stone_layers_pave_staked_roads() -> void:
 		_advance(run, 25.0)
 		var paved := int(run.world.town.paved_counts().get("stone_path", 0))
 		if with_yard:
-			check(paved > 0, "craftspeople pave the staked road (%d squares)" % paved)
+			check(paved > 0, "craftspeople pave the worn path (%d squares)" % paved)
 			check(int(run.stock["stone"]) < stone, "paving uses stone")
 		else:
 			check_eq(paved, 0, "nothing is paved without a stone-layers' yard")
@@ -157,12 +170,19 @@ func test_stone_layers_pave_staked_roads() -> void:
 func test_feet_wear_trails() -> void:
 	var p := _run().world.pathing
 	var i := p.index_of(Vector2(300, 300))
-	p.tread(Vector2(300, 300), 10.0)
+	p.tread(Vector2(300, 300), 5.0)
 	p.wear_trails()
-	check_eq(p.ground[i], Pathing.TRAIL, "a busy square becomes a trail")
-	for n in 4:
+	check_eq(p.ground[i], Pathing.TRAIL, "a walked square becomes a trail")
+	p.wear_trails()
+	check_eq(p.ground[i], Pathing.TRAIL, "light use doesn't wear it deeper")
+	p.tread(Vector2(300, 300), 30.0)
+	p.wear_trails()
+	check_eq(p.ground[i], Pathing.PATH, "a busy trail becomes a worn path")
+	check(p.busy_paths.has(i), "and is listed for paving")
+	check(p.speeds[Pathing.PATH] > p.speeds[Pathing.TRAIL], "a worn path is quicker than a trail")
+	for n in 8:
 		p.wear_trails()
-	check_eq(p.ground[i], Pathing.PLAIN, "an unused trail fades")
+	check_eq(p.ground[i], Pathing.PLAIN, "an unused path fades back to plain ground")
 
 
 func test_layout_is_seeded() -> void:
@@ -176,9 +196,8 @@ func test_layout_is_seeded() -> void:
 	check(a.thickets != c.thickets, "another seed, other thickets")
 
 
-func test_record_has_roads_and_town() -> void:
+func test_record_has_paths_and_town() -> void:
 	var run := _run()
-	run.stake_road([Vector2.ZERO, Vector2(250, 0)])
 	var bot := AutoPlayer.new()
 	while run.round_number < 2 and not run.is_over():
 		match run.phase:
@@ -192,8 +211,9 @@ func test_record_has_roads_and_town() -> void:
 			RunState.Phase.RELIC:
 				run.choose_relic("")
 	var record := run.to_record()
-	check(int(record["format"]) >= 8, "record format 8 or later")
-	var first: Dictionary = record["rounds"][0]
-	check(first["actions"].any(func(a: Dictionary) -> bool: return a["kind"] == "road"), "the staked road is recorded")
-	check(first.has("town") and int(first["town"]["staked"]) > 0, "the round records staked squares")
+	check(int(record["format"]) >= 10, "record format 10 or later")
+	var town: Dictionary = record["rounds"][0]["town"]
+	for key in ["paved", "trails", "paths", "plots_by_ring", "gates"]:
+		check(town.has(key), "the round's town has %s" % key)
+	check(int(town["trails"]) > 0, "feet wore some trails")
 	check(record.has("plots"), "the record lists where buildings stand")
