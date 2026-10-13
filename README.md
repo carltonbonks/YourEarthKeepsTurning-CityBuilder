@@ -38,7 +38,8 @@ Engine: Godot 4.7.1 (GDScript). Read [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) 
 
 ```sh
 tools/setup_godot.sh                                     # get Godot (Linux), once
-tools/test.sh                                            # import and run every test
+tools/test.sh                                            # import and run every test (tools/test.sh market: only matching tests)
+tools/balance.sh 60 balanced workers                     # bot win rates, styles in parallel
 godot --headless --path . --export-release "Web" build/web/index.html
 godot --headless --path . -s res://tools/balance_run.gd -- runs=50 style=balanced   # balance report
 ```

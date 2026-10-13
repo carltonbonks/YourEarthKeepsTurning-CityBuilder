@@ -5,9 +5,14 @@ How the code is laid out and the habits every change follows. Design intent live
 ## Getting started
 
 ```sh
-tools/setup_godot.sh                                     # downloads Godot 4.7.1 to ~/godot (once per machine)
-tools/test.sh                                            # imports, runs every test, fails on any script error
+tools/setup_godot.sh          # downloads Godot 4.7.1 to ~/godot (once per machine; cloud sessions do it at start, see .claude/hooks)
+tools/test.sh                 # imports, runs every test (~75 s), fails on any script error
+tools/test.sh market gate     # only tests whose "file::method" contains a filter; use while working, then run all once
+QUICK=1 tools/test.sh town    # skips the import step (fine unless you added a script, class_name or resource)
+tools/balance.sh 60 balanced workers   # bot win rates, one style per core at once
 ```
+
+Tests over 2 s print their time. Most of the suite is whole bot runs: a test that only reads a finished run's record should use `bot_record(seed, style)` from `TestCase`, which plays each seed and style once per test run and shares it.
 
 All tests must pass before a PR; CI runs `tools/test.sh` too (see `.github/workflows/ci.yml`). A GDScript error stops a test part-way without failing a check, which is why `tools/test.sh` also fails on any `SCRIPT ERROR` in the log: never run `tests/run_tests.gd` alone and trust its count.
 
@@ -27,6 +32,7 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `sim/market.gd` | `Market` (`world.market`): workshops, stalls, smelting, building-posted prizes and carcass yields. |
 | `sim/enemy_ai.gd` | `EnemyAI` (`world.enemy_ai`): dens and wanderers, the wave, probes, enemy targeting, hearth and tower fire. |
 | `sim/unit.gd` | `Unit`: one hero, townsperson or enemy (plain fields). |
+| `sim/unit_grid.gd` | `UnitGrid`: buckets units by position so `World.nearest_enemy` / `nearest_friend` only look nearby. Same answers as a full scan. |
 | `sim/loot.gd` | `Loot`: items as plain data `{base, tier, affixes}`; rolling, stats, how a hero rates an item. |
 | `sim/seeded_rng.gd` | `SeededRng`: every random roll goes through one of these. |
 | `sim/autoplayer.gd` | `AutoPlayer`: scripted player for tests and balance runs (styles: balanced, workers, heroes, market, bronze). |
@@ -41,10 +47,12 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `game/tooltips.gd` | Hover text for map things and the build list, tag notes and supply warnings. Read-only. |
 | `game/run_history.gd` | Saves runs to `user://runs/`, download/copy for sharing. |
 | `data/*.json` | All content and balance numbers. Each file starts with a `_note` explaining its keys; keep it current when you add a key. |
-| `tools/` | Headless helpers: `balance_run.gd` (bot runs), `run_report.gd` (compare runs), `market_probe.gd` (one run's economy), `export_csv.py` (run records to CSV tables). `snapshot.gd` saves a picture of the screen after a bot has played (needs a display: `xvfb-run` in a container). |
-| `tests/` | `run_tests.gd` runs every `test_*` method in `tests/test_*.gd` (classes extend `TestCase`, use `check` / `check_eq`). `test_screen.gd` plays a run through the real UI; `test_tags.gd` enforces the tag habit. |
+| `tools/` | Headless helpers: `test.sh` (tests), `balance.sh` / `balance_run.gd` (bot runs), `run_report.gd` (compare runs), `market_probe.gd` (one run's economy), `perf_probe.gd` (ms per step as the town grows), `export_csv.py` (run records to CSV tables). `snapshot.gd` saves a picture of the screen after a bot has played (needs a display: `xvfb-run` in a container). |
+| `tests/` | `run_tests.gd` runs every `test_*` method in `tests/test_*.gd` (classes extend `TestCase`, use `check` / `check_eq`). `TestCase.bot_record(seed, style)` shares finished bot runs between tests. `test_screen.gd` plays a run through the real UI; `test_tags.gd` enforces the tag habit. |
 
 Flow of a round: `RunState` BUILD → for each of 3 days: PICK at dawn → SIM (`World.step()` until the next pause) → after night 3's wave: RELIC → next BUILD.
+
+Big towns: anything that runs for every unit every step must not loop over every other unit (that grows with people squared). Use `nearest_enemy` / `nearest_friend` (grid-backed), or build an index once per step (like `FolkAI.begin_step`). Check with `tools/perf_probe.gd` (see [PERFORMANCE.md](PERFORMANCE.md)).
 
 Where new code goes: a new townsfolk job goes in `FolkAI`, a hero behaviour or ability in `HeroAI`, an economy building in `Market`, an enemy behaviour in `EnemyAI`. State shared by more than one part lives on `World`; a part keeps private state only if no other part reads it (like `Market._prizes`). Parts call each other through the world (`w.market.stall_index(...)`), and a helper used from another part has no leading underscore. Avoid names Godot already uses for built-in functions (that is why it is `walk_toward`, not `move_toward`). Never move a unit by setting `pos` toward a goal yourself: go through `walk_toward`, so units go round buildings and roads count. A new panel or pop-up on the screen gets its own file in `game/` rather than growing `main.gd`.
 
@@ -82,7 +90,7 @@ Every run is saved as `RunState.to_record()`, used by the game's Run history, th
 ### 5. Tests and balance
 - Every new rule gets a test in `tests/`, usually by building a `RunState` with a fixed seed and stepping it (see `tests/test_market.gd`).
 - After a change that affects difficulty, run the bots and report win rates per style in the PR:
-  `~/godot/godot --headless --path . -s res://tools/balance_run.gd -- runs=40 style=balanced`
+  `tools/balance.sh 60 balanced workers` (runs the styles in parallel; one style alone is `balance_run.gd -- runs=60 style=balanced`). For a before/after, run the same command on `main` in a second worktree.
   Current target (tuning pass 1): balanced 70-80%, workers clearly weaker.
 - New mechanics that a scripted player should use get taught to `AutoPlayer`, otherwise bot numbers stop meaning anything.
 
@@ -90,33 +98,12 @@ Every run is saved as `RunState.to_record()`, used by the game's Run history, th
 If players need to understand a rule to make a choice, it shows up in a tooltip (`game/tooltips.gd`) or a building's `text` in data. Supply warnings (a stall with no workshop feeding it) are the model: say what is missing and what to build.
 
 ### 7. Shipping a slice
-Small slices, one PR each, from a `claude/...` branch. A PR says what changed in plain language, how to try it on the playtest link (merged to `main` = live at https://carltonbonks.github.io/YourEarthKeepsTurning-CityBuilder/), bot win rates if balance moved, and 2-3 playtest questions with a seed. Claude's default choices for open design questions go in CLAUDE.md's "Open questions" as "Claude's defaults, pending Yusuf's playtest". Update the "How it plays" section of README.md when the game changes.
+Small slices, one PR each, from a `claude/...` branch. A PR says what changed in plain language, how to try it on the playtest link (merged to `main` = live at https://carltonbonks.github.io/YourEarthKeepsTurning-CityBuilder/), bot win rates if balance moved, and 2-3 playtest questions with a seed. Claude's default choices for open design questions go in [PENDING_DEFAULTS.md](PENDING_DEFAULTS.md) (one line per area, with bot numbers), and CLAUDE.md's "Open questions" names the area. Update the "How it plays" section of README.md when the game changes.
 
 ## Run data for analysis
 
-Run records (Yusuf's downloads and bot batches) live in the project's shared folder at `game-data/raw/`, and `python3 tools/export_csv.py <raw> <csv>` rebuilds the CSV tables in `game-data/csv/` (described in `game-data/README.md` there). Bot batches: `balance_run.gd -- runs=60 style=balanced out=bots-<label>-balanced.jsonl label=<label>`.
+Run records (Yusuf's downloads and bot batches) live in the project's shared folder at `game-data/raw/`, and `python3 tools/export_csv.py <raw> <csv>` rebuilds the CSV tables in `game-data/csv/` (described in `game-data/README.md` there). Bot batches: `OUT=<dir> LABEL=<label> tools/balance.sh 60` writes `bots-<label>-<style>.jsonl` per style.
 
-## Performance and town size
+## Performance
 
-Measured 2026-10-12 (native headless, a bot's round-8 town padded with extra townsfolk, plus one raider per three people). Time per `World.step()` by day:
-
-| People | ms per step |
-| --- | --- |
-| ~20 (bot today) | 1 |
-| 60 | 3 |
-| 175 | 15 |
-| 400 | 63 |
-| 850 | 250, with stalls over 1 s |
-
-Budget: 10 steps per game second, so 8x speed leaves about 12 ms a step (less in the web export, which is slower than native). Fine up to roughly 150 people; a 1000-person town is unplayable as the code stands.
-
-Where the time goes (all grow with people squared), cheapest fix first:
-- Idle craftspeople re-run `FolkAI._choose_work` every step, and `Market.workshop_needing_hands` filters all folk for each workshop. Fix: let idle workers wait before looking again, and count hands per workshop once per step.
-- `FolkAI._warrior_tick` filters all folk to find its patrol slot. Fix: index warriors once per step. (A quick try of these first two fixes took 400 people from 63 to 27 ms.)
-- `World.nearest_enemy` / `nearest_friend` scan every unit, and `EnemyAI.dens_tick` and `war_chant` scan every enemy. Fix: a spatial grid of buckets so lookups only check nearby squares.
-- Stalls: a building finishing bumps `Pathing.version`, and every unit re-routes in the same step. Fix: stagger re-routing over several steps, or share routes (a flow field to the hearth for raiders).
-- Drawing (`game/arena_view.gd`) is not the bottleneck at these sizes (judged from the code, not measured).
-
-Past a few hundred people the better route is design, not tuning: CLAUDE.md already says townsfolk are handled in aggregate, so simulate them as crews and keep heroes individual.
-
-To re-measure: pad a run with `w.folk_ai.add_folk(role)` after the bot reaches the round you want, top up stock at each dawn, and time `run.step()` with `Time.get_ticks_usec()`.
+How sim cost grows with town size, where the time goes and how to re-measure: [PERFORMANCE.md](PERFORMANCE.md). Read it before adding anything that loops over every unit each step.

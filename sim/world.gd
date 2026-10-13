@@ -55,6 +55,13 @@ var night_report := {}
 var alarms: Array[Unit] = []
 var new_alarms: Array[Unit] = []
 
+## Where enemies and friends (townsfolk and heroes) stand, for fast nearest-unit lookups (see UnitGrid).
+## Rebuilt each step when those units stop moving; a stale grid is never read (the lookups scan the lists instead).
+var _enemy_grid: UnitGrid
+var _friend_grid: UnitGrid
+var _enemy_grid_ok := false
+var _friend_grid_ok := false
+
 ## The world's behaviour is split by who acts; each part reads and changes this World's state.
 var folk_ai: FolkAI
 var hero_ai: HeroAI
@@ -73,6 +80,8 @@ func _init(run_state: RunState) -> void:
 	dt = 1.0 / content.num("ticks_per_second")
 	hearth_hp = run.hearth_max_hp()
 	pathing = Pathing.new(content)
+	_enemy_grid = UnitGrid.new(content.num("world_radius"))
+	_friend_grid = UnitGrid.new(content.num("world_radius"))
 	town = Town.new(self)
 	_place_nodes()
 	_place_dens()
@@ -170,15 +179,24 @@ func step() -> void:
 	for enemy in enemies:
 		if not enemy.spawned and time >= enemy.spawn_time:
 			enemy.spawned = true
+	# Enemies stand still while townsfolk and heroes act, and they stand still while enemies act.
+	folk_ai.begin_step()
+	pathing.reroutes_left = Pathing.REROUTES_PER_STEP
+	_enemy_grid.rebuild(enemies)
+	_enemy_grid_ok = true
 	for unit in folk:
 		if unit.alive:
 			folk_ai.folk_tick(unit)
 	for hero in run.heroes:
 		if hero.alive:
 			hero_ai.hero_tick(hero)
+	_enemy_grid_ok = false
+	_friend_grid.rebuild(folk + run.heroes)
+	_friend_grid_ok = true
 	for enemy in enemies:
 		if enemy.alive and enemy.spawned:
 			enemy_ai.enemy_tick(enemy)
+	_friend_grid_ok = false
 	enemy_ai.towers_tick()
 	_cleanup()
 	shots = shots.filter(func(s: Dictionary) -> bool: return time - float(s["time"]) < 0.25)
@@ -479,7 +497,13 @@ func _cleanup() -> void:
 			u.target = null
 
 
+## Lookups within this distance use the grids; longer ones scan the whole list.
+const GRID_LOOKUP_MAX := 400.0
+
+
 func nearest_enemy(from: Vector2, max_distance: float, max_from_home := INF) -> Unit:
+	if _enemy_grid_ok and max_distance <= GRID_LOOKUP_MAX:
+		return _enemy_grid.nearest(from, max_distance, max_from_home, true)
 	var best: Unit = null
 	var best_d := max_distance
 	for enemy in enemies:
@@ -507,6 +531,8 @@ func nearest_alarm(from: Vector2) -> Unit:
 
 
 func nearest_friend(from: Vector2, max_distance: float) -> Unit:
+	if _friend_grid_ok and max_distance <= GRID_LOOKUP_MAX:
+		return _friend_grid.nearest(from, max_distance)
 	var best: Unit = null
 	var best_d := max_distance
 	for unit in folk + run.heroes:
@@ -523,6 +549,8 @@ func nearest_friend(from: Vector2, max_distance: float) -> Unit:
 func release() -> void:
 	alarms = []
 	new_alarms = []
+	_enemy_grid.rebuild([] as Array[Unit])
+	_friend_grid.rebuild([] as Array[Unit])
 	for unit in folk + enemies + run.heroes:
 		unit.target = null
 

@@ -1,16 +1,9 @@
 extends TestCase
 
 
-func _played(seed_value := 4821) -> RunState:
-	var run := RunState.new(Content.load_default(), seed_value)
-	AutoPlayer.new().play_run(run)
-	return run
-
-
 func test_record_has_one_entry_per_round_played() -> void:
-	var run := _played()
-	var record := run.to_record()
-	check_eq(record["rounds"].size(), run.round_number, "one round entry per round")
+	var record := bot_record()
+	check_eq(record["rounds"].size(), int(record["round_reached"]), "one round entry per round")
 	check(record["result"] in ["won", "lost"], "finished run has a result")
 	check_eq(record["format"], RunState.RECORD_FORMAT, "format version stored")
 
@@ -42,8 +35,8 @@ func test_unfinished_run_includes_current_round() -> void:
 
 func test_record_survives_json_and_feeds_stats() -> void:
 	var runs := []
-	for s in 3:
-		runs.append(JSON.parse_string(JSON.stringify(_played(200 + s).to_record())))
+	for r in [bot_record(), bot_record(1001, "market"), bot_record(1003, "bronze")]:
+		runs.append(JSON.parse_string(JSON.stringify(r)))
 	var lines := RunStats.report(runs)
 	check(lines[0].begins_with("Runs: 3"), "report counts runs: %s" % lines[0])
 	var history := RunHistory.one_line(runs[0])

@@ -228,9 +228,7 @@ func test_dropped_items_are_valid_and_reproducible() -> void:
 
 
 func test_record_has_hero_items_whims_and_loot() -> void:
-	var run := _run(4821)
-	AutoPlayer.new().play_run(run)
-	var record := run.to_record()
+	var record := bot_record(4821)
 	check(int(record["format"]) >= 4, "record format 4 or later")
 	var whims := 0
 	for rd: Dictionary in record["rounds"]:
