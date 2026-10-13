@@ -6,9 +6,11 @@ extends RefCounted
 
 const RESOURCE_COLORS := {"food": "#d98aa8", "fuel": "#e0b050", "wood": "#7fbf6a", "stone": "#b0b4bc", "shells": "#ffd24a",
 	"flint": "#8fa0b8", "hides": "#c09060", "bone": "#e0d8c0", "obsidian": "#b08ad8",
-	"copper": "#d08850", "cassiterite": "#9a9090", "tin": "#c8d0d8", "bronze": "#e0a860"}
-## Shown in the stock line from the start; later goods appear once you have some.
-const STONE_AGE_RESOURCES := ["food", "fuel", "wood", "stone", "shells", "flint", "hides", "bone", "obsidian"]
+	"copper": "#d08850", "cassiterite": "#9a9090", "tin": "#c8d0d8", "bronze": "#e0a860",
+	"bog_iron": "#8a6a4a", "charcoal": "#6a6a6a", "iron": "#a0a8b0", "steel": "#d0d8e8"}
+## Goods of a later age: shown in the stock line once the town reaches that age or has some.
+const RESOURCE_AGE := {"copper": "bronze", "cassiterite": "bronze", "tin": "bronze", "bronze": "bronze",
+	"bog_iron": "medieval", "charcoal": "medieval", "iron": "medieval", "steel": "medieval"}
 
 
 ## Round, seed, age, hearth, stock, people and upkeep, then the fire line.
@@ -17,7 +19,7 @@ static func status(run: RunState) -> String:
 	var w := run.world
 	var stock := PackedStringArray()
 	for r: String in RunState.RESOURCES:
-		if not STONE_AGE_RESOURCES.has(r) and int(run.stock[r]) == 0 and not content.age_reached(run.age, "bronze"):
+		if int(run.stock[r]) == 0 and not content.age_reached(run.age, RESOURCE_AGE.get(r, "")):
 			continue
 		stock.append("[color=%s]%s %d[/color]" % [RESOURCE_COLORS[r], r.capitalize(), run.stock[r]])
 	var folk := PackedStringArray()
@@ -153,6 +155,9 @@ static func market(run: RunState) -> String:
 			if b["craft"] == "":
 				var kinds := PackedStringArray()
 				for id in content.recipes_for(b["type"]):
+					# Smelting recipes fill the stock and need no stall.
+					if not content.market["recipes"][id].has("stall"):
+						continue
 					var k: String = content.market["recipes"][id]["stall"]
 					if w.market.stall_index(k) < 0 and not kinds.has(content.market["stall_names"][k]):
 						kinds.append(content.market["stall_names"][k])

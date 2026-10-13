@@ -121,7 +121,7 @@ func finish_craft(index: int, crafter: Unit = null) -> void:
 			w.run.stock[good] = int(w.run.stock[good]) + int(r["makes"][good])
 		b["craft"] = ""
 		b["made"] = int(b["made"]) + 1
-		w.run.note_crafted(id)
+		w.run.record.note_crafted(id)
 		return
 	var good := {"recipe": id, "tier": int(b["craft_tier"]) + int(master.get("extra_tier", 0))}
 	if r.has("item"):
@@ -134,7 +134,7 @@ func finish_craft(index: int, crafter: Unit = null) -> void:
 		good["item"] = Loot.make(r["item"], int(good["tier"]), affixes)
 	b["craft"] = ""
 	b["made"] = int(b["made"]) + 1
-	w.run.note_crafted(id)
+	w.run.record.note_crafted(id)
 	var s := stall_index(r["stall"])
 	if s >= 0:
 		w.buildings[s]["goods"].append(good)
@@ -177,7 +177,7 @@ func carcass(victim: Unit) -> void:
 			got[res] = int(got.get(res, 0)) + int(prize["yields"][res])
 	for res: String in got:
 		w.run.stock[res] = int(w.run.stock[res]) + int(got[res])
-		w.run.note_economy("yields", int(got[res]), res)
+		w.run.record.note_economy("yields", int(got[res]), res)
 
 
 func pay_prizes(hero: Unit, victim: Unit) -> void:
@@ -187,4 +187,4 @@ func pay_prizes(hero: Unit, victim: Unit) -> void:
 	w.run.stock["shells"] = int(w.run.stock["shells"]) - paid
 	hero.gold += paid
 	hero.mood_events["prize"] = int(hero.mood_events.get("prize", 0)) + 1
-	w.run.note_economy("prizes", paid)
+	w.run.record.note_economy("prizes", paid)

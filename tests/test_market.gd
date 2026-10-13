@@ -213,7 +213,7 @@ func test_townsfolk_never_gather_obsidian() -> void:
 
 func test_market_bot_run_records_the_economy() -> void:
 	var record := bot_record(1001, "market")
-	check_eq(int(record["format"]), RunState.RECORD_FORMAT, "current record format")
+	check_eq(int(record["format"]), RunRecord.RECORD_FORMAT, "current record format")
 	check(record.has("prices"), "prices in the record")
 	var crafted := 0
 	var sold := 0

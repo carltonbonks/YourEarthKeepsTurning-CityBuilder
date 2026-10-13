@@ -115,6 +115,14 @@ func age_name(id: String) -> String:
 	return ages["ages"][id]["name"]
 
 
+## The name of the building that brings an age (its "ages_up"), e.g. "Stone keep" for the medieval age.
+func age_builder_name(id: String) -> String:
+	for b: String in buildings:
+		if buildings[b].get("ages_up", "") == id:
+			return buildings[b]["name"]
+	return age_name(id)
+
+
 ## Recipe ids a workshop type can make, sorted.
 func recipes_for(workshop: String) -> Array[String]:
 	var out: Array[String] = []
@@ -131,7 +139,7 @@ func recipe_name(id: String) -> String:
 	if r.has("item"):
 		return items["bases"][r["item"]]["name"]
 	if r.has("makes"):
-		return "%s ingot" % id if id == "bronze" else id
+		return "%s ingot" % id if id == "bronze" else ("iron bloom" if id == "iron" else id)
 	return market["provisions"][r["provision"]]["name"]
 
 

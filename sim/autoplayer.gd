@@ -9,6 +9,9 @@ extends RefCounted
 ## "market": like balanced, but builds every workshop and stall early and the hunting lodge.
 ## "bronze": like market, then raises the Bronze moot as soon as it can, the smelter and bronzesmith,
 ## buys tool sets (picks, chisels, then spears) and some tin from the caravan.
+## "medieval": like bronze, then saves for the Stone keep once the bronzesmith stands, and after it
+## the charcoal burner, bloomery, blacksmith, townhouses, fields, guildhall, chapel and iron tool sets;
+## it takes family cards whenever the houses have room.
 ## Every style takes a Promote card when one is offered and affordable.
 ## Every style builds the stone-layers' yard from round 5 so craftspeople pave the busiest paths,
 ## and orders up to `gates` gates from `gate_round` (see below), and a garden when food runs short.
@@ -39,6 +42,8 @@ func play_run(run: RunState) -> void:
 
 
 func build(run: RunState) -> void:
+	if _ages(style):
+		_buy_goods(run)
 	_paving(run)
 	if style != "workers" and (run.round_number >= 2 or style == "heroes"):
 		run.build("longhouse")
@@ -48,20 +53,23 @@ func build(run: RunState) -> void:
 			if run.build(type):
 				break
 	# Saving up for the Bronze moot: only essentials until it is ordered.
-	if style == "bronze" and run.round_number >= 3 and run.world.count_buildings("bronze_moot", false) == 0:
+	if _ages(style) and run.round_number >= 3 and run.world.count_buildings("bronze_moot", false) == 0:
 		if run.housing() - run.population() <= 1:
 			run.build("hut")
 		run.build("market")
 		run.build("bronze_moot")
+		_gardens(run)
 		return
 	if style == "heroes" and run.round_number >= 2:
 		run.build("tavern")
 	if run.housing() - run.population() <= 2:
 		run.build("hut")
 	_gardens(run)
-	if style == "bronze":
+	if _ages(style):
 		_bronze(run)
-	if (style == "market" or style == "bronze") and run.round_number >= 2:
+	if style == "medieval" and _medieval(run):
+		return
+	if (style == "market" or _ages(style)) and run.round_number >= 2:
 		for type: String in ["market", "arms_stall", "knapper", "hide_stall", "hide_rack", "hunting_lodge",
 				"charm_stall", "bone_carver", "provisions_stall", "smoke_hut"]:
 			run.build(type)
@@ -80,7 +88,11 @@ func build(run: RunState) -> void:
 
 ## From round 5, a yard so craftspeople pave the busiest paths (from round 3 cost about 9 points:
 ## paving early eats the stone and wood the town needs).
+## The ages styles wait until their age-up building is ordered: the yard and paving eat the stone it needs.
 func _paving(run: RunState) -> void:
+	var saving_for := "stone_keep" if style == "medieval" else ("bronze_moot" if style == "bronze" else "")
+	if saving_for != "" and run.world.count_buildings(saving_for, false) == 0:
+		return
 	if run.round_number >= 5:
 		for b in run.content.buildings:
 			if run.content.buildings[b].get("paves", false):
@@ -114,13 +126,52 @@ func _bronze(run: RunState) -> void:
 	if not run.build("smelter") and run.world.count_buildings("smelter", false) == 0:
 		return
 	run.build("bronzesmith")
+	while int(run.stock["shells"]) > 45 and int(run.stock["tin"]) < 4 and run.trade("tin"):
+		pass
+	# The medieval bot keeps its ingots for the Stone keep until it is ordered.
+	if style == "medieval" and run.world.count_buildings("stone_keep", false) == 0:
+		return
 	for id: String in ["bronze_picks", "bronze_chisels", "bronze_spears"]:
 		if run.tools.has(id):
 			continue
 		run.buy_tools(id)
 		break
-	while int(run.stock["shells"]) > 45 and int(run.stock["tin"]) < 4 and run.trade("tin"):
+
+
+## Spare shells buy timber and stone from the caravan before anything is ordered.
+func _buy_goods(run: RunState) -> void:
+	for good: String in ["stone", "wood"]:
+		while int(run.stock["shells"]) > 60 and int(run.stock[good]) < 30 and run.trade(good):
+			pass
+
+
+func _ages(s: String) -> bool:
+	return s == "bronze" or s == "medieval"
+
+
+## The medieval bot's build. Returns true while it is saving for the Stone keep (only essentials then).
+func _medieval(run: RunState) -> bool:
+	var w := run.world
+	if w.count_buildings("bronzesmith", false) == 0:
+		return false
+	if w.count_buildings("stone_keep", false) == 0:
+		if run.round_number < 5 or run.population() < int(run.content.buildings["stone_keep"].get("min_people", 0)):
+			return false
+		run.build("stone_keep")
+		return w.count_buildings("stone_keep", false) == 0
+	if not run.content.age_reached(run.age, "medieval"):
+		return false
+	if run.housing() - run.population() <= 4:
+		run.build("townhouse")
+	while run.count_role("tribesperson") / 2 > w.count_buildings("field", false) and run.build("field"):
 		pass
+	for type: String in ["charcoal_burner", "bloomery", "blacksmith", "guildhall", "chapel", "charcoal_burner"]:
+		run.build(type)
+	for id: String in ["iron_ploughs", "mail_and_halberds", "iron_tools"]:
+		if not run.tools.has(id):
+			run.buy_tools(id)
+			break
+	return false
 
 
 ## Beds in finished and ordered lodgings, minus heroes.
@@ -144,6 +195,8 @@ func pick(run: RunState) -> int:
 		match "promote" if card["kind"] == "promote" else card["role"]:
 			"promote":
 				score = 6.0
+			"family":
+				score = 8.0 if style == "medieval" else 3.5
 			"hero":
 				score = 5.0 if style != "workers" else -100.0
 				if style == "heroes":

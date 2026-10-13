@@ -1,5 +1,5 @@
 {
-	"_note": "Map features. Resource nodes are placed in a ring around the hearth (min_distance/max_distance override the ring); dens far out in the wilds. heroes_only nodes are out in hero territory: townsfolk never gather them, heroes pick them up and sell them to the settlement once the buyer building stands, for price shells each, while it holds fewer than buy_until. wild nodes sit by the dens: heroes fetch them the same way, and townsfolk only go when no monster is within wild_safe_radius (so once heroes have cleared the den nearby). age = the node only counts once the town reaches that age.",
+	"_note": "Map features. Resource nodes are placed in a ring around the hearth (min_distance/max_distance override the ring); dens far out in the wilds. heroes_only nodes are out in hero territory: townsfolk never gather them, heroes pick them up and sell them to the settlement once the buyer building stands, for price shells each, while it holds fewer than buy_until. wild nodes sit by the dens: heroes fetch them the same way, and townsfolk only go when no monster is within wild_safe_radius (so once heroes have cleared the den nearby). age = the node only counts once the town reaches that age. A den's later = from that round on, it spawns something else (by round, never by age).",
 	"nodes": {
 		"brush": {"name": "Dry brush", "gives": "fuel", "amount": 16, "count": 6, "color": "#b3a25a"},
 		"berries": {"name": "Berry thicket", "gives": "food", "amount": 12, "count": 5, "color": "#9a4b7a"},
@@ -8,11 +8,12 @@
 		"flint_pit": {"name": "Flint pit", "gives": "flint", "amount": 12, "count": 2, "color": "#5a6a7a"},
 		"obsidian": {"name": "Obsidian outcrop", "gives": "obsidian", "amount": 9, "count": 2, "color": "#2a1a3a", "heroes_only": true, "buyer": "knapper", "price": 2, "buy_until": 12, "min_distance": 480, "max_distance": 640},
 		"copper_seam": {"name": "Copper seam", "gives": "copper", "amount": 16, "count": 3, "color": "#b87333", "age": "bronze", "min_distance": 340, "max_distance": 460},
+		"iron_bog": {"name": "Bog-iron pool", "gives": "bog_iron", "amount": 14, "count": 3, "color": "#6a4a2a", "age": "medieval", "min_distance": 300, "max_distance": 440},
 		"cassiterite": {"name": "Cassiterite vein", "gives": "cassiterite", "amount": 10, "count": 2, "color": "#3a3030", "age": "bronze", "wild": true, "near_dens": true, "buyer": "smelter", "price": 2, "buy_until": 10}
 	},
 	"wild_safe_radius": 260,
 	"dens": {
 		"wolf_den": {"name": "Wolf den", "spawns": "wolf", "color": "#5a4636"},
-		"barrow": {"name": "Barrow mound", "spawns": "barrow_wight", "color": "#4a4a5e"}
+		"barrow": {"name": "Barrow mound", "spawns": "barrow_wight", "later": {"from_round": 10, "spawns": "hollow_knight"}, "color": "#4a4a5e"}
 	}
 }

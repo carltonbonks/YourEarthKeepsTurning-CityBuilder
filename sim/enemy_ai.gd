@@ -20,18 +20,28 @@ func dens_tick() -> void:
 		den["respawn_left"] = float(den["respawn_left"]) - w.dt
 		if living < cap and float(den["respawn_left"]) <= 0.0:
 			den["respawn_left"] = w.content.num("den_respawn_seconds")
-			var e := make_enemy(den["spawns"], den["pos"] + Vector2.from_angle(w.rng.randf() * TAU) * 20.0, w.time,
+			var e := make_enemy(den_spawns(den), den["pos"] + Vector2.from_angle(w.rng.randf() * TAU) * 20.0, w.time,
 				1.0 + 0.08 * (w.run.round_number - 1))
 			e.den_index = i
 			e.wander_goal = e.pos
 			w.enemies.append(e)
 
 
+## What a den sends out this round: its later creature once that round comes (by round, never by age).
+func den_spawns(den: Dictionary) -> String:
+	var later: Dictionary = w.content.world["dens"][den["type"]].get("later", {})
+	if not later.is_empty() and w.run.round_number >= int(later["from_round"]):
+		return later["spawns"]
+	return den["spawns"]
+
+
 func enemy_tick(enemy: Unit) -> void:
 	enemy.cooldown_left -= w.dt
 	var aggro := w.content.num("enemy_aggro")
 	var holding_grudge := enemy.target != null and enemy.target.alive and w.time < enemy.grudge_until
-	if not holding_grudge and (enemy.target == null or not enemy.target.alive or enemy.pos.distance_to(enemy.target.pos) > aggro * 3.0):
+	if w.content.unit_has_tag(enemy, "siege"):
+		enemy.target = null
+	elif not holding_grudge and (enemy.target == null or not enemy.target.alive or enemy.pos.distance_to(enemy.target.pos) > aggro * 3.0):
 		enemy.target = w.nearest_friend(enemy.pos, aggro)
 	if enemy.target != null:
 		w.fight(enemy, enemy.target)
@@ -47,6 +57,8 @@ func enemy_tick(enemy: Unit) -> void:
 	elif enemy.cooldown_left <= 0.0:
 		enemy.cooldown_left = enemy.cooldown
 		var dmg := enemy.attack * war_chant()
+		if w.content.unit_has_tag(enemy, "siege"):
+			w.run.record.note_count("siege_damage", roundi(dmg))
 		w.hearth_hp -= dmg
 		w.wave_stats["keep_damage"] = float(w.wave_stats["keep_damage"]) + dmg
 		w.night_report["hearth_damage"] = float(w.night_report["hearth_damage"]) + dmg
@@ -70,7 +82,7 @@ func spawn_wave() -> void:
 	w.wave_spawned = true
 	w.wave_stats["hearth_hp_before"] = w.hearth_hp
 	var types := w.run.next_wave
-	w.run.note_power(types)
+	w.run.record.note_power(types)
 	var interval := w.content.num("wave_spawn_interval")
 	w.night_report["raiders"] = int(w.night_report["raiders"]) + types.size()
 	for i in types.size():
@@ -81,7 +93,7 @@ func spawn_wave() -> void:
 
 ## A small raid on an early night, from a random side, not warned of.
 func spawn_probe() -> void:
-	var types := w.run.generate_probe(w.run.round_number, w.day_index())
+	var types := w.run.waves.probe(w.run.round_number, w.day_index())
 	var side := SeededRng.stream(w.run.run_seed, "probe", w.run.round_number * 10 + w.day_index()).randi_range(0, 3) * PI / 2.0
 	for i in types.size():
 		var at := Vector2.from_angle(side + w.rng.randf_range(-0.3, 0.3)) * w.content.num("world_radius") * 0.8
@@ -135,7 +147,7 @@ func towers_tick() -> void:
 		if target != null:
 			w.hearth_cooldown_left = w.content.num("hearth_cooldown")
 			w.shots.append({"from": Vector2.ZERO, "to": target.pos, "ranged": true, "time": w.time})
-			w.damage(null, target, (w.content.num("hearth_attack") + w.run.mod("tower_attack")) * shield_left(target))
+			w.damage(null, target, (w.content.num("hearth_attack") + w.run.mod("tower_attack")) * armour_left(target))
 	for b in w.buildings:
 		var def: Dictionary = w.content.buildings[b["type"]]
 		if not def.has("attack") or float(b["work_left"]) > 0.0:
@@ -147,9 +159,16 @@ func towers_tick() -> void:
 		if target != null:
 			b["cooldown_left"] = float(def["cooldown"])
 			w.shots.append({"from": b["pos"], "to": target.pos, "ranged": true, "time": w.time})
-			w.damage(null, target, (float(def["attack"]) + w.run.mod("tower_attack")) * shield_left(target))
+			w.damage(null, target, (float(def["attack"]) + w.run.mod("tower_attack")) * armour_left(target))
 
 
-## Share of a stone blow (arrows, the hearth's fire) that gets past a shield.
-func shield_left(enemy: Unit) -> float:
-	return 1.0 - float(w.content.enemies[enemy.type_id].get("shield", 0.0))
+## Share of a blow that gets past an enemy's armour: a shield turns blows that aren't metal,
+## mail turns blows that aren't steel. Arrows and the hearth's fire are neither.
+func armour_left(enemy: Unit, metal := false, steel := false) -> float:
+	var e: Dictionary = w.content.enemies[enemy.type_id]
+	var left := 1.0
+	if not metal and not steel:
+		left *= 1.0 - float(e.get("shield", 0.0))
+	if not steel:
+		left *= 1.0 - float(e.get("mail", 0.0))
+	return left

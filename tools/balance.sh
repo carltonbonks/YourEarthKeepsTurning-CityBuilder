@@ -2,7 +2,7 @@
 # Runs the balance bots for several styles at once (one Godot process per style, as many at a time as there are cores)
 # and prints each style's report. A 60-run style takes ~12 minutes alone, so this is the quick way to get PR win rates.
 # Usage: tools/balance.sh [runs] [styles...]     e.g. tools/balance.sh 60 balanced workers
-#   Defaults: 60 runs; styles balanced workers heroes market bronze. Extra balance_run.gd args go in BOT_ARGS,
+#   Defaults: 60 runs; styles balanced workers heroes market bronze medieval. Extra balance_run.gd args go in BOT_ARGS,
 #   e.g. BOT_ARGS="gates=0". Set OUT=<dir> LABEL=<name> to also keep the records as <dir>/bots-<name>-<style>.jsonl
 #   (for run_report.gd and export_csv.py).
 set -uo pipefail
@@ -10,7 +10,7 @@ godot=${GODOT:-~/godot/godot}
 runs=${1:-60}
 shift || true
 styles=("$@")
-[ ${#styles[@]} -gt 0 ] || styles=(balanced workers heroes market bronze)
+[ ${#styles[@]} -gt 0 ] || styles=(balanced workers heroes market bronze medieval)
 logs=$(mktemp -d)
 for style in "${styles[@]}"; do
   out=""

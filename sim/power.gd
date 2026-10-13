@@ -13,11 +13,11 @@ static func rating(hp: float, dps: float) -> float:
 	return sqrt(maxf(hp, 0.0) * maxf(dps, 0.0))
 
 
-## One enemy type at full strength. A shield counts as extra HP against stone blows,
+## One enemy type at full strength. A shield and mail count as extra HP against stone blows,
 ## which is what most of the town hits with.
 static func enemy(content: Content, type_id: String) -> float:
 	var e: Dictionary = content.enemies[type_id]
-	var hp := float(e["hp"]) / maxf(0.05, 1.0 - float(e.get("shield", 0.0)))
+	var hp := float(e["hp"]) / maxf(0.05, (1.0 - float(e.get("shield", 0.0))) * (1.0 - float(e.get("mail", 0.0))))
 	return rating(hp, float(e["attack"]) / float(e["cooldown"]))
 
 

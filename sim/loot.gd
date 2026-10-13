@@ -32,6 +32,17 @@ static func total(content: Content, hero: Unit, key: String) -> float:
 	return sum
 
 
+## Extra damage a hero's gear does against this victim: each item's bane (attack per tier) against a tag it carries.
+static func bane(content: Content, hero: Unit, victim: Unit) -> float:
+	var extra := 0.0
+	for s: String in hero.items:
+		var item: Dictionary = hero.items[s]
+		var b: Dictionary = content.items["bases"][item["base"]].get("bane", {})
+		if not b.is_empty() and content.unit_has_tag(victim, b["tag"]):
+			extra += float(b["attack"]) * int(item["tier"])
+	return extra
+
+
 static func value(content: Content, item: Dictionary) -> int:
 	return int(content.items["value_per_tier"]) * int(item["tier"]) \
 		+ int(content.items["value_per_affix"]) * item["affixes"].size()

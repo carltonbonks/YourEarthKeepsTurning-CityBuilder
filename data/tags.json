@@ -1,5 +1,7 @@
 {
 	"_note": "What each tag that a rule reads does, shown in hover tooltips. Any entity can carry tags in its data (\"tags\": [...] on enemies, hero classes, traits, townsfolk roles, buildings, item bases or relics; see Content.TAG_KINDS). Descriptive tags no rule reads yet are fine and show by name alone. When a rule starts reading a tag, add its line here: tests/test_tags.gd fails until you do. Prize tags (a building's \"prize\", like the hunting lodge's beast prize) are explained from data/buildings.json, so they need no line.",
 	"sentient": "turns on whoever hits it",
-	"fighter": "stands and fights, so it counts toward the town's power level"
+	"fighter": "stands and fights, so it counts toward the town's power level",
+	"siege": "ignores people and heads for gates and the hearth",
+	"proud": "sleeping rough sours their mood twice as fast; wearing steel cheers them"
 }
