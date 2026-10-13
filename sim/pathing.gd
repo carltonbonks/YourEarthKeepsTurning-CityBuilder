@@ -20,6 +20,12 @@ const PATH := 3
 const FIRST_ROAD := 4
 ## Goals closer than this are walked to in a straight line.
 const STRAIGHT_RANGE := 20.0
+## Finding a route is the costliest thing a unit does, and sometimes everyone needs one at once: a building
+## finishes (every cached route is out of date) or dusk sends everyone home. At most this many units that
+## already had a route re-route per step; the rest carry on for a step or two (along their old route if the
+## town changed, straight at their new goal if the goal moved), so a big town doesn't stall. A unit's first
+## route is never held back. Bot runs are too small to reach the cap.
+const REROUTES_PER_STEP := 64
 
 var cell: float
 var cells: int  ## Squares per side.
@@ -39,6 +45,8 @@ var busy_paths := PackedInt32Array()
 var version := 0
 ## Bumped whenever a square's ground changes (routes still work, just not the fastest; drawing redraws).
 var ground_version := 0
+## Re-routes left this step (see REROUTES_PER_STEP).
+var reroutes_left := REROUTES_PER_STEP
 var _max_speed := 1.0
 var _trail: Dictionary
 var _path: Dictionary
@@ -240,8 +248,17 @@ func next_point(unit: Unit, goal: Vector2) -> Vector2:
 	var enemy := unit.is_enemy()
 	if dist <= STRAIGHT_RANGE:
 		return goal
-	if unit.path_version != version or unit.path_goal.distance_to(goal) > maxf(10.0, dist * 0.2) \
-			or (not unit.path.is_empty() and unit.path_index >= unit.path.size()):
+	var goal_moved := unit.path_goal.distance_to(goal) > maxf(10.0, dist * 0.2) \
+			or (not unit.path.is_empty() and unit.path_index >= unit.path.size())
+	var stale := unit.path_version != version
+	if (stale or goal_moved) and unit.path_version >= 0:
+		if reroutes_left <= 0:
+			if goal_moved:
+				return goal
+			stale = false
+		else:
+			reroutes_left -= 1
+	if stale or goal_moved:
 		unit.path_goal = goal
 		unit.path_version = version
 		unit.path_index = 0

@@ -32,6 +32,7 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `sim/market.gd` | `Market` (`world.market`): workshops, stalls, smelting, building-posted prizes and carcass yields. |
 | `sim/enemy_ai.gd` | `EnemyAI` (`world.enemy_ai`): dens and wanderers, the wave, probes, enemy targeting, hearth and tower fire. |
 | `sim/unit.gd` | `Unit`: one hero, townsperson or enemy (plain fields). |
+| `sim/unit_grid.gd` | `UnitGrid`: buckets units by position so `World.nearest_enemy` / `nearest_friend` only look nearby. Same answers as a full scan. |
 | `sim/loot.gd` | `Loot`: items as plain data `{base, tier, affixes}`; rolling, stats, how a hero rates an item. |
 | `sim/seeded_rng.gd` | `SeededRng`: every random roll goes through one of these. |
 | `sim/autoplayer.gd` | `AutoPlayer`: scripted player for tests and balance runs (styles: balanced, workers, heroes, market, bronze). |
@@ -46,10 +47,12 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `game/tooltips.gd` | Hover text for map things and the build list, tag notes and supply warnings. Read-only. |
 | `game/run_history.gd` | Saves runs to `user://runs/`, download/copy for sharing. |
 | `data/*.json` | All content and balance numbers. Each file starts with a `_note` explaining its keys; keep it current when you add a key. |
-| `tools/` | Headless helpers: `test.sh` (tests), `balance.sh` / `balance_run.gd` (bot runs), `run_report.gd` (compare runs), `market_probe.gd` (one run's economy), `export_csv.py` (run records to CSV tables). `snapshot.gd` saves a picture of the screen after a bot has played (needs a display: `xvfb-run` in a container). |
+| `tools/` | Headless helpers: `test.sh` (tests), `balance.sh` / `balance_run.gd` (bot runs), `run_report.gd` (compare runs), `market_probe.gd` (one run's economy), `perf_probe.gd` (ms per step as the town grows), `export_csv.py` (run records to CSV tables). `snapshot.gd` saves a picture of the screen after a bot has played (needs a display: `xvfb-run` in a container). |
 | `tests/` | `run_tests.gd` runs every `test_*` method in `tests/test_*.gd` (classes extend `TestCase`, use `check` / `check_eq`). `TestCase.bot_record(seed, style)` shares finished bot runs between tests. `test_screen.gd` plays a run through the real UI; `test_tags.gd` enforces the tag habit. |
 
 Flow of a round: `RunState` BUILD → for each of 3 days: PICK at dawn → SIM (`World.step()` until the next pause) → after night 3's wave: RELIC → next BUILD.
+
+Big towns: anything that runs for every unit every step must not loop over every other unit (that grows with people squared). Use `nearest_enemy` / `nearest_friend` (grid-backed), or build an index once per step (like `FolkAI.begin_step`). Check with `tools/perf_probe.gd` (see [PERFORMANCE.md](PERFORMANCE.md)).
 
 Where new code goes: a new townsfolk job goes in `FolkAI`, a hero behaviour or ability in `HeroAI`, an economy building in `Market`, an enemy behaviour in `EnemyAI`. State shared by more than one part lives on `World`; a part keeps private state only if no other part reads it (like `Market._prizes`). Parts call each other through the world (`w.market.stall_index(...)`), and a helper used from another part has no leading underscore. Avoid names Godot already uses for built-in functions (that is why it is `walk_toward`, not `move_toward`). Never move a unit by setting `pos` toward a goal yourself: go through `walk_toward`, so units go round buildings and roads count. A new panel or pop-up on the screen gets its own file in `game/` rather than growing `main.gd`.
 

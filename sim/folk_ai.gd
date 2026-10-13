@@ -3,13 +3,23 @@ extends RefCounted
 ## Townsfolk behaviour in the World: warriors patrol and answer calls for help;
 ## tribespeople and craftspeople gather, haul, build, craft, patch the hearth and
 ## go home at dusk. Townsfolk are handled as groups; nobody gives them orders.
-## Holds no state of its own: everything lives on `w` (the World).
+## Its only state is a per-step index of warriors, so each finds its patrol slot without scanning everyone.
 
 var w: World
+## Warrior -> its place among the warriors in w.folk (dead ones included until cleanup), rebuilt each step.
+var _warrior_slot := {}
 
 
 func _init(world: World) -> void:
 	w = world
+
+
+## Called by World at the start of each step, before anyone acts.
+func begin_step() -> void:
+	_warrior_slot.clear()
+	for unit in w.folk:
+		if unit.type_id == "warrior":
+			_warrior_slot[unit] = _warrior_slot.size()
 
 
 func add_folk(role: String) -> Unit:
@@ -74,7 +84,9 @@ func _warrior_tick(unit: Unit) -> void:
 		unit.intent = "answering a call for help"
 		w.fight(unit, call)
 		return
-	var index := w.folk.filter(func(u: Unit) -> bool: return u.type_id == "warrior").find(unit)
+	var index: int = _warrior_slot.get(unit, -1)
+	if index < 0:  # joined since the step began (or ticked outside World.step)
+		index = w.folk.filter(func(u: Unit) -> bool: return u.type_id == "warrior").find(unit)
 	var angle := w.time * 0.05 + index * 2.4
 	unit.intent = "patrolling"
 	w.walk_toward(unit, Vector2.from_angle(angle) * patrol)
