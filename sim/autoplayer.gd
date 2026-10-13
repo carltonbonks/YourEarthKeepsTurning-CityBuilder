@@ -11,7 +11,7 @@ extends RefCounted
 ## buys tool sets (picks, chisels, then spears) and some tin from the caravan.
 ## Every style takes a Promote card when one is offered and affordable.
 ## Every style builds the stone-layers' yard from round 5 so craftspeople pave the busiest paths,
-## and orders up to `gates` gates from `gate_round` (see below).
+## and orders up to `gates` gates from `gate_round` (see below), and a garden when food runs short.
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
 ## since the market is now the only place heroes can buy gear.
 var style := "balanced"
@@ -20,6 +20,8 @@ var style := "balanced"
 ## balance_run.gd sets these with gates= and gate_round=.
 var gates := 2
 var gate_round := 3
+## Gardens: one a round while food in store would last fewer than this many days (0 = never). balance_run.gd: gardens=.
+var garden_days := 3.0
 
 
 func play_run(run: RunState) -> void:
@@ -56,6 +58,7 @@ func build(run: RunState) -> void:
 		run.build("tavern")
 	if run.housing() - run.population() <= 2:
 		run.build("hut")
+	_gardens(run)
 	if style == "bronze":
 		_bronze(run)
 	if (style == "market" or style == "bronze") and run.round_number >= 2:
@@ -82,6 +85,16 @@ func _paving(run: RunState) -> void:
 		for b in run.content.buildings:
 			if run.content.buildings[b].get("paves", false):
 				run.build(b)
+
+
+## A garden when food is short: less than `garden_days` days of eating in store at the start of the round.
+func _gardens(run: RunState) -> void:
+	if garden_days <= 0.0 or float(run.stock["food"]) >= run.food_needed_today() * garden_days:
+		return
+	for b in run.content.buildings:
+		if run.content.buildings[b].get("daily", {}).has("food"):
+			run.build(b)
+			return
 
 
 ## One gate a round across the busiest gap, up to `gates`.

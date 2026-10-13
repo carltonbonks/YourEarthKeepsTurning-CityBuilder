@@ -199,3 +199,31 @@ func test_record_counts_gates() -> void:
 	run.world.dens.clear()
 	var snapshot: Dictionary = run._town_snapshot()
 	check_eq(int(snapshot["gates"]["built"]), 1, "the round's town counts the gate")
+
+
+func test_watch_posts_spread_out() -> void:
+	var run := _run()
+	var w := run.world
+	var spread := float(run.content.buildings["watch_post"]["spread"])
+	for i in 4:
+		check(run.build("watch_post"), "watch post %d can be ordered" % (i + 1))
+	var posts := w.buildings.filter(func(b: Dictionary) -> bool: return b["type"] == "watch_post")
+	for i in posts.size():
+		for j in range(i + 1, posts.size()):
+			check((posts[i]["pos"] as Vector2).distance_to(posts[j]["pos"]) >= spread * 0.75,
+				"watch posts %d and %d stand apart" % [i, j])
+
+
+func test_watch_posts_may_crowd_a_gate() -> void:
+	var run := _run()
+	var w := run.world
+	var k := _west_plot(run)
+	_fill(run, k, false)
+	w.wave_sides.assign([PI])
+	var b := _gate(run)
+	var near := 0
+	for i in 2:
+		check(run.build("watch_post"), "a watch post can be ordered")
+		if (w.buildings[-1]["pos"] as Vector2).distance_to(w.buildings[b]["pos"]) < float(run.content.town["gate"]["guard_within"]):
+			near += 1
+	check_eq(near, 2, "both posts guard the gate, close together")

@@ -66,6 +66,13 @@ func show_pick() -> void:
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub.add_theme_color_override("font_color", Color("#c8c8c8") if room else Color("#e0a050"))
 	_box.add_child(sub)
+	if run.hunger_turned_away != "":
+		var away := Label.new()
+		var role: String = content.townsfolk[run.hunger_turned_away]["name"].to_lower()
+		away.text = "Word has spread that a %s left hungry: no %s will join today." % [role, role]
+		away.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		away.add_theme_color_override("font_color", Color("#e0a050"))
+		_box.add_child(away)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	_box.add_child(row)
@@ -80,14 +87,14 @@ func show_pick() -> void:
 			var hero: Unit = card["hero"]
 			var c: Dictionary = content.hero_classes[hero.type_id]
 			var likes: Array = content.traits[hero.trait_id].get("lodging", [])
-			btn.text = "HERO: %s\n%s %s\nHP %d, damage %d%s\nLikes to sleep in: %s\nCosts %d shells" % [hero.display_name,
+			btn.text = "HERO: %s\n%s %s\nHP %d, damage %d%s\nLikes to sleep in: %s\nCosts %d shells. Eats %s a day." % [hero.display_name,
 				content.traits[hero.trait_id]["name"], c["name"], int(hero.max_hp), int(hero.attack),
 				", ranged" if hero.attack_range > 60 else "",
-				" or ".join(likes.map(func(id: String) -> String: return content.buildings[id]["name"].to_lower())), card["cost"]]
+				" or ".join(likes.map(func(id: String) -> String: return content.buildings[id]["name"].to_lower())), card["cost"], _food_each()]
 			btn.tooltip_text = _trait_hint(hero.trait_id)
 		else:
 			var def: Dictionary = content.townsfolk[card["role"]]
-			btn.text = "%s\n\n%s\nFree. Eats 1 food a day." % [def["name"], def["text"]]
+			btn.text = "%s\n\n%s\nFree. Eats %s a day." % [def["name"], def["text"], _food_each()]
 		btn.disabled = not run.can_take_pick(i)
 		btn.pressed.connect(func() -> void: pick_taken.emit(i))
 		row.add_child(btn)
@@ -96,6 +103,11 @@ func show_pick() -> void:
 	skip.pressed.connect(func() -> void: pick_taken.emit(-1))
 	_box.add_child(skip)
 	show()
+
+
+func _food_each() -> String:
+	var n := run.content.num("food_per_person_per_day")
+	return "%s food" % (str(int(n)) if n == floorf(n) else str(n))
 
 
 func _promote_text(card: Dictionary) -> String:

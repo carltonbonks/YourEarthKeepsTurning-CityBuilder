@@ -12,6 +12,9 @@ extends RefCounted
 ## themselves (Pathing.wear_trails); once a building with "paves" stands, stone-layers
 ## pave the busiest worn paths a stretch at a time for stone. See data/town.json.
 
+## Score added for standing right on top of another building of a kind that spreads out (less further away).
+const SPREAD_PENALTY := 200.0
+
 var w: World
 var pathing: Pathing
 ## {ring, sector, a0, a1, r0, r1, pos, cells: PackedInt32Array, age, obstacle, building}
@@ -188,16 +191,22 @@ func _plot_score(type: String, k: int) -> float:
 				best = minf(best, absf(angle_difference(side, (plot["pos"] as Vector2).angle())))
 			score += best * 80.0
 			# Watch posts like to stand over a gate.
-			for b in w.buildings:
-				if is_gate_type(b["type"]) and (plot["pos"] as Vector2).distance_to(b["pos"]) < float(w.content.town["gate"]["guard_within"]):
-					score -= 120.0
-					break
+			if _guards_gate(k):
+				score -= 120.0
 		_:
 			var best := ring * 60.0 + 200.0
 			for b in w.buildings:
 				if b["type"] == near:
 					best = minf(best, (plot["pos"] as Vector2).distance_to(b["pos"]))
 			score = best
+	# A building with "spread" keeps that far from others of its kind, unless it is guarding a gate.
+	var spread := float(w.content.buildings[type].get("spread", 0.0))
+	if spread > 0.0 and not _guards_gate(k):
+		for b in w.buildings:
+			if b["type"] == type:
+				var d := (plot["pos"] as Vector2).distance_to(b["pos"])
+				if d < spread:
+					score += (spread - d) / spread * SPREAD_PENALTY
 	# Buildings like company: a plot beside another building is a little more likely.
 	for other in [k - 1, k + 1]:
 		if other >= 0 and other < plots.size() and plots[other]["ring"] == ring and int(plots[other]["building"]) >= 0:
@@ -205,6 +214,14 @@ func _plot_score(type: String, k: int) -> float:
 	# A little seeded jitter so towns grow a bit differently each run.
 	score += float(hash([w.run.run_seed, k, w.buildings.size()]) % 1000) / 1000.0 * 20.0
 	return score
+
+
+## Whether plot k is within guard_within of a gate (standing or ordered).
+func _guards_gate(k: int) -> bool:
+	for b in w.buildings:
+		if is_gate_type(b["type"]) and (plots[k]["pos"] as Vector2).distance_to(b["pos"]) < float(w.content.town["gate"]["guard_within"]):
+			return true
+	return false
 
 
 ## Puts building index b on plot k: the plot turns solid (a gate stays open until it is built, see on_built).
