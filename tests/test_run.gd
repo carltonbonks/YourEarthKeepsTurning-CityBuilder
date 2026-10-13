@@ -29,12 +29,11 @@ func test_new_run_starts_small_around_the_hearth() -> void:
 
 
 func test_same_seed_and_choices_replay_identically() -> void:
-	var a := _run(77)
-	var b := _run(77)
+	# Replays the run other tests share and compares the whole record, not just the story.
+	var a := _run(4821)
 	AutoPlayer.new().play_run(a)
-	AutoPlayer.new().play_run(b)
-	check_eq(a.round_number, b.round_number, "round reached")
-	check_eq(a.story, b.story, "story of the run")
+	check_eq(JSON.stringify(a.to_record()), JSON.stringify(bot_record(4821)), "same record")
+	a.dispose()
 
 
 func test_round_has_three_dawn_picks_then_a_relic() -> void:

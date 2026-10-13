@@ -212,11 +212,7 @@ func test_townsfolk_never_gather_obsidian() -> void:
 
 
 func test_market_bot_run_records_the_economy() -> void:
-	var run := _run(1001)
-	var bot := AutoPlayer.new()
-	bot.style = "market"
-	bot.play_run(run)
-	var record := run.to_record()
+	var record := bot_record(1001, "market")
 	check_eq(int(record["format"]), RunState.RECORD_FORMAT, "current record format")
 	check(record.has("prices"), "prices in the record")
 	var crafted := 0
@@ -231,4 +227,3 @@ func test_market_bot_run_records_the_economy() -> void:
 	check(sold > 0, "heroes bought goods")
 	for h: Dictionary in record["heroes"]:
 		check(h.has("pack"), "hero snapshot has a pack")
-	run.dispose()

@@ -69,6 +69,7 @@ func _init() -> void:
 		rounds_total += run.round_number
 		deaths_total += run.fallen.size()
 		folk_lost += run.fallen_folk
+		run.dispose()
 	print("Style: %s, %d runs (seeds 1000-%d)" % [style, runs, 999 + runs])
 	print("Win rate: %d%%" % roundi(100.0 * wins / runs))
 	print("Average round reached: %.1f" % (float(rounds_total) / runs))
