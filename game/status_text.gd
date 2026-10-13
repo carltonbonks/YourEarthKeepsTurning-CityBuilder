@@ -23,11 +23,10 @@ static func status(run: RunState) -> String:
 	var folk := PackedStringArray()
 	for role: String in content.townsfolk:
 		folk.append("%s %d" % [content.townsfolk[role]["name"], run.count_role(role)])
-	var text := "[b]Round %d / %d[/b]   Seed %d   %s\nHearth: %d / %d HP\n%s\nPeople %d / %d housing  (%s, heroes %d)\nUpkeep: %d food per day, %d fuel per night" % [
+	var text := "[b]Round %d / %d[/b]   Seed %d   %s\nHearth: %d / %d HP\n%s\nPeople %d / %d housing  (%s, heroes %d)" % [
 		run.round_number, content.int_num("rounds_to_win"), run.run_seed, content.age_name(run.age), maxi(0, int(w.hearth_hp)), int(run.hearth_max_hp()),
-		"  ".join(stock), run.population(), run.housing(), ", ".join(folk), run.living_heroes().size(),
-		food_per_day(run), run.fuel_needed_tonight()]
-	return text + "\n" + fuel_line(run)
+		"  ".join(stock), run.population(), run.housing(), ", ".join(folk), run.living_heroes().size()]
+	return text + "\n" + food_line(run) + "\n" + fuel_line(run)
 
 
 ## Fuel in reserve against the nightly burn: one block per night it will last (up to 8).
@@ -45,8 +44,22 @@ static func fuel_line(run: RunState) -> String:
 		"%d nights" % int(nights) if nights >= 1.0 else "less than a night", spare_wood]
 
 
-static func food_per_day(run: RunState) -> int:
-	return maxi(0, int(ceil(run.population() * run.content.num("food_per_person_per_day") * (1.0 - 0.25 * run.world.count_buildings("drying_rack")))))
+## Food in store against the dawn meal: everyone eats, heroes too. One block per day it will last (up to 8).
+static func food_line(run: RunState) -> String:
+	var eat := run.food_needed_today()
+	var grown := run.food_grown_daily()
+	var food: int = run.stock["food"]
+	var who := "%d townsfolk + %d heroes" % [run.world.folk.size(), run.living_heroes().size()]
+	var garden := ", gardens bring %d" % grown if grown > 0 else ""
+	var net := eat - grown
+	if net <= 0:
+		return "Food: %d, eaten each dawn by %s: %d a day%s, so it keeps growing" % [food, who, eat, garden]
+	var days := float(food) / net
+	var color := "#e05050" if days < 1.0 else ("#e0a050" if days < 2.0 else "#d98aa8")
+	var blocks := mini(8, int(days))
+	var bar := "█".repeat(blocks) + "░".repeat(8 - blocks)
+	return "Food: [color=%s]%s[/color] %d, eaten each dawn by %s: %d a day%s, lasts %s" % [color, bar, food, who, eat, garden,
+		"%d days" % int(days) if days >= 1.0 else "short for the next dawn: gather more or someone leaves"]
 
 
 ## The line above the map: build phase, or day/night, the warned attack and a cold night.

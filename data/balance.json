@@ -21,6 +21,8 @@
 	"base_housing": 8,
 
 	"food_per_person_per_day": 1,
+	"_hunger_note": "Everyone eats food_per_person_per_day at each dawn, heroes included. When there isn't enough, one townsperson walks away and every hero's mood drops; with hunger_turns_folk_away, word gets round and nobody of the leaver's role comes to that dawn's pick.",
+	"hunger_turns_folk_away": true,
 	"fuel_per_night_base": 2,
 	"fuel_per_person_per_night": 0.25,
 	"cold_night_damage": 0.4,

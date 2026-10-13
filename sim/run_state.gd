@@ -48,6 +48,8 @@ var trader_stock := {}
 ## Heroes who left town unhappy.
 var departed: Array[Unit] = []
 var _hungry_today := false
+## The role of whoever left hungry this dawn ("" if nobody): none of that role come to the dawn pick.
+var hunger_turned_away := ""
 
 ## Machine-readable history of this run for stats and debugging (see to_record()).
 ## Format changes bump RECORD_FORMAT so old saved runs can still be read.
@@ -70,7 +72,9 @@ var _hungry_today := false
 ## 11: per round "power" when the wave comes: the town's power level by part (heroes, fighters, defences, total)
 ##     and the wave's ("wave", and "wave_scheduled" before catch-up), on the same scale (sim/power.gd);
 ##     per round "wave_eased" (raiders catch-up held back from the scheduled wave).
-const RECORD_FORMAT := 11
+## 12: per round "food_grown" (food gardens brought in at dawns); a dawn pick has "hunger_turned_away"
+##     (the role of someone who had just left hungry, so none of that role were offered).
+const RECORD_FORMAT := 12
 var record_rounds: Array[Dictionary] = []
 var _round_entry := {}
 
@@ -327,8 +331,12 @@ func choose_pick(index: int) -> void:
 			world.folk_ai.add_folk(card["role"])
 			taken = card["role"]
 			tell("A %s joins the settlement." % content.townsfolk[card["role"]]["name"].to_lower())
-	_round_entry["picks"].append({"day": world.day_index() + 1, "offered": pick_offer.map(_card_label), "taken": taken})
+	var entry := {"day": world.day_index() + 1, "offered": pick_offer.map(_card_label), "taken": taken}
+	if hunger_turned_away != "":
+		entry["hunger_turned_away"] = hunger_turned_away
+	_round_entry["picks"].append(entry)
 	pick_offer = []
+	hunger_turned_away = ""
 	phase = Phase.SIM
 	world.resume()
 	tell("Day %d dawns." % (world.day_index() + 1))
@@ -341,7 +349,8 @@ func _offer_picks() -> void:
 	var roles := content.townsfolk.keys()
 	roles.sort()
 	for role: String in roles:
-		pool.append({"kind": "folk", "role": role, "cost": 0})
+		if role != hunger_turned_away:
+			pool.append({"kind": "folk", "role": role, "cost": 0})
 	if world.hero_ai.count_lodgings() > 0:
 		pool.append({"kind": "hero", "role": "hero", "cost": content.int_num("hero_card_cost"), "hero": _make_hero(true)})
 	pick_offer = []
@@ -453,13 +462,30 @@ func run_until_pause() -> void:
 		step()
 
 
-## Food eaten at each dawn. If there isn't enough, someone leaves.
-func daily_upkeep() -> void:
+## Food the town eats each dawn: every person, townsfolk and heroes alike, less drying racks and relics.
+func food_needed_today() -> int:
 	var racks := world.count_buildings("drying_rack")
 	var growth := 0.0
 	for id in relics:
 		growth += float(content.relics[id]["effects"].get("food_growth", 0.0)) * (round_number - int(relic_acquired_round[id]))
-	var need := maxi(0, int(ceil(population() * content.num("food_per_person_per_day") * (1.0 - 0.25 * racks) - growth)))
+	return maxi(0, int(ceil(population() * content.num("food_per_person_per_day") * (1.0 - 0.25 * racks) - growth)))
+
+
+## Food that standing buildings (gardens) bring in each dawn, before anyone eats.
+func food_grown_daily() -> int:
+	var total := 0
+	for type: String in content.buildings:
+		total += world.count_buildings(type) * int(content.buildings[type].get("daily", {}).get("food", 0))
+	return total
+
+
+## Food eaten at each dawn. If there isn't enough, someone leaves, and none of their role join that dawn.
+func daily_upkeep() -> void:
+	var grown := food_grown_daily()
+	if grown > 0:
+		stock["food"] = int(stock["food"]) + grown
+		_round_entry["food_grown"] = int(_round_entry.get("food_grown", 0)) + grown
+	var need := food_needed_today()
 	if int(stock["food"]) >= need:
 		stock["food"] = int(stock["food"]) - need
 		return
@@ -471,6 +497,8 @@ func daily_upkeep() -> void:
 		world.night_report["left"].append(leaver.display_name)
 		_round_entry["left_hungry"] = int(_round_entry.get("left_hungry", 0)) + 1
 		tell("Hunger: a %s walks away into the wilds." % leaver.display_name.to_lower())
+		if content.balance.get("hunger_turns_folk_away", false):
+			hunger_turned_away = leaver.type_id
 
 
 func fuel_needed_tonight() -> int:

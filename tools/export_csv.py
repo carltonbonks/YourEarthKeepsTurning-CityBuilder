@@ -121,6 +121,7 @@ def main(raw_folder, out_folder):
                 "townsfolk_start": sum(folk_start.values()), "townsfolk_end": sum(folk_end.values()) if folk_end else "",
                 "buildings_ordered": sum(1 for a in rd.get("actions", []) if a.get("kind", "build") == "build"),
                 "left_hungry": rd.get("left_hungry", 0),
+                "food_grown": rd.get("food_grown", 0),
                 "roads_staked": sum(1 for a in rd.get("actions", []) if a.get("kind") == "road"),
                 "staked_squares": rd.get("town", {}).get("staked", ""),
                 "trail_squares": rd.get("town", {}).get("trails", ""),
@@ -172,6 +173,7 @@ def main(raw_folder, out_folder):
                     "offered_3": offered[2] if len(offered) > 2 else "",
                     "hero_offered": 1 if any(o.startswith("hero:") for o in offered) else 0,
                     "taken": taken or "(skipped)", "taken_kind": "hero" if taken.startswith("hero:") else ("none" if not taken else "townsfolk"),
+                    "hunger_turned_away": p.get("hunger_turned_away", ""),
                 })
             for a in rd.get("actions", []):
                 if a.get("kind", "build") not in ("build", "price"):
@@ -219,7 +221,7 @@ def main(raw_folder, out_folder):
     columns = {
         "runs": list(tables["runs"][0].keys()) if tables["runs"] else ["run_id"],
         "rounds": list(tables["rounds"][0].keys()) if tables["rounds"] else ["run_id"],
-        "picks": ["run_id", "round", "day", "offered_1", "offered_2", "offered_3", "hero_offered", "taken", "taken_kind"],
+        "picks": ["run_id", "round", "day", "offered_1", "offered_2", "offered_3", "hero_offered", "taken", "taken_kind", "hunger_turned_away"],
         "builds": ["run_id", "round", "building"],
         "wave_enemies": ["run_id", "round", "enemy", "count"],
         "deaths": ["run_id", "round", "day", "at_night", "name", "role", "is_hero", "killer"],

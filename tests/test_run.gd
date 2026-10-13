@@ -258,3 +258,53 @@ func test_hungry_leavers_show_in_the_night_report() -> void:
 	run.world.reset_night_report()
 	run.daily_upkeep()
 	check_eq(run.world.night_report["left"].size(), 1, "someone who walks away hungry is in the report")
+
+
+func test_heroes_eat_like_everyone() -> void:
+	var run := _run()
+	var per := run.content.num("food_per_person_per_day")
+	check(not run.living_heroes().is_empty(), "the run starts with heroes")
+	check_eq(run.food_needed_today(), int(ceil((run.world.folk.size() + run.living_heroes().size()) * per)),
+		"townsfolk and heroes each eat")
+
+
+func test_hunger_turns_the_same_kind_away() -> void:
+	var run := _run()
+	run.begin_round()
+	run.choose_pick(-1)
+	run.stock["food"] = 0
+	run.world.reset_night_report()
+	var before := {}
+	for u in run.world.folk:
+		before[u] = u.type_id
+	run.daily_upkeep()
+	var left := ""
+	for u: Unit in before:
+		if not run.world.folk.has(u):
+			left = before[u]
+	check(left != "", "someone left hungry")
+	check_eq(run.hunger_turned_away, left, "word spreads among their kind")
+	for i in 5:
+		run._offer_picks()
+		for card in run.pick_offer:
+			check(card["kind"] != "folk" or card["role"] != left, "no %s comes the dawn after one left hungry" % left)
+	run.choose_pick(-1)
+	check_eq(run._round_entry["picks"][-1].get("hunger_turned_away", ""), left, "the pick record says who stayed away")
+	run.stock["food"] = 99
+	run.daily_upkeep()
+	check_eq(run.hunger_turned_away, "", "with food again, they come back")
+
+
+func test_gardens_bring_food_every_dawn() -> void:
+	var run := _run()
+	var grows := int(run.content.buildings["garden"]["daily"]["food"])
+	check(run.build("garden"), "a garden can be ordered")
+	run.world.buildings[-1]["work_left"] = 0.0
+	check_eq(run.food_grown_daily(), grows, "a standing garden grows food")
+	run.begin_round()
+	run.choose_pick(-1)
+	run.stock["food"] = 50
+	var need := run.food_needed_today()
+	run.daily_upkeep()
+	check_eq(run.stock["food"], 50 + grows - need, "garden food arrives before the town eats")
+	check_eq(run._round_entry["food_grown"], grows, "food grown is recorded")
