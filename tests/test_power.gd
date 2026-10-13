@@ -30,7 +30,7 @@ func test_shield_counts_as_extra_hp() -> void:
 func test_later_waves_are_stronger() -> void:
 	var run := _run()
 	var c := run.content
-	check(Power.wave(c, run.generate_wave(8)) > Power.wave(c, run.generate_wave(1)) * 3.0, "round 8 wave is far stronger than round 1")
+	check(Power.wave(c, run.waves.generate(8)) > Power.wave(c, run.waves.generate(1)) * 3.0, "round 8 wave is far stronger than round 1")
 
 
 func test_town_power_counts_heroes_fighters_and_defences() -> void:
@@ -80,8 +80,8 @@ func _weaken(run: RunState) -> void:
 func test_catch_up_eases_a_wave_that_far_outmatches_the_town() -> void:
 	var run := _run()
 	_weaken(run)
-	var scheduled := run.generate_wave(8)
-	var planned := run.plan_wave(8)
+	var scheduled := run.waves.generate(8)
+	var planned := run.waves.plan(8)
 	check(planned.size() < scheduled.size(), "a weak town faces fewer raiders")
 	check_eq(run.wave_eased, scheduled.size() - planned.size(), "held-back raiders are counted")
 	check(planned.size() >= ceili(scheduled.size() * run.content.num("catch_up_min_share")), "never below the minimum share")
@@ -92,14 +92,14 @@ func test_catch_up_never_grows_a_wave() -> void:
 	var run := _run()
 	for i in 40:
 		run.world.folk_ai.add_folk("warrior")
-	check_eq(run.plan_wave(3), run.generate_wave(3), "a strong town gets exactly the scheduled wave")
+	check_eq(run.waves.plan(3), run.waves.generate(3), "a strong town gets exactly the scheduled wave")
 	check_eq(run.wave_eased, 0, "nothing held back")
 
 
 func test_catch_up_keeps_the_boss_and_can_be_turned_off() -> void:
 	var run := _run()
 	_weaken(run)
-	var last := run.content.int_num("rounds_to_win")
-	check(run.plan_wave(last).has("antlered_king"), "the boss always comes")
+	var king_round := int(run.content.enemies["antlered_king"]["boss_round"])
+	check(run.waves.plan(king_round).has("antlered_king"), "the boss always comes")
 	run.content.balance["catch_up_max_ratio"] = 0
-	check_eq(run.plan_wave(8), run.generate_wave(8), "0 turns catch-up off")
+	check_eq(run.waves.plan(8), run.waves.generate(8), "0 turns catch-up off")

@@ -157,7 +157,7 @@ func _pay_town(hero: Unit, amount: int, reason: String) -> int:
 		return 0
 	hero.gold -= paid
 	w.run.stock["shells"] = int(w.run.stock["shells"]) + paid
-	w.run.note_hero_spending(reason, paid)
+	w.run.record.note_hero_spending(reason, paid)
 	return paid
 
 
@@ -244,7 +244,7 @@ func roll_whims() -> void:
 		hero.whim = rng.weighted(weights)
 		if hero.whim == "":
 			hero.whim = "none"
-		w.run.note_whim(hero)
+		w.run.record.note_whim(hero)
 		if hero.whim != "none":
 			notes.append("%s is %s" % [hero.display_name, w.content.whims[hero.whim]["name"]])
 	if not notes.is_empty():
@@ -317,7 +317,7 @@ func give_item(hero: Unit, item: Dictionary) -> void:
 	else:
 		hero.spares.append(item)
 		w.run.tell("%s finds a %s and keeps it to sell." % [hero.display_name, Loot.describe(w.content, item)])
-	w.run.note_loot(hero, item, equip)
+	w.run.record.note_loot(hero, item, equip)
 	_trim_spares(hero)
 
 
@@ -405,8 +405,8 @@ func _buy(hero: Unit, pick: Dictionary) -> void:
 	hero.gold -= price
 	w.run.stock["shells"] = int(w.run.stock["shells"]) + price
 	hero.mood_events["bought"] = 1
-	w.run.note_hero_spending("market", price)
-	w.run.note_market_sale(hero, good, price)
+	w.run.record.note_hero_spending("market", price)
+	w.run.record.note_market_sale(hero, good, price)
 	var where: String = w.content.buildings[stall["type"]]["name"].to_lower()
 	if good.has("item"):
 		var item: Dictionary = good["item"]
@@ -481,5 +481,5 @@ func sell_shards(hero: Unit) -> void:
 	w.run.stock["shells"] = int(w.run.stock["shells"]) - pay
 	hero.gold += pay
 	hero.carry_amount = 0
-	w.run.note_economy(hero.carrying, n)
+	w.run.record.note_economy(hero.carrying, n)
 	w.run.tell("%s brings back %d %s and sells it for %d shells." % [hero.display_name, n, hero.carrying, pay])

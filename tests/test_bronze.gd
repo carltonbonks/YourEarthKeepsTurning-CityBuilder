@@ -54,9 +54,9 @@ func test_bronze_buildings_wait_for_the_moot() -> void:
 	run.stock["shells"] = 99
 	check(not run.can_build("smelter"), "no smelter in the stone age")
 	run.build("market")
-	check(not run.can_build("bronze_moot"), "the moot needs 12 people")
+	check(not run.can_build("bronze_moot"), "the moot needs 9 people")
 	_crowd(run, 12)
-	check(run.can_build("bronze_moot"), "with a market and 12 people the moot can be ordered")
+	check(run.can_build("bronze_moot"), "with a market and enough people the moot can be ordered")
 	check_eq(run.age, "neolithic", "still the stone age while the moot is unbuilt")
 	_raise(run, "bronze_moot")
 	check_eq(run.age, "bronze", "raising the moot brings the bronze age")
@@ -160,7 +160,7 @@ func test_tool_sets_cost_bronze_and_upgrade_a_group() -> void:
 	run.stock["bronze"] = 10
 	check(run.buy_tools("bronze_spears"), "spears bought")
 	check(warrior.attack > attack, "warriors hit harder")
-	check(run.has_metal_tools("warrior"), "warriors now strike with metal")
+	check(run.has_tools_with("warrior", "metal"), "warriors now strike with metal")
 	check_eq(int(run.stock["bronze"]), 6, "the ingots are spent")
 	check(not run.buy_tools("bronze_spears"), "each set only once")
 	var plain := run.world.folk_ai.work_rate(run.world.folk_ai.add_folk("craftsperson"))
@@ -218,10 +218,10 @@ func test_bronze_shields_turn_stone_but_not_metal() -> void:
 
 func test_reavers_join_waves_from_round_6() -> void:
 	var run := _run()
-	check(not run.generate_wave(5).has("bronze_reaver"), "no reavers before round 6")
+	check(not run.waves.generate(5).has("bronze_reaver"), "no reavers before round 6")
 	var seen := false
 	for r in range(6, 11):
-		seen = seen or run.generate_wave(r).has("bronze_reaver")
+		seen = seen or run.waves.generate(r).has("bronze_reaver")
 	check(seen, "reavers turn up in later waves")
 
 
@@ -309,13 +309,13 @@ func test_heroes_sleeping_rough_grow_unhappy_and_leave() -> void:
 	_raise(run, "shrine")
 	# Fill every bed with other heroes so one is left by the fire.
 	while not run.heroes.any(func(h: Unit) -> bool: return h.lodging < 0):
-		run._add_hero(run._make_hero())
+		run.people.add_hero(run.people.make_hero())
 	var rough: Array = run.heroes.filter(func(h: Unit) -> bool: return h.lodging < 0)
 	check(not rough.is_empty(), "someone sleeps rough")
 	var hero: Unit = rough[0]
 	hero.mood = run.content.num("mood_leave_at") + 3.0
 	hero.slept = "rough"
-	run._update_moods()
+	run.people.update_moods()
 	check(not run.heroes.has(hero), "an unhappy hero leaves")
 	check(run.departed.has(hero), "and is remembered as departed")
 	check(run.world.night_report["heroes_left"].has(hero.display_name), "the dawn report names them")
@@ -327,7 +327,7 @@ func test_happy_heroes_stay_and_mood_rises() -> void:
 	var before := hero.mood
 	hero.slept = "favourite"
 	hero.mood_events = {"bought": 1}
-	run._update_moods()
+	run.people.update_moods()
 	check(hero.mood > before, "a good night and a purchase lift mood")
 	check(run.heroes.has(hero), "a happy hero stays")
 	check(hero.mood_events.is_empty() and hero.slept == "", "the day's events are used up")

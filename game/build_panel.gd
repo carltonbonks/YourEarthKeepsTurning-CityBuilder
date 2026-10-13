@@ -49,7 +49,7 @@ func refresh() -> void:
 			cost.append("%d %s" % [def["cost"][r], r])
 		var owned := run.world.count_buildings(type, false)
 		var btn := Button.new()
-		btn.text = "%s  (%s)%s" % [def["name"], ", ".join(cost), "  [%d/%d]" % [owned, def["max"]] if def.has("max") else ("  [%d]" % owned if owned > 0 else "")]
+		btn.text = "%s  (%s)%s" % [def["name"], ", ".join(cost), "  [%d/%d]" % [owned, run.building_max(type)] if def.has("max") else ("  [%d]" % owned if owned > 0 else "")]
 		btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], def["work"]]
 		var blocked := _build_blocker(type)
 		if blocked != "":
@@ -70,7 +70,7 @@ func refresh() -> void:
 
 	_refresh_bronze()
 	_refresh_prices()
-	var counts := run.wave_counts()
+	var counts := run.waves.counts()
 	var ids := counts.keys()
 	ids.sort()
 	var parts := PackedStringArray()
@@ -116,7 +116,7 @@ func _build_blocker(type: String) -> String:
 	if needs != "" and run.world.count_buildings(needs, false) == 0:
 		out.append("Needs a %s first." % content.buildings[needs]["name"].to_lower())
 	if not content.age_reached(run.age, def.get("age", "")):
-		out.append("Needs the %s (raise the Bronze moot)." % content.age_name(def["age"]).to_lower())
+		out.append("Needs the %s (raise the %s)." % [content.age_name(def["age"]).to_lower(), content.age_builder_name(def["age"])])
 	if run.population() < int(def.get("min_people", 0)):
 		out.append("Needs %d people (you have %d)." % [def["min_people"], run.population()])
 	if def.has("ages_up") and content.age_reached(run.age, def["ages_up"]):
@@ -126,15 +126,19 @@ func _build_blocker(type: String) -> String:
 	return " ".join(out)
 
 
-## Bronze-age choices while building: tool sets for townsfolk and the southern caravan.
+## Later-age choices while building: tool sets for townsfolk groups and the southern caravan.
 func _refresh_bronze() -> void:
 	var content := run.content
 	if not content.age_reached(run.age, "bronze"):
 		return
-	UiKit.heading(_build_list, "Bronze tool sets (once each)")
+	UiKit.heading(_build_list, "Tool sets (once each)")
 	UiKit.note(_build_list, "Bronze ingots: %d. Every ingot here is one the bronzesmith can't turn into hero gear." % run.stock["bronze"])
+	if content.age_reached(run.age, "medieval"):
+		UiKit.note(_build_list, "Iron: %d, steel: %d. Every bloom here is one the blacksmith can't forge for heroes." % [run.stock["iron"], run.stock["steel"]])
 	for id: String in content.ages["tools"]:
 		var def: Dictionary = content.ages["tools"][id]
+		if not content.age_reached(run.age, def.get("age", "")):
+			continue
 		var cost := PackedStringArray()
 		for r: String in def["cost"]:
 			cost.append("%d %s" % [def["cost"][r], r])

@@ -1,5 +1,5 @@
 {
-	"_note": "Hero classes, personality traits, names and whims. wilds = how keen a hero is to hunt at the dens by day (0 = stays home). Traits also drive retreat, target choice, where heroes like to sleep (lodging, first match wins), when they feel tired (tired_at, energy 0-100), how they rate items (likes: weight per item stat) and how likely each whim is (whims: weights). max_markup = the dearest stall price a hero will pay (1.5 = Dear).",
+	"_note": "Hero classes, personality traits, names and whims. wilds = how keen a hero is to hunt at the dens by day (0 = stays home). Traits also drive retreat, target choice, where heroes like to sleep (lodging, first match wins), when they feel tired (tired_at, energy 0-100), how they rate items (likes: weight per item stat) and how likely each whim is (whims: weights). max_markup = the dearest stall price a hero will pay (1.5 = Dear). A class with needs only turns up once that building stands, and card_cost replaces the usual hero card cost.",
 	"classes": {
 		"hunter": {
 			"name": "Hunter",
@@ -27,6 +27,18 @@
 			"cooldown": 0.8,
 			"speed": 92,
 			"color": "#9b7fe0"
+		},
+		"knight": {
+			"name": "Knight",
+			"tags": ["proud"],
+			"needs": "guildhall",
+			"card_cost": 45,
+			"hp": 80,
+			"attack": 9,
+			"range": 28,
+			"cooldown": 1.1,
+			"speed": 62,
+			"color": "#c8c8e0"
 		}
 	},
 	"traits": {
@@ -42,6 +54,7 @@
 			"wilds": 1.0,
 			"lodging": [
 				"tavern",
+				"guildhall",
 				"longhouse"
 			],
 			"tired_at": 20,
@@ -75,6 +88,7 @@
 			"wilds": 0.3,
 			"lodging": [
 				"shrine",
+				"guildhall",
 				"longhouse"
 			],
 			"tired_at": 40,

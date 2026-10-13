@@ -22,7 +22,15 @@
 		"bronze_sword": {"workshop": "bronzesmith", "item": "bronze_sword", "min_tier": 2, "max_tier": 4, "needs": {"bronze": 1, "wood": 1}, "work": 14, "stall": "arms", "price": 13},
 		"bronze_axe": {"workshop": "bronzesmith", "item": "bronze_axe", "min_tier": 2, "max_tier": 4, "needs": {"bronze": 1, "wood": 2}, "work": 14, "stall": "arms", "price": 13},
 		"bronze_scale": {"workshop": "bronzesmith", "item": "bronze_scale", "min_tier": 2, "max_tier": 4, "needs": {"bronze": 2, "hides": 1}, "work": 18, "stall": "hides", "price": 14},
-		"bronze_torc": {"workshop": "bronzesmith", "item": "bronze_torc", "min_tier": 2, "max_tier": 4, "needs": {"bronze": 1}, "work": 10, "stall": "charms", "price": 12}
+		"bronze_torc": {"workshop": "bronzesmith", "item": "bronze_torc", "min_tier": 2, "max_tier": 4, "needs": {"bronze": 1}, "work": 10, "stall": "charms", "price": 12},
+		"charcoal": {"workshop": "charcoal_burner", "makes": {"charcoal": 2}, "keep": 12, "needs": {"wood": 3}, "work": 8},
+		"iron": {"workshop": "bloomery", "makes": {"iron": 1}, "keep": 8, "needs": {"bog_iron": 2, "charcoal": 2}, "work": 12},
+		"steel": {"workshop": "blacksmith", "makes": {"steel": 1}, "keep": 4, "needs": {"iron": 1, "charcoal": 2}, "work": 16},
+		"iron_spear": {"workshop": "blacksmith", "item": "iron_spear", "min_tier": 3, "max_tier": 5, "needs": {"iron": 1, "wood": 1}, "work": 14, "stall": "arms", "price": 15},
+		"steel_longsword": {"workshop": "blacksmith", "item": "steel_longsword", "min_tier": 4, "max_tier": 5, "needs": {"steel": 1, "wood": 1}, "work": 18, "stall": "arms", "price": 18},
+		"mail_hauberk": {"workshop": "blacksmith", "item": "mail_hauberk", "min_tier": 3, "max_tier": 5, "needs": {"iron": 2, "hides": 1}, "work": 18, "stall": "hides", "price": 15},
+		"steel_plate": {"workshop": "blacksmith", "item": "steel_plate", "min_tier": 4, "max_tier": 5, "needs": {"steel": 2, "hides": 1}, "work": 22, "stall": "hides", "price": 19},
+		"reliquary": {"workshop": "chapel", "item": "reliquary", "min_tier": 3, "max_tier": 5, "needs": {"bronze": 1, "bone": 2}, "work": 14, "stall": "charms", "price": 12}
 	},
 	"provisions": {
 		"smoked_meat": {"name": "smoked meat", "energy": 40},

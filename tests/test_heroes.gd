@@ -55,7 +55,7 @@ func test_full_lodging_overflows() -> void:
 	var shrine := _raise(run, "shrine")
 	var longhouse := _raise(run, "longhouse")
 	for i in 2:
-		run._add_hero(run._make_hero())
+		run.people.add_hero(run.people.make_hero())
 	for hero in run.heroes:
 		hero.trait_id = "cautious"
 	run.world.hero_ai.assign_lodgings()
@@ -74,7 +74,7 @@ func test_any_lodging_brings_hero_cards() -> void:
 		for card in run.pick_offer:
 			if card["kind"] == "hero":
 				seen += 1
-		run._offer_picks()
+		run.people.offer_picks()
 	check(seen > 0, "a mead hall alone lets heroes appear at dawn")
 
 
@@ -83,7 +83,7 @@ func test_lodging_draws_heroes_who_like_it() -> void:
 	_raise(run, "tavern")
 	var greedy := 0
 	for i in 200:
-		if run._make_hero(true).trait_id == "greedy":
+		if run.people.make_hero(true).trait_id == "greedy":
 			greedy += 1
 	# 4 traits: greedy and brave both favour the mead hall, weight 3 each vs 1 for the others.
 	check(greedy > 50, "a mead hall draws greedy heroes more often (%d of 200)" % greedy)
@@ -199,19 +199,19 @@ func test_selling_loot_pays_hero_and_settlement() -> void:
 	hero.spares.append(Loot.make("fur_cloak", 2, ["sturdy"]))
 	hero.gold = 0
 	var shells: int = run.stock["shells"]
-	run._heroes_sell_finds()
+	run.people.heroes_sell_finds()
 	var value := Loot.value(run.content, Loot.make("fur_cloak", 2, ["sturdy"]))
 	var cut := roundi(value * float(run.content.items["sell_tax"]))
 	check_eq(run.stock["shells"], shells + cut, "the settlement keeps a cut")
 	check(hero.spares.is_empty(), "spares sold")
-	check_eq(run._round_entry["sales"].size(), 1, "sale recorded")
+	check_eq(run.record.entry["sales"].size(), 1, "sale recorded")
 
 
 func test_no_traders_sell_gear_between_rounds() -> void:
 	var run := _run()
 	var hero := _hero_with_trait(run, "brave")
 	hero.gold = 200
-	run._heroes_sell_finds()
+	run.people.heroes_sell_finds()
 	check(not hero.items.has("weapon"), "gear only comes from the market's stalls now")
 	check_eq(hero.gold, 200, "nothing bought")
 

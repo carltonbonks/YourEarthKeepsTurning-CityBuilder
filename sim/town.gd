@@ -353,7 +353,7 @@ func pave(i: int) -> bool:
 			return false
 		for r: String in cost:
 			w.run.stock[r] = int(w.run.stock[r]) - int(cost[r])
-		w.run.note_spend("paving", cost)
+		w.run.record.note_spend("paving", cost)
 		_paid[kind] = int(w.content.town["stretch_cells"])
 	_paid[kind] = int(_paid[kind]) - 1
 	pathing.set_ground(i, kind)

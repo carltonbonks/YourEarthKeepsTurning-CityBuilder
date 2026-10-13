@@ -86,7 +86,7 @@ func test_no_hero_cards_without_a_longhouse() -> void:
 		_to_round_end(run)
 		if run.phase != RunState.Phase.RELIC:
 			break
-		for card in run._round_entry["picks"]:
+		for card in run.record.entry["picks"]:
 			for label: String in card["offered"]:
 				check(not label.begins_with("hero:"), "hero card without lodging")
 		run.choose_relic("")
@@ -105,7 +105,7 @@ func test_longhouse_brings_hero_cards() -> void:
 			if card["kind"] == "hero":
 				heroes_seen += 1
 				check_eq(card["cost"], run.content.int_num("hero_card_cost"), "hero card costs shells")
-		run._offer_picks()
+		run.people.offer_picks()
 	check(heroes_seen > 0, "hero cards appear once the longhouse stands")
 
 
@@ -116,7 +116,7 @@ func test_hero_card_needs_shells() -> void:
 	run.build("longhouse")
 	run.world.buildings[0]["work_left"] = 0.0
 	run.begin_round()
-	run.pick_offer = [{"kind": "hero", "role": "hero", "cost": 30, "hero": run._make_hero()}]
+	run.pick_offer = [{"kind": "hero", "role": "hero", "cost": 30, "hero": run.people.make_hero()}]
 	run.stock["shells"] = 10
 	check(not run.can_take_pick(0), "can't afford hero with 10 shells")
 	run.stock["shells"] = 40
@@ -163,12 +163,15 @@ func test_hunger_drives_people_away() -> void:
 
 func test_waves_grow() -> void:
 	var run := _run()
-	check(run.generate_wave(8).size() > run.generate_wave(1).size(), "round 8 wave should be bigger than round 1")
+	check(run.waves.generate(8).size() > run.waves.generate(1).size(), "round 8 wave should be bigger than round 1")
 
 
-func test_last_round_has_boss() -> void:
+func test_bosses_lead_their_rounds() -> void:
 	var run := _run()
-	check(run.generate_wave(run.content.int_num("rounds_to_win")).has("antlered_king"), "final wave includes the boss")
+	var king_round := int(run.content.enemies["antlered_king"]["boss_round"])
+	check(run.waves.generate(king_round).has("antlered_king"), "the Antlered King leads his round's wave")
+	check(not run.waves.generate(king_round + 1).has("antlered_king"), "and only that one")
+	check(run.waves.generate(run.content.int_num("rounds_to_win")).has("black_margrave"), "the final wave has the Margrave")
 
 
 func test_relic_changes_stats() -> void:
@@ -244,7 +247,7 @@ func test_huts_need_fuel() -> void:
 func test_nights_are_recorded() -> void:
 	var run := _run()
 	_to_round_end(run)
-	var nights: Array = run._round_entry["nights"]
+	var nights: Array = run.record.entry["nights"]
 	check_eq(nights.size(), 3, "one report per night")
 	check_eq(nights[2]["night"], 3, "last report is night 3")
 
@@ -284,11 +287,11 @@ func test_hunger_turns_the_same_kind_away() -> void:
 	check(left != "", "someone left hungry")
 	check_eq(run.hunger_turned_away, left, "word spreads among their kind")
 	for i in 5:
-		run._offer_picks()
+		run.people.offer_picks()
 		for card in run.pick_offer:
 			check(card["kind"] != "folk" or card["role"] != left, "no %s comes the dawn after one left hungry" % left)
 	run.choose_pick(-1)
-	check_eq(run._round_entry["picks"][-1].get("hunger_turned_away", ""), left, "the pick record says who stayed away")
+	check_eq(run.record.entry["picks"][-1].get("hunger_turned_away", ""), left, "the pick record says who stayed away")
 	run.stock["food"] = 99
 	run.daily_upkeep()
 	check_eq(run.hunger_turned_away, "", "with food again, they come back")
@@ -306,4 +309,4 @@ func test_gardens_bring_food_every_dawn() -> void:
 	var need := run.food_needed_today()
 	run.daily_upkeep()
 	check_eq(run.stock["food"], 50 + grows - need, "garden food arrives before the town eats")
-	check_eq(run._round_entry["food_grown"], grows, "food grown is recorded")
+	check_eq(run.record.entry["food_grown"], grows, "food grown is recorded")

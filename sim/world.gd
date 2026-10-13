@@ -399,8 +399,10 @@ func _batter(unit: Unit, square: int) -> void:
 		return
 	unit.cooldown_left = unit.cooldown
 	shots.append({"from": unit.pos, "to": pathing.center(square), "ranged": false, "time": time})
+	if content.unit_has_tag(unit, "siege"):
+		run.record.note_count("siege_damage", roundi(unit.attack * enemy_ai.war_chant()))
 	if pathing.hit_wall(square, unit.attack * enemy_ai.war_chant()):
-		run.note_breach()
+		run.record.note_breach()
 		if not bool(night_report.get("breached", false)):
 			night_report["breached"] = true
 			run.tell("Raiders break through a gate.")
@@ -431,16 +433,19 @@ func hit(attacker: Unit, victim: Unit) -> void:
 		if attacker.energy <= 0.0:
 			amount *= content.num("exhausted_attack")
 		attacker.energy = maxf(0.0, attacker.energy - content.num("energy_per_attack"))
-	if victim.is_enemy() and not _metal_blow(attacker):
-		amount *= enemy_ai.shield_left(victim)
+	if victim.is_enemy():
+		if attacker.is_hero():
+			amount += Loot.bane(content, attacker, victim)
+		amount *= enemy_ai.armour_left(victim, _blow_is(attacker, "metal"), _blow_is(attacker, "steel"))
 	damage(attacker, victim, amount)
 
 
-## Bronze shields turn stone; a bronze weapon or bronze-armed warrior cuts through.
-func _metal_blow(attacker: Unit) -> bool:
+## Bronze shields turn stone and mail turns anything short of steel. A hero's blow is what their
+## weapon is made of; a warrior's is what their group's tool sets give ("metal", "steel").
+func _blow_is(attacker: Unit, kind: String) -> bool:
 	if attacker.is_hero():
-		return attacker.items.has("weapon") and content.items["bases"][attacker.items["weapon"]["base"]].get("metal", false)
-	return attacker.is_folk() and run.has_metal_tools(attacker.type_id)
+		return attacker.items.has("weapon") and content.items["bases"][attacker.items["weapon"]["base"]].get(kind, false)
+	return attacker.is_folk() and run.has_tools_with(attacker.type_id, kind)
 
 
 func damage(attacker: Unit, victim: Unit, amount: float) -> void:

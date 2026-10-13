@@ -23,7 +23,10 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | File | Role |
 | --- | --- |
 | `sim/content.gd` | `Content`: loads every `data/*.json` once. The only place data is read. Helpers such as `has_tag` / `unit_has_tag`, `age_reached`, `recipes_for`. |
-| `sim/run_state.gd` | `RunState`: one run. Phases (BUILD, PICK, SIM, RELIC, WON, LOST), stock, building orders, dawn picks, promotions, relics (`mod()`), hero mood, upkeep, wave generation, and the run record (`to_record()`, `RECORD_FORMAT`). |
+| `sim/run_state.gd` | `RunState`: one run. Phases (BUILD, PICK, SIM, RELIC, WON, LOST), stock, building orders, taking dawn cards, relics (`mod()`), ages, tool sets and the caravan, upkeep (food, fuel, fields). Its three parts below hold the rest. |
+| `sim/people.gd` | `People` (`run.people`): dealing the dawn cards (townsfolk, heroes, families, Promote cards), promotions and knighting, making and adding heroes, hero mood and heroes leaving, levelling, healing and selling finds between rounds. |
+| `sim/wave_planner.gd` | `WavePlanner` (`run.waves`): each round's wave from its budget, bosses on their `boss_round`, catch-up easing (`plan`), early-night probes, the wave preview (`counts`). |
+| `sim/run_record.gd` | `RunRecord` (`run.record`): the run's history. `to_record()`, `RECORD_FORMAT` and its changelog, the round being played (`entry`) and every `note_*` logger other parts call. |
 | `sim/world.gd` | `World`: the map and everything on it, stepped in fixed ticks. Owns all world state, the day/night clock, the map, and the shared movement and combat helpers (`walk_toward`, `fight`, `hit`, `damage`, `nearest_enemy`). Every move goes through `walk_toward`, which asks `Pathing` for the next point and walks faster on trails and roads. Pauses at dawn and at round end for `RunState`. Behaviour lives in four parts it creates: |
 | `sim/town.gd` | `Town` (`world.town`): the ring town. Plots in rings and sectors round the hearth, obstacles, thickets, where a new building goes (`choose_plot`: its `near` key, off paving if it can, never walling off the hearth; a gate in the busiest gap), what building over ground does (`occupy`: trails vanish, paving is lifted and refunded), paving the busiest worn paths (`next_to_pave`, `pave`) and gates (`on_built`, `patch_walls`, `gate_health`). |
 | `sim/pathing.gd` | `Pathing` (`world.pathing`): the ground as a grid of squares (solid or open; plain, thicket, trail, worn path or a road kind; gate health) and how units find their way (`next_point`, Godot's AStarGrid2D: one grid for townsfolk and heroes, who walk through gates, and one for raiders, where gates cost extra). Raiders that walk into a gate batter it (`World.walk_toward`). Walking straight when that is as quick, cached routes otherwise; desire paths worn by feet (`tread`, `wear_trails` at dawn, which also lists `busy_paths` for paving). |
@@ -35,7 +38,7 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `sim/unit_grid.gd` | `UnitGrid`: buckets units by position so `World.nearest_enemy` / `nearest_friend` only look nearby. Same answers as a full scan. |
 | `sim/loot.gd` | `Loot`: items as plain data `{base, tier, affixes}`; rolling, stats, how a hero rates an item. |
 | `sim/seeded_rng.gd` | `SeededRng`: every random roll goes through one of these. |
-| `sim/autoplayer.gd` | `AutoPlayer`: scripted player for tests and balance runs (styles: balanced, workers, heroes, market, bronze). |
+| `sim/autoplayer.gd` | `AutoPlayer`: scripted player for tests and balance runs (styles: balanced, workers, heroes, market, bronze, medieval). |
 | `sim/power.gd` | `Power`: power levels. A fighter rates sqrt(effective HP x damage per second); the town (heroes, `fighter` townsfolk, hearth and towers) and a wave are sums on the same scale. Logged per round as `power`. `RunState.plan_wave` uses it for catch-up: a wave that far outmatches the town is eased (never grown). |
 | `sim/run_stats.gd` | Plain-language stats from run records (Run history screen and `tools/run_report.gd`). |
 | `game/main.gd` | The one screen: runs the flow (new run, ticking, pausing for decisions) and lays out the panels. UI built in code (placeholder). |
@@ -71,6 +74,9 @@ Descriptive tags no rule reads yet are fine: they show in tooltips by name and g
 | `sentient` | `World.damage` | turns on whoever hits it for a while |
 | `fighter` | `Power.town` | a townsfolk role that counts toward the town's power level |
 | `beast` | the hunting lodge's `prize` in `data/buildings.json`, used by `Market` | the lodge pays shells and extra hides per kill |
+| `undead` | the chapel's `prize`, and the reliquary's `bane` in `data/items.json` (`Loot.bane`) | the chapel pays per kill; reliquaries hit them harder |
+| `siege` | `EnemyAI.enemy_tick`, `World._batter` | ignores people, goes for gates and the hearth (battering rams) |
+| `proud` | `People.update_moods` | knights: sleeping rough hurts twice as much, wearing steel cheers them |
 
 When a rule reads a tag:
 1. Read it through `Content.has_tag(kind, id, tag)` or `Content.unit_has_tag(unit, tag)` (a unit carries its type's tags; a hero also carries its trait's), with the tag written in quotes. Never check ids or names instead.
@@ -85,7 +91,7 @@ Tooltips show tags for creatures today (`Tooltips.tag_notes(run, kind, id)` work
 All randomness goes through the run's `SeededRng` (never `randi()`/`randf()`), and the sim steps in fixed ticks. The same seed and the same choices must give the same run, so "seed 4821, round 6" is reproducible.
 
 ### 4. Run records
-Every run is saved as `RunState.to_record()`, used by the game's Run history, the bots and `tools/export_csv.py`. When a mechanic changes what a run looks like: extend the record (never drop or rename fields), bump `RECORD_FORMAT` with a comment saying what the new format adds, add the new fields to `tools/export_csv.py`, and keep `tests/test_run_record.gd` passing.
+Every run is saved as `RunState.to_record()` (built by `RunRecord`), used by the game's Run history, the bots and `tools/export_csv.py`. When a mechanic changes what a run looks like: extend the record (never drop or rename fields), bump `RECORD_FORMAT` in `sim/run_record.gd` with a comment saying what the new format adds, add the new fields to `tools/export_csv.py`, and keep `tests/test_run_record.gd` passing.
 
 ### 5. Tests and balance
 - Every new rule gets a test in `tests/`, usually by building a `RunState` with a fixed seed and stepping it (see `tests/test_market.gd`).

@@ -53,7 +53,7 @@ func _init() -> void:
 			record["id"] = "%s-%s-%d" % [label, style, run.run_seed]
 			record["game_version"] = label
 			out_file.store_line(JSON.stringify(record))
-		for rd: Dictionary in run.record_rounds:
+		for rd: Dictionary in run.record.rounds:
 			if rd.has("power"):
 				var p: Array = power_by_round.get(rd["round"], [0, 0.0, 0.0, 0.0])
 				var town := float(rd["power"]["town"]["total"])

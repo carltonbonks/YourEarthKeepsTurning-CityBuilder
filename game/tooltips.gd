@@ -58,6 +58,8 @@ static func enemy(run: RunState, type_id: String, u: Unit = null) -> Dictionary:
 		t["lines"].append("Health %d, attack %s" % [int(def["hp"]), _num(float(def["attack"]))])
 	if def.has("shield"):
 		t["lines"].append("Shrugs off %d%% of each blow unless it is metal" % roundi(float(def["shield"]) * 100.0))
+	if def.has("mail"):
+		t["lines"].append("Mail: shrugs off %d%% of each blow unless it is steel" % roundi(float(def["mail"]) * 100.0))
 	if def.has("war_chant"):
 		t["lines"].append("Hangs back and makes every enemy hit %d%% harder while it lives" % roundi(float(def["war_chant"]) * 100.0))
 	var yields: Dictionary = def.get("yields", {})

@@ -8,7 +8,7 @@ Re-running is safe: runs are de-duplicated by run_id and the tables are rebuilt.
 Usage: python3 tools/export_csv.py <raw_folder> <csv_folder>
 
 Run records come from the game's Run history (Copy / Download) and from
-tools/balance_run.gd out=... (bot runs). See RunState.to_record() for the format.
+tools/balance_run.gd out=... (bot runs). See RunRecord.to_record() (sim/run_record.gd) for the format.
 """
 
 import csv
@@ -17,7 +17,7 @@ import os
 import sys
 
 RESOURCES = ["food", "fuel", "wood", "stone", "shells", "flint", "hides", "bone", "obsidian",
-             "copper", "cassiterite", "tin", "bronze"]
+             "copper", "cassiterite", "tin", "bronze", "bog_iron", "charcoal", "iron", "steel"]
 ROLES = ["tribesperson", "warrior", "craftsperson"]
 
 
@@ -88,6 +88,8 @@ def main(raw_folder, out_folder):
             "watch_posts": r.get("buildings", []).count("watch_post"),
             "deaths_total": len(all_deaths), "source_file": r["_source_file"],
             "age_end": r.get("age", "neolithic"), "age_up_round": r.get("age_up_round", 0),
+            "bronze_round": r.get("age_rounds", {}).get("bronze", r.get("age_up_round", 0) if r.get("age") == "bronze" else 0),
+            "medieval_round": r.get("age_rounds", {}).get("medieval", 0),
             "tools": "+".join(r.get("tools", [])), "heroes_departed": len(r.get("departed", [])),
             "promotions": sum(len(rd.get("promotions", [])) for rd in rounds),
             **{"stock_end_" + k: r.get("stock", {}).get(k, "") for k in RESOURCES},
@@ -128,7 +130,7 @@ def main(raw_folder, out_folder):
                 "path_squares": rd.get("town", {}).get("paths", ""),
                 "gates_broken": rd.get("town", {}).get("gates", {}).get("broken", ""),
                 "paving_stone": rd.get("paving", {}).get("stone", 0),
-                **{"paved_" + k: rd.get("town", {}).get("paved", {}).get(k, 0) for k in ["stone_path", "cobbled_road"]},
+                **{"paved_" + k: rd.get("town", {}).get("paved", {}).get(k, 0) for k in ["stone_path", "cobbled_road", "flagstone_street"]},
                 "palisades_staked": sum(1 for a in rd.get("actions", []) if a.get("kind") == "wall"),
                 "palisade_staked_squares": rd.get("town", {}).get("walls", {}).get("staked", ""),
                 "palisade_standing_squares": rd.get("town", {}).get("walls", {}).get("standing", ""),
@@ -140,6 +142,8 @@ def main(raw_folder, out_folder):
                 "wave_power": rd.get("power", {}).get("wave", ""),
                 "wave_power_scheduled": rd.get("power", {}).get("wave_scheduled", ""),
                 "wave_eased": rd.get("wave_eased", 0),
+                "siege_damage": rd.get("siege_damage", 0),
+                "families": sum(1 for p in rd.get("picks", []) if p.get("taken") == "family"),
                 "wave_to_town_power": round(rd["power"]["wave"] / rd["power"]["town"]["total"], 2)
                 if rd.get("power", {}).get("town", {}).get("total") else "",
                 "relic_pick": rd.get("relic_pick", ""),

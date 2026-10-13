@@ -128,7 +128,7 @@ func test_folk_walk_through_and_raiders_batter() -> void:
 	check(arrived, "the raider gets in")
 	check(w.town.gate_health(b) < 1.0, "by battering the gate")
 	check_eq(int(w.town.gate_counts()["broken"]), 1, "the gate counts as broken")
-	check(int(run._round_entry["breaches"]) > 0, "the breach is recorded")
+	check(int(run.record.entry["breaches"]) > 0, "the breach is recorded")
 	w.town.patch_walls()
 	check(w.town.gate_health(b) == 1.0, "it is mended at dawn")
 
@@ -197,7 +197,7 @@ func test_record_counts_gates() -> void:
 	run.choose_pick(-1)
 	run.world.enemies.clear()
 	run.world.dens.clear()
-	var snapshot: Dictionary = run._town_snapshot()
+	var snapshot: Dictionary = run.record.town_snapshot()
 	check_eq(int(snapshot["gates"]["built"]), 1, "the round's town counts the gate")
 
 

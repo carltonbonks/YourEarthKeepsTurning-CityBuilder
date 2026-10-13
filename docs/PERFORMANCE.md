@@ -15,6 +15,8 @@ Measured 2026-10-13 with `tools/perf_probe.gd` (native headless; a bot's round-8
 
 Budget: 10 steps per game second, so 1x speed allows 100 ms a step, 4x 25 ms, 8x 12 ms (the web export is slower than native; not measured). So about 400 people run at 4x and 850 at 2x. Cost now grows roughly in line with the number of people, not with its square: about 30 microseconds per unit per step.
 
+Medieval towns (2026-10-13, after the medieval age): the same probe on the medieval bot's round-12 town (`style=medieval round=12`, more buildings and a 5th ring) takes 3.4 / 10.2 / 21.5 / 46.6 ms on average for 60 / 175 / 400 / 850 people, so 400 people still run at 4x. The round-8 numbers above are unchanged by the medieval age (37 ms at 850).
+
 ## What was done (seeded runs unchanged)
 
 All of these give the same results as before: 96 seeded bot runs across four styles came out byte-identical.

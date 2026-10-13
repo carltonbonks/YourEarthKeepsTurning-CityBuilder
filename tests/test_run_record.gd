@@ -5,7 +5,7 @@ func test_record_has_one_entry_per_round_played() -> void:
 	var record := bot_record()
 	check_eq(record["rounds"].size(), int(record["round_reached"]), "one round entry per round")
 	check(record["result"] in ["won", "lost"], "finished run has a result")
-	check_eq(record["format"], RunState.RECORD_FORMAT, "format version stored")
+	check_eq(record["format"], RunRecord.RECORD_FORMAT, "format version stored")
 
 
 func test_record_captures_builds_picks_and_wave() -> void:

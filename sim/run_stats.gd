@@ -99,6 +99,10 @@ static func report(runs: Array) -> PackedStringArray:
 	if not finished.is_empty():
 		out.append("Reached the bronze age: %d runs%s" % [aged,
 			" (average round %.1f, %d won)" % [aged_round / aged, aged_won] if aged > 0 else ""])
+		var medieval := finished.filter(func(r: Dictionary) -> bool: return r.get("age_rounds", {}).has("medieval"))
+		if not medieval.is_empty():
+			out.append("Reached the medieval age: %d runs (%d won)" % [medieval.size(),
+				medieval.filter(func(r: Dictionary) -> bool: return r["result"] == "won").size()])
 		out.append("Promotions per run: %.1f   Heroes who left unhappy per run: %.1f" % [
 			float(promoted) / finished.size(), float(departed) / finished.size()])
 	var relic_ids := picked.keys()
