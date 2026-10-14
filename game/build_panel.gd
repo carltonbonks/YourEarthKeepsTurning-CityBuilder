@@ -1,7 +1,7 @@
 class_name BuildPanel
 extends VBoxContainer
-## The build-phase panel on the left: how the town's paths are wearing in, building orders, bronze
-## tool sets and the caravan, stall prices, the warned attack and the Begin round button.
+## The build-phase panel on the left: the round's building cards (run.hand), bronze tool sets and the
+## caravan, stall prices, how the town's paths are wearing in, the warned attack and the Begin round button.
 ## Every choice goes through RunState; `changed` asks the screen to refresh.
 
 signal changed
@@ -18,18 +18,15 @@ var _begin_btn: Button
 
 
 func _init() -> void:
-	UiKit.heading(self, "Paths")
-	UiKit.note(self, "Feet wear trails where people walk most, and busy trails become worn paths. A stone-layers' yard paves the busiest paths for stone. Everyone walks faster on them, raiders too; a gate across a busy path slows raiders without shutting your people in.")
-	_road_box = VBoxContainer.new()
-	add_child(_road_box)
-	add_child(HSeparator.new())
-	UiKit.heading(self, "Order buildings")
-	UiKit.note(self, "Craftspeople raise what you order during the days. Each building picks its own plot in the rings round the hearth. Nobody takes orders otherwise.")
+	UiKit.heading(self, "Building cards")
+	UiKit.note(self, "Order from this round's cards. Each building finds its own plot and craftspeople raise it during the days. Unused cards are gone at the end of the round.")
 	_build_list = VBoxContainer.new()
 	add_child(_build_list)
 	add_child(HSeparator.new())
 	_price_box = VBoxContainer.new()
 	add_child(_price_box)
+	_road_box = VBoxContainer.new()
+	add_child(_road_box)
 	_wave_label = UiKit.rich(self, 0)
 	_wave_label.fit_content = true
 	_begin_btn = UiKit.button(self, "", func() -> void: begin_pressed.emit())
@@ -41,29 +38,21 @@ func refresh() -> void:
 	var content := run.content
 	for child in _build_list.get_children():
 		child.queue_free()
-	var types := content.buildings.keys()
-	for type: String in types:
-		var def: Dictionary = content.buildings[type]
-		var cost := PackedStringArray()
-		for r: String in def["cost"]:
-			cost.append("%d %s" % [def["cost"][r], r])
-		var owned := run.world.count_buildings(type, false)
-		var btn := Button.new()
-		btn.text = "%s  (%s)%s" % [def["name"], ", ".join(cost), "  [%d/%d]" % [owned, run.building_max(type)] if def.has("max") else ("  [%d]" % owned if owned > 0 else "")]
-		btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], def["work"]]
-		var blocked := _build_blocker(type)
-		if blocked != "":
-			btn.tooltip_text += "\n" + blocked
-		btn.disabled = not run.can_build(type)
-		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		btn.pressed.connect(_act.bind(run.build.bind(type)))
-		_build_list.add_child(btn)
-		UiKit.note(_build_list, def["text"] + (" " + blocked if blocked != "" else ""), 11)
-		var problems := Tooltips.warnings(run, type)
-		if not problems.is_empty():
-			btn.tooltip_text += "\n" + "\n".join(PackedStringArray(problems))
-			if owned > 0:
-				UiKit.note(_build_list, " ".join(PackedStringArray(problems)), 11, Color("#ffb060"))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	_build_list.add_child(grid)
+	for card: Dictionary in run.hand.cards:
+		grid.add_child(_card_button(card, false))
+	if run.hand.cards.is_empty():
+		UiKit.note(_build_list, "No cards left this round.", 12)
+	if not run.hand.milestone.is_empty():
+		_build_list.add_child(_card_button(run.hand.milestone, true))
+	var redraw := UiKit.button(_build_list, "Redraw unused cards (%d shells)%s" % [run.hand.redraw_cost(),
+		"" if run.hand.redraws == 0 else ": used"], _act.bind(run.hand.redraw))
+	redraw.disabled = not run.hand.can_redraw()
+	redraw.tooltip_text = "Once a round: the cards you haven't used are swapped for a fresh deal."
 	var pending := run.world.buildings.filter(func(b: Dictionary) -> bool: return float(b["work_left"]) > 0.0).size()
 	if pending > 0 and run.count_role("craftsperson") == 0:
 		UiKit.note(_build_list, "Nobody can raise buildings yet: pick a craftsperson at dawn.", 0, Color("#e0a050"))
@@ -81,6 +70,53 @@ func refresh() -> void:
 	_begin_btn.text = "Begin round %d" % run.round_number
 
 
+const NEED_TEXT := {
+	"housing": "Beds are nearly full",
+	"food": "Food is running short",
+	"beds": "Heroes need beds",
+	"supply": "A stall has nothing to sell",
+	"stall": "Your workshop needs a stall",
+}
+
+
+## One building card: name, cost, why the town wants it; the description and warnings on hover.
+func _card_button(card: Dictionary, age_up: bool) -> Button:
+	var content := run.content
+	var type: String = card["building"]
+	var def: Dictionary = content.buildings[type]
+	var cost := PackedStringArray()
+	for r: String in def["cost"]:
+		cost.append("%d %s" % [def["cost"][r], r])
+	var owned := run.world.count_buildings(type, false)
+	var lines := PackedStringArray()
+	lines.append(("RAISE: " if age_up else "") + def["name"])
+	lines.append(", ".join(cost))
+	var why: String = NEED_TEXT.get(card["need"], "")
+	if why == "" and owned == 0 and not age_up:
+		why = "New"
+	elif why == "" and owned > 0:
+		why = "You have %d" % owned
+	lines.append(why)
+	var btn := Button.new()
+	btn.text = "\n".join(lines)
+	btn.autowrap_mode = TextServer.AUTOWRAP_WORD
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.custom_minimum_size = Vector2(0, 72)
+	if card["need"] != "":
+		btn.add_theme_color_override("font_color", Color("#ffd28a"))
+	btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], def["work"]]
+	var blocked := _build_blocker(type)
+	if blocked != "":
+		btn.tooltip_text += "\n" + blocked
+	var problems := Tooltips.warnings(run, type)
+	if not problems.is_empty():
+		btn.tooltip_text += "\n" + "\n".join(PackedStringArray(problems))
+	btn.disabled = not run.hand.can_order(type)
+	btn.pressed.connect(_act.bind(run.hand.order.bind(type)))
+	return btn
+
+
 ## How far the desire paths have worn in, and what has been paved.
 func _refresh_paths() -> void:
 	for child in _road_box.get_children():
@@ -93,7 +129,7 @@ func _refresh_paths() -> void:
 	var paved := town.paved_counts()
 	for id: String in paved:
 		parts.append("%d of %s" % [paved[id], run.content.town["roads"][id]["name"].to_lower()])
-	UiKit.note(_road_box, ", ".join(parts) + ".", 11)
+	UiKit.note(_road_box, "Paths: " + ", ".join(parts) + ".", 11)
 	var gates := town.gate_counts()
 	if gates["built"] > 0:
 		UiKit.note(_road_box, "Gates: %d." % gates["built"], 11)

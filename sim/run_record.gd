@@ -29,7 +29,9 @@ extends RefCounted
 ## 13: the medieval age: "age_rounds" (age -> round reached), new goods in "stock" (bog_iron, charcoal, iron, steel);
 ##     a dawn pick can take "family" (several townsfolk at once); "promotions" can be a champion knighted
 ##     (role "champion", "level"); per round "siege_damage" (what battering rams did to gates and the hearth).
-const RECORD_FORMAT := 13
+## 14: building cards: per round "build_hands" (the building cards dealt, then one more list per redraw,
+##     each {"cards": [building types]}); a "redraw" action ({"kind": "redraw", "cost"}).
+const RECORD_FORMAT := 14
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -96,7 +98,8 @@ func begin_round() -> void:
 		"whims": [], "loot": [], "sales": [], "hero_spending": {},
 		"prices": run.prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
 		"age": run.age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
-		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0}
+		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0,
+		"build_hands": [{"cards": run.hand.labels()}]}
 
 
 func end_round() -> void:
