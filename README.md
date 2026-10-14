@@ -30,7 +30,7 @@ A handful of people around a fire, in the middle of a map. Resources ring the ca
 | `game/` | Scenes, UI and visuals that show the simulation. |
 | `data/` | Balance numbers and content (heroes, enemies, relics) as JSON files. |
 | `tools/` | Headless helpers, e.g. the balance report and Godot setup. |
-| `docs/` | [DEVELOPMENT.md](docs/DEVELOPMENT.md): code map and development habits. |
+| `docs/` | [DEVELOPMENT.md](docs/DEVELOPMENT.md): code map and development habits. [PENDING_DEFAULTS.md](docs/PENDING_DEFAULTS.md): Claude's design defaults still waiting for a playtest. [PERFORMANCE.md](docs/PERFORMANCE.md): how the sim copes with big towns. |
 | `tests/` | Automated tests for `sim/`. |
 
 ## For developers
@@ -52,4 +52,4 @@ godot --headless --path . -s res://tools/balance_run.gd -- runs=50 style=balance
 godot --headless --path . -s res://tools/run_report.gd -- in=sim.jsonl in=my_runs.json
 ```
 
-Balance report styles (a scripted player): `balanced` (huts, a longhouse, watch posts, picks by need), `workers` (never takes heroes), `heroes` (rushes the longhouse, takes every hero it can afford), `market` (builds every workshop, stall and the hunting lodge early), `bronze` (like market, then ages up as soon as it can). `tools/market_probe.gd -- seed=4821 style=market` prints one run's economy round by round. `tools/snapshot.gd` saves a picture of the screen after a bot has played some rounds (needs a display; see the file).
+Balance report styles (a scripted player): `balanced` (huts, a longhouse, watch posts, picks by need), `workers` (never takes heroes), `heroes` (rushes the longhouse, takes every hero it can afford), `market` (builds every workshop, stall and the hunting lodge early), `bronze` (like market, then ages up as soon as it can), `medieval` (like bronze, then raises the Stone keep and uses the medieval buildings). `tools/market_probe.gd -- seed=4821 style=market` prints one run's economy round by round. `tools/snapshot.gd` saves a picture of the screen after a bot has played some rounds (needs a display; see the file).
