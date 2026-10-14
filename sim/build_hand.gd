@@ -116,7 +116,7 @@ func need(type: String) -> String:
 	if (def.get("daily", {}).has("food") or type == "drying_rack") \
 			and float(run.stock["food"]) < run.food_needed_today() * 3.0:
 		return "food"
-	if def.has("lodging") and run.world.hero_ai.count_lodgings() > 0 and _free_beds() <= 0:
+	if def.has("lodging") and run.world.hero_ai.count_lodgings() > 0 and free_beds() <= 0:
 		return "beds"
 	if def.has("workshop"):
 		for id in content.recipes_for(type):
@@ -172,7 +172,7 @@ func _fill(rng: SeededRng, avoid: Array = []) -> void:
 		cards.append({"building": type, "need": need(type)})
 
 
-func _free_beds() -> int:
+func free_beds() -> int:
 	var beds := 0
 	for b in run.world.buildings:
 		var def: Dictionary = run.content.buildings[b["type"]]

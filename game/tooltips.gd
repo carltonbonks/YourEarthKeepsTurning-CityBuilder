@@ -102,13 +102,13 @@ static func building(run: RunState, index: int) -> Dictionary:
 			if run.world.hero_ai.bed_index(h) == index:
 				used += 1
 		t["lines"].append("Beds: %d of %d taken" % [used, int(def["lodging"]["beds"])])
+	if def.has("tower_hp") and float(b["work_left"]) <= 0.0:
+		t["lines"].append("Broken: shoots again once mended at dawn" if float(b["hp"]) <= 0.0 else "Health: %d / %d" % [int(b["hp"]), int(def["tower_hp"])])
 	if def.has("stall"):
-		var kind: String = def["stall"]["sells"]
 		var names := PackedStringArray()
 		for g: Dictionary in b["goods"]:
 			names.append(c.recipe_name(g["recipe"]))
 		t["lines"].append("On sale: %s" % (", ".join(names) if not names.is_empty() else "nothing"))
-		t["lines"].append("Price: %s" % str(run.prices.get(kind, "fair")).capitalize())
 	if def.has("workshop") and b["craft"] != "":
 		t["lines"].append("Making: %s" % c.recipe_name(b["craft"]))
 	if def.has("gate_hp") and work_left <= 0.0:

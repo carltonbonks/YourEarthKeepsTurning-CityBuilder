@@ -5,8 +5,8 @@ extends Control
 ##
 ## This file runs the flow (new run, ticking the sim, pausing for decisions) and
 ## lays out the screen. The parts live in their own files: BuildPanel (the
-## build-phase choices), Overlays (picks, relics, end screen, Run history, dev
-## tuning), StatusText (the live text) and ArenaView (the map).
+## build-phase choices), BuildHandView (the building cards), Overlays (picks,
+## relics, end screen, Run history, dev tuning), StatusText (the live text) and ArenaView (the map).
 
 const SPEEDS := [1, 2, 4, 8]
 
@@ -21,6 +21,7 @@ var _run_id := ""
 
 var _status: RichTextLabel
 var _build_panel: BuildPanel
+var _hand_view: BuildHandView
 var _market_label: RichTextLabel
 var _sim_box: VBoxContainer
 var _relic_label: RichTextLabel
@@ -62,6 +63,7 @@ func _new_run(seed_value: int) -> void:
 	_arena.run = run
 	_arena.reset_camera()
 	_build_panel.run = run
+	_hand_view.run = run
 	_overlays.run = run
 	_shown_story = 0
 	_story_label.clear()
@@ -119,9 +121,11 @@ func _tuning_closed() -> void:
 func _refresh() -> void:
 	var building := run.phase == RunState.Phase.BUILD
 	_build_panel.visible = building
+	_hand_view.visible = building
 	_sim_box.visible = run.phase == RunState.Phase.SIM
 	if building:
 		_build_panel.refresh()
+		_hand_view.refresh()
 	_relic_label.text = StatusText.relics(run)
 	_refresh_live()
 
@@ -247,11 +251,20 @@ func _build_ui() -> void:
 	_clock_label = UiKit.rich(right, 26)
 	_clock_label.add_theme_font_size_override("normal_font_size", 15)
 	_clock_label.add_theme_font_size_override("bold_font_size", 15)
+	# The map, with the building cards as a heads-up hand along its bottom edge while building.
+	var map_box := Control.new()
+	map_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	map_box.size_flags_stretch_ratio = 2.6
+	right.add_child(map_box)
 	_arena = ArenaView.new()
-	_arena.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_arena.size_flags_stretch_ratio = 2.6
+	_arena.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_arena.clip_contents = true
-	right.add_child(_arena)
+	map_box.add_child(_arena)
+	_hand_view = BuildHandView.new()
+	_hand_view.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	_hand_view.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_hand_view.changed.connect(_refresh)
+	map_box.add_child(_hand_view)
 	var bottom := HBoxContainer.new()
 	bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(bottom)

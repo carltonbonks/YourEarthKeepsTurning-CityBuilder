@@ -10,6 +10,7 @@ const ENEMY_RADIUS := 7.0
 const BOSS_RADIUS := 15.0
 const MIN_ZOOM := 1.0
 const MAX_ZOOM := 4.0
+const PAVE_GLOW_SECONDS := 6.0
 
 var run: RunState
 var zoom := 1.2
@@ -21,6 +22,8 @@ var _moved := false
 ## Squares worth drawing (trails, paths, roads), rebuilt when the ground changes: [index, ground kind].
 var _ground_cache: Array = []
 var _ground_seen := [-1, null]
+## Square index -> world time it was paved (or re-laid), for the glow.
+var _paved_at := {}
 
 
 func reset_camera() -> void:
@@ -134,14 +137,29 @@ func _draw() -> void:
 		var work_left := float(b["work_left"])
 		if work_left <= 0.0 and w.town.is_gate_type(b["type"]):
 			# A gate fades as raiders batter it, and shows its health.
+			# Drawn open, so it reads as a way through: a faint floor, a dashed edge and two posts either
+			# side of the opening (across the ring, the way people walk through).
 			var whole := w.town.gate_health(bi)
-			draw_colored_polygon(shape, Color(col, 0.35 + 0.65 * whole))
-			draw_polyline(_closed(shape), Color("#e8d9a8"), 1.0)
+			draw_colored_polygon(shape, Color(col, 0.12 + 0.18 * whole))
+			var edge := _closed(shape)
+			for k in edge.size() - 1:
+				draw_dashed_line(edge[k], edge[k + 1], Color("#e8d9a8", 0.5 + 0.5 * whole), 1.5, 4.0)
+			var across: Vector2 = Vector2(b["pos"]).normalized().orthogonal() if Vector2(b["pos"]).length() > 0.0 else Vector2.RIGHT
+			var post := maxf(2.5, 3.5 * s)
+			for side: float in [-1.0, 1.0]:
+				var at := p + across * side * half * 0.75
+				draw_rect(Rect2(at - Vector2(post, post), Vector2(post, post) * 2.0), Color(col.lightened(0.2), 0.4 + 0.6 * whole))
+			draw_line(p - across * half * 0.35, p + across * half * 0.35, Color("#e8d9a8", 0.35), 1.0)
 			if whole < 1.0:
 				_bar(p + Vector2(-half, half + 3), half * 2.0, whole, Color("#e0a050"))
 		elif work_left <= 0.0:
-			draw_colored_polygon(shape, col)
-			draw_polyline(_closed(shape), Color("#e8d9a8"), 1.0)
+			# A broken tower is drawn dark until it is mended at dawn; a hurt one shows its health.
+			var tower_hp := float(def.get("tower_hp", 0.0))
+			var broken := tower_hp > 0.0 and float(b["hp"]) <= 0.0
+			draw_colored_polygon(shape, col.darkened(0.6) if broken else col)
+			draw_polyline(_closed(shape), Color("#e05050") if broken else Color("#e8d9a8"), 1.0)
+			if tower_hp > 0.0 and float(b["hp"]) < tower_hp:
+				_bar(p + Vector2(-half, half + 3), half * 2.0, float(b["hp"]) / tower_hp, Color("#e05050"))
 		else:
 			var done := 1.0 - work_left / float(def["work"])
 			draw_colored_polygon(shape, Color(col, 0.25))
@@ -328,11 +346,20 @@ func _draw_ground() -> void:
 	var w := run.world
 	var seen := [w.pathing.ground_version, w]
 	if seen != _ground_seen:
+		var same_world: bool = _ground_seen[1] == w
 		_ground_seen = seen
+		var was := {}
+		for entry: Array in _ground_cache:
+			was[entry[0]] = entry[1]
+		if not same_world:
+			_paved_at.clear()
 		_ground_cache = []
 		for i in w.pathing.ground.size():
-			if w.pathing.ground[i] >= Pathing.TRAIL:
-				_ground_cache.append([i, w.pathing.ground[i]])
+			var g: int = w.pathing.ground[i]
+			if g >= Pathing.TRAIL:
+				_ground_cache.append([i, g])
+				if same_world and g >= Pathing.FIRST_ROAD and int(was.get(i, 0)) != g:
+					_paved_at[i] = w.time
 	var cell := w.pathing.cell * _scale()
 	var trail := Color(run.content.town["trail"]["color"])
 	var path := Color(run.content.town["path"]["color"])
@@ -342,9 +369,17 @@ func _draw_ground() -> void:
 		if g >= Pathing.FIRST_ROAD:
 			draw_rect(Rect2(p - Vector2(cell, cell) / 2.0, Vector2(cell, cell)), Color(w.town.road_def(g)["color"]))
 		elif g == Pathing.PATH:
-			draw_rect(Rect2(p - Vector2(cell, cell) * 0.45, Vector2(cell, cell) * 0.9), Color(path, 0.9))
+			draw_rect(Rect2(p - Vector2(cell, cell) * 0.48, Vector2(cell, cell) * 0.96), Color(path, 1.0))
 		else:
-			draw_rect(Rect2(p - Vector2(cell, cell) * 0.35, Vector2(cell, cell) * 0.7), Color(trail, 0.8))
+			draw_rect(Rect2(p - Vector2(cell, cell) * 0.38, Vector2(cell, cell) * 0.77), Color(trail.lightened(0.1), 0.88))
+	# Squares paved in the last few seconds glow, so you can see the stone-layers at work.
+	for i: int in _paved_at.keys():
+		var age := w.time - float(_paved_at[i])
+		if age > PAVE_GLOW_SECONDS or age < 0.0:
+			_paved_at.erase(i)
+			continue
+		var q := _to_screen(w.pathing.center(i))
+		draw_rect(Rect2(q - Vector2(cell, cell) / 2.0, Vector2(cell, cell)), Color("#ffe08a", 0.9 * (1.0 - age / PAVE_GLOW_SECONDS)), false, 1.5)
 
 
 func _screen_poly(points: PackedVector2Array) -> PackedVector2Array:

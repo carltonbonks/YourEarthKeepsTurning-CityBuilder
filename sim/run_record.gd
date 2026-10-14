@@ -31,7 +31,8 @@ extends RefCounted
 ##     (role "champion", "level"); per round "siege_damage" (what battering rams did to gates and the hearth).
 ## 14: building cards: per round "build_hands" (the building cards dealt, then one more list per redraw,
 ##     each {"cards": [building types]}); a "redraw" action ({"kind": "redraw", "cost"}).
-const RECORD_FORMAT := 14
+## 15: towers can be broken: per round "towers_broken" (watch posts or the keep knocked out by sentient raiders).
+const RECORD_FORMAT := 15
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -98,7 +99,7 @@ func begin_round() -> void:
 		"whims": [], "loot": [], "sales": [], "hero_spending": {},
 		"prices": run.prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
 		"age": run.age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
-		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0,
+		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0, "towers_broken": 0,
 		"build_hands": [{"cards": run.hand.labels()}]}
 
 

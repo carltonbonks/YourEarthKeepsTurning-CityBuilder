@@ -87,6 +87,8 @@ var wander_goal := Vector2.ZERO
 var is_probe := false  ## Part of a small raid on an early night.
 ## Sentient enemies chase whoever last hurt them until this time.
 var grudge_until := -1.0
+## A sentient enemy shot by a tower goes for that building (index into World.buildings), -1 for none.
+var target_tower := -1
 
 
 func is_hero() -> bool:

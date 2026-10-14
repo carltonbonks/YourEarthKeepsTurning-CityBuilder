@@ -83,7 +83,7 @@ static func clock(run: RunState) -> String:
 	return text
 
 
-## Every hero with stats, bed, whim, gear and intent; the fallen and departed; townsfolk of note.
+## Every hero with stats, bed, gear and intent (whims are in the hover card); the fallen and departed; townsfolk of note.
 static func heroes(run: RunState) -> String:
 	var content := run.content
 	var w := run.world
@@ -99,11 +99,10 @@ static func heroes(run: RunState) -> String:
 			"" if hero.alive else "  [color=#e05050]fallen[/color]"]
 		if not hero.alive:
 			continue
-		var whim: String = content.whims.get(hero.whim, {}).get("name", "")
 		var bed := "No bed: sleeps by the hearth" if hero.lodging < 0 else "Sleeps in %s%s" % [w.hero_ai.bed_name(hero.lodging),
 			"" if w.hero_ai.is_preferred(hero, hero.lodging) else " (not their favourite)"]
-		text += "    [color=#9aa]%s%s[/color]\n" % [bed,
-			("  ·  today: " + whim) if whim != "" and run.phase != RunState.Phase.BUILD else ""]
+		# Today's whim is in the hero's hover card (Tooltips), not here: it is detail for when you look closer.
+		text += "    [color=#9aa]%s[/color]\n" % bed
 		var gear := PackedStringArray()
 		for slot: String in Loot.SLOTS:
 			if hero.items.has(slot):
@@ -143,11 +142,10 @@ static func market(run: RunState) -> String:
 		if float(b["work_left"]) > 0.0:
 			continue
 		if def.has("stall"):
-			var kind: String = def["stall"]["sells"]
 			var goods := PackedStringArray()
 			for g: Dictionary in b["goods"]:
 				goods.append("%s t%d (%d)" % [content.recipe_name(g["recipe"]), int(g["tier"]), run.price_of(g)])
-			lines.append("[color=#ffd24a]%s[/color] %s, %d/%d: %s" % [def["name"], run.prices[kind].capitalize(), b["goods"].size(),
+			lines.append("[color=#ffd24a]%s[/color] %d/%d: %s" % [def["name"], b["goods"].size(),
 				content.market["stall_capacity"], ", ".join(goods) if not goods.is_empty() else "[color=#888]empty[/color]"])
 		elif def.has("workshop"):
 			var doing := "making a %s" % content.recipe_name(b["craft"]) if b["craft"] != "" else "[color=#888]idle[/color]"

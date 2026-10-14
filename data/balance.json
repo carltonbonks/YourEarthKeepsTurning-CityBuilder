@@ -12,6 +12,9 @@
 	"hearth_max_hp": 150,
 	"hearth_attack": 3,
 	"hearth_range": 160,
+	"_tower_note": "A sentient raider shot by a tower (a building with tower_hp) goes for that tower for tower_grudge_seconds, attacking from tower_reach past its own attack range.",
+	"tower_grudge_seconds": 8,
+	"tower_reach": 14,
 	"hearth_cooldown": 1.0,
 	"hearth_heal_rate": 4,
 
