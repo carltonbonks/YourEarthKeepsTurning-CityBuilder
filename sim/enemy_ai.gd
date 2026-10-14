@@ -39,6 +39,11 @@ func enemy_tick(enemy: Unit) -> void:
 	enemy.cooldown_left -= w.dt
 	var aggro := w.content.num("enemy_aggro")
 	var holding_grudge := enemy.target != null and enemy.target.alive and w.time < enemy.grudge_until
+	if enemy.target_tower >= 0:
+		if w.time < enemy.grudge_until and tower_standing(enemy.target_tower):
+			_attack_tower(enemy, enemy.target_tower)
+			return
+		enemy.target_tower = -1
 	if w.content.unit_has_tag(enemy, "siege"):
 		enemy.target = null
 	elif not holding_grudge and (enemy.target == null or not enemy.target.alive or enemy.pos.distance_to(enemy.target.pos) > aggro * 3.0):
@@ -155,11 +160,54 @@ func towers_tick() -> void:
 		b["cooldown_left"] = float(b["cooldown_left"]) - w.dt
 		if float(b["cooldown_left"]) > 0.0:
 			continue
+		if def.has("tower_hp") and float(b["hp"]) <= 0.0:
+			continue
 		var target := w.nearest_enemy(b["pos"], float(def["range"]))
 		if target != null:
 			b["cooldown_left"] = float(def["cooldown"])
 			w.shots.append({"from": b["pos"], "to": target.pos, "ranged": true, "time": w.time})
 			w.damage(null, target, (float(def["attack"]) + w.run.mod("tower_attack")) * armour_left(target))
+			# Sentient raiders turn on the tower that shot them (siege engines only want gates and the hearth).
+			if target.alive and def.has("tower_hp") and w.content.unit_has_tag(target, "sentient") \
+					and not w.content.unit_has_tag(target, "siege"):
+				target.target = null
+				target.target_tower = w.buildings.find(b)
+				target.grudge_until = w.time + w.content.num("tower_grudge_seconds")
+
+
+## True if building b is a tower that still stands (not broken).
+func tower_standing(b: int) -> bool:
+	if b < 0 or b >= w.buildings.size():
+		return false
+	var building: Dictionary = w.buildings[b]
+	return w.content.buildings[building["type"]].has("tower_hp") and float(building["work_left"]) <= 0.0 and float(building["hp"]) > 0.0
+
+
+## Walks up to a tower and hits it. A tower at 0 health is broken: it stops shooting until mended at dawn.
+func _attack_tower(enemy: Unit, b: int) -> void:
+	var building: Dictionary = w.buildings[b]
+	var reach := enemy.attack_range + w.content.num("tower_reach")
+	if not w.walk_toward(enemy, building["pos"], reach):
+		return
+	if enemy.cooldown_left > 0.0:
+		return
+	enemy.cooldown_left = enemy.cooldown
+	var dmg := enemy.attack * war_chant()
+	w.shots.append({"from": enemy.pos, "to": building["pos"], "ranged": enemy.attack_range > 60, "time": w.time})
+	building["hp"] = maxf(0.0, float(building["hp"]) - dmg)
+	if float(building["hp"]) <= 0.0:
+		enemy.target_tower = -1
+		w.run.record.note_count("towers_broken", 1)
+		w.run.tell("A %s broke the %s: it shoots no more until it is mended at dawn." % [
+			enemy.display_name.to_lower(), w.content.buildings[building["type"]]["name"].to_lower()])
+
+
+## At dawn, every tower is mended to full health.
+func mend_towers() -> void:
+	for b in w.buildings:
+		var def: Dictionary = w.content.buildings[b["type"]]
+		if def.has("tower_hp"):
+			b["hp"] = float(def["tower_hp"])
 
 
 ## Share of a blow that gets past an enemy's armour: a shield turns blows that aren't metal,

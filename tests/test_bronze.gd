@@ -355,3 +355,16 @@ func test_bronze_bot_records_format_7_fields() -> void:
 			check(rd.has(key), "round %d has %s" % [rd["round"], key])
 	for h: Dictionary in record["heroes"]:
 		check(h.has("mood"), "hero snapshot has mood")
+
+
+func test_raising_the_moot_brings_founding_gifts() -> void:
+	var run := _run()
+	_raise(run, "market")
+	_crowd(run, 9)
+	var bronze := int(run.stock["bronze"])
+	var hearth := run.world.hearth_hp
+	run.world.hearth_hp = hearth - 50.0
+	_raise(run, "bronze_moot")
+	check_eq(run.age, "bronze", "the moot brings the bronze age")
+	check_eq(int(run.stock["bronze"]), bronze + 2, "the southern traders bring 2 bronze ingots")
+	check_eq(run.world.hearth_hp, hearth - 20.0, "and the hearth gains 30 health")

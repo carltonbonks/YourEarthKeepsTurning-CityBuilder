@@ -300,7 +300,7 @@ func show_tuning() -> void:
 			spin.value = float(r[key])
 			spin.value_changed.connect(func(v: float) -> void: r[key] = v)
 			grid.add_child(spin)
-	for level: String in BuildPanel.PRICE_LEVELS:
+	for level: String in ["cheap", "fair", "dear"]:
 		var l := Label.new()
 		l.text = "%s price x" % level.capitalize()
 		grid.add_child(l)

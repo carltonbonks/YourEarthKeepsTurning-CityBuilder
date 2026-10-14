@@ -256,6 +256,7 @@ func _dawn() -> void:
 		node["amount"] = mini(int(node["max"]), int(node["amount"]) + content.int_num("node_regrow_per_day"))
 	pathing.wear_trails()
 	town.patch_walls()
+	enemy_ai.mend_towers()
 	run.daily_upkeep()
 	pause = Pause.DAWN
 
@@ -344,6 +345,7 @@ func add_building(type: String) -> bool:
 		return false
 	buildings.append({"type": type, "plot": plot, "pos": town.plots[plot]["pos"],
 		"work_left": float(content.buildings[type]["work"]), "cooldown_left": 0.0,
+		"hp": float(content.buildings[type].get("tower_hp", 0.0)),
 		"goods": [], "craft": "", "craft_left": 0.0, "craft_tier": 1, "made": 0})
 	town.occupy(plot, buildings.size() - 1)
 	return true
@@ -454,6 +456,7 @@ func damage(attacker: Unit, victim: Unit, amount: float) -> void:
 		# Sentient creatures turn on whoever hurt them.
 		if victim.is_enemy() and attacker != null and content.unit_has_tag(victim, "sentient"):
 			victim.target = attacker
+			victim.target_tower = -1
 			victim.grudge_until = time + 8.0
 		return
 	victim.alive = false

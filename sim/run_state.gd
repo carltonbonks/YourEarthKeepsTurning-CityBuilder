@@ -217,6 +217,9 @@ func on_building_done(type: String) -> void:
 		world.hero_ai.assign_lodgings()
 	if def.has("hearth_hp"):
 		world.hearth_hp = minf(hearth_max_hp(), world.hearth_hp + float(def["hearth_hp"]))
+	# Goods a building brings with it when it stands (the age-up buildings' founding gifts).
+	for good: String in def.get("gift", {}):
+		stock[good] = int(stock.get(good, 0)) + int(def["gift"][good])
 	var next_age: String = def.get("ages_up", "")
 	if next_age != "" and not content.age_reached(age, next_age):
 		age = next_age

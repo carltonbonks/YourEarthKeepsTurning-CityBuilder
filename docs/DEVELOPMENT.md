@@ -34,7 +34,7 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `sim/folk_ai.gd` | `FolkAI` (`world.folk_ai`): townsfolk. Warriors patrol and answer calls; workers gather, haul, build, craft and patch the hearth. |
 | `sim/hero_ai.gd` | `HeroAI` (`world.hero_ai`): heroes. Energy and beds, whims, choosing fights, stats and gear, shopping at stalls, fetching from the wilds. |
 | `sim/market.gd` | `Market` (`world.market`): workshops, stalls, smelting, building-posted prizes and carcass yields. |
-| `sim/enemy_ai.gd` | `EnemyAI` (`world.enemy_ai`): dens and wanderers, the wave, probes, enemy targeting, hearth and tower fire. |
+| `sim/enemy_ai.gd` | `EnemyAI` (`world.enemy_ai`): dens and wanderers, the wave, probes, enemy targeting, hearth and tower fire, sentient raiders breaking towers that shot them (`mend_towers` at dawn). |
 | `sim/unit.gd` | `Unit`: one hero, townsperson or enemy (plain fields). |
 | `sim/unit_grid.gd` | `UnitGrid`: buckets units by position so `World.nearest_enemy` / `nearest_friend` only look nearby. Same answers as a full scan. |
 | `sim/loot.gd` | `Loot`: items as plain data `{base, tier, affixes}`; rolling, stats, how a hero rates an item. |
@@ -43,7 +43,8 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `sim/power.gd` | `Power`: power levels. A fighter rates sqrt(effective HP x damage per second); the town (heroes, `fighter` townsfolk, hearth and towers) and a wave are sums on the same scale. Logged per round as `power`. `RunState.plan_wave` uses it for catch-up: a wave that far outmatches the town is eased (never grown). |
 | `sim/run_stats.gd` | Plain-language stats from run records (Run history screen and `tools/run_report.gd`). |
 | `game/main.gd` | The one screen: runs the flow (new run, ticking, pausing for decisions) and lays out the panels. UI built in code (placeholder). |
-| `game/build_panel.gd` | `BuildPanel`: build-phase choices (building cards, redraw, tool sets, caravan, stall prices, the warned attack, Begin round). |
+| `game/build_panel.gd` | `BuildPanel`: the rest of the build phase (tool sets, caravan, paths, the warned attack with both power levels and any catch-up, Begin round). |
+| `game/build_hand_view.gd` | `BuildHandView`: the building cards as a heads-up hand along the bottom of the map, with each card's "Recommended: ..." line (`recommendation`) and the redraw. |
 | `game/overlays.gd` | `Overlays`: dawn pick, relic pick, end screen, Run history, dev tuning. Sends choices back as signals. |
 | `game/status_text.gd` | `StatusText`: the live text (status, clock, heroes, market, relics) built from the run. Read-only. |
 | `game/ui_kit.gd` | `UiKit`: small shared builders (heading, button, rich text, note). |
@@ -72,7 +73,7 @@ Descriptive tags no rule reads yet are fine: they show in tooltips by name and g
 
 | Tag | Read by | Effect |
 | --- | --- | --- |
-| `sentient` | `World.damage` | turns on whoever hits it for a while |
+| `sentient` | `World.damage`, `EnemyAI.towers_tick` | turns on whoever hits it for a while, towers (`tower_hp`) included |
 | `fighter` | `Power.town` | a townsfolk role that counts toward the town's power level |
 | `beast` | the hunting lodge's `prize` in `data/buildings.json`, used by `Market` | the lodge pays shells and extra hides per kill |
 | `undead` | the chapel's `prize`, and the reliquary's `bane` in `data/items.json` (`Loot.bane`) | the chapel pays per kill; reliquaries hit them harder |
