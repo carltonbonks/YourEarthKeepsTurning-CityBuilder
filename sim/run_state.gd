@@ -23,6 +23,7 @@ var phase := Phase.BUILD
 
 var world: World
 var people: People
+var hand: BuildHand
 var waves: WavePlanner
 var record: RunRecord
 var stock := {}
@@ -66,6 +67,7 @@ func _init(game_content: Content, seed_value: int) -> void:
 	content = game_content
 	run_seed = seed_value
 	people = People.new(self)
+	hand = BuildHand.new(self)
 	waves = WavePlanner.new(self)
 	record = RunRecord.new(self)
 	age = content.ages["order"][0]
@@ -546,6 +548,7 @@ func _enter_build() -> void:
 		for good: String in trader["goods"]:
 			trader_stock[good] = int(trader["goods"][good]["stock"])
 		tell("The %s has come with %s." % [trader["name"].to_lower(), ", ".join(trader_stock.keys())])
+	hand.deal()
 	record.begin_round()
 
 
@@ -562,6 +565,7 @@ func to_record() -> Dictionary:
 func dispose() -> void:
 	world.dispose()
 	people.run = null
+	hand.run = null
 	waves.run = null
 	record.run = null
 

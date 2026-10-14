@@ -13,6 +13,7 @@ extends RefCounted
 ## the charcoal burner, bloomery, blacksmith, townhouses, fields, guildhall, chapel and iron tool sets;
 ## it takes family cards whenever the houses have room.
 ## Every style takes a Promote card when one is offered and affordable.
+## Every style can only order buildings on the round's cards (run.hand), and redraws once when shells are spare.
 ## Every style builds the stone-layers' yard from round 5 so craftspeople pave the busiest paths,
 ## and orders up to `gates` gates from `gate_round` (see below), and a garden when food runs short.
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
@@ -25,6 +26,8 @@ var gates := 2
 var gate_round := 3
 ## Gardens: one a round while food in store would last fewer than this many days (0 = never). balance_run.gd: gardens=.
 var garden_days := 3.0
+## Redraws the building cards once a round when it has at least this many shells (after its first pass).
+var redraw_above := 40
 
 
 func play_run(run: RunState) -> void:
@@ -41,29 +44,42 @@ func play_run(run: RunState) -> void:
 				run.choose_relic(run.relic_offer[0] if not run.relic_offer.is_empty() else "")
 
 
+## Orders from the round's building cards, then redraws once when shells are spare and orders again.
 func build(run: RunState) -> void:
+	_build_pass(run)
+	if int(run.stock["shells"]) >= redraw_above and run.hand.can_redraw():
+		run.hand.redraw()
+		_build_pass(run)
+
+
+## Orders a building if a card for it is in hand.
+func _order(run: RunState, type: String) -> bool:
+	return run.hand.order(type)
+
+
+func _build_pass(run: RunState) -> void:
 	if _ages(style):
 		_buy_goods(run)
 	_paving(run)
 	if style != "workers" and (run.round_number >= 2 or style == "heroes"):
-		run.build("longhouse")
+		_order(run, "longhouse")
 	# Heroes without a bed sulk and leave, so add lodging when the beds run out.
 	if style != "workers" and not run.heroes.is_empty() and free_beds(run) <= 0:
 		for type: String in ["tavern", "shrine", "longhouse"]:
-			if run.build(type):
+			if _order(run, type):
 				break
 	# Saving up for the Bronze moot: only essentials until it is ordered.
 	if _ages(style) and run.round_number >= 3 and run.world.count_buildings("bronze_moot", false) == 0:
 		if run.housing() - run.population() <= 1:
-			run.build("hut")
-		run.build("market")
-		run.build("bronze_moot")
+			_order(run, "hut")
+		_order(run, "market")
+		_order(run, "bronze_moot")
 		_gardens(run)
 		return
 	if style == "heroes" and run.round_number >= 2:
-		run.build("tavern")
+		_order(run, "tavern")
 	if run.housing() - run.population() <= 2:
-		run.build("hut")
+		_order(run, "hut")
 	_gardens(run)
 	if _ages(style):
 		_bronze(run)
@@ -72,16 +88,16 @@ func build(run: RunState) -> void:
 	if (style == "market" or _ages(style)) and run.round_number >= 2:
 		for type: String in ["market", "arms_stall", "knapper", "hide_stall", "hide_rack", "hunting_lodge",
 				"charm_stall", "bone_carver", "provisions_stall", "smoke_hut"]:
-			run.build(type)
+			_order(run, type)
 	elif style != "workers" and run.round_number >= 3:
 		for type: String in ["market", "arms_stall", "knapper", "hide_stall", "hide_rack"]:
-			run.build(type)
+			_order(run, type)
 	if style != "workers" and run.round_number >= (3 if style == "heroes" else 4):
-		run.build("shrine")
+		_order(run, "shrine")
 	if run.round_number >= 3:
-		run.build("drying_rack")
+		_order(run, "drying_rack")
 	if run.round_number >= 2:
-		run.build("watch_post")
+		_order(run, "watch_post")
 	# Gates last, with whatever is left over.
 	_gates(run)
 
@@ -96,7 +112,7 @@ func _paving(run: RunState) -> void:
 	if run.round_number >= 5:
 		for b in run.content.buildings:
 			if run.content.buildings[b].get("paves", false):
-				run.build(b)
+				_order(run, b)
 
 
 ## A garden when food is short: less than `garden_days` days of eating in store at the start of the round.
@@ -105,7 +121,7 @@ func _gardens(run: RunState) -> void:
 		return
 	for b in run.content.buildings:
 		if run.content.buildings[b].get("daily", {}).has("food"):
-			run.build(b)
+			_order(run, b)
 			return
 
 
@@ -115,17 +131,17 @@ func _gates(run: RunState) -> void:
 		return
 	for b in run.content.buildings:
 		if run.content.buildings[b].has("gate_hp") and run.world.count_buildings(b, false) < gates:
-			run.build(b)
+			_order(run, b)
 
 
 func _bronze(run: RunState) -> void:
 	if run.round_number >= 3:
-		run.build("bronze_moot")
+		_order(run, "bronze_moot")
 	if run.world.count_buildings("bronze_moot", false) == 0:
 		return
-	if not run.build("smelter") and run.world.count_buildings("smelter", false) == 0:
+	if not _order(run, "smelter") and run.world.count_buildings("smelter", false) == 0:
 		return
-	run.build("bronzesmith")
+	_order(run, "bronzesmith")
 	while int(run.stock["shells"]) > 45 and int(run.stock["tin"]) < 4 and run.trade("tin"):
 		pass
 	# The medieval bot keeps its ingots for the Stone keep until it is ordered.
@@ -157,16 +173,16 @@ func _medieval(run: RunState) -> bool:
 	if w.count_buildings("stone_keep", false) == 0:
 		if run.round_number < 5 or run.population() < int(run.content.buildings["stone_keep"].get("min_people", 0)):
 			return false
-		run.build("stone_keep")
+		_order(run, "stone_keep")
 		return w.count_buildings("stone_keep", false) == 0
 	if not run.content.age_reached(run.age, "medieval"):
 		return false
 	if run.housing() - run.population() <= 4:
-		run.build("townhouse")
-	while run.count_role("tribesperson") / 2 > w.count_buildings("field", false) and run.build("field"):
+		_order(run, "townhouse")
+	while run.count_role("tribesperson") / 2 > w.count_buildings("field", false) and _order(run, "field"):
 		pass
 	for type: String in ["charcoal_burner", "bloomery", "blacksmith", "guildhall", "chapel", "charcoal_burner"]:
-		run.build(type)
+		_order(run, type)
 	for id: String in ["iron_ploughs", "mail_and_halberds", "iron_tools"]:
 		if not run.tools.has(id):
 			run.buy_tools(id)

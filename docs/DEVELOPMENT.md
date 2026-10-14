@@ -25,6 +25,7 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `sim/content.gd` | `Content`: loads every `data/*.json` once. The only place data is read. Helpers such as `has_tag` / `unit_has_tag`, `age_reached`, `recipes_for`. |
 | `sim/run_state.gd` | `RunState`: one run. Phases (BUILD, PICK, SIM, RELIC, WON, LOST), stock, building orders, taking dawn cards, relics (`mod()`), ages, tool sets and the caravan, upkeep (food, fuel, fields). Its three parts below hold the rest. |
 | `sim/people.gd` | `People` (`run.people`): dealing the dawn cards (townsfolk, heroes, families, Promote cards), promotions and knighting, making and adding heroes, hero mood and heroes leaving, levelling, healing and selling finds between rounds. |
+| `sim/build_hand.gd` | `BuildHand` (`run.hand`): the round's building cards. Deals a hand weighted toward what the town needs (`need`), the ageing-up card (`milestone`), ordering from a card (`order`, which calls `RunState.build`) and the once-a-round redraw. The player and `AutoPlayer` order only through it; `RunState.build` is the raw rule tests use for setup. |
 | `sim/wave_planner.gd` | `WavePlanner` (`run.waves`): each round's wave from its budget, bosses on their `boss_round`, catch-up easing (`plan`), early-night probes, the wave preview (`counts`). |
 | `sim/run_record.gd` | `RunRecord` (`run.record`): the run's history. `to_record()`, `RECORD_FORMAT` and its changelog, the round being played (`entry`) and every `note_*` logger other parts call. |
 | `sim/world.gd` | `World`: the map and everything on it, stepped in fixed ticks. Owns all world state, the day/night clock, the map, and the shared movement and combat helpers (`walk_toward`, `fight`, `hit`, `damage`, `nearest_enemy`). Every move goes through `walk_toward`, which asks `Pathing` for the next point and walks faster on trails and roads. Pauses at dawn and at round end for `RunState`. Behaviour lives in four parts it creates: |
@@ -42,7 +43,7 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `sim/power.gd` | `Power`: power levels. A fighter rates sqrt(effective HP x damage per second); the town (heroes, `fighter` townsfolk, hearth and towers) and a wave are sums on the same scale. Logged per round as `power`. `RunState.plan_wave` uses it for catch-up: a wave that far outmatches the town is eased (never grown). |
 | `sim/run_stats.gd` | Plain-language stats from run records (Run history screen and `tools/run_report.gd`). |
 | `game/main.gd` | The one screen: runs the flow (new run, ticking, pausing for decisions) and lays out the panels. UI built in code (placeholder). |
-| `game/build_panel.gd` | `BuildPanel`: build-phase choices (orders, tool sets, caravan, stall prices, the warned attack, Begin round). |
+| `game/build_panel.gd` | `BuildPanel`: build-phase choices (building cards, redraw, tool sets, caravan, stall prices, the warned attack, Begin round). |
 | `game/overlays.gd` | `Overlays`: dawn pick, relic pick, end screen, Run history, dev tuning. Sends choices back as signals. |
 | `game/status_text.gd` | `StatusText`: the live text (status, clock, heroes, market, relics) built from the run. Read-only. |
 | `game/ui_kit.gd` | `UiKit`: small shared builders (heading, button, rich text, note). |

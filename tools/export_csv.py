@@ -66,7 +66,7 @@ def main(raw_folder, out_folder):
     records = load_records(raw_folder)
     tables = {name: [] for name in
               ["runs", "rounds", "picks", "builds", "wave_enemies", "deaths", "nights", "relic_offers", "heroes",
-               "loot", "whims", "market_sales", "crafted", "promotions"]}
+               "loot", "whims", "market_sales", "crafted", "promotions", "build_cards"]}
 
     for r in records:
         rid = r["_run_id"]
@@ -183,6 +183,11 @@ def main(raw_folder, out_folder):
                 if a.get("kind", "build") not in ("build", "price"):
                     continue
                 tables["builds"].append({"run_id": rid, "round": rn, "building": a.get("building", a.get("kind", ""))})
+            built = [a.get("building", "") for a in rd.get("actions", []) if a.get("kind", "build") == "build"]
+            for deal, hand in enumerate(rd.get("build_hands", [])):
+                for building in hand.get("cards", []):
+                    tables["build_cards"].append({"run_id": rid, "round": rn, "deal": deal + 1, "building": building,
+                                                  "ordered": 1 if building in built else 0})
             for enemy, count in wave.items():
                 tables["wave_enemies"].append({"run_id": rid, "round": rn, "enemy": enemy, "count": count})
             for d in deaths:
@@ -239,6 +244,7 @@ def main(raw_folder, out_folder):
         "market_sales": ["run_id", "round", "day", "hero", "trait", "recipe", "tier", "price", "stall"],
         "crafted": ["run_id", "round", "recipe", "count"],
         "promotions": ["run_id", "round", "day", "role", "name", "became", "trait", "joined_round"],
+        "build_cards": ["run_id", "round", "deal", "building", "ordered"],
     }
     for table, rows in tables.items():
         count = write(out_folder, table, columns[table], rows)
