@@ -85,7 +85,7 @@ When a rule reads a tag:
 4. `tests/test_tags.gd` scans `sim/` and `game/` for `has_tag(...)` calls and fails if a read tag has no `tags.json` line, if nothing carries it, or if `tags.json` explains a tag no rule reads any more.
 5. A behaviour only one entity will ever have can be a specific data key instead (like `shield` or `war_chant`); if a second entity might want it, make it a tag.
 
-Tooltips show tags for creatures today (`Tooltips.tag_notes(run, kind, id)` works for any kind); when heroes, buildings or items get tags, show them in those tooltips too.
+Tooltips show tags for creatures only (`Tooltips.tag_notes(run, kind, id)` works for any kind). Knights' `proud` is the first hero tag a rule reads and the hero tooltip doesn't show it yet; when heroes, buildings or items get tags players need to see, show them in those tooltips too.
 
 ### 3. Determinism
 All randomness goes through the run's `SeededRng` (never `randi()`/`randf()`), and the sim steps in fixed ticks. The same seed and the same choices must give the same run, so "seed 4821, round 6" is reproducible.

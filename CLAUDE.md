@@ -86,7 +86,7 @@ When a feature doesn't serve at least one pillar, question it.
 
 Yusuf must be able to try changes and give feedback quickly, without heavy builds. This keeps token cost down and keeps development interactive.
 - **Small slices:** ship the smallest playable change that answers a design question, then get feedback before building more.
-- **Playtest in the browser where possible:** prefer Godot web exports Yusuf can open from a link, with no install or build steps on their side. Fall back to a downloadable desktop build only when web can't do it.
+- **Playtest in the browser:** Yusuf plays the web build at the link in README.md (every merge to `main` goes live there), with no install or build steps on their side. Fall back to a downloadable desktop build only when web can't do it.
 - **Tune without rebuilding:** balance numbers live in data files, and in-game debug or tuning panels let Yusuf tweak values and re-run a round live.
 - **Prototype before engine work** when it's cheaper: paper or spreadsheet mockups, or text summaries of headless simulation runs (e.g. "100 seeded runs: average waves survived, top relics"), to settle a design question before building it in-game.
 - **Clear feedback hooks:** each playtest comes with 2-3 specific questions, plus a seed so Yusuf can say "seed 4821, round 6 felt unfair" and Claude can reproduce it.
@@ -114,7 +114,6 @@ Yusuf must be able to try changes and give feedback quickly, without heavy build
 
 ## Open questions
 - Final art style (pixel vs low-poly 3D).
-- How Yusuf wants to playtest (browser builds from a link are the assumed default).
 - Working title.
 - Which buildings post which incentives.
 - Claude's defaults, pending Yusuf's playtest, for: hero energy and lodgings, marketplace rules, bronze age with promotions and hero mood, ring town with desire paths and gates, power level and catch-up, food and watch posts, the medieval age, and difficulty tuning pass 1. The details and bot numbers are in [docs/PENDING_DEFAULTS.md](docs/PENDING_DEFAULTS.md); read it before touching one of those areas.
