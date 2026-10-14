@@ -2,6 +2,7 @@ class_name BuildHand
 extends RefCounted
 ## Building cards (`run.hand`): each round's build phase deals a hand of buildings to order from,
 ## weighted toward what the town needs, plus a card for ageing up whenever it can be raised.
+## Basic buildings (homes and food) are always on offer and never dealt, like Against the Storm's basics.
 ## Ordering a card pays the building's cost (RunState.build) and uses the card up.
 ## Numbers are in data/balance.json (build_hand_size, build_need_weight, build_new_weight, build_redraw_cost).
 
@@ -45,9 +46,21 @@ func redraw_cost() -> int:
 	return run.content.int_num("build_redraw_cost")
 
 
-## True if this building type is on a card in hand (the ageing-up card counts).
+## Basic buildings (homes and food, `basic` in data/buildings.json) that can go up now: always on offer,
+## as many as the town can pay for, never dealt as cards.
+func basics() -> Array[String]:
+	var out: Array[String] = []
+	var types := run.content.buildings.keys()
+	types.sort()
+	for type: String in types:
+		if run.content.buildings[type].get("basic", false) and eligible(type):
+			out.append(type)
+	return out
+
+
+## True if this building type is on a card in hand (the ageing-up card and basic buildings count).
 func offers(type: String) -> bool:
-	return milestone.get("building", "") == type or cards.any(func(c: Dictionary) -> bool: return c["building"] == type)
+	return run.content.buildings[type].get("basic", false) or milestone.get("building", "") == type or cards.any(func(c: Dictionary) -> bool: return c["building"] == type)
 
 
 ## Orders the building on a card in hand and uses the card up.
@@ -58,6 +71,8 @@ func can_order(type: String) -> bool:
 func order(type: String) -> bool:
 	if not can_order(type) or not run.build(type):
 		return false
+	if run.content.buildings[type].get("basic", false):
+		return true
 	if milestone.get("building", "") == type:
 		milestone = {}
 	else:
@@ -91,7 +106,8 @@ func eligible(type: String) -> bool:
 
 
 ## Why the town wants a building now: "housing", "food", "beds", "supply" (a stall has nobody making
-## its goods), "stall" (a workshop has nowhere to sell), or "" for nothing in particular.
+## its goods), "stall" (a workshop has nowhere to sell), "age" (new in the town's current age),
+## or "" for nothing in particular.
 func need(type: String) -> String:
 	var content := run.content
 	var def: Dictionary = content.buildings[type]
@@ -117,7 +133,15 @@ func need(type: String) -> String:
 		return "stall"
 	if def.has("stall") and not _has_stall(def["stall"]["sells"]) and _supplied(def["stall"]["sells"]):
 		return "stall"
+	var own_age: String = def.get("age", "")
+	if own_age != "" and own_age == run.age and run.world.count_buildings(type, false) == 0:
+		return "age"
 	return ""
+
+
+## How many cards a hand holds: build_hand_size, plus build_hand_per_age for every age past the first.
+func size() -> int:
+	return run.content.int_num("build_hand_size") + run.content.int_num("build_hand_per_age") * run.content.ages["order"].find(run.age)
 
 
 func _fill(rng: SeededRng, avoid: Array = []) -> void:
@@ -128,7 +152,7 @@ func _fill(rng: SeededRng, avoid: Array = []) -> void:
 	var types := content.buildings.keys()
 	types.sort()
 	for type: String in types:
-		if not eligible(type):
+		if not eligible(type) or content.buildings[type].get("basic", false):
 			continue
 		if content.buildings[type].has("ages_up"):
 			milestone = {"building": type, "need": ""}
@@ -142,7 +166,7 @@ func _fill(rng: SeededRng, avoid: Array = []) -> void:
 		if avoid.has(type):
 			weight *= 0.25
 		weights[type] = weight
-	while cards.size() < content.int_num("build_hand_size") and not weights.is_empty():
+	while cards.size() < size() and not weights.is_empty():
 		var type := rng.weighted(weights)
 		weights.erase(type)
 		cards.append({"building": type, "need": need(type)})

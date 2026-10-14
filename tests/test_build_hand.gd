@@ -13,7 +13,7 @@ func _types(run: RunState) -> Array:
 func test_hand_is_dealt_without_repeats() -> void:
 	var run := _run()
 	var types := _types(run)
-	check_eq(types.size(), run.content.int_num("build_hand_size"), "a full hand is dealt")
+	check_eq(types.size(), run.content.int_num("build_hand_size"), "a full hand is dealt in the first age")
 	for t: String in types:
 		check_eq(types.count(t), 1, "%s is dealt once" % t)
 		check(run.hand.eligible(t), "%s could be ordered now" % t)
@@ -31,7 +31,7 @@ func test_only_cards_in_hand_can_be_ordered() -> void:
 	var held: String = run.hand.cards[0]["building"]
 	var missing := ""
 	for t: String in run.content.buildings:
-		if run.hand.eligible(t) and not run.hand.offers(t):
+		if run.hand.eligible(t) and not run.hand.offers(t) and not run.content.buildings[t].get("basic", false):
 			missing = t
 			break
 	check(missing != "", "some building is not in hand")
@@ -81,3 +81,12 @@ func test_redraw_costs_shells_once_a_round() -> void:
 	var hands: Array = record["rounds"][-1]["build_hands"]
 	check_eq(hands.size(), 2, "the record keeps the first hand and the redrawn one")
 	check(record["rounds"][-1]["actions"].any(func(a: Dictionary) -> bool: return a["kind"] == "redraw"), "the redraw is logged")
+
+
+func test_basics_are_always_on_offer() -> void:
+	var run := _run()
+	run.stock["wood"] = 99
+	check(run.hand.basics().has("hut"), "huts are always on offer")
+	check(not _types(run).has("hut"), "huts are never dealt as a card")
+	check(run.hand.order("hut") and run.hand.order("hut"), "two huts can be ordered in one round")
+	check_eq(run.world.count_buildings("hut", false), 2, "both huts are placed")

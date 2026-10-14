@@ -19,7 +19,7 @@ var _begin_btn: Button
 
 func _init() -> void:
 	UiKit.heading(self, "Building cards")
-	UiKit.note(self, "Order from this round's cards. Each building finds its own plot and craftspeople raise it during the days. Unused cards are gone at the end of the round.")
+	UiKit.note(self, "Homes and food are always on offer; everything else comes from this round's cards. Each building finds its own plot and craftspeople raise it during the days. Unused cards are gone at the end of the round.")
 	_build_list = VBoxContainer.new()
 	add_child(_build_list)
 	add_child(HSeparator.new())
@@ -38,6 +38,12 @@ func refresh() -> void:
 	var content := run.content
 	for child in _build_list.get_children():
 		child.queue_free()
+	var basics := HFlowContainer.new()
+	basics.add_theme_constant_override("h_separation", 6)
+	basics.add_theme_constant_override("v_separation", 6)
+	_build_list.add_child(basics)
+	for type: String in run.hand.basics():
+		basics.add_child(_basic_button(type))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 6)
@@ -76,7 +82,31 @@ const NEED_TEXT := {
 	"beds": "Heroes need beds",
 	"supply": "A stall has nothing to sell",
 	"stall": "Your workshop needs a stall",
+	"age": "New in this age",
 }
+
+
+## A basic building (homes and food): always on offer, a small button rather than a card.
+func _basic_button(type: String) -> Button:
+	var def: Dictionary = run.content.buildings[type]
+	var owned := run.world.count_buildings(type, false)
+	var btn := Button.new()
+	btn.text = "%s  %s%s" % [def["name"], _cost_text(def), "  [%d]" % owned if owned > 0 else ""]
+	var why: String = NEED_TEXT.get(run.hand.need(type), "")
+	if why != "":
+		btn.add_theme_color_override("font_color", Color("#ffd28a"))
+		btn.text += "  (%s)" % why.to_lower()
+	btn.tooltip_text = "%s\nAlways on offer.\nA craftsperson needs about %d seconds to raise it." % [def["text"], def["work"]]
+	btn.disabled = not run.hand.can_order(type)
+	btn.pressed.connect(_act.bind(run.hand.order.bind(type)))
+	return btn
+
+
+func _cost_text(def: Dictionary) -> String:
+	var cost := PackedStringArray()
+	for r: String in def["cost"]:
+		cost.append("%d %s" % [def["cost"][r], r])
+	return ", ".join(cost)
 
 
 ## One building card: name, cost, why the town wants it; the description and warnings on hover.
@@ -84,13 +114,10 @@ func _card_button(card: Dictionary, age_up: bool) -> Button:
 	var content := run.content
 	var type: String = card["building"]
 	var def: Dictionary = content.buildings[type]
-	var cost := PackedStringArray()
-	for r: String in def["cost"]:
-		cost.append("%d %s" % [def["cost"][r], r])
 	var owned := run.world.count_buildings(type, false)
 	var lines := PackedStringArray()
 	lines.append(("RAISE: " if age_up else "") + def["name"])
-	lines.append(", ".join(cost))
+	lines.append(_cost_text(def))
 	var why: String = NEED_TEXT.get(card["need"], "")
 	if why == "" and owned == 0 and not age_up:
 		why = "New"

@@ -34,8 +34,9 @@
 	"hero_card_cost": 30,
 	"lodging_draw_bonus": 2,
 
-	"_build_cards_note": "Building cards: each round's build phase deals build_hand_size building cards; ordering one pays its cost and uses up the card. Ageing up is a card of its own whenever it can be raised. Cards are drawn without repeats, weight 1 each, times build_need_weight when the town needs that kind (housing almost full, food short, heroes without beds, a stall nobody supplies or a workshop with no stall), times build_new_weight for a building the town has never had. One redraw a round for build_redraw_cost shells deals a fresh hand for the cards not yet used.",
+	"_build_cards_note": "Building cards: each round's build phase deals build_hand_size building cards; ordering one pays its cost and uses up the card. Ageing up is a card of its own whenever it can be raised. Cards are drawn without repeats, weight 1 each, times build_need_weight when the town needs that kind (housing almost full, food short, heroes without beds, a stall nobody supplies or a workshop with no stall), times build_new_weight for a building the town has never had. A building of the town's current age it has never had counts as needed. The hand grows by build_hand_per_age for every age past the first. One redraw a round for build_redraw_cost shells deals a fresh hand for the cards not yet used.",
 	"build_hand_size": 5,
+	"build_hand_per_age": 1,
 	"build_need_weight": 4,
 	"build_new_weight": 2,
 	"build_redraw_cost": 10,
