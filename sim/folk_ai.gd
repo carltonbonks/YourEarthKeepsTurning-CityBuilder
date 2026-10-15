@@ -6,6 +6,9 @@ extends RefCounted
 ## Its only state is per-step indexes built in one pass over the townsfolk: warriors' patrol slots, and the
 ## gathering already planned (so each gatherer plans its trip without scanning everyone).
 
+## Seconds an idle townsperson waits before looking for work again.
+const IDLE_RECHECK := 1.0
+
 var w: World
 ## Warrior -> its place among the warriors in w.folk (dead ones included until cleanup), rebuilt each step.
 var _warrior_slot := {}
@@ -13,6 +16,8 @@ var _warrior_slot := {}
 var _claimed := {}
 ## Good -> how much is on its way in (claimed at nodes or being hauled home).
 var _inbound := {}
+## The town's wants this step (RunState.resource_wants), worked out the first time someone plans a trip.
+var _wants := {}
 
 
 func _init(world: World) -> void:
@@ -24,6 +29,7 @@ func begin_step() -> void:
 	_warrior_slot.clear()
 	_claimed.clear()
 	_inbound.clear()
+	_wants = {}
 	for unit in w.folk:
 		if unit.type_id == "warrior":
 			_warrior_slot[unit] = _warrior_slot.size()
@@ -219,6 +225,9 @@ func _worker_tick(unit: Unit) -> void:
 		_:
 			unit.intent = "idle"
 			w.walk_toward(unit, unit.home)
+			unit.task_timer -= w.dt
+			if unit.task_timer <= 0.0:
+				unit.task = ""
 
 
 func _choose_work(unit: Unit) -> void:
@@ -248,7 +257,9 @@ func _choose_work(unit: Unit) -> void:
 		return
 	var best := plan_trip(unit)
 	if best < 0:
-		unit.task = ""
+		# Nothing worth fetching: wait a moment before looking again.
+		unit.task = "idle"
+		unit.task_timer = IDLE_RECHECK
 		return
 	unit.task = "gather"
 	unit.task_index = best
@@ -266,7 +277,9 @@ func plan_trip(unit: Unit) -> int:
 	var gather := gather_time(unit)
 	if time_left <= gather:
 		return -1
-	var wants := w.run.resource_wants()
+	if _wants.is_empty():
+		_wants = w.run.resource_wants()
+	var wants := _wants
 	var floor_need := w.content.num("gather_need_floor")
 	var slack := w.content.num("gather_trip_slack")
 	var carry := carry_of(unit)
