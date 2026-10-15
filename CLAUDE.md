@@ -117,4 +117,4 @@ Yusuf must be able to try changes and give feedback quickly, without heavy build
 - Final art style (pixel vs low-poly 3D).
 - Working title.
 - Which buildings post which incentives.
-- Claude's defaults, pending Yusuf's playtest, for: hero energy and lodgings, marketplace rules, bronze age with promotions and hero mood, ring town with desire paths and gates, power level and catch-up, food and watch posts, the medieval age, difficulty tuning pass 1, the building-card numbers, and the 2026-10-14 batch (towers, earlier ages). The details and bot numbers are in [docs/PENDING_DEFAULTS.md](docs/PENDING_DEFAULTS.md); read it before touching one of those areas.
+- Claude's defaults, pending Yusuf's playtest, for: hero energy and lodgings, marketplace rules, bronze age with promotions and hero mood, ring town with desire paths and gates, power level and catch-up, food and watch posts, the medieval age, difficulty tuning pass 1, the building-card numbers, the 2026-10-14 batch (towers, earlier ages), and gatherers planning their trips. The details and bot numbers are in [docs/PENDING_DEFAULTS.md](docs/PENDING_DEFAULTS.md); read it before touching one of those areas.
