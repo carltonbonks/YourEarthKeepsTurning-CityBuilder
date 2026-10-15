@@ -144,6 +144,9 @@ def main(raw_folder, out_folder):
                 "wave_eased": rd.get("wave_eased", 0),
                 "siege_damage": rd.get("siege_damage", 0),
                 "towers_broken": rd.get("towers_broken", 0),
+                "gathered_total": sum(rd.get("gathered", {}).values()) if "gathered" in rd else "",
+                **{"trips_cut_short_" + k: rd.get("trips_cut_short", {}).get(k, 0) if "trips_cut_short" in rd else ""
+                   for k in ["dusk", "emptied", "unsafe"]},
                 "families": sum(1 for p in rd.get("picks", []) if p.get("taken") == "family"),
                 "wave_to_town_power": round(rd["power"]["wave"] / rd["power"]["town"]["total"], 2)
                 if rd.get("power", {}).get("town", {}).get("total") else "",

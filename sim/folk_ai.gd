@@ -3,11 +3,21 @@ extends RefCounted
 ## Townsfolk behaviour in the World: warriors patrol and answer calls for help;
 ## tribespeople and craftspeople gather, haul, build, craft, patch the hearth and
 ## go home at dusk. Townsfolk are handled as groups; nobody gives them orders.
-## Its only state is a per-step index of warriors, so each finds its patrol slot without scanning everyone.
+## Its only state is per-step indexes built in one pass over the townsfolk: warriors' patrol slots, and the
+## gathering already planned (so each gatherer plans its trip without scanning everyone).
+
+## Seconds an idle townsperson waits before looking for work again.
+const IDLE_RECHECK := 1.0
 
 var w: World
 ## Warrior -> its place among the warriors in w.folk (dead ones included until cleanup), rebuilt each step.
 var _warrior_slot := {}
+## Node index -> how much the gatherers already heading there will take.
+var _claimed := {}
+## Good -> how much is on its way in (claimed at nodes or being hauled home).
+var _inbound := {}
+## The town's wants this step (RunState.resource_wants), worked out the first time someone plans a trip.
+var _wants := {}
 
 
 func _init(world: World) -> void:
@@ -17,9 +27,23 @@ func _init(world: World) -> void:
 ## Called by World at the start of each step, before anyone acts.
 func begin_step() -> void:
 	_warrior_slot.clear()
+	_claimed.clear()
+	_inbound.clear()
+	_wants = {}
 	for unit in w.folk:
 		if unit.type_id == "warrior":
 			_warrior_slot[unit] = _warrior_slot.size()
+		elif unit.alive:
+			if unit.task == "gather":
+				_claim(unit.task_index, carry_of(unit))
+			if unit.carry_amount > 0:
+				_inbound[unit.carrying] = int(_inbound.get(unit.carrying, 0)) + unit.carry_amount
+
+
+func _claim(node_index: int, amount: int) -> void:
+	_claimed[node_index] = int(_claimed.get(node_index, 0)) + amount
+	var good: String = w.nodes[node_index]["gives"]
+	_inbound[good] = int(_inbound.get(good, 0)) + amount
 
 
 func add_folk(role: String) -> Unit:
@@ -116,6 +140,8 @@ func _worker_tick(unit: Unit) -> void:
 			unit.task = ""
 		return
 	if w.is_dusk():
+		if unit.task == "gather":
+			w.run.record.note_count("trips_cut_short", 1, "dusk")
 		unit.task = ""
 		unit.intent = "sleeping" if w.is_night() else "heading home"
 		w.walk_toward(unit, unit.home)
@@ -183,20 +209,25 @@ func _worker_tick(unit: Unit) -> void:
 			var node: Dictionary = w.nodes[unit.task_index]
 			unit.intent = "gathering %s" % node["gives"]
 			if int(node["amount"]) <= 0 or not w.node_safe(node):
+				if unit.carry_amount == 0:
+					w.run.record.note_count("trips_cut_short", 1, "emptied" if int(node["amount"]) <= 0 else "unsafe")
 				unit.task = "" if unit.carry_amount == 0 else "return"
 				return
 			if w.walk_toward(unit, node["pos"], 10.0):
 				unit.task_timer -= w.dt
 				if unit.task_timer <= 0.0:
-					var carry := float(def.get("carry", 2)) + w.run.tool_bonus(unit.type_id, "carry")
-					var take := mini(int(node["amount"]), int(carry * (1.0 + w.run.mod("carry_mult"))))
+					var take := mini(int(node["amount"]), carry_of(unit))
 					node["amount"] = int(node["amount"]) - take
+					w.run.record.note_count("gathered", take, node["gives"])
 					unit.carrying = node["gives"]
 					unit.carry_amount = take
 					unit.task = "return"
 		_:
 			unit.intent = "idle"
 			w.walk_toward(unit, unit.home)
+			unit.task_timer -= w.dt
+			if unit.task_timer <= 0.0:
+				unit.task = ""
 
 
 func _choose_work(unit: Unit) -> void:
@@ -224,20 +255,76 @@ func _choose_work(unit: Unit) -> void:
 		unit.task = "repair"
 		unit.task_timer = 2.0
 		return
-	var wants: Array[String] = ["wood"]
-	if unit.type_id != "craftsperson":
-		wants = w.run.needed_resources()
-	var best := -1
-	for want in wants:
-		best = nearest_node(unit, want)
-		if best >= 0:
-			break
+	var best := plan_trip(unit)
 	if best < 0:
-		unit.task = ""
+		# Nothing worth fetching: wait a moment before looking again.
+		unit.task = "idle"
+		unit.task_timer = IDLE_RECHECK
 		return
 	unit.task = "gather"
 	unit.task_index = best
-	unit.task_timer = float(w.content.townsfolk[unit.type_id].get("gather_seconds", 3)) / (1.0 + w.run.tool_bonus(unit.type_id, "gather_mult"))
+	unit.task_timer = gather_time(unit)
+	_claim(best, carry_of(unit))
+
+
+## Picks the gathering trip worth the most to the town, or -1. Each trip is scored by how badly the town
+## needs the good (after what is already on its way in) times what this gatherer can carry back from what
+## the node will have left once the others heading there have taken theirs, over the time the round trip takes.
+## A trip that can't reach the node and finish gathering before dusk isn't started.
+## Craftspeople only fetch wood.
+func plan_trip(unit: Unit) -> int:
+	var time_left := w.content.num("day_seconds") - w.content.num("dusk_seconds") - w.time_of_day()
+	var gather := gather_time(unit)
+	if time_left <= gather:
+		return -1
+	if _wants.is_empty():
+		_wants = w.run.resource_wants()
+	var wants := _wants
+	var floor_need := w.content.num("gather_need_floor")
+	var slack := w.content.num("gather_trip_slack")
+	var carry := carry_of(unit)
+	var need := {}
+	for good: String in wants:
+		var short := float(wants[good]) - float(w.run.stock[good]) - float(_inbound.get(good, 0))
+		need[good] = maxf(floor_need, short / maxf(float(wants[good]), 1.0))
+	var best := -1
+	var best_score := 0.0
+	for i in w.nodes.size():
+		var node := w.nodes[i]
+		var good: String = node["gives"]
+		if not need.has(good) or (unit.type_id == "craftsperson" and good != "wood") or not _can_gather(node):
+			continue
+		var take := mini(carry, int(node["amount"]) - int(_claimed.get(i, 0)))
+		if take <= 0:
+			continue
+		var d := unit.pos.distance_to(node["pos"])
+		# Gatherers avoid nodes with a monster prowling nearby.
+		if w.nearest_enemy(node["pos"], 120.0) != null:
+			d += 400.0
+		var walk := d / maxf(unit.speed, 1.0) * slack
+		if walk + gather > time_left:
+			continue
+		var score := float(need[good]) * take / (walk * 2.0 + gather)
+		if score > best_score:
+			best_score = score
+			best = i
+	return best
+
+
+## How much a townsperson brings back from one gathering trip (tools and relics included).
+func carry_of(unit: Unit) -> int:
+	var carry := float(w.content.townsfolk[unit.type_id].get("carry", 2)) + w.run.tool_bonus(unit.type_id, "carry")
+	return int(carry * (1.0 + w.run.mod("carry_mult")))
+
+
+## Seconds a townsperson spends gathering at a node (tools included).
+func gather_time(unit: Unit) -> float:
+	return float(w.content.townsfolk[unit.type_id].get("gather_seconds", 3)) / (1.0 + w.run.tool_bonus(unit.type_id, "gather_mult"))
+
+
+## A node townsfolk may gather from now: stocked, theirs to work, of the town's age, and safe.
+func _can_gather(node: Dictionary) -> bool:
+	return int(node["amount"]) > 0 and not node.get("heroes_only", false) and w.node_active(node) and w.node_safe(node)
 
 
 ## The closest node a townsperson can gather a good from, or -1.
@@ -246,8 +333,7 @@ func nearest_node(unit: Unit, want: String) -> int:
 	var best_d := INF
 	for i in w.nodes.size():
 		var node := w.nodes[i]
-		if node["gives"] != want or int(node["amount"]) <= 0 or node.get("heroes_only", false) \
-				or not w.node_active(node) or not w.node_safe(node):
+		if node["gives"] != want or not _can_gather(node):
 			continue
 		var d := unit.pos.distance_to(node["pos"])
 		# Gatherers avoid nodes with a monster prowling nearby.
