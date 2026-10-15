@@ -32,7 +32,9 @@ extends RefCounted
 ## 14: building cards: per round "build_hands" (the building cards dealt, then one more list per redraw,
 ##     each {"cards": [building types]}); a "redraw" action ({"kind": "redraw", "cost"}).
 ## 15: towers can be broken: per round "towers_broken" (watch posts or the keep knocked out by sentient raiders).
-const RECORD_FORMAT := 15
+## 16: gathering trips: per round "gathered" (good -> amount townsfolk brought in from nodes) and "trips_cut_short"
+##     (why -> count of gathering trips given up empty-handed: "dusk", "emptied" (node ran out), "unsafe").
+const RECORD_FORMAT := 16
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -100,6 +102,7 @@ func begin_round() -> void:
 		"prices": run.prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
 		"age": run.age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
 		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0, "towers_broken": 0,
+		"gathered": {}, "trips_cut_short": {},
 		"build_hands": [{"cards": run.hand.labels()}]}
 
 

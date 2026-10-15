@@ -1,5 +1,5 @@
 {
-	"_note": "Core balance numbers. Edit and reload; no code changes needed. Times are in seconds of game time.",
+	"_note": "Core balance numbers. Edit and reload; no code changes needed. Times are in seconds of game time. Gatherers plan each trip (sim/folk_ai.gd plan_trip): gather_trip_slack pads their walking estimate for detours, and gather_need_floor is how much they still value a good the town already has enough of (a full shortage counts 1).",
 	"rounds_to_win": 14,
 	"days_per_round": 3,
 	"day_seconds": 32,
@@ -66,6 +66,8 @@
 	"node_min_distance": 200,
 	"node_max_distance": 520,
 	"node_regrow_per_day": 2,
+	"gather_trip_slack": 1.15,
+	"gather_need_floor": 0.05,
 
 	"xp_per_level": 10,
 	"level_hp": 8,

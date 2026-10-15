@@ -425,6 +425,18 @@ func most_needed_resource() -> String:
 
 ## Gatherable goods, most needed first (shortest against two days of need).
 func needed_resources() -> Array[String]:
+	var wants := resource_wants()
+	var gaps := {}
+	for r: String in wants:
+		gaps[r] = (wants[r] - float(stock[r])) / maxf(wants[r], 1.0)
+	var out: Array[String] = []
+	out.assign(wants.keys())
+	out.sort_custom(func(a: String, b: String) -> bool: return gaps[a] > gaps[b] or (gaps[a] == gaps[b] and a < b))
+	return out
+
+
+## Gatherable good -> how much the town wants in store (two days of need, plus what its buildings eat).
+func resource_wants() -> Dictionary:
 	var wants := {
 		"food": population() * content.num("food_per_person_per_day") * 2.0,
 		"fuel": fuel_needed_tonight() * 2.0,
@@ -447,13 +459,7 @@ func needed_resources() -> Array[String]:
 		wants["wood"] += 6.0 * world.count_buildings("charcoal_burner")
 	if world.count_buildings("bloomery") > 0:
 		wants["bog_iron"] = 8.0
-	var gaps := {}
-	for r: String in wants:
-		gaps[r] = (wants[r] - float(stock[r])) / maxf(wants[r], 1.0)
-	var out: Array[String] = []
-	out.assign(wants.keys())
-	out.sort_custom(func(a: String, b: String) -> bool: return gaps[a] > gaps[b] or (gaps[a] == gaps[b] and a < b))
-	return out
+	return wants
 
 
 ## Files the night's report in the round record and keeps it for the UI.
