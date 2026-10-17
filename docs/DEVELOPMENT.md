@@ -48,7 +48,7 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `game/overlays.gd` | `Overlays`: dawn pick, relic pick, end screen, Run history, dev tuning. Sends choices back as signals. |
 | `game/status_text.gd` | `StatusText`: the live text (status, clock, heroes, market, relics) built from the run. Read-only. |
 | `game/ui_kit.gd` | `UiKit`: small shared builders (heading, button, rich text, note). |
-| `game/arena_view.gd` | Draws the map with placeholder shapes; zoom, pan, hover. Read-only. |
+| `game/arena_view.gd` | Draws the map with placeholder shapes, tilted (isometric, everything standing drawn back to front) or flat (V toggles); zoom, pan, hover. Read-only: only the projection (`_to_screen` / `_to_world`) knows about the tilt. |
 | `game/tooltips.gd` | Hover text for map things and the build list, tag notes and supply warnings. Read-only. |
 | `game/run_history.gd` | Saves runs to `user://runs/`, download/copy for sharing. |
 | `data/*.json` | All content and balance numbers. Each file starts with a `_note` explaining its keys; keep it current when you add a key. |

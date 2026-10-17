@@ -2,10 +2,10 @@ extends SceneTree
 ## Saves a picture of the game screen after a bot has played some rounds, to check how the map looks.
 ## Needs a display (not --headless); in a container: xvfb-run ~/godot/godot --path . -s res://tools/snapshot.gd -- seed=4821 round=5 style=market out=/tmp/map.png
 ## mid=1 stops partway through the round's first day instead of at the build phase; zoom= zooms the map;
-## gates=2 has the bot order up to 2 gates.
+## gates=2 has the bot order up to 2 gates; flat=1 shows the flat top-down map instead of the tilted one.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -40,6 +40,7 @@ func _init() -> void:
 	main._overlays.hide()
 	main._refresh()
 	main._arena.zoom = float(args["zoom"])
+	main._arena.iso = args["flat"] != "1"
 	for i in 4:
 		await process_frame
 	var image := root.get_texture().get_image()
