@@ -53,3 +53,18 @@ func test_map_hover_finds_heroes_and_dens() -> void:
 	check(view.hovered(Vector2(1, 1)).is_empty(), "pointing at empty ground shows nothing")
 	check(Tooltips.as_text(Tooltips.hero(run, hero)).begins_with(hero.display_name), "hero text starts with the name")
 	view.free()
+
+
+func test_tilted_and_flat_views_map_points_back() -> void:
+	var run := _run()
+	var view := ArenaView.new()
+	view.run = run
+	view.size = Vector2(900, 700)
+	view.pan = Vector2(40, -25)
+	for iso: bool in [true, false]:
+		view.iso = iso
+		for p: Vector2 in [Vector2.ZERO, Vector2(120, -300), Vector2(-500, 260)]:
+			check(view._to_world(view._to_screen(p)).distance_to(p) < 0.01, "screen to world and back (iso=%s)" % iso)
+	view.iso = true
+	check(view._to_screen(Vector2(100, 100)).x == view._to_screen(Vector2.ZERO).x, "tilted: south-east of the hearth is straight down")
+	view.free()

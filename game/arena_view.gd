@@ -2,6 +2,9 @@ class_name ArenaView
 extends Control
 ## Draws the settlement map with placeholder shapes. Read-only: it only looks at
 ## the RunState / World and never changes them, so art can be swapped freely.
+## By default the map is tilted (isometric): the ground is turned 45 degrees and squashed, buildings
+## stand up as blocks, and everything standing is drawn back to front so nearer things cover farther
+## ones. V switches to the flat top-down view. The sim never knows: only the view's projection changes.
 ## Mouse wheel zooms, dragging pans, hovering shows a tooltip (see Tooltips).
 
 const HERO_RADIUS := 9.0
@@ -11,8 +14,17 @@ const BOSS_RADIUS := 15.0
 const MIN_ZOOM := 1.0
 const MAX_ZOOM := 4.0
 const PAVE_GLOW_SECONDS := 6.0
+## How much the tilted ground is squashed top to bottom (0.5 is classic 2:1 isometric).
+const ISO_SQUASH := 0.5
+const HALF_ROOT2 := 0.70710678
+## Placeholder heights of standing buildings, in world units. Buildings that shoot stand taller.
+const BUILDING_HEIGHT := 14.0
+const TOWER_HEIGHT := 32.0
+## What each kind of standing thing is, for the back-to-front pass.
+enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO }
 
 var run: RunState
+var iso := true  ## Tilted (isometric) view; false is the flat top-down view.
 var zoom := 1.2
 var pan := Vector2.ZERO  ## World point at the centre of the view.
 var _dragging := false
@@ -53,7 +65,14 @@ func _gui_input(event: InputEvent) -> void:
 		if _dragging and _mouse.distance_to(_press_at) > 5.0:
 			_moved = true
 		if _dragging and _moved:
-			pan -= (event as InputEventMouseMotion).relative / _scale()
+			pan -= _unproject((event as InputEventMouseMotion).relative / _scale())
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_V:
+		iso = not iso
+		get_viewport().set_input_as_handled()
 
 
 func _notification(what: int) -> void:
@@ -64,15 +83,44 @@ func _notification(what: int) -> void:
 func _scale() -> float:
 	if run == null:
 		return 1.0
-	return minf(size.x, size.y) / (run.content.num("world_radius") * 2.1) * zoom
+	# Tilted, the map is half as tall as it is wide, so it can fill more of a wide screen.
+	var fit := minf(size.x, size.y / ISO_SQUASH) * 0.8 if iso else minf(size.x, size.y)
+	return fit / (run.content.num("world_radius") * 2.1) * zoom
 
 
+## A world offset as a screen offset before zooming: turned 45 degrees and squashed when tilted.
+func _project(d: Vector2) -> Vector2:
+	if not iso:
+		return d
+	return Vector2(d.x - d.y, (d.x + d.y) * ISO_SQUASH) * HALF_ROOT2
+
+
+func _unproject(v: Vector2) -> Vector2:
+	if not iso:
+		return v
+	var across := v.x / HALF_ROOT2  # x - y
+	var down := v.y / (HALF_ROOT2 * ISO_SQUASH)  # x + y
+	return Vector2((across + down) / 2.0, (down - across) / 2.0)
+
+
+## Where a ground point is on screen.
 func _to_screen(p: Vector2) -> Vector2:
-	return size / 2.0 + (p - pan) * _scale()
+	return size / 2.0 + _project(p - pan) * _scale()
 
 
+## The ground point under a screen point.
 func _to_world(s: Vector2) -> Vector2:
-	return (s - size / 2.0) / _scale() + pan
+	return _unproject((s - size / 2.0) / _scale()) + pan
+
+
+## The middle of a round marker of screen radius r standing on a ground point (it sits on the ground when tilted).
+func _stand(p: Vector2, r: float) -> Vector2:
+	return _to_screen(p) - Vector2(0.0, r if iso else 0.0)
+
+
+## How many pixels a height in world units rises on screen (none in the flat view).
+func _lift(height: float) -> float:
+	return height * _scale() if iso else 0.0
 
 
 func _draw() -> void:
@@ -82,148 +130,285 @@ func _draw() -> void:
 	var w := run.world
 	var s := _scale()
 	var font := get_theme_default_font()
-	var center := _to_screen(Vector2.ZERO)
 	var radius := content.num("world_radius")
 
-	# Ground: the wilds, then the settlement clearing.
+	# Ground: the wilds, then the settlement clearing. Flat circles become ellipses when tilted.
 	draw_rect(Rect2(Vector2.ZERO, size), Color("#161a17"))
-	draw_circle(center, radius * s, Color("#25301f"))
+	_ground_circle(Vector2.ZERO, radius, Color("#25301f"), 96)
 	for thicket in w.town.thickets:
-		draw_circle(_to_screen(thicket["pos"]), float(thicket["radius"]) * s, Color(content.town["thickets"]["color"]))
-	draw_circle(center, content.num("settlement_radius") * s, Color("#33402a"))
-	draw_arc(center, content.num("settlement_radius") * s, 0, TAU, 64, Color("#4d5c3a"), 1.0)
+		_ground_circle(thicket["pos"], float(thicket["radius"]), Color(content.town["thickets"]["color"]), 24)
+	_ground_circle(Vector2.ZERO, content.num("settlement_radius"), Color("#33402a"), 64)
+	draw_polyline(_closed(_ground_ring(Vector2.ZERO, content.num("settlement_radius"), 64)), Color("#4d5c3a"), 1.0)
 	_draw_plots()
 	_draw_ground()
+	_ground_circle(Vector2.ZERO, World.HEARTH_RADIUS, Color("#5a4030"), 32)
 
 	# Warned attack sides: red wedges at the map edge until the wave arrives.
 	if not w.wave_spawned:
 		for angle in w.wave_sides:
 			var dir := Vector2.from_angle(angle)
-			var tip := _to_screen(dir * radius * 0.86)
-			var base := _to_screen(dir * radius * 1.0)
-			var side := dir.orthogonal() * 22.0
-			draw_colored_polygon(PackedVector2Array([tip, base + side, base - side]), Color("#c0403a"))
+			var side := dir.orthogonal() * 22.0 / s
+			draw_colored_polygon(_screen_poly(PackedVector2Array([dir * radius * 0.86, dir * radius + side, dir * radius - side])),
+				Color("#c0403a"))
 
-	# Resource nodes: size shows how much is left.
+	# Everything standing, back to front: nearer things (lower on screen) cover farther ones.
+	# The flat view keeps the old layers (resources, dens, buildings, hearth, townsfolk, enemies, heroes).
+	var things: Array = []
+	var keys := PackedInt64Array()
 	for node in w.nodes:
-		if not w.node_active(node):
-			continue
-		var def: Dictionary = content.world["nodes"][node["type"]]
-		var p := _to_screen(node["pos"])
-		var left := float(node["amount"]) / float(node["max"])
-		var r := maxf(3.0, (6.0 + 8.0 * left) * s * 1.6)
-		var col := Color(def["color"])
-		draw_circle(p, r, col if left > 0.0 else Color(col, 0.25))
-		if zoom > 1.6:
-			draw_string(font, p + Vector2(r + 2, 4), "%s %d" % [def["name"], node["amount"]], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#c8c8b0"))
-
-	# Dens.
+		if w.node_active(node):
+			_queue(things, keys, Kind.NODE, node, node["pos"])
 	for den in w.dens:
-		var def: Dictionary = content.world["dens"][den["type"]]
-		var p := _to_screen(den["pos"])
-		var r := maxf(8.0, 18.0 * s * 1.6)
-		draw_circle(p, r, Color(def["color"]))
-		draw_arc(p, r, 0, TAU, 24, Color("#a05050"), 2.0)
-		draw_string(font, p + Vector2(-r, r + 12), def["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#d0a0a0"))
-
-	# Buildings fill their plot: solid when raised, outline plus progress while being built.
+		_queue(things, keys, Kind.DEN, den, den["pos"])
 	for bi in w.buildings.size():
-		var b: Dictionary = w.buildings[bi]
-		var def: Dictionary = content.buildings[b["type"]]
-		var p := _to_screen(b["pos"])
-		var half := maxf(4.0, 11.0 * s)
-		var shape := _screen_poly(w.town.plot_outline(b["plot"]))
-		var col := Color(def["color"])
-		var work_left := float(b["work_left"])
-		if work_left <= 0.0 and w.town.is_gate_type(b["type"]):
-			# A gate fades as raiders batter it, and shows its health.
-			# Drawn open, so it reads as a way through: a faint floor, a dashed edge and two posts either
-			# side of the opening (across the ring, the way people walk through).
-			var whole := w.town.gate_health(bi)
-			draw_colored_polygon(shape, Color(col, 0.12 + 0.18 * whole))
-			var edge := _closed(shape)
-			for k in edge.size() - 1:
-				draw_dashed_line(edge[k], edge[k + 1], Color("#e8d9a8", 0.5 + 0.5 * whole), 1.5, 4.0)
-			var across: Vector2 = Vector2(b["pos"]).normalized().orthogonal() if Vector2(b["pos"]).length() > 0.0 else Vector2.RIGHT
-			var post := maxf(2.5, 3.5 * s)
-			for side: float in [-1.0, 1.0]:
-				var at := p + across * side * half * 0.75
-				draw_rect(Rect2(at - Vector2(post, post), Vector2(post, post) * 2.0), Color(col.lightened(0.2), 0.4 + 0.6 * whole))
-			draw_line(p - across * half * 0.35, p + across * half * 0.35, Color("#e8d9a8", 0.35), 1.0)
-			if whole < 1.0:
-				_bar(p + Vector2(-half, half + 3), half * 2.0, whole, Color("#e0a050"))
-		elif work_left <= 0.0:
-			# A broken tower is drawn dark until it is mended at dawn; a hurt one shows its health.
-			var tower_hp := float(def.get("tower_hp", 0.0))
-			var broken := tower_hp > 0.0 and float(b["hp"]) <= 0.0
-			draw_colored_polygon(shape, col.darkened(0.6) if broken else col)
-			draw_polyline(_closed(shape), Color("#e05050") if broken else Color("#e8d9a8"), 1.0)
-			if tower_hp > 0.0 and float(b["hp"]) < tower_hp:
-				_bar(p + Vector2(-half, half + 3), half * 2.0, float(b["hp"]) / tower_hp, Color("#e05050"))
-		else:
-			var done := 1.0 - work_left / float(def["work"])
-			draw_colored_polygon(shape, Color(col, 0.25))
-			draw_polyline(_closed(shape), col, 1.5)
-			_bar(p + Vector2(-half, half + 3), half * 2.0, done, Color("#e8d9a8"))
-		# Stalls show a dot per good on sale; workshops show how far the current good is.
-		if work_left <= 0.0 and def.has("stall"):
-			for k in b["goods"].size():
-				draw_circle(p + Vector2(-half + 3.0 + k * 5.0, half + 4.0), 2.0, Color("#ffd24a"))
-		elif work_left <= 0.0 and def.has("workshop") and b["craft"] != "":
-			var recipe: Dictionary = content.market["recipes"][b["craft"]]
-			_bar(p + Vector2(-half, half + 3), half * 2.0, 1.0 - float(b["craft_left"]) / float(recipe["work"]), Color("#ffd24a"))
-		if zoom > 1.4:
-			draw_string(font, p + Vector2(-half, -half - 3), def["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#d8d0b8"))
-
-	# Hearth.
-	var hearth_r := World.HEARTH_RADIUS * s
-	draw_circle(center, hearth_r, Color("#5a4030"))
-	draw_circle(center, hearth_r * 0.55, Color("#ff9a3a") if not w.cold_tonight else Color("#6a6a7a"))
-	_bar(center + Vector2(-hearth_r, -hearth_r - 8), hearth_r * 2.0, w.hearth_hp / run.hearth_max_hp(), Color("#7fd0ff"))
-
-	# Shots.
-	for shot in w.shots:
-		var c := Color("#fff3b0") if shot["ranged"] else Color("#ffffff")
-		draw_line(_to_screen(shot["from"]), _to_screen(shot["to"]), Color(c, 0.6), 1.5 if shot["ranged"] else 2.5)
-
-	# Townsfolk.
+		_queue(things, keys, Kind.BUILDING, bi, w.buildings[bi]["pos"])
+	_queue(things, keys, Kind.HEARTH, null, Vector2.ZERO)
 	for u in w.folk:
-		if not u.alive:
-			continue
-		var p := _to_screen(u.pos)
-		var r := FOLK_RADIUS * maxf(1.0, zoom * 0.7)
-		draw_circle(p, r, Color(content.townsfolk[u.type_id]["color"]))
-		if u.carry_amount > 0:
-			draw_circle(p + Vector2(r, -r), r * 0.5, Color(main_color(u.carrying)))
-		if u.hp < u.max_hp:
-			_bar(p + Vector2(-r, -r - 4), r * 2.0, u.hp_fraction(), Color("#5ee07a"))
-
-	# Enemies.
+		if u.alive:
+			_queue(things, keys, Kind.FOLK, u, u.pos)
 	for e in w.enemies:
-		if not e.alive or not e.spawned:
-			continue
-		var p := _to_screen(e.pos)
-		var r := (BOSS_RADIUS if e.is_boss else ENEMY_RADIUS) * maxf(1.0, zoom * 0.7)
-		draw_circle(p, r, Color(content.enemies[e.type_id]["color"]))
-		if e.den_index >= 0:
-			draw_arc(p, r, 0, TAU, 16, Color("#301818"), 1.5)
-		_bar(p + Vector2(-r, -r - 5), r * 2.0, e.hp_fraction(), Color("#e05050"))
-
-	# Heroes.
+		if e.alive and e.spawned:
+			_queue(things, keys, Kind.ENEMY, e, e.pos)
 	for hero in run.heroes:
 		if hero.alive:
-			_draw_hero(hero, _to_screen(hero.pos), font)
+			_queue(things, keys, Kind.HERO, hero, hero.pos)
+	keys.sort()
+	for key in keys:
+		var thing: Array = things[key & 0xFFFF]
+		match thing[0]:
+			Kind.NODE:
+				_draw_node(thing[1], font)
+			Kind.DEN:
+				_draw_den(thing[1], font)
+			Kind.BUILDING:
+				_draw_building(thing[1], font)
+			Kind.HEARTH:
+				_draw_hearth()
+			Kind.FOLK:
+				_draw_folk(thing[1])
+			Kind.ENEMY:
+				_draw_enemy(thing[1])
+			Kind.HERO:
+				_draw_hero(thing[1], font)
+
+	# Shots fly at chest height.
+	var chest := Vector2(0.0, -FOLK_RADIUS * maxf(1.0, zoom * 0.7) if iso else 0.0)
+	for shot in w.shots:
+		var c := Color("#fff3b0") if shot["ranged"] else Color("#ffffff")
+		draw_line(_to_screen(shot["from"]) + chest, _to_screen(shot["to"]) + chest, Color(c, 0.6), 1.5 if shot["ranged"] else 2.5)
 
 	# Night falls over everything.
 	var dark := _darkness()
 	if dark > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.12, dark))
-	var help := "Mouse wheel to zoom, drag to look around, point at anything for details"
+	var help := "Mouse wheel to zoom, drag to look around, V for %s view, point at anything for details" % ("flat" if iso else "tilted")
 	draw_string(font, Vector2(8, size.y - 8), help, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#8a9088"))
 	if _mouse.x >= 0.0 and not _dragging:
 		var tip := hovered(_mouse)
 		if not tip.is_empty():
 			_draw_tip(tip, _mouse, font)
+
+
+## Adds a standing thing to this frame's back-to-front pass. The sort key packs depth above the thing's index.
+func _queue(things: Array, keys: PackedInt64Array, kind: Kind, ref: Variant, pos: Vector2) -> void:
+	var depth := (_to_screen(pos).y + 50000.0) * 4.0 if iso else float(kind)
+	keys.append((int(depth) << 16) | things.size())
+	things.append([kind, ref])
+
+
+func _draw_node(node: Dictionary, font: Font) -> void:
+	var def: Dictionary = run.content.world["nodes"][node["type"]]
+	var left := float(node["amount"]) / float(node["max"])
+	var r := _node_radius(node)
+	var p := _stand(node["pos"], r)
+	_shadow(node["pos"], r)
+	var col := Color(def["color"])
+	draw_circle(p, r, col if left > 0.0 else Color(col, 0.25))
+	if zoom > 1.6:
+		draw_string(font, p + Vector2(r + 2, 4), "%s %d" % [def["name"], node["amount"]], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#c8c8b0"))
+
+
+## Resource nodes: size shows how much is left.
+func _node_radius(node: Dictionary) -> float:
+	return maxf(3.0, (6.0 + 8.0 * float(node["amount"]) / float(node["max"])) * _scale() * 1.6)
+
+
+func _draw_den(den: Dictionary, font: Font) -> void:
+	var def: Dictionary = run.content.world["dens"][den["type"]]
+	var r := _den_radius()
+	var p := _stand(den["pos"], r)
+	_shadow(den["pos"], r)
+	draw_circle(p, r, Color(def["color"]))
+	draw_arc(p, r, 0, TAU, 24, Color("#a05050"), 2.0)
+	draw_string(font, p + Vector2(-r, r + 12), def["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#d0a0a0"))
+
+
+func _den_radius() -> float:
+	return maxf(8.0, 18.0 * _scale() * 1.6)
+
+
+## How tall a building stands on screen: towers taller, gates flat, half-built ones part way up.
+func _building_lift(bi: int) -> float:
+	var b: Dictionary = run.world.buildings[bi]
+	var def: Dictionary = run.content.buildings[b["type"]]
+	if run.world.town.is_gate_type(b["type"]):
+		return 0.0
+	var done := clampf(1.0 - float(b["work_left"]) / float(def["work"]), 0.0, 1.0)
+	return _lift(TOWER_HEIGHT if def.has("attack") else BUILDING_HEIGHT) * done
+
+
+## Buildings fill their plot: solid when raised, outline plus progress while being built.
+func _draw_building(bi: int, font: Font) -> void:
+	var w := run.world
+	var s := _scale()
+	var b: Dictionary = w.buildings[bi]
+	var def: Dictionary = run.content.buildings[b["type"]]
+	var lift := _building_lift(bi)
+	var p := _to_screen(b["pos"]) - Vector2(0.0, lift)  # The middle of the roof.
+	var half := maxf(4.0, 11.0 * s)
+	var shape := _screen_poly(w.town.plot_outline(b["plot"]))
+	var col := Color(def["color"])
+	var work_left := float(b["work_left"])
+	if work_left <= 0.0 and w.town.is_gate_type(b["type"]):
+		# A gate fades as raiders batter it, and shows its health.
+		# Drawn open, so it reads as a way through: a faint floor, a dashed edge and two posts either
+		# side of the opening (across the ring, the way people walk through).
+		var whole := w.town.gate_health(bi)
+		draw_colored_polygon(shape, Color(col, 0.12 + 0.18 * whole))
+		var edge := _closed(shape)
+		for k in edge.size() - 1:
+			draw_dashed_line(edge[k], edge[k + 1], Color("#e8d9a8", 0.5 + 0.5 * whole), 1.5, 4.0)
+		var pos := Vector2(b["pos"])
+		var across: Vector2 = pos.normalized().orthogonal() if pos.length() > 0.0 else Vector2.RIGHT
+		var post := maxf(2.5, 3.5 * s)
+		var post_up := _lift(BUILDING_HEIGHT)
+		for side: float in [-1.0, 1.0]:
+			var at := _to_screen(pos + across * side * half / s * 0.75)
+			draw_rect(Rect2(at - Vector2(post, post + post_up), Vector2(post * 2.0, post * 2.0 + post_up)),
+				Color(col.lightened(0.2), 0.4 + 0.6 * whole))
+		draw_line(_to_screen(pos - across * half / s * 0.35), _to_screen(pos + across * half / s * 0.35), Color("#e8d9a8", 0.35), 1.0)
+		if whole < 1.0:
+			_bar(p + Vector2(-half, half + 3), half * 2.0, whole, Color("#e0a050"))
+	elif work_left <= 0.0:
+		# A broken tower is drawn dark until it is mended at dawn; a hurt one shows its health.
+		var tower_hp := float(def.get("tower_hp", 0.0))
+		var broken := tower_hp > 0.0 and float(b["hp"]) <= 0.0
+		_draw_block(shape, lift, col.darkened(0.6) if broken else col, Color("#e05050") if broken else Color("#e8d9a8"))
+		if tower_hp > 0.0 and float(b["hp"]) < tower_hp:
+			_bar(p + Vector2(-half, half + 3), half * 2.0, float(b["hp"]) / tower_hp, Color("#e05050"))
+	else:
+		var done := 1.0 - work_left / float(def["work"])
+		draw_colored_polygon(shape, Color(col, 0.25))
+		draw_polyline(_closed(shape), col, 1.5)
+		if lift >= 1.0:
+			_draw_block(shape, lift, Color(col, 0.55), col)
+		_bar(p + Vector2(-half, half + 3), half * 2.0, done, Color("#e8d9a8"))
+	# Stalls show a dot per good on sale; workshops show how far the current good is.
+	if work_left <= 0.0 and def.has("stall"):
+		for k in b["goods"].size():
+			draw_circle(p + Vector2(-half + 3.0 + k * 5.0, half + 4.0), 2.0, Color("#ffd24a"))
+	elif work_left <= 0.0 and def.has("workshop") and b["craft"] != "":
+		var recipe: Dictionary = run.content.market["recipes"][b["craft"]]
+		_bar(p + Vector2(-half, half + 3), half * 2.0, 1.0 - float(b["craft_left"]) / float(recipe["work"]), Color("#ffd24a"))
+	if zoom > 1.4:
+		draw_string(font, p + Vector2(-half, -half - 3), def["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#d8d0b8"))
+
+
+## A flat shape stood up as a block `lift` pixels tall: the walls facing the viewer, shaded as if lit
+## from the left, then the roof. With no lift it is the flat shape.
+func _draw_block(base: PackedVector2Array, lift: float, color: Color, edge: Color) -> void:
+	if lift < 1.0:
+		draw_colored_polygon(base, color)
+		draw_polyline(_closed(base), edge, 1.0)
+		return
+	var up := Vector2(0.0, -lift)
+	var middle := Vector2.ZERO
+	for q in base:
+		middle += q
+	middle /= base.size()
+	var walls: Array = []
+	for k in base.size():
+		var a := base[k]
+		var b := base[(k + 1) % base.size()]
+		var out := (b - a).orthogonal().normalized()
+		if out.dot((a + b) / 2.0 - middle) < 0.0:
+			out = -out
+		if out.y > 0.05:  # Faces the viewer.
+			walls.append([(a.y + b.y) / 2.0, a, b, out.x])
+	walls.sort_custom(func(x: Array, y: Array) -> bool: return x[0] < y[0])
+	for wall: Array in walls:
+		var a: Vector2 = wall[1]
+		var b: Vector2 = wall[2]
+		draw_colored_polygon(PackedVector2Array([a, b, b + up, a + up]), color.darkened(0.3 + 0.2 * float(wall[3])))
+	var roof := PackedVector2Array()
+	for q in base:
+		roof.append(q + up)
+	draw_colored_polygon(roof, color)
+	draw_polyline(_closed(roof), edge, 1.0)
+
+
+func _draw_hearth() -> void:
+	var s := _scale()
+	var hearth_r := World.HEARTH_RADIUS * s
+	var center := _to_screen(Vector2.ZERO)
+	if not iso:
+		draw_circle(center, hearth_r, Color("#5a4030"))
+	var fire := hearth_r * (0.3 if iso else 0.55)
+	draw_circle(center - Vector2(0.0, fire if iso else 0.0), fire, Color("#ff9a3a") if not run.world.cold_tonight else Color("#6a6a7a"))
+	var top := hearth_r * ISO_SQUASH + fire if iso else hearth_r
+	_bar(center + Vector2(-hearth_r, -top - 8), hearth_r * 2.0, run.world.hearth_hp / run.hearth_max_hp(), Color("#7fd0ff"))
+
+
+func _draw_folk(u: Unit) -> void:
+	var r := FOLK_RADIUS * maxf(1.0, zoom * 0.7)
+	var p := _stand(u.pos, r)
+	_shadow(u.pos, r)
+	draw_circle(p, r, Color(run.content.townsfolk[u.type_id]["color"]))
+	if u.carry_amount > 0:
+		draw_circle(p + Vector2(r, -r), r * 0.5, Color(main_color(u.carrying)))
+	if u.hp < u.max_hp:
+		_bar(p + Vector2(-r, -r - 4), r * 2.0, u.hp_fraction(), Color("#5ee07a"))
+
+
+func _draw_enemy(e: Unit) -> void:
+	var r := (BOSS_RADIUS if e.is_boss else ENEMY_RADIUS) * maxf(1.0, zoom * 0.7)
+	var p := _stand(e.pos, r)
+	_shadow(e.pos, r)
+	draw_circle(p, r, Color(run.content.enemies[e.type_id]["color"]))
+	if e.den_index >= 0:
+		draw_arc(p, r, 0, TAU, 16, Color("#301818"), 1.5)
+	_bar(p + Vector2(-r, -r - 5), r * 2.0, e.hp_fraction(), Color("#e05050"))
+
+
+## A soft dark ellipse on the ground under something standing (tilted view only).
+func _shadow(p: Vector2, r: float) -> void:
+	if iso:
+		draw_colored_polygon(_ground_ring(p, r * 0.9 / _scale(), 12), Color(0, 0, 0, 0.3))
+
+
+## A flat circle on the ground (an ellipse when tilted).
+func _ground_circle(p: Vector2, radius: float, color: Color, points: int) -> void:
+	if iso:
+		draw_colored_polygon(_ground_ring(p, radius, points), color)
+	else:
+		draw_circle(_to_screen(p), radius * _scale(), color)
+
+
+func _ground_ring(p: Vector2, radius: float, points: int) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for k in points:
+		out.append(_to_screen(p + Vector2.from_angle(TAU * k / points) * radius))
+	return out
+
+
+## A ground square around a world point (a diamond when tilted).
+func _ground_square(p: Vector2, half: float, color: Color, filled := true) -> void:
+	var corners := _screen_poly(PackedVector2Array([p + Vector2(-half, -half), p + Vector2(half, -half),
+		p + Vector2(half, half), p + Vector2(-half, half)]))
+	if filled:
+		draw_colored_polygon(corners, color)
+	else:
+		draw_polyline(_closed(corners), color, 1.5)
 
 
 ## The tooltip for whatever is under a screen point ({} if nothing). Small, moving things win over big, still ones.
@@ -239,15 +424,16 @@ func hovered(at: Vector2) -> Dictionary:
 	for u in w.folk:
 		if u.alive and _near(u.pos, at, FOLK_RADIUS * grow):
 			return Tooltips.folk(run, u)
+	var building := _building_at(at)
+	if building >= 0:
+		return Tooltips.building(run, building)
 	var plot := w.town.plot_at(_to_world(at))
-	if plot >= 0 and int(w.town.plots[plot]["building"]) >= 0:
-		return Tooltips.building(run, w.town.plots[plot]["building"])
 	if plot >= 0 and w.town.plots[plot]["obstacle"] != "":
 		return Tooltips.obstacle(run, w.town.plots[plot]["obstacle"])
-	if _near(Vector2.ZERO, at, World.HEARTH_RADIUS * _scale()):
+	if _to_world(at).length() <= World.HEARTH_RADIUS + 3.0 / _scale():
 		return Tooltips.hearth(run)
 	for den in w.dens:
-		if _near(den["pos"], at, maxf(8.0, 18.0 * _scale() * 1.6)):
+		if _near(den["pos"], at, _den_radius()):
 			return Tooltips.den(run, den)
 	for node in w.nodes:
 		if w.node_active(node) and _near(node["pos"], at, maxf(3.0, 14.0 * _scale() * 1.6)):
@@ -258,8 +444,27 @@ func hovered(at: Vector2) -> Dictionary:
 	return {}
 
 
+## True when a screen point is on a round marker of screen radius `radius` standing at a world point.
 func _near(world_pos: Vector2, at: Vector2, radius: float) -> bool:
-	return _to_screen(world_pos).distance_to(at) <= radius + 3.0
+	return _stand(world_pos, radius).distance_to(at) <= radius + 3.0
+
+
+## The building under a screen point (-1 if none): its floor, walls or roof. The nearest one wins.
+func _building_at(at: Vector2) -> int:
+	var w := run.world
+	var best := -1
+	var best_y := -INF
+	for bi in w.buildings.size():
+		var base := _screen_poly(w.town.plot_outline(w.buildings[bi]["plot"]))
+		var lift := _building_lift(bi)
+		for rise: float in ([0.0, 0.5, 1.0] if lift >= 1.0 else [0.0]):
+			if Geometry2D.is_point_in_polygon(at + Vector2(0.0, lift * rise), base):
+				var y := _to_screen(w.buildings[bi]["pos"]).y
+				if y > best_y:
+					best = bi
+					best_y = y
+				break
+	return best
 
 
 ## A dark box beside the mouse: title, lines, tags, then warnings in orange. Kept inside the map.
@@ -311,8 +516,10 @@ func main_color(resource: String) -> String:
 	return {"food": "#d98aa8", "fuel": "#e0b050", "wood": "#7fbf6a", "stone": "#b0b4bc"}.get(resource, "#ffffff")
 
 
-func _draw_hero(hero: Unit, p: Vector2, font: Font) -> void:
+func _draw_hero(hero: Unit, font: Font) -> void:
 	var r := HERO_RADIUS * maxf(1.0, zoom * 0.7)
+	var p := _stand(hero.pos, r)
+	_shadow(hero.pos, r)
 	var color := Color(run.content.hero_classes[hero.type_id]["color"])
 	if hero.resting:
 		# Sleepers are drawn dimmer, with a "z".
@@ -360,26 +567,25 @@ func _draw_ground() -> void:
 				_ground_cache.append([i, g])
 				if same_world and g >= Pathing.FIRST_ROAD and int(was.get(i, 0)) != g:
 					_paved_at[i] = w.time
-	var cell := w.pathing.cell * _scale()
+	var cell := w.pathing.cell
 	var trail := Color(run.content.town["trail"]["color"])
 	var path := Color(run.content.town["path"]["color"])
 	for entry: Array in _ground_cache:
-		var p := _to_screen(w.pathing.center(entry[0]))
+		var p := w.pathing.center(entry[0])
 		var g: int = entry[1]
 		if g >= Pathing.FIRST_ROAD:
-			draw_rect(Rect2(p - Vector2(cell, cell) / 2.0, Vector2(cell, cell)), Color(w.town.road_def(g)["color"]))
+			_ground_square(p, cell * 0.5, Color(w.town.road_def(g)["color"]))
 		elif g == Pathing.PATH:
-			draw_rect(Rect2(p - Vector2(cell, cell) * 0.48, Vector2(cell, cell) * 0.96), Color(path, 1.0))
+			_ground_square(p, cell * 0.48, Color(path, 1.0))
 		else:
-			draw_rect(Rect2(p - Vector2(cell, cell) * 0.38, Vector2(cell, cell) * 0.77), Color(trail.lightened(0.1), 0.88))
+			_ground_square(p, cell * 0.385, Color(trail.lightened(0.1), 0.88))
 	# Squares paved in the last few seconds glow, so you can see the stone-layers at work.
 	for i: int in _paved_at.keys():
 		var age := w.time - float(_paved_at[i])
 		if age > PAVE_GLOW_SECONDS or age < 0.0:
 			_paved_at.erase(i)
 			continue
-		var q := _to_screen(w.pathing.center(i))
-		draw_rect(Rect2(q - Vector2(cell, cell) / 2.0, Vector2(cell, cell)), Color("#ffe08a", 0.9 * (1.0 - age / PAVE_GLOW_SECONDS)), false, 1.5)
+		_ground_square(w.pathing.center(i), cell * 0.5, Color("#ffe08a", 0.9 * (1.0 - age / PAVE_GLOW_SECONDS)), false)
 
 
 func _screen_poly(points: PackedVector2Array) -> PackedVector2Array:
