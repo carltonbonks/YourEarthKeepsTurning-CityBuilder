@@ -168,7 +168,7 @@ func test_watch_posts_like_gates() -> void:
 	var w := run.world
 	var k := _west_plot(run)
 	_fill(run, k, false)
-	w.wave_sides.assign([PI])  # Warned from the west, where the gate is.
+	w.wave_sides.assign([0.0])  # Warned from the east, away from the gate: the gate still wins.
 	var b := _gate(run)
 	check(run.build("watch_post"), "a watch post can be ordered")
 	var post: Dictionary = w.buildings[-1]
@@ -202,29 +202,53 @@ func test_record_counts_gates() -> void:
 	check_eq(int(snapshot["gates"]["built"]), 1, "the round's town counts the gate")
 
 
-func test_watch_posts_spread_out() -> void:
+func _near(run: RunState, a: Vector2, b: Vector2) -> bool:
+	return a.distance_to(b) < float(run.content.town["gate"]["guard_within"])
+
+
+func test_watch_posts_take_gates_in_turn() -> void:
 	var run := _run()
 	var w := run.world
-	var spread := float(run.content.buildings["watch_post"]["spread"])
+	var town := w.town
+	var k := _west_plot(run)
+	_fill(run, k, false)
+	# A second gap on the far side of the ring.
+	var east := k
+	for n in town.plots.size():
+		if int(town.plots[n]["ring"]) == 2 and (town.plots[n]["pos"] as Vector2).x > (town.plots[east]["pos"] as Vector2).x:
+			east = n
+	_fill(run, east, false)
+	var first := _gate(run)
+	var second := _gate(run)
+	check(run.build("watch_post"), "a first watch post")
+	var p1: Dictionary = w.buildings[-1]
+	check(run.build("watch_post"), "a second watch post")
+	var p2: Dictionary = w.buildings[-1]
+	check(_near(run, p1["pos"], w.buildings[first]["pos"]), "the first post guards the older gate")
+	check(_near(run, p2["pos"], w.buildings[second]["pos"]), "the second post goes to the other gate")
+	for post: Dictionary in [p1, p2]:
+		check(not town.plots[post["plot"]]["lane"], "a post never stands in a lane")
+
+
+func test_watch_posts_guard_lanes_without_gates() -> void:
+	var run := _run()
+	var w := run.world
 	for i in 4:
 		check(run.build("watch_post"), "watch post %d can be ordered" % (i + 1))
 	var posts := w.buildings.filter(func(b: Dictionary) -> bool: return b["type"] == "watch_post")
 	for i in posts.size():
+		check(not w.town.plots[posts[i]["plot"]]["lane"], "watch post %d keeps the lane free" % i)
 		for j in range(i + 1, posts.size()):
-			check((posts[i]["pos"] as Vector2).distance_to(posts[j]["pos"]) >= spread * 0.75,
-				"watch posts %d and %d stand apart" % [i, j])
+			check(not _near(run, posts[i]["pos"], posts[j]["pos"]), "watch posts %d and %d guard different spots" % [i, j])
 
 
-func test_watch_posts_may_crowd_a_gate() -> void:
+func test_a_second_post_moves_on_from_a_guarded_gate() -> void:
 	var run := _run()
 	var w := run.world
 	var k := _west_plot(run)
 	_fill(run, k, false)
-	w.wave_sides.assign([PI])
 	var b := _gate(run)
-	var near := 0
-	for i in 2:
-		check(run.build("watch_post"), "a watch post can be ordered")
-		if (w.buildings[-1]["pos"] as Vector2).distance_to(w.buildings[b]["pos"]) < float(run.content.town["gate"]["guard_within"]):
-			near += 1
-	check_eq(near, 2, "both posts guard the gate, close together")
+	run.build("watch_post")
+	check(_near(run, w.buildings[-1]["pos"], w.buildings[b]["pos"]), "the first post guards the gate")
+	run.build("watch_post")
+	check(not _near(run, w.buildings[-1]["pos"], w.buildings[b]["pos"]), "the next one guards somewhere else")

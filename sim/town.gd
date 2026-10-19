@@ -12,19 +12,23 @@ extends RefCounted
 ## themselves (Pathing.wear_trails); once a building with "paves" stands, stone-layers
 ## pave the busiest worn paths a stretch at a time for stone. See data/town.json.
 
-## Score added for standing right on top of another building of a kind that spreads out (less further away).
-const SPREAD_PENALTY := 200.0
+## Score added for building on a lane plot: buildings leave the lanes free unless nothing else is left.
+const LANE_PENALTY := 5000.0
+## How much a gate likes a lane plot, in the same units as the feet passing through it.
+const GATE_LANE_BONUS := 40.0
 
 var w: World
 var pathing: Pathing
-## {ring, sector, a0, a1, r0, r1, pos, cells: PackedInt32Array, age, obstacle, building}
-## building = index into World.buildings, or -1.
+## {ring, sector, a0, a1, r0, r1, pos, cells: PackedInt32Array, age, obstacle, building, lane}
+## building = index into World.buildings, or -1. lane = left free between clusters (see _mark_lanes).
 var plots: Array[Dictionary] = []
 ## Patches of scrub that slow walkers: {pos, radius}.
 var thickets: Array[Dictionary] = []
 ## Squares of road already paid for, per road kind (each payment covers a stretch).
 var _paid := {}
 var _plot_of := PackedInt32Array()  ## Square -> plot index, or -1.
+## Where the watch post being placed wants to stand (see _guard_point), worked out once per choose_plot.
+var _guard_at := Vector2.ZERO
 
 
 func _init(world: World) -> void:
@@ -33,6 +37,7 @@ func _init(world: World) -> void:
 	_plot_of.resize(pathing.cells * pathing.cells)
 	_plot_of.fill(-1)
 	_make_plots()
+	_mark_lanes()
 	_place_obstacles()
 	_place_thickets()
 
@@ -56,7 +61,7 @@ func _make_plots() -> void:
 			plots.append({"ring": ring, "sector": i / per_sector, "ring_first": first, "ring_count": count, "a0": a0, "a1": a0 + width,
 				"r0": radius - depth / 2.0, "r1": radius + depth / 2.0,
 				"pos": Vector2.from_angle(a0 + width / 2.0) * radius, "cells": PackedInt32Array(),
-				"age": def.get("age", ""), "obstacle": "", "building": -1})
+				"age": def.get("age", ""), "obstacle": "", "building": -1, "lane": false})
 		for i in pathing.cells_in_circle(Vector2.ZERO, radius + depth / 2.0):
 			var p := pathing.center(i)
 			if p.length() < radius - depth / 2.0:
@@ -64,6 +69,48 @@ func _make_plots() -> void:
 			var k := int(floor(fposmod(p.angle() - start, TAU) / width)) % count
 			plots[first + k]["cells"].append(i)
 			_plot_of[i] = first + k
+
+
+## Buildings stand in clusters of about `cluster` plots (data/town.json) with a lane plot
+## between clusters, left free for people to pass and for gates. Lanes line up from ring to
+## ring: every lane carries on into the plot straight out from it, and the outer rings, which
+## have more plots, get extra lanes so no cluster runs longer than cluster + 1.
+func _mark_lanes() -> void:
+	var size := int(w.content.town["cluster"])
+	var inner: Array[int] = []
+	for ring in w.content.town["rings"].size():
+		var ring_plots: Array[int] = []
+		for k in plots.size():
+			if int(plots[k]["ring"]) == ring:
+				ring_plots.append(k)
+		var count := ring_plots.size()
+		var width := TAU / count
+		var start := float(plots[ring_plots[0]]["a0"])
+		var forced := {}
+		if inner.is_empty():
+			forced[0] = true
+		for k in inner:
+			var mid := (float(plots[k]["a0"]) + float(plots[k]["a1"])) / 2.0
+			forced[int(floor(fposmod(mid - start, TAU) / width)) % count] = true
+		var lanes: Array = forced.keys()
+		lanes.sort()
+		# Split each run of plots between two lanes into clusters as even as possible.
+		var extra: Array[int] = []
+		for n in lanes.size():
+			var from: int = lanes[n]
+			var run := posmod(int(lanes[(n + 1) % lanes.size()]) - from - 1, count)
+			if lanes.size() == 1:
+				run = count - 1
+			var cuts := ceili(maxf(0.0, run - size - 1) / float(size + 2))
+			var left := run - cuts
+			var at := from
+			for c in cuts:
+				at += int(floor(float(left) * (c + 1) / (cuts + 1))) - int(floor(float(left) * c / (cuts + 1))) + 1
+				extra.append(posmod(at, count))
+		inner.clear()
+		for i in lanes + extra:
+			plots[ring_plots[i]]["lane"] = true
+			inner.append(ring_plots[i])
 
 
 ## Boulders and old oaks already sit on a few plots of the opening rings.
@@ -129,13 +176,18 @@ func plot_free(k: int) -> bool:
 ## The plot a new building of this type would go on, or -1 if there is none.
 ## A gate only goes beside a building (or obstacle) of its ring, best in a gap between two,
 ## where the busiest desire path runs; it never shuts anyone in, since your people walk through.
+## Other buildings keep off lanes and paved road unless nothing else is left.
 func choose_plot(type: String) -> int:
 	var gate := is_gate_type(type)
+	if w.content.buildings[type].get("near", "") == "gate_guard":
+		_guard_at = _guard_point()
 	var order: Array = []
 	for k in plots.size():
 		if plot_free(k) and (not gate or _sides_closed(k) > 0):
-			# Buildings keep off paved roads unless nothing else is left.
-			order.append([_gate_score(k) if gate else _plot_score(type, k) + (1000.0 if _paved_in(k) > 0 else 0.0), k])
+			var score := _gate_score(k) if gate else _plot_score(type, k) + (1000.0 if _paved_in(k) > 0 else 0.0)
+			if not gate and plots[k]["lane"]:
+				score += LANE_PENALTY
+			order.append([score, k])
 	order.sort()
 	for pair: Array in order:
 		if gate or _keeps_town_open(pair[1]):
@@ -159,9 +211,10 @@ func _sides_closed(k: int) -> int:
 	return n
 
 
-## Lower is better: a true gap first, then the plot the most feet pass through, outer rings first on a tie.
+## Lower is better: a true gap first, then the plot the most feet pass through (a lane counts
+## as a few more), outer rings first on a tie.
 func _gate_score(k: int) -> float:
-	var feet := 0.0
+	var feet := GATE_LANE_BONUS if plots[k]["lane"] else 0.0
 	for i in plots[k]["cells"]:
 		feet += pathing.traffic[i] + (4.0 if pathing.ground[i] >= Pathing.TRAIL else 0.0)
 	return (0.0 if _sides_closed(k) == 2 else 100000.0) - feet - int(plots[k]["ring"]) * 0.5
@@ -169,7 +222,8 @@ func _gate_score(k: int) -> float:
 
 ## Lower is better. Each building type says what it wants to be near in buildings.json:
 ## "hearth" (inner rings, the default), "outer" (outer rings), "warned_side" (outer rings
-## facing this round's warned attack) or another building's id (beside one of those).
+## facing this round's warned attack), "gate_guard" (just outside a gate, see _guard_point)
+## or another building's id (beside one of those).
 func _plot_score(type: String, k: int) -> float:
 	var plot := plots[k]
 	var ring := int(plot["ring"])
@@ -190,23 +244,14 @@ func _plot_score(type: String, k: int) -> float:
 			for side in w.wave_sides:
 				best = minf(best, absf(angle_difference(side, (plot["pos"] as Vector2).angle())))
 			score += best * 80.0
-			# Watch posts like to stand over a gate.
-			if _guards_gate(k):
-				score -= 120.0
+		"gate_guard":
+			score = (plot["pos"] as Vector2).distance_to(_guard_at)
 		_:
 			var best := ring * 60.0 + 200.0
 			for b in w.buildings:
 				if b["type"] == near:
 					best = minf(best, (plot["pos"] as Vector2).distance_to(b["pos"]))
 			score = best
-	# A building with "spread" keeps that far from others of its kind, unless it is guarding a gate.
-	var spread := float(w.content.buildings[type].get("spread", 0.0))
-	if spread > 0.0 and not _guards_gate(k):
-		for b in w.buildings:
-			if b["type"] == type:
-				var d := (plot["pos"] as Vector2).distance_to(b["pos"])
-				if d < spread:
-					score += (spread - d) / spread * SPREAD_PENALTY
 	# Buildings like company: a plot beside another building is a little more likely.
 	for other in [k - 1, k + 1]:
 		if other >= 0 and other < plots.size() and plots[other]["ring"] == ring and int(plots[other]["building"]) >= 0:
@@ -216,12 +261,54 @@ func _plot_score(type: String, k: int) -> float:
 	return score
 
 
-## Whether plot k is within guard_within of a gate (standing or ordered).
-func _guards_gate(k: int) -> bool:
+## Where the next watch post should stand: just outside the gate with the fewest posts guarding
+## it (the oldest on a tie). Once every gate has one, or there is no gate, it guards the next
+## likely gate spot instead: an unguarded lane beside buildings that the most feet pass through,
+## facing the warned attack on a tie. A post guards the gate or lane nearest it within guard_within.
+func _guard_point() -> Vector2:
+	var within := float(w.content.town["gate"]["guard_within"])
+	var posts: Array[Vector2] = []
 	for b in w.buildings:
-		if is_gate_type(b["type"]) and (plots[k]["pos"] as Vector2).distance_to(b["pos"]) < float(w.content.town["gate"]["guard_within"]):
-			return true
-	return false
+		if w.content.buildings[b["type"]].get("near", "") == "gate_guard":
+			posts.append(b["pos"])
+	var target := Vector2.INF
+	var fewest := 1
+	for b in w.buildings:
+		if is_gate_type(b["type"]):
+			var guards := posts.filter(func(p: Vector2) -> bool: return p.distance_to(b["pos"]) < within).size()
+			if guards < fewest:
+				fewest = guards
+				target = b["pos"]
+	if target == Vector2.INF:
+		var best := INF
+		for k in plots.size():
+			if not plot_free(k) or not plots[k]["lane"]:
+				continue
+			var at: Vector2 = plots[k]["pos"]
+			if posts.any(func(p: Vector2) -> bool: return p.distance_to(at) < within):
+				continue
+			var facing := PI
+			for side in w.wave_sides:
+				facing = minf(facing, absf(angle_difference(side, at.angle())))
+			var closed := _sides_closed(k)
+			var score := _gate_score(k) + (200000.0 if closed == 0 else 0.0) + facing * 10.0
+			if score < best:
+				best = score
+				target = at
+	if target == Vector2.INF:
+		# Every gate and lane is guarded: stack on the least-guarded gate.
+		fewest = posts.size() + 1
+		for b in w.buildings:
+			if is_gate_type(b["type"]):
+				var guards := posts.filter(func(p: Vector2) -> bool: return p.distance_to(b["pos"]) < within).size()
+				if guards < fewest:
+					fewest = guards
+					target = b["pos"]
+	if target == Vector2.INF:
+		return Vector2.ZERO
+	# Straight out from the gate, one ring further; the lane there stays free, so the post stands beside the path.
+	var step := float(w.content.town["rings"][1]["radius"]) - float(w.content.town["rings"][0]["radius"])
+	return target + target.normalized() * step
 
 
 ## Puts building index b on plot k: the plot turns solid (a gate stays open until it is built, see on_built).

@@ -217,3 +217,47 @@ func test_record_has_paths_and_town() -> void:
 		check(town.has(key), "the round's town has %s" % key)
 	check(int(town["trails"]) > 0, "feet wore some trails")
 	check(record.has("plots"), "the record lists where buildings stand")
+
+
+func test_lanes_split_rings_into_clusters() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	var town := run.world.town
+	var longest := int(run.content.town["cluster"]) + 1
+	for ring in run.content.town["rings"].size():
+		var row := town.plots.filter(func(p: Dictionary) -> bool: return int(p["ring"]) == ring)
+		var lanes := row.filter(func(p: Dictionary) -> bool: return p["lane"]).size()
+		check(lanes > 0, "ring %d has lanes" % ring)
+		# Walk round the ring from a lane and measure each cluster.
+		var start := row.find(row.filter(func(p: Dictionary) -> bool: return p["lane"])[0])
+		var length := 0
+		for i in row.size():
+			if row[(start + i) % row.size()]["lane"]:
+				length = 0
+			else:
+				length += 1
+				check(length <= longest, "ring %d: no cluster longer than %d" % [ring, longest])
+		# Every lane of the ring inside carries on into this ring.
+		if ring > 0:
+			for k in town.plots.size():
+				var p: Dictionary = town.plots[k]
+				if int(p["ring"]) == ring - 1 and p["lane"]:
+					var mid := (float(p["a0"]) + float(p["a1"])) / 2.0
+					var out := row.filter(func(q: Dictionary) -> bool: return fposmod(mid - float(q["a0"]), TAU) < float(q["a1"]) - float(q["a0"]))
+					check(out.size() == 1 and out[0]["lane"], "ring %d: lanes line up" % ring)
+
+
+func test_buildings_leave_lanes_free() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	for r: String in ["wood", "stone", "shells"]:
+		run.stock[r] = 999
+	for i in 3:
+		run.build("hut")
+	for b in run.world.buildings:
+		check(not run.world.town.plots[b["plot"]]["lane"], "a hut keeps off the lanes")
+	# Once every other plot of the town is taken, a building may use a lane.
+	var town := run.world.town
+	for k in town.plots.size():
+		if town.plot_free(k) and not town.plots[k]["lane"]:
+			town.plots[k]["obstacle"] = "boulder"
+	var k := town.choose_plot("hut")
+	check(k >= 0 and town.plots[k]["lane"], "with nothing else free, a lane is used")
