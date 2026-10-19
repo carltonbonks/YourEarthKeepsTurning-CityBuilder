@@ -176,7 +176,9 @@ static func node(run: RunState, n: Dictionary) -> Dictionary:
 		var buyer: String = def.get("buyer", "")
 		var sold := " and sell it to the %s for %d shells each" % [c.buildings[buyer]["name"].to_lower(), int(def["price"])] if buyer != "" else ""
 		t["lines"].append("Heroes fetch it%s" % sold)
-	if n["wild"]:
+	if run.world.held_by_camp(n):
+		t["lines"].append("Held by the war camp: townsfolk won't gather it until heroes clear the camp")
+	elif n["wild"]:
 		t["lines"].append("Townsfolk only go once no monster is near")
 	elif not n["heroes_only"]:
 		t["lines"].append("Townsfolk gather it")
@@ -185,10 +187,31 @@ static func node(run: RunState, n: Dictionary) -> Dictionary:
 
 static func den(run: RunState, d: Dictionary) -> Dictionary:
 	var c := run.content
+	if d.get("camp", false):
+		return war_camp(run, d)
 	var t := enemy(run, d["spawns"])
 	var spawn_name: String = t["title"]
 	t["title"] = c.world["dens"][d["type"]]["name"]
 	t["lines"].insert(0, "Sends out %s. Hero territory: heroes hunt here for loot and XP." % spawn_name.to_lower())
+	return t
+
+
+## The war camp: who is in it, what it holds, and what clearing it pays.
+static func war_camp(run: RunState, d: Dictionary) -> Dictionary:
+	var c := run.content
+	var t := new_tip(c.world["dens"][d["type"]]["name"])
+	var counts := {}
+	for e in run.world.enemy_ai.camp_raiders():
+		counts[e.display_name] = int(counts.get(e.display_name, 0)) + 1
+	var names := counts.keys()
+	names.sort()
+	var who: Array[String] = []
+	for n: String in names:
+		who.append("%s x%d" % [n, counts[n]])
+	t["lines"].append("Raiders the warband held back: %s." % ", ".join(who))
+	t["lines"].append("They set on anyone who comes close, and townsfolk won't gather near the camp.")
+	t["lines"].append("Clear it for %d shells of plunder; the hero who ends it also finds an item." % [
+		int(d["joined"]) * c.int_num("camp_spoils_per_raider")])
 	return t
 
 

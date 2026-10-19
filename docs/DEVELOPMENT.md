@@ -34,7 +34,7 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `sim/folk_ai.gd` | `FolkAI` (`world.folk_ai`): townsfolk. Warriors patrol and answer calls; workers gather (each plans its trip: `plan_trip`), haul, build, craft and patch the hearth. |
 | `sim/hero_ai.gd` | `HeroAI` (`world.hero_ai`): heroes. Energy and beds, whims, choosing fights, stats and gear, shopping at stalls, fetching from the wilds. |
 | `sim/market.gd` | `Market` (`world.market`): workshops, stalls, smelting, building-posted prizes and carcass yields. |
-| `sim/enemy_ai.gd` | `EnemyAI` (`world.enemy_ai`): dens and wanderers, the wave, probes, enemy targeting, hearth and tower fire, sentient raiders breaking towers that shot them (`mend_towers` at dawn). |
+| `sim/enemy_ai.gd` | `EnemyAI` (`world.enemy_ai`): dens and wanderers, the war camp held-back raiders make (`make_camp`, cleared in `on_camper_killed`), the wave, probes, enemy targeting, hearth and tower fire, sentient raiders breaking towers that shot them (`mend_towers` at dawn). |
 | `sim/unit.gd` | `Unit`: one hero, townsperson or enemy (plain fields). |
 | `sim/unit_grid.gd` | `UnitGrid`: buckets units by position so `World.nearest_enemy` / `nearest_friend` only look nearby. Same answers as a full scan. |
 | `sim/loot.gd` | `Loot`: items as plain data `{base, tier, affixes}`; rolling, stats, how a hero rates an item. |

@@ -73,8 +73,9 @@ func refresh() -> void:
 	_verdict.text = "They outmatch you" if ratio > OUTMATCHED else ("An even fight" if ratio > EVEN else "You should hold")
 	_verdict.add_theme_color_override("font_color", Color("#ff7060") if ratio > OUTMATCHED else (Color("#e0c070") if ratio > EVEN else Color("#a8d890")))
 	_eased.visible = run.wave_eased > 0
-	_eased.text = "The warband holds back %d raider%s: your town looks too weak to be worth them all." % [
-		run.wave_eased, "" if run.wave_eased == 1 else "s"]
+	_eased.text = "The warband holds back %d raider%s: your town looks too weak to be worth them all.%s" % [
+		run.wave_eased, "" if run.wave_eased == 1 else "s",
+		" %d make a war camp in the wilds." % run.camp_joined if run.camp_joined > 0 else ""]
 	_begin.visible = building
 	_begin.text = "Begin round %d" % run.round_number
 
@@ -92,4 +93,5 @@ static func tip(r: RunState) -> Dictionary:
 	t["lines"].append("Earlier nights bring only wanderers and small probes.")
 	if r.wave_eased > 0:
 		t["lines"].append("Catch-up: the warband holds back raiders when your town has fallen far behind. A strong town never faces more for being strong.")
+		t["lines"].append("Held-back raiders make a war camp out in the wilds: it blocks gathering nearby until heroes clear it, and clearing it pays.")
 	return t

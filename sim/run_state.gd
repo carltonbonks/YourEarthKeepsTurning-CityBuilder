@@ -40,6 +40,9 @@ var pick_offer: Array[Dictionary] = []
 var next_wave: Array[String] = []
 ## Raiders held back from this round's scheduled wave by catch-up (see WavePlanner.plan).
 var wave_eased := 0
+## This round's raiders the warband held back, and how many of them joined the war camp.
+var held_back: Array[String] = []
+var camp_joined := 0
 ## Plain-language story of what happened, newest last.
 var story: Array[String] = []
 ## The last night's report, shown at the next decision (see World.night_report).
@@ -548,8 +551,11 @@ func choose_relic(relic_id: String) -> void:
 func _enter_build() -> void:
 	phase = Phase.BUILD
 	next_wave = waves.plan(round_number)
+	camp_joined = world.enemy_ai.make_camp(held_back)
 	if wave_eased > 0:
 		tell("Scouts say the warband holds back %d of its number: your camp looks too weak to be worth them all." % wave_eased)
+	if camp_joined > 0:
+		tell("%d of them make a war camp out in the wilds. Gatherers can't work near it until heroes clear it." % camp_joined)
 	world.roll_wave_sides()
 	trader_stock = {}
 	var trader: Dictionary = content.ages["trader"]
