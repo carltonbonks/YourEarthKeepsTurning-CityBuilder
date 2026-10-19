@@ -42,14 +42,19 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `sim/autoplayer.gd` | `AutoPlayer`: scripted player for tests and balance runs (styles: balanced, workers, heroes, market, bronze, medieval). |
 | `sim/power.gd` | `Power`: power levels. A fighter rates sqrt(effective HP x damage per second); the town (heroes, `fighter` townsfolk, hearth and towers) and a wave are sums on the same scale. Logged per round as `power`. `RunState.plan_wave` uses it for catch-up: a wave that far outmatches the town is eased (never grown). |
 | `sim/run_stats.gd` | Plain-language stats from run records (Run history screen and `tools/run_report.gd`). |
-| `game/main.gd` | The one screen: runs the flow (new run, ticking, pausing for decisions) and lays out the panels. UI built in code (placeholder). |
-| `game/build_panel.gd` | `BuildPanel`: the rest of the build phase (tool sets, caravan, paths, the warned attack with both power levels and any catch-up, Begin round). |
-| `game/build_hand_view.gd` | `BuildHandView`: the building cards as a heads-up hand along the bottom of the map, with each card's "Recommended: ..." line (`recommendation`) and the redraw. |
-| `game/overlays.gd` | `Overlays`: dawn pick, relic pick, end screen, Run history, dev tuning. Sends choices back as signals. |
-| `game/status_text.gd` | `StatusText`: the live text (status, clock, heroes, market, relics) built from the run. Read-only. |
-| `game/ui_kit.gd` | `UiKit`: small shared builders (heading, button, rich text, note). |
+| `game/main.gd` | The one screen: runs the flow (new run, ticking, pausing for decisions, pause/speed, the Esc menu) and lays out the parts. UI built in code (placeholder). The screen stays short: decisions are cards, detail is in hover cards. |
+| `game/top_bar.gd` | `TopBar`: the thin bar of key numbers (round, hearth, people, food and fuel as days and nights left, wood/stone/shells, relics) with pause, speed and the menu button. |
+| `game/tip_chip.gd` | `TipChip`: a small panel whose hover card is built on demand from a Tooltips-style dictionary, styled like the map's tooltips. Use it for any new bit of screen that needs "more on hover". |
+| `game/threat_card.gd` | `ThreatCard`: the round's attack (sides, town vs attack power bar and verdict, the catch-up banner) and the Begin round button, in the map's top-right corner. |
+| `game/alerts.gd` | `Alerts`: short alerts that pop up when a problem starts and fade. `Alerts.active(run)` is the read-only rule (tested in `tests/test_alerts.gd`). |
+| `game/hero_strip.gd` | `HeroStrip`: heroes as small portraits under the map (health, mood, what they are doing); hover for gear and bed, click to point the map at them. |
+| `game/story_log.gd` | `StoryLog`: the story's last three lines and the Full log button. |
+| `game/build_hand_view.gd` | `BuildHandView`: the building cards as a heads-up hand along the bottom of the map, with each card's "Recommended: ..." line (`recommendation`), tool sets and caravan goods in later ages, and the redraw. `build_blocker` says why a card can't be ordered yet. |
+| `game/overlays.gd` | `Overlays`: dawn pick and relic pick (as cards), end screen, Esc menu, full story log, Run history, dev tuning. Sends choices back as signals. |
+| `game/status_text.gd` | `StatusText`: the top bar's chip text and hover cards, and the clock line, built from the run. Read-only. |
+| `game/ui_kit.gd` | `UiKit`: small shared builders (heading, button, rich text, note, `card` for the card look, `bar`). |
 | `game/arena_view.gd` | Draws the map with placeholder shapes, tilted (isometric, everything standing drawn back to front) or flat (V toggles); zoom, pan, hover. Read-only: only the projection (`_to_screen` / `_to_world`) knows about the tilt. |
-| `game/tooltips.gd` | Hover text for map things and the build list, tag notes and supply warnings. Read-only. |
+| `game/tooltips.gd` | Hover text for map things (stalls list their goods), tag notes and supply warnings. Read-only. Tip dictionaries from here also feed `TipChip`. |
 | `game/run_history.gd` | Saves runs to `user://runs/`, download/copy for sharing. |
 | `data/*.json` | All content and balance numbers. Each file starts with a `_note` explaining its keys; keep it current when you add a key. |
 | `tools/` | Headless helpers: `test.sh` (tests), `balance.sh` / `balance_run.gd` (bot runs), `run_report.gd` (compare runs), `market_probe.gd` (one run's economy), `perf_probe.gd` (ms per step as the town grows), `export_csv.py` (run records to CSV tables). `snapshot.gd` saves a picture of the screen after a bot has played (needs a display: `xvfb-run` in a container). |
@@ -59,7 +64,7 @@ Flow of a round: `RunState` BUILD → for each of 3 days: PICK at dawn → SIM (
 
 Big towns: anything that runs for every unit every step must not loop over every other unit (that grows with people squared). Use `nearest_enemy` / `nearest_friend` (grid-backed), or build an index once per step (like `FolkAI.begin_step`). Check with `tools/perf_probe.gd` (see [PERFORMANCE.md](PERFORMANCE.md)).
 
-Where new code goes: a new townsfolk job goes in `FolkAI`, a hero behaviour or ability in `HeroAI`, an economy building in `Market`, an enemy behaviour in `EnemyAI`. State shared by more than one part lives on `World`; a part keeps private state only if no other part reads it (like `Market._prizes`). Parts call each other through the world (`w.market.stall_index(...)`), and a helper used from another part has no leading underscore. Avoid names Godot already uses for built-in functions (that is why it is `walk_toward`, not `move_toward`). Never move a unit by setting `pos` toward a goal yourself: go through `walk_toward`, so units go round buildings and roads count. A new panel or pop-up on the screen gets its own file in `game/` rather than growing `main.gd`.
+Where new code goes: a new townsfolk job goes in `FolkAI`, a hero behaviour or ability in `HeroAI`, an economy building in `Market`, an enemy behaviour in `EnemyAI`. State shared by more than one part lives on `World`; a part keeps private state only if no other part reads it (like `Market._prizes`). Parts call each other through the world (`w.market.stall_index(...)`), and a helper used from another part has no leading underscore. Avoid names Godot already uses for built-in functions (that is why it is `walk_toward`, not `move_toward`). Never move a unit by setting `pos` toward a goal yourself: go through `walk_toward`, so units go round buildings and roads count. A new panel or pop-up on the screen gets its own file in `game/` rather than growing `main.gd`. Keep the screen short: a new number goes in a hover card (a `TipChip` or a tooltip) unless the player needs it for most decisions.
 
 ## Habits
 

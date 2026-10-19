@@ -43,6 +43,12 @@ func reset_camera() -> void:
 	pan = Vector2.ZERO
 
 
+## Points the view at a ground point, zooming in a little if the view is wide.
+func look_at_point(p: Vector2) -> void:
+	pan = p
+	zoom = maxf(zoom, 2.0)
+
+
 func _process(_delta: float) -> void:
 	queue_redraw()
 

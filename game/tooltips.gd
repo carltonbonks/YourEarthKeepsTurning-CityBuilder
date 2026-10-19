@@ -5,13 +5,13 @@ extends RefCounted
 ## Each tip is {"title": String, "lines": Array[String], "tags": Array, "warnings": Array[String]}.
 
 
-static func _tip(title: String) -> Dictionary:
+static func new_tip(title: String) -> Dictionary:
 	return {"title": title, "lines": [] as Array[String], "tags": [], "warnings": [] as Array[String]}
 
 
 static func hero(run: RunState, u: Unit) -> Dictionary:
 	var c := run.content
-	var t := _tip(u.display_name)
+	var t := new_tip(u.display_name)
 	t["lines"].append("%s %s, level %d" % [c.traits[u.trait_id]["name"], c.hero_classes[u.type_id]["name"].to_lower(), u.level])
 	t["lines"].append("Health %d/%d, attack %s" % [roundi(u.hp), roundi(u.max_hp), _num(u.attack)])
 	t["lines"].append("Energy %d, mood %d, %d shells, %d kills" % [roundi(u.energy), roundi(u.mood), u.gold, u.kills])
@@ -33,7 +33,7 @@ static func hero(run: RunState, u: Unit) -> Dictionary:
 static func folk(run: RunState, u: Unit) -> Dictionary:
 	var c := run.content
 	var def: Dictionary = c.townsfolk[u.type_id]
-	var t := _tip(def["name"])
+	var t := new_tip(def["name"])
 	t["lines"].append(def["text"])
 	t["lines"].append("Health %d/%d, attack %s" % [roundi(u.hp), roundi(u.max_hp), _num(u.attack)])
 	if u.master_of != "":
@@ -49,7 +49,7 @@ static func folk(run: RunState, u: Unit) -> Dictionary:
 static func enemy(run: RunState, type_id: String, u: Unit = null) -> Dictionary:
 	var c := run.content
 	var def: Dictionary = c.enemies[type_id]
-	var t := _tip(def["name"])
+	var t := new_tip(def["name"])
 	if u != null:
 		t["lines"].append("Health %d/%d, attack %s" % [roundi(u.hp), roundi(u.max_hp), _num(u.attack)])
 		if u.den_index >= 0:
@@ -91,7 +91,7 @@ static func building(run: RunState, index: int) -> Dictionary:
 	var c := run.content
 	var b: Dictionary = run.world.buildings[index]
 	var def: Dictionary = c.buildings[b["type"]]
-	var t := _tip(def["name"])
+	var t := new_tip(def["name"])
 	t["lines"].append(def["text"])
 	var work_left := float(b["work_left"])
 	if work_left > 0.0:
@@ -107,10 +107,13 @@ static func building(run: RunState, index: int) -> Dictionary:
 	if def.has("stall"):
 		var names := PackedStringArray()
 		for g: Dictionary in b["goods"]:
-			names.append(c.recipe_name(g["recipe"]))
-		t["lines"].append("On sale: %s" % (", ".join(names) if not names.is_empty() else "nothing"))
+			names.append("%s (tier %d)" % [c.recipe_name(g["recipe"]), int(g["tier"])])
+		t["lines"].append("On sale (%d of %d): %s" % [names.size(), int(c.market["stall_capacity"]),
+			", ".join(names) if not names.is_empty() else "nothing"])
 	if def.has("workshop") and b["craft"] != "":
 		t["lines"].append("Making: %s" % c.recipe_name(b["craft"]))
+	elif def.has("workshop") and work_left <= 0.0:
+		t["lines"].append("Idle right now")
 	if def.has("gate_hp") and work_left <= 0.0:
 		var whole := run.world.town.gate_health(index)
 		t["lines"].append("Health %d%%. Mended to full each dawn." % roundi(100.0 * whole) if whole > 0.0 else "Broken through! Mended at dawn.")
@@ -167,7 +170,7 @@ static func _stall_name(c: Content, kind: String) -> String:
 static func node(run: RunState, n: Dictionary) -> Dictionary:
 	var c := run.content
 	var def: Dictionary = c.world["nodes"][n["type"]]
-	var t := _tip(def["name"])
+	var t := new_tip(def["name"])
 	t["lines"].append("%d of %d %s left" % [int(n["amount"]), int(n["max"]), n["gives"]])
 	if n["heroes_only"] or n["wild"]:
 		var buyer: String = def.get("buyer", "")
@@ -191,7 +194,7 @@ static func den(run: RunState, d: Dictionary) -> Dictionary:
 
 static func obstacle(run: RunState, id: String) -> Dictionary:
 	var def: Dictionary = run.content.town["obstacles"][id]
-	var t := _tip(def["name"])
+	var t := new_tip(def["name"])
 	t["lines"].append(def["text"])
 	return t
 
@@ -204,11 +207,11 @@ static func ground(run: RunState, square: int) -> Dictionary:
 	var t: Dictionary
 	if g >= Pathing.FIRST_ROAD:
 		var def := w.town.road_def(g)
-		t = _tip(def["name"])
+		t = new_tip(def["name"])
 		t["lines"].append(def["text"])
 	elif g == Pathing.PATH or g == Pathing.TRAIL:
 		var def: Dictionary = c.town["path" if g == Pathing.PATH else "trail"]
-		t = _tip(def["name"])
+		t = new_tip(def["name"])
 		t["lines"].append(def["text"])
 		if g == Pathing.PATH and g < w.town.best_road():
 			if w.town.can_pave():
@@ -216,13 +219,13 @@ static func ground(run: RunState, square: int) -> Dictionary:
 			else:
 				t["lines"].append("A %s would pave it." % w.town.paver_name())
 	else:
-		t = _tip(c.town["thickets"]["name"])
+		t = new_tip(c.town["thickets"]["name"])
 		t["lines"].append(c.town["thickets"]["text"])
 	return t
 
 
 static func hearth(run: RunState) -> Dictionary:
-	var t := _tip("Hearth")
+	var t := new_tip("Hearth")
 	t["lines"].append("Health %d/%d. If it falls, the run is lost." % [roundi(run.world.hearth_hp), roundi(run.hearth_max_hp())])
 	t["lines"].append("Fuel %d: a cold night hurts everyone and sours heroes' mood." % int(run.stock["fuel"]))
 	return t

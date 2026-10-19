@@ -1,13 +1,13 @@
 class_name BuildHandView
 extends PanelContainer
 ## The round's building cards (run.hand) as a heads-up hand along the bottom of the map, like the
-## dawn pick: basics (homes and food, always on offer), the dealt cards, the ageing-up card and the
-## redraw. A card the town needs says why at the top ("Recommended: ..."). Shown only while building.
+## dawn pick: basics (homes and food, always on offer), the dealt cards, the ageing-up card, tool sets
+## and the caravan in later ages, and the redraw. A card the town needs says why at the top ("Recommended: ..."). Shown only while building.
 ## Every choice goes through run.hand; `changed` asks the screen to refresh.
 
 signal changed
 
-const RECOMMEND_COLOR := Color("#ffd28a")
+const RECOMMEND_COLOR := UiKit.RECOMMEND_COLOR
 const CARD_SIZE := Vector2(150, 132)
 const BASIC_SIZE := Vector2(118, 132)
 
@@ -41,12 +41,14 @@ func refresh() -> void:
 		_row.add_child(_card(card["building"], card["need"], "card"))
 	if not run.hand.milestone.is_empty():
 		_row.add_child(_card(run.hand.milestone["building"], "", "age"))
+	_age_cards()
 	if run.hand.cards.is_empty() and run.hand.milestone.is_empty():
 		var none := UiKit.note(_row, "No cards left this round.", 12)
 		none.custom_minimum_size.x = 120
 	var redraw := Button.new()
 	redraw.text = "Redraw\nunused\n(%d shells)%s" % [run.hand.redraw_cost(), "" if run.hand.redraws == 0 else "\nused"]
 	redraw.custom_minimum_size = Vector2(86, CARD_SIZE.y)
+	redraw.focus_mode = Control.FOCUS_NONE
 	redraw.disabled = not run.hand.can_redraw()
 	redraw.tooltip_text = "Once a round: the cards you haven't used are swapped for a fresh deal."
 	redraw.pressed.connect(_act.bind(run.hand.redraw))
@@ -79,78 +81,81 @@ func recommendation(type: String, need: String) -> String:
 func _card(type: String, need: String, kind: String) -> Button:
 	var def: Dictionary = run.content.buildings[type]
 	var owned := run.world.count_buildings(type, false)
-	var btn := Button.new()
-	btn.custom_minimum_size = BASIC_SIZE if kind == "basic" else CARD_SIZE
-	btn.clip_text = true
-	var box := VBoxContainer.new()
-	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 6)
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_theme_constant_override("separation", 2)
-	btn.add_child(box)
 	var why := recommendation(type, need)
-	_frame(btn, RECOMMEND_COLOR if why != "" else (UiKit.HEADING_COLOR if kind == "age" else Color("#5a606c")))
-	var top := _label(box, ("Recommended: " + why) if why != "" else ("Always on offer" if kind == "basic" else ("Ageing up" if kind == "age" else "")), 11)
-	top.add_theme_color_override("font_color", RECOMMEND_COLOR if why != "" else UiKit.HINT_COLOR)
-	# Every card keeps room for two lines here, so names line up along the hand.
-	top.custom_minimum_size.y = 34
-	if why != "":
-		var hl := StyleBoxFlat.new()
-		hl.bg_color = Color(0.45, 0.33, 0.1, 0.55)
-		hl.set_corner_radius_all(3)
-		hl.set_content_margin_all(2)
-		top.add_theme_stylebox_override("normal", hl)
-	var name := _label(box, ("RAISE: " if kind == "age" else "") + def["name"], 15)
-	name.add_theme_color_override("font_color", UiKit.HEADING_COLOR if kind == "age" else Color.WHITE)
-	_label(box, _cost_text(def), 12)
-	var blurb := _label(box, def["text"], 10)
-	blurb.add_theme_color_override("font_color", Color("#b8bcc4"))
-	blurb.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	blurb.clip_text = true
-	blurb.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	if owned > 0:
-		_label(box, "You have %d" % owned, 10).add_theme_color_override("font_color", UiKit.HINT_COLOR)
+	var top := ("Recommended: " + why) if why != "" else ("Always on offer" if kind == "basic" else ("Ageing up" if kind == "age" else ""))
+	var border := RECOMMEND_COLOR if why != "" else (UiKit.HEADING_COLOR if kind == "age" else UiKit.CARD_BORDER)
+	var btn := UiKit.card(top, ("RAISE: " if kind == "age" else "") + def["name"], _cost_text(def["cost"]), def["text"],
+		"You have %d" % owned if owned > 0 else "", BASIC_SIZE if kind == "basic" else CARD_SIZE, border, why != "",
+		UiKit.HEADING_COLOR if kind == "age" else Color.WHITE)
 	btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], def["work"]]
-	var blocked := BuildPanel.build_blocker(run, type)
+	var blocked := build_blocker(run, type)
 	if blocked != "":
 		btn.tooltip_text += "\n" + blocked
 	var problems := Tooltips.warnings(run, type)
 	if not problems.is_empty():
 		btn.tooltip_text += "\n" + "\n".join(PackedStringArray(problems))
 	btn.disabled = not run.hand.can_order(type)
-	if btn.disabled:
-		box.modulate = Color(1, 1, 1, 0.5)
+	UiKit.fade_if_disabled(btn)
 	btn.pressed.connect(_act.bind(run.hand.order.bind(type)))
 	return btn
 
 
-## A card's border and face: gold when the town needs it, grey otherwise; brighter on hover.
-func _frame(btn: Button, border: Color) -> void:
-	for state: String in ["normal", "hover", "pressed", "disabled", "focus"]:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color("#2a2e36") if state != "hover" else Color("#353a44")
-		if state == "focus":
-			sb.draw_center = false
-		sb.border_color = border if state != "disabled" else Color(border, 0.4)
-		sb.set_border_width_all(2 if border == RECOMMEND_COLOR else 1)
-		sb.set_corner_radius_all(5)
-		btn.add_theme_stylebox_override(state, sb)
+## Later-age cards beside the buildings: tool sets (a lasting upgrade for one townsfolk group, once
+## each) and whatever the southern caravan has left. They cost goods and shells, like any card.
+func _age_cards() -> void:
+	var content := run.content
+	if not content.age_reached(run.age, "bronze"):
+		return
+	var ids: Array = content.ages["tools"].keys()
+	for id: String in ids:
+		var def: Dictionary = content.ages["tools"][id]
+		if run.tools.has(id) or not content.age_reached(run.age, def.get("age", "")):
+			continue
+		var btn := UiKit.card("Tool set for %ss" % content.townsfolk[def["role"]]["name"].to_lower(), def["name"],
+			_cost_text(def["cost"]), def["text"], "", CARD_SIZE, Color("#8fa0b8"))
+		btn.tooltip_text = "%s\nOnce only. Every ingot spent here is one the smiths can't turn into hero gear.\nYou have %d bronze%s." % [
+			def["text"], run.stock["bronze"], ", %d iron, %d steel" % [run.stock["iron"], run.stock["steel"]] if content.age_reached(run.age, "medieval") else ""]
+		btn.disabled = not run.can_buy_tools(id)
+		UiKit.fade_if_disabled(btn)
+		btn.pressed.connect(_act.bind(run.buy_tools.bind(id)))
+		_row.add_child(btn)
+	var trader: Dictionary = content.ages["trader"]
+	for good: String in run.trader_stock:
+		if int(run.trader_stock[good]) <= 0:
+			continue
+		var btn := UiKit.card(trader["name"], "1 %s" % good, "%d shells" % run.trader_price(good), "",
+			"%d left this round" % run.trader_stock[good], BASIC_SIZE, Color("#c0a060"))
+		btn.tooltip_text = trader["text"]
+		btn.disabled = not run.can_trade(good)
+		UiKit.fade_if_disabled(btn)
+		btn.pressed.connect(_act.bind(run.trade.bind(good)))
+		_row.add_child(btn)
 
 
-func _label(parent: Control, text: String, font_size: int) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD
-	l.add_theme_font_size_override("font_size", font_size)
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(l)
-	return l
+## Why a building can't be ordered yet, beyond its cost ("" if nothing).
+static func build_blocker(r: RunState, type: String) -> String:
+	var content := r.content
+	var def: Dictionary = content.buildings[type]
+	var out := PackedStringArray()
+	var needs: String = def.get("requires", "")
+	if needs != "" and r.world.count_buildings(needs, false) == 0:
+		out.append("Needs a %s first." % content.buildings[needs]["name"].to_lower())
+	if not content.age_reached(r.age, def.get("age", "")):
+		out.append("Needs the %s (raise the %s)." % [content.age_name(def["age"]).to_lower(), content.age_builder_name(def["age"])])
+	if r.population() < int(def.get("min_people", 0)):
+		out.append("Needs %d people (you have %d)." % [def["min_people"], r.population()])
+	if def.has("ages_up") and content.age_reached(r.age, def["ages_up"]):
+		out.append("Already raised.")
+	if def.has("gate_hp") and out.is_empty() and r.world.town.choose_plot(type) < 0:
+		out.append("Needs a free plot beside a building.")
+	return " ".join(out)
 
 
-static func _cost_text(def: Dictionary) -> String:
-	var cost := PackedStringArray()
-	for r: String in def["cost"]:
-		cost.append("%d %s" % [def["cost"][r], r])
-	return ", ".join(cost)
+static func _cost_text(cost: Dictionary) -> String:
+	var parts := PackedStringArray()
+	for r: String in cost:
+		parts.append("%d %s" % [cost[r], r])
+	return ", ".join(parts)
 
 
 func _act(choice: Callable) -> void:
