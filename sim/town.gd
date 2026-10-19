@@ -221,8 +221,8 @@ func _gate_score(k: int) -> float:
 
 
 ## Lower is better. Each building type says what it wants to be near in buildings.json:
-## "hearth" (inner rings, the default), "outer" (outer rings), "warned_side" (outer rings
-## facing this round's warned attack), "gate_guard" (just outside a gate, see _guard_point)
+## "hearth" (inner rings, the default), "outer" (outer rings), "tended" (outer rings, by the most
+## untended nodes it would tend), "warned_side" (outer rings facing this round's warned attack), "gate_guard" (just outside a gate, see _guard_point)
 ## or another building's id (beside one of those).
 func _plot_score(type: String, k: int) -> float:
 	var plot := plots[k]
@@ -238,6 +238,8 @@ func _plot_score(type: String, k: int) -> float:
 			score = ring * 60.0
 		"outer":
 			score = (rings - 1 - ring) * 60.0
+		"tended":
+			score = (rings - 1 - ring) * 60.0 - _untended_reach(type, plot["pos"]) * 2.0
 		"warned_side":
 			score = (rings - 1 - ring) * 30.0
 			var best := PI
@@ -309,6 +311,20 @@ func _guard_point() -> Vector2:
 	# Straight out from the gate, one ring further; the lane there stays free, so the post stands beside the path.
 	var step := float(w.content.town["rings"][1]["radius"]) - float(w.content.town["rings"][0]["radius"])
 	return target + target.normalized() * step
+
+
+## The full size of the nodes a building that tends ("tends" in buildings.json) would reach from pos,
+## leaving out nodes another building of its kind already tends.
+func _untended_reach(type: String, pos: Vector2) -> float:
+	var tends: Dictionary = w.content.buildings[type].get("tends", {})
+	var total := 0.0
+	for node in w.nodes:
+		if not w.tends_node(tends, pos, node):
+			continue
+		if w.buildings.any(func(b: Dictionary) -> bool: return b["type"] == type and w.tends_node(tends, b["pos"], node)):
+			continue
+		total += float(node["max"])
+	return total
 
 
 ## Puts building index b on plot k: the plot turns solid (a gate stays open until it is built, see on_built).

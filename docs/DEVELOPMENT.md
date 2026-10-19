@@ -57,7 +57,7 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `game/tooltips.gd` | Hover text for map things (stalls list their goods), tag notes and supply warnings. Read-only. Tip dictionaries from here also feed `TipChip`. |
 | `game/run_history.gd` | Saves runs to `user://runs/`, download/copy for sharing. |
 | `data/*.json` | All content and balance numbers. Each file starts with a `_note` explaining its keys; keep it current when you add a key. |
-| `tools/` | Headless helpers: `test.sh` (tests), `balance.sh` / `balance_run.gd` (bot runs), `run_report.gd` (compare runs), `market_probe.gd` (one run's economy), `perf_probe.gd` (ms per step as the town grows), `export_csv.py` (run records to CSV tables). `snapshot.gd` saves a picture of the screen after a bot has played (needs a display: `xvfb-run` in a container). |
+| `tools/` | Headless helpers: `test.sh` (tests), `balance.sh` / `balance_run.gd` (bot runs), `run_report.gd` (compare runs), `market_probe.gd` (one run's economy), `perf_probe.gd` (ms per step as the town grows), `node_probe.gd` (how full each kind of resource node is, round by round), `export_csv.py` (run records to CSV tables). `snapshot.gd` saves a picture of the screen after a bot has played (needs a display: `xvfb-run` in a container). |
 | `tests/` | `run_tests.gd` runs every `test_*` method in `tests/test_*.gd` (classes extend `TestCase`, use `check` / `check_eq`). `TestCase.bot_record(seed, style)` shares finished bot runs between tests. `test_screen.gd` plays a run through the real UI; `test_tags.gd` enforces the tag habit. |
 
 Flow of a round: `RunState` BUILD → for each of 3 days: PICK at dawn → SIM (`World.step()` until the next pause) → after night 3's wave: RELIC → next BUILD.
@@ -72,7 +72,7 @@ Where new code goes: a new townsfolk job goes in `FolkAI`, a hero behaviour or a
 Numbers, names and content go in `data/*.json`, read through `Content`. Code reads keys, never hardcodes a balance value. A new key gets a line in that file's `_note`. Keep visuals swappable: `game/` may pick colours and shapes from data but no rule may depend on art.
 
 ### 2. Tags: entities say what they are, rules key on that
-Any entity can carry descriptive `tags` in its data: enemies, hero classes, traits, townsfolk roles, buildings, item bases and relics (`Content.TAG_KINDS`). A wolf is `animal`, `sentient`, `beast`. Tags are how rules pick out kinds of thing without naming ids, so new relics, hero abilities, buildings and mechanics should key on tags ("+damage against `undead`", "the hunting lodge pays for `beast`") rather than on lists of enemy or building ids.
+Any entity can carry descriptive `tags` in its data: enemies, hero classes, traits, townsfolk roles, buildings, item bases, relics and resource nodes (`Content.TAG_KINDS`). A wolf is `animal`, `sentient`, `beast`. Tags are how rules pick out kinds of thing without naming ids, so new relics, hero abilities, buildings and mechanics should key on tags ("+damage against `undead`", "the hunting lodge pays for `beast`") rather than on lists of enemy or building ids.
 
 Descriptive tags no rule reads yet are fine: they show in tooltips by name and give future rules something to key on. A tag starts *doing* something only when a rule reads it. Today these do:
 

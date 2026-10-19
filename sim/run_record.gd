@@ -36,7 +36,8 @@ extends RefCounted
 ##     (why -> count of gathering trips given up empty-handed: "dusk", "emptied" (node ran out), "unsafe").
 ## 17: the war camp: per round "camp_joined" (held-back raiders who joined the war camp as the round began),
 ##     "camp_raiders" (raiders in the camp then), "camps_cleared" and "camp_spoils" (shells the town took).
-const RECORD_FORMAT := 17
+## 18: per round "tended" (good -> how much nodes regrew thanks to buildings that tend them, the Forester's hut).
+const RECORD_FORMAT := 18
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -104,7 +105,7 @@ func begin_round() -> void:
 		"prices": run.prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
 		"age": run.age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
 		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0, "towers_broken": 0,
-		"gathered": {}, "trips_cut_short": {},
+		"gathered": {}, "trips_cut_short": {}, "tended": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
 		"camps_cleared": 0, "camp_spoils": 0,
 		"build_hands": [{"cards": run.hand.labels()}]}

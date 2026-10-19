@@ -105,7 +105,8 @@ func eligible(type: String) -> bool:
 		and run.world.town.choose_plot(type) >= 0
 
 
-## Why the town wants a building now: "housing", "food", "beds", "supply" (a stall has nobody making
+## Why the town wants a building now: "housing", "food", "beds", "regrow" (the nodes it tends are picked over),
+## "fuel" (it makes fuel and there is less than two nights' worth), "supply" (a stall has nobody making
 ## its goods), "stall" (a workshop has nowhere to sell), "age" (new in the town's current age),
 ## or "" for nothing in particular.
 func need(type: String) -> String:
@@ -118,6 +119,10 @@ func need(type: String) -> String:
 		return "food"
 	if def.has("lodging") and run.world.hero_ai.count_lodgings() > 0 and free_beds() <= 0:
 		return "beds"
+	if def.has("tends") and run.world.nodes_fullness(def["tends"]["tag"]) < content.num("build_tend_below"):
+		return "regrow"
+	if def.has("workshop") and _makes_fuel(type) and float(run.stock["fuel"]) < run.fuel_needed_tonight() * 2.0:
+		return "fuel"
 	if def.has("workshop"):
 		for id in content.recipes_for(type):
 			var kind: String = content.market["recipes"][id].get("stall", "")
@@ -137,6 +142,11 @@ func need(type: String) -> String:
 	if own_age != "" and own_age == run.age and run.world.count_buildings(type, false) == 0:
 		return "age"
 	return ""
+
+
+func _makes_fuel(type: String) -> bool:
+	return run.content.recipes_for(type).any(func(id: String) -> bool:
+		return run.content.market["recipes"][id].get("makes", {}).has("fuel"))
 
 
 ## How many cards a hand holds: build_hand_size, plus build_hand_per_age for every age past the first.

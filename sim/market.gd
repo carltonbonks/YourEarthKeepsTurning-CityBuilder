@@ -52,9 +52,12 @@ func next_recipe(index: int) -> String:
 		if r.has("makes"):
 			# Smelting fills the settlement's stock, up to what it wants to keep.
 			var good: String = r["makes"].keys()[0]
-			if int(w.run.stock[good]) >= int(r.get("keep", 99)):
+			var keep := float(r.get("keep", 99))
+			if r.has("keep_nights"):
+				keep = w.run.fuel_needed_tonight() * float(r["keep_nights"])
+			if float(w.run.stock[good]) >= keep:
 				continue
-			score = float(w.run.stock[good]) / float(r.get("keep", 99)) * float(w.content.market["stall_capacity"])
+			score = float(w.run.stock[good]) / keep * float(w.content.market["stall_capacity"])
 		else:
 			var s := stall_index(r["stall"])
 			if s < 0 or _stall_load(r["stall"]) >= int(w.content.market["stall_capacity"]):

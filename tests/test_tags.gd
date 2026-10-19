@@ -22,12 +22,14 @@ func _tags_read_in_code() -> Dictionary:
 	return found
 
 
+## Tags buildings key on in their data: a prize's tag, and the tag of the nodes a building tends.
 func _prize_tags(c: Content) -> Array:
 	var out := []
 	for id: String in c.buildings:
-		var prize: Dictionary = c.buildings[id].get("prize", {})
-		if prize.has("tag"):
-			out.append(prize["tag"])
+		for key in ["prize", "tends"]:
+			var rule: Dictionary = c.buildings[id].get(key, {})
+			if rule.has("tag"):
+				out.append(rule["tag"])
 	return out
 
 

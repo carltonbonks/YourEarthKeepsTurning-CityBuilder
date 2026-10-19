@@ -71,6 +71,12 @@ func recommendation(type: String, need: String) -> String:
 			return "%d hero%s without a bed" % [short, "" if short == 1 else "es"] if short > 0 else "Hero beds are full"
 		"supply":
 			return "A stall has nothing to sell"
+		"regrow":
+			var tag: String = content.buildings[type]["tends"]["tag"]
+			return "The wild plants are %d%% picked over" % roundi(100.0 * (1.0 - run.world.nodes_fullness(tag)))
+		"fuel":
+			var nights := int(float(run.stock["fuel"]) / maxi(1, run.fuel_needed_tonight()))
+			return "Fuel for %d night%s" % [nights, "" if nights == 1 else "s"] if nights > 0 else "Fuel runs out tonight"
 		"stall":
 			return "Your workshop needs a stall"
 		"age":

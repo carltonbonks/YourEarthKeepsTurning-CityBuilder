@@ -182,6 +182,8 @@ static func node(run: RunState, n: Dictionary) -> Dictionary:
 		t["lines"].append("Townsfolk only go once no monster is near")
 	elif not n["heroes_only"]:
 		t["lines"].append("Townsfolk gather it")
+	t["lines"].append("Regrows %d each dawn" % run.world.node_regrowth(n))
+	t["tags"] = tag_notes(run, "node", n["type"])
 	return t
 
 
