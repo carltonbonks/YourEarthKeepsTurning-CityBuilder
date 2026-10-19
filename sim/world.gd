@@ -255,11 +255,53 @@ func _dawn() -> void:
 	enemies = enemies.filter(func(e: Unit) -> bool: return not e.is_probe)
 	for node in nodes:
 		node["amount"] = mini(int(node["max"]), int(node["amount"]) + content.int_num("node_regrow_per_day"))
+	_tend_nodes()
 	pathing.wear_trails()
 	town.patch_walls()
 	enemy_ai.mend_towers()
 	run.daily_upkeep()
 	pause = Pause.DAWN
+
+
+## Buildings that tend nodes ("tends" in buildings.json): each dawn every node carrying their tag within
+## their radius regrows a share of its full size, once per such building.
+func _tend_nodes() -> void:
+	for b in buildings:
+		var tends: Dictionary = content.buildings[b["type"]].get("tends", {})
+		if tends.is_empty() or float(b["work_left"]) > 0.0:
+			continue
+		for node in nodes:
+			if tends_node(tends, b["pos"], node):
+				var before := int(node["amount"])
+				node["amount"] = mini(int(node["max"]), before + maxi(1, roundi(float(node["max"]) * float(tends["share"]))))
+				run.record.note_count("tended", int(node["amount"]) - before, node["gives"])
+
+
+## Whether a building's "tends" from pos reaches this node.
+func tends_node(tends: Dictionary, pos: Vector2, node: Dictionary) -> bool:
+	return content.has_tag("node", node["type"], tends["tag"]) and node_active(node) \
+		and pos.distance_to(node["pos"]) <= float(tends["radius"])
+
+
+## How much a node regrows each dawn: node_regrow_per_day, plus what buildings tending it add.
+func node_regrowth(node: Dictionary) -> int:
+	var total := content.int_num("node_regrow_per_day")
+	for b in buildings:
+		var tends: Dictionary = content.buildings[b["type"]].get("tends", {})
+		if not tends.is_empty() and float(b["work_left"]) <= 0.0 and tends_node(tends, b["pos"], node):
+			total += maxi(1, roundi(float(node["max"]) * float(tends["share"])))
+	return total
+
+
+## How full the nodes carrying a tag are, 0 to 1 (1 when there are none).
+func nodes_fullness(tag: String) -> float:
+	var amount := 0
+	var full := 0
+	for node in nodes:
+		if content.has_tag("node", node["type"], tag) and node_active(node):
+			amount += int(node["amount"])
+			full += int(node["max"])
+	return float(amount) / full if full > 0 else 1.0
 
 
 func _finish_round() -> void:

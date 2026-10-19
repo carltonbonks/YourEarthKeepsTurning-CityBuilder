@@ -15,6 +15,7 @@ extends RefCounted
 ## Every style takes a Promote card when one is offered and affordable.
 ## Every style can only order buildings on the round's cards (run.hand), and redraws once when shells are spare.
 ## Every style builds the stone-layers' yard from round 5 so craftspeople pave the busiest paths,
+## orders the forester and charcoal pit when they are needed (see _upkeep),
 ## and orders up to `gates` gates from `gate_round` (see below), and a garden when food runs short.
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
 ## since the market is now the only place heroes can buy gear.
@@ -26,6 +27,8 @@ var gates := 2
 var gate_round := 3
 ## Gardens: one a round while food in store would last fewer than this many days (0 = never). balance_run.gd: gardens=.
 var garden_days := 3.0
+## Orders the forester and charcoal pit when the cards recommend them. balance_run.gd: upkeep=0 turns it off.
+var upkeep := true
 ## Redraws the building cards once a round when it has at least this many shells (after its first pass).
 var redraw_above := 40
 
@@ -75,12 +78,14 @@ func _build_pass(run: RunState) -> void:
 		_order(run, "market")
 		_order(run, "bronze_moot")
 		_gardens(run)
+		_upkeep(run)
 		return
 	if style == "heroes" and run.round_number >= 2:
 		_order(run, "tavern")
 	if run.housing() - run.population() <= 2:
 		_order(run, "hut")
 	_gardens(run)
+	_upkeep(run)
 	if _ages(style):
 		_bronze(run)
 	if style == "medieval" and _medieval(run):
@@ -123,6 +128,16 @@ func _gardens(run: RunState) -> void:
 		if run.content.buildings[b].get("daily", {}).has("food"):
 			_order(run, b)
 			return
+
+
+## Upkeep buildings the cards recommend: a forester once the wild plants are picked over, a charcoal pit when fuel is low.
+func _upkeep(run: RunState) -> void:
+	if not upkeep:
+		return
+	for type: String in run.content.buildings:
+		var why := run.hand.need(type)
+		if why == "regrow" or why == "fuel":
+			_order(run, type)
 
 
 ## One gate a round across the busiest gap, up to `gates`.

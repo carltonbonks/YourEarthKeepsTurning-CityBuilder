@@ -146,6 +146,7 @@ def main(raw_folder, out_folder):
                 "towers_broken": rd.get("towers_broken", 0),
                 **{k: rd.get(k, "") for k in ["camp_joined", "camp_raiders", "camps_cleared", "camp_spoils"]},
                 "gathered_total": sum(rd.get("gathered", {}).values()) if "gathered" in rd else "",
+                "tended_total": sum(rd.get("tended", {}).values()) if "tended" in rd else "",
                 **{"trips_cut_short_" + k: rd.get("trips_cut_short", {}).get(k, 0) if "trips_cut_short" in rd else ""
                    for k in ["dusk", "emptied", "unsafe"]},
                 "families": sum(1 for p in rd.get("picks", []) if p.get("taken") == "family"),

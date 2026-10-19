@@ -1,5 +1,5 @@
 {
-	"_note": "What workshops make and stalls sell. A recipe uses up its needs from the settlement's stock when a craftsperson starts it, takes work craftsperson-seconds, and puts one good on a stall that sells its stall kind. Gear is an item from data/items.json; its tier is 1 + (round - 1) / tier_every_rounds, kept between min_tier and max_tier. price = shells per tier at a Fair price; price_levels scale it. Heroes buy gear they like better than what they wear and carry up to pack_limit of each provision. hero_carry = how much a hero can carry back from a node out in the wilds (prices are in data/world.json). makes = the recipe puts goods into the settlement's stock instead of on a stall (the smelter), and keep = it stops once the stock holds that many. extra_tier on a recipe adds to its tier.",
+	"_note": "What workshops make and stalls sell. A recipe uses up its needs from the settlement's stock when a craftsperson starts it, takes work craftsperson-seconds, and puts one good on a stall that sells its stall kind. Gear is an item from data/items.json; its tier is 1 + (round - 1) / tier_every_rounds, kept between min_tier and max_tier. price = shells per tier at a Fair price; price_levels scale it. Heroes buy gear they like better than what they wear and carry up to pack_limit of each provision. hero_carry = how much a hero can carry back from a node out in the wilds (prices are in data/world.json). makes = the recipe puts goods into the settlement's stock instead of on a stall (the smelter), and keep = it stops once the stock holds that many; keep_nights = it stops once the stock holds that many nights of fuel. extra_tier on a recipe adds to its tier.",
 	"price_levels": {"cheap": 0.6, "fair": 1.0, "dear": 1.5},
 	"stall_capacity": 4,
 	"pack_limit": 2,
@@ -23,6 +23,7 @@
 		"bronze_axe": {"workshop": "bronzesmith", "item": "bronze_axe", "min_tier": 2, "max_tier": 4, "needs": {"bronze": 1, "wood": 2}, "work": 14, "stall": "arms", "price": 13},
 		"bronze_scale": {"workshop": "bronzesmith", "item": "bronze_scale", "min_tier": 2, "max_tier": 4, "needs": {"bronze": 2, "hides": 1}, "work": 18, "stall": "hides", "price": 14},
 		"bronze_torc": {"workshop": "bronzesmith", "item": "bronze_torc", "min_tier": 2, "max_tier": 4, "needs": {"bronze": 1}, "work": 10, "stall": "charms", "price": 12},
+		"pit_charcoal": {"workshop": "charcoal_pit", "makes": {"fuel": 6}, "keep_nights": 2, "needs": {"wood": 3}, "work": 8},
 		"charcoal": {"workshop": "charcoal_burner", "makes": {"charcoal": 2}, "keep": 12, "needs": {"wood": 3}, "work": 8},
 		"iron": {"workshop": "bloomery", "makes": {"iron": 1}, "keep": 8, "needs": {"bog_iron": 2, "charcoal": 2}, "work": 12},
 		"steel": {"workshop": "blacksmith", "makes": {"steel": 1}, "keep": 4, "needs": {"iron": 1, "charcoal": 2}, "work": 16},

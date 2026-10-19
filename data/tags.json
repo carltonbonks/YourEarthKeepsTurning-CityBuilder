@@ -3,5 +3,6 @@
 	"sentient": "turns on whoever hits it, watch posts and the keep included",
 	"fighter": "stands and fights, so it counts toward the town's power level",
 	"siege": "ignores people and heads for gates and the hearth",
+	"plant": "grows back; a Forester's hut nearby makes it regrow faster",
 	"proud": "sleeping rough sours their mood twice as fast; wearing steel cheers them"
 }

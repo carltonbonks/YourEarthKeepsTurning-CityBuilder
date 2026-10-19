@@ -78,7 +78,7 @@ When a feature doesn't serve at least one pillar, question it.
 
 **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) is the code map and the habits every change follows.** The short version:
 - `sim/` is the game and runs headless; `game/` only shows it and never changes rules. Content and numbers live in `data/*.json`, read through `Content`, each file with a `_note` explaining its keys.
-- Tags: any entity (enemy, hero class, trait, townsfolk role, building, item base, relic) can carry descriptive tags, and relics, abilities, buildings and mechanics key on tags rather than ids. Rules read them only via `Content.has_tag` / `unit_has_tag`; a tag a rule reads gets a player-facing line in `data/tags.json` (`tests/test_tags.gd` enforces it).
+- Tags: any entity (enemy, hero class, trait, townsfolk role, building, item base, relic, resource node) can carry descriptive tags, and relics, abilities, buildings and mechanics key on tags rather than ids. Rules read them only via `Content.has_tag` / `unit_has_tag`; a tag a rule reads gets a player-facing line in `data/tags.json` (`tests/test_tags.gd` enforces it).
 - All randomness goes through `SeededRng`. Run records only grow: new fields, bump `RECORD_FORMAT`, update `tools/export_csv.py`.
 - Every rule gets a test; balance-affecting changes report bot win rates; new mechanics are taught to `AutoPlayer`.
 - Setup and tests: `tools/setup_godot.sh` once (cloud sessions do it at start), then `tools/test.sh [filter]` (also fails on script errors); bot win rates with `tools/balance.sh`. Claude's pending design defaults and their numbers are in docs/PENDING_DEFAULTS.md. New behaviour goes in the matching `World` part (`FolkAI`, `HeroAI`, `Market`, `EnemyAI`) and new UI in its own `game/` file.

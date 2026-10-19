@@ -457,6 +457,9 @@ func resource_wants() -> Dictionary:
 		wants["copper"] = 8.0
 		wants["cassiterite"] = 4.0
 		wants["fuel"] += 3.0
+	# The charcoal pit eats wood when fuel runs low.
+	if world.count_buildings("charcoal_pit") > 0:
+		wants["wood"] += 3.0 * world.count_buildings("charcoal_pit")
 	# The charcoal burner eats wood, and the bloomery wants bog iron.
 	if world.count_buildings("charcoal_burner") > 0:
 		wants["wood"] += 6.0 * world.count_buildings("charcoal_burner")
