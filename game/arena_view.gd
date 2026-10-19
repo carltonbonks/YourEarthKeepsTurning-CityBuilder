@@ -242,6 +242,9 @@ func _node_radius(node: Dictionary) -> float:
 func _draw_den(den: Dictionary, font: Font) -> void:
 	var def: Dictionary = run.content.world["dens"][den["type"]]
 	var r := _den_radius()
+	if den.get("camp", false):
+		# The land the war camp holds: townsfolk won't gather inside this ring.
+		draw_polyline(_closed(_ground_ring(den["pos"], run.content.num("camp_hold_radius"), 40)), Color(0.8, 0.3, 0.2, 0.45), 1.5)
 	var p := _stand(den["pos"], r)
 	_shadow(den["pos"], r)
 	draw_circle(p, r, Color(def["color"]))

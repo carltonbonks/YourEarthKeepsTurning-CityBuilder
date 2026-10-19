@@ -34,7 +34,9 @@ extends RefCounted
 ## 15: towers can be broken: per round "towers_broken" (watch posts or the keep knocked out by sentient raiders).
 ## 16: gathering trips: per round "gathered" (good -> amount townsfolk brought in from nodes) and "trips_cut_short"
 ##     (why -> count of gathering trips given up empty-handed: "dusk", "emptied" (node ran out), "unsafe").
-const RECORD_FORMAT := 16
+## 17: the war camp: per round "camp_joined" (held-back raiders who joined the war camp as the round began),
+##     "camp_raiders" (raiders in the camp then), "camps_cleared" and "camp_spoils" (shells the town took).
+const RECORD_FORMAT := 17
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -103,6 +105,8 @@ func begin_round() -> void:
 		"age": run.age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
 		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0, "towers_broken": 0,
 		"gathered": {}, "trips_cut_short": {},
+		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
+		"camps_cleared": 0, "camp_spoils": 0,
 		"build_hands": [{"cards": run.hand.labels()}]}
 
 

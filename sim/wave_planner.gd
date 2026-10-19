@@ -40,11 +40,13 @@ func generate(for_round: int) -> Array[String]:
 ## The round's warned wave: the scheduled wave, eased off while it would far outmatch the town.
 ## Catch-up only ever shrinks a wave, so a town that pulls ahead keeps its lead. Raiders are held
 ## back from the end of the list (never the boss) until the wave is at most catch_up_max_ratio
-## times the town's power, keeping at least catch_up_min_share of them. Sets run.wave_eased.
+## times the town's power, keeping at least catch_up_min_share of them. Sets run.wave_eased and
+## run.held_back (the raiders held back, who make a war camp: EnemyAI.make_camp).
 func plan(for_round: int) -> Array[String]:
 	var content := run.content
 	var wave := generate(for_round)
 	run.wave_eased = 0
+	run.held_back = []
 	var cap := content.num("catch_up_max_ratio")
 	if cap <= 0.0:
 		return wave
@@ -56,6 +58,7 @@ func plan(for_round: int) -> Array[String]:
 			i -= 1
 		if i < 0:
 			break
+		run.held_back.append(wave[i])
 		wave.remove_at(i)
 		run.wave_eased += 1
 	return wave

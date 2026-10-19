@@ -26,7 +26,8 @@ var dt: float
 var hearth_hp := 0.0
 var hearth_cooldown_left := 0.0
 var nodes: Array[Dictionary] = []  ## {type, gives, pos, amount, max, heroes_only, wild, age}
-var dens: Array[Dictionary] = []  ## {type, spawns, pos, respawn_left}
+## {type, spawns, pos, respawn_left}; the war camp (at most one, always last) also has camp, joined, cleared.
+var dens: Array[Dictionary] = []
 ## The ground and how units find their way (see Pathing), and the town's plots, gates and paving (see Town).
 var pathing: Pathing
 var town: Town
@@ -321,15 +322,31 @@ func node_active(node: Dictionary) -> bool:
 	return content.age_reached(run.age, node.get("age", ""))
 
 
-## Townsfolk only go to a wild node when no monster is anywhere near it.
+## Townsfolk only go to a wild node when no monster is anywhere near it, and never to one the war camp holds.
 func node_safe(node: Dictionary) -> bool:
+	if held_by_camp(node):
+		return false
 	return not node.get("wild", false) or nearest_enemy(node["pos"], float(content.world["wild_safe_radius"])) == null
+
+
+## The war camp's index in dens, or -1 when there is none.
+func camp_index() -> int:
+	if not dens.is_empty() and dens[-1].get("camp", false) and not dens[-1].get("cleared", false):
+		return dens.size() - 1
+	return -1
+
+
+## True while the war camp sits close enough to a node that townsfolk won't gather it.
+func held_by_camp(node: Dictionary) -> bool:
+	var ci := camp_index()
+	return ci >= 0 and node["pos"].distance_to(dens[ci]["pos"]) <= content.num("camp_hold_radius")
 
 
 func _place_dens() -> void:
 	var ids: Array = content.world["dens"].keys()
 	ids.sort()
 	var start := rng.randf() * TAU
+	ids = ids.filter(func(id: String) -> bool: return not content.world["dens"][id].get("camp", false))
 	for i in content.int_num("den_count"):
 		var id: String = ids[i % ids.size()]
 		var angle := start + TAU * i / content.num("den_count") + rng.randf_range(-0.4, 0.4)
@@ -477,6 +494,7 @@ func damage(attacker: Unit, victim: Unit, amount: float) -> void:
 		return
 	night_report["kills"] = int(night_report["kills"]) + 1
 	market.carcass(victim)
+	enemy_ai.on_camper_killed(victim, attacker)
 	if attacker != null and attacker.is_folk():
 		attacker.kills += 1
 	if attacker == null or not attacker.is_hero():
@@ -497,6 +515,8 @@ func _cleanup() -> void:
 			folk.erase(unit)
 			run.fallen_folk += 1
 	enemies = enemies.filter(func(e: Unit) -> bool: return e.alive or not e.spawned)
+	if not dens.is_empty() and dens[-1].get("cleared", false):
+		dens.pop_back()
 	for e in enemies:
 		if e.target != null and not e.target.alive:
 			e.target = null

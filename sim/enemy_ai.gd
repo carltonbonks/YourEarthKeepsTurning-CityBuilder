@@ -1,6 +1,6 @@
 class_name EnemyAI
 extends RefCounted
-## Enemies in the World: den wanderers, the warned wave, early-night probes,
+## Enemies in the World: den wanderers, the war camp, the warned wave, early-night probes,
 ## how enemies pick targets and attack the hearth, plus the hearth's and towers' fire.
 ## Holds no state of its own: everything lives on `w` (the World).
 
@@ -16,6 +16,8 @@ func dens_tick() -> void:
 	var cap := w.content.int_num("den_base_wanderers") + int(w.content.num("den_wanderers_per_level") * (level - 1.0))
 	for i in w.dens.size():
 		var den := w.dens[i]
+		if den.get("camp", false):
+			continue
 		var living := w.enemies.filter(func(e: Unit) -> bool: return e.alive and e.den_index == i).size()
 		den["respawn_left"] = float(den["respawn_left"]) - w.dt
 		if living < cap and float(den["respawn_left"]) <= 0.0:
@@ -74,6 +76,8 @@ func enemy_tick(enemy: Unit) -> void:
 func _wander(enemy: Unit) -> void:
 	var den: Dictionary = w.dens[enemy.den_index]
 	var roam := w.content.num("den_roam_night") if w.is_night() else w.content.num("den_roam_day")
+	if den.get("camp", false):
+		roam = w.content.num("camp_roam")
 	if enemy.pos.distance_to(enemy.wander_goal) < 6.0 or enemy.wander_goal.distance_to(den["pos"]) > roam:
 		var goal: Vector2 = den["pos"] + Vector2.from_angle(w.rng.randf() * TAU) * w.rng.randf_range(0.0, roam)
 		enemy.wander_goal = goal.limit_length(w.content.num("world_radius"))
@@ -81,6 +85,78 @@ func _wander(enemy: Unit) -> void:
 	enemy.speed *= 0.5
 	w.walk_toward(enemy, enemy.wander_goal)
 	enemy.speed = old_speed
+
+
+## Raiders the warband held back make a war camp in the wilds instead of vanishing (see _camp_note in
+## data/balance.json). They join the camp already standing, up to camp_max_raiders living; battering rams
+## never camp. Returns how many joined.
+func make_camp(types: Array[String]) -> int:
+	var ci := w.camp_index()
+	var room := w.content.int_num("camp_max_raiders") - (camp_raiders().size() if ci >= 0 else 0)
+	var joining: Array[String] = []
+	for id in types:
+		if joining.size() < room and not w.content.has_tag("enemy", id, "siege"):
+			joining.append(id)
+	if joining.is_empty():
+		return 0
+	if ci < 0:
+		w.dens.append({"type": "war_camp", "spawns": joining[0], "pos": _camp_site(), "respawn_left": 0.0,
+			"camp": true, "joined": 0})
+		ci = w.dens.size() - 1
+	var camp := w.dens[ci]
+	var rng := SeededRng.stream(w.run.run_seed, "camp_raiders", w.run.round_number)
+	for id in joining:
+		var e := make_enemy(id, camp["pos"] + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(5.0, 25.0), 0.0)
+		e.spawned = true
+		e.den_index = ci
+		e.wander_goal = e.pos
+		w.enemies.append(e)
+	camp["joined"] = int(camp["joined"]) + joining.size()
+	return joining.size()
+
+
+## The war camp's living raiders.
+func camp_raiders() -> Array[Unit]:
+	var ci := w.camp_index()
+	var out: Array[Unit] = []
+	for e in w.enemies:
+		if ci >= 0 and e.alive and e.den_index == ci:
+			out.append(e)
+	return out
+
+
+## The node the war camp sits by: one townsfolk gather, a fair way out. The camp goes a little beyond it.
+func _camp_site() -> Vector2:
+	var rng := SeededRng.stream(w.run.run_seed, "camp", w.run.round_number)
+	var lo := w.content.num("camp_node_min_distance")
+	var hi := w.content.num("camp_node_max_distance")
+	var options: Array[Vector2] = []
+	for node in w.nodes:
+		var d: float = node["pos"].length()
+		if d >= lo and d <= hi and int(node["amount"]) > 0 and not node["heroes_only"] and not node["wild"] and w.node_active(node):
+			options.append(node["pos"])
+	var at := Vector2.from_angle(rng.randf() * TAU) * hi
+	if not options.is_empty():
+		at = options[rng.randi_range(0, options.size() - 1)]
+	return at.normalized() * maxf(at.length() + w.content.num("camp_offset"), w.content.num("camp_min_distance"))
+
+
+## When the war camp's last raider falls the camp is cleared: the town takes the spoils, and a hero
+## who struck the last blow finds an item too.
+func on_camper_killed(victim: Unit, attacker: Unit) -> void:
+	var ci := w.camp_index()
+	if ci < 0 or victim.den_index != ci or not camp_raiders().is_empty():
+		return
+	var camp := w.dens[ci]
+	camp["cleared"] = true
+	var spoils := int(camp["joined"]) * w.content.int_num("camp_spoils_per_raider")
+	w.run.stock["shells"] = int(w.run.stock["shells"]) + spoils
+	w.run.record.note_count("camps_cleared", 1)
+	w.run.record.note_count("camp_spoils", spoils)
+	var who := "%s clears" % attacker.display_name if attacker != null and attacker.is_hero() else "Your people clear"
+	w.run.tell("%s the war camp: %d shells of plunder come back to town, and the land round it is free again." % [who, spoils])
+	if attacker != null and attacker.is_hero():
+		w.hero_ai.give_item(attacker, Loot.roll(w.content, w.rng, w.run.round_number, w.run.age))
 
 
 func spawn_wave() -> void:
