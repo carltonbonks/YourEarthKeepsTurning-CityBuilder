@@ -1,0 +1,96 @@
+class_name HeroStrip
+extends ScrollContainer
+## The heroes as a row of small portraits under the map: name and level, a health bar, a mood dot and
+## what they are doing. Gear, bed, today's whim and the rest are in the hover card (Tooltips.hero).
+## Clicking a portrait points the map at that hero. Heroes no longer in town share one grey chip.
+
+signal hero_pressed(hero: Unit)
+
+const CHIP_WIDTH := 168.0
+
+var run: RunState
+var _row: HBoxContainer
+## The heroes the row was built for, so it is only rebuilt when someone joins or leaves.
+var _shown: Array = []
+## Per portrait: [hero, health bar, mood dot, intent label, name label].
+var _parts: Array = []
+
+
+func _init() -> void:
+	vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	custom_minimum_size.y = 62
+	_row = HBoxContainer.new()
+	_row.add_theme_constant_override("separation", 6)
+	add_child(_row)
+
+
+func refresh() -> void:
+	var living := run.living_heroes()
+	var shown: Array = []
+	shown.assign(living)
+	shown.append(run.fallen.size() + run.departed.size())
+	if shown != _shown:
+		_rebuild(living)
+		_shown = shown
+	var content := run.content
+	for parts: Array in _parts:
+		var hero: Unit = parts[0]
+		UiKit.set_bar(parts[1], hero.hp / maxf(1.0, hero.max_hp), _health_color(hero.hp / maxf(1.0, hero.max_hp)))
+		var mood := "#a8d890" if hero.mood > content.num("mood_grumble_at") else ("#e0a050" if hero.mood > content.num("mood_leave_at") else "#e05050")
+		var doing := hero.intent if hero.intent != "" and run.phase == RunState.Phase.SIM else ("tired" if hero.energy <= 0.0 else "")
+		(parts[2] as Label).add_theme_color_override("font_color", Color(mood))
+		(parts[3] as Label).text = doing
+		(parts[4] as Label).text = "%s  Lv%d" % [hero.display_name, hero.level]
+
+
+func _rebuild(living: Array[Unit]) -> void:
+	for child in _row.get_children():
+		child.queue_free()
+	_parts.clear()
+	if living.is_empty() and run.fallen.is_empty() and run.departed.is_empty():
+		UiKit.note(_row, "No heroes yet. Build a lodging and they come to the dawn picks.", 12)
+		return
+	for hero in living:
+		var chip := TipChip.new()
+		chip.custom_minimum_size.x = CHIP_WIDTH
+		chip.tip = func() -> Dictionary: return Tooltips.hero(run, hero) if hero.alive else {}
+		chip.pressed.connect(func() -> void: hero_pressed.emit(hero))
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 3)
+		chip.add_child(box)
+		var name := Label.new()
+		name.add_theme_font_size_override("font_size", 13)
+		name.add_theme_color_override("font_color", Color(run.content.hero_classes[hero.type_id]["color"]))
+		name.clip_text = true
+		box.add_child(name)
+		var hp := UiKit.bar(box, 1.0, Color("#7fd07f"))
+		var line := HBoxContainer.new()
+		line.add_theme_constant_override("separation", 4)
+		box.add_child(line)
+		var dot := Label.new()
+		dot.text = "●"
+		dot.add_theme_font_size_override("font_size", 11)
+		line.add_child(dot)
+		var doing := Label.new()
+		doing.clip_text = true
+		doing.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		doing.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		doing.add_theme_font_size_override("font_size", 11)
+		doing.add_theme_color_override("font_color", UiKit.HINT_COLOR)
+		line.add_child(doing)
+		_row.add_child(chip)
+		_parts.append([hero, hp, dot, doing, name])
+	var lost := run.fallen.size() + run.departed.size()
+	if lost > 0:
+		var chip := TipChip.new()
+		chip.tip = func() -> Dictionary: return StatusText.lost_heroes_tip(run)
+		var l := Label.new()
+		l.text = "%d lost" % lost
+		l.add_theme_color_override("font_color", Color("#888888"))
+		l.add_theme_font_size_override("font_size", 12)
+		chip.add_child(l)
+		_row.add_child(chip)
+
+
+static func _health_color(share: float) -> Color:
+	return Color("#e05050") if share < 0.35 else (Color("#e0a050") if share < 0.7 else Color("#7fd07f"))

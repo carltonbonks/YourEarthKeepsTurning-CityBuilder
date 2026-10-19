@@ -1,36 +1,37 @@
 extends Control
-## The game screen: the settlement map in the middle, decisions on the left,
-## heroes and the story underneath. UI is built in code for now (placeholder
-## layout); all rules live in sim/.
+## The game screen: a thin bar of key numbers on top, the map filling the middle, and the heroes and
+## the story's last lines underneath. Decisions are cards: the building hand over the map while
+## building, the dawn and relic picks in the middle. Detail lives in hover cards, not on screen.
+## UI is built in code for now (placeholder layout); all rules live in sim/.
 ##
-## This file runs the flow (new run, ticking the sim, pausing for decisions) and
-## lays out the screen. The parts live in their own files: BuildPanel (the
-## build-phase choices), BuildHandView (the building cards), Overlays (picks,
-## relics, end screen, Run history, dev tuning), StatusText (the live text) and ArenaView (the map).
+## This file runs the flow (new run, ticking the sim, pausing for decisions, pause and speed, the Esc
+## menu) and lays out the screen. The parts live in their own files: TopBar, BuildHandView (the
+## building cards), ThreatCard (the attack and Begin round), Alerts, HeroStrip, StoryLog, Overlays
+## (picks, relics, end screen, menu, Run history, dev tuning) and ArenaView (the map).
 
-const SPEEDS := [1, 2, 4, 8]
+## How often the live panels are rebuilt while the sim runs (the map redraws every frame).
+const LIVE_REFRESH_SECONDS := 0.1
 
 var content: Content
 var run: RunState
 var speed := 2
+## The speed Space returns to after a pause.
+var _play_speed := 2
 var _tick_acc := 0.0
-## How much of run.story is already on screen.
-var _shown_story := 0
+var _live_acc := 0.0
+var _menu_open := false
 ## Id of this run's file in Run history.
 var _run_id := ""
 
-var _status: RichTextLabel
-var _build_panel: BuildPanel
+var _top: TopBar
 var _hand_view: BuildHandView
-var _market_label: RichTextLabel
-var _sim_box: VBoxContainer
-var _relic_label: RichTextLabel
+var _threat: ThreatCard
+var _alerts: Alerts
 var _arena: ArenaView
 var _clock_label: RichTextLabel
-var _heroes_label: RichTextLabel
-var _story_label: RichTextLabel
+var _heroes: HeroStrip
+var _story: StoryLog
 var _overlays: Overlays
-var _seed_edit: LineEdit
 
 
 func _ready() -> void:
@@ -40,7 +41,13 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if run.phase != RunState.Phase.SIM:
+	if run.phase != RunState.Phase.SIM or _overlays.visible:
+		return
+	_live_acc += delta
+	if speed == 0:
+		if _live_acc >= LIVE_REFRESH_SECONDS:
+			_live_acc = 0.0
+			_refresh_live()
 		return
 	_tick_acc += delta * speed
 	var dt := run.world.dt
@@ -49,8 +56,21 @@ func _process(delta: float) -> void:
 		run.step()
 	if run.phase != RunState.Phase.SIM:
 		_on_pause()
-	else:
+	elif _live_acc >= LIVE_REFRESH_SECONDS:
+		_live_acc = 0.0
 		_refresh_live()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo:
+		return
+	if key.keycode == KEY_ESCAPE:
+		_close_menu() if _menu_open else _open_menu()
+		get_viewport().set_input_as_handled()
+	elif key.keycode == KEY_SPACE and not _overlays.visible:
+		_set_speed(_play_speed if speed == 0 else 0)
+		get_viewport().set_input_as_handled()
 
 
 # --- Flow ------------------------------------------------------------------
@@ -62,13 +82,12 @@ func _new_run(seed_value: int) -> void:
 	_run_id = RunHistory.new_run_id(seed_value)
 	_arena.run = run
 	_arena.reset_camera()
-	_build_panel.run = run
-	_hand_view.run = run
-	_overlays.run = run
-	_shown_story = 0
-	_story_label.clear()
+	for part: Variant in [_top, _hand_view, _threat, _alerts, _heroes, _story, _overlays]:
+		part.set("run", run)
+	_alerts.reset()
+	_story.refresh()
+	_menu_open = false
 	_overlays.hide()
-	_seed_edit.text = str(seed_value)
 	_refresh()
 
 
@@ -111,7 +130,21 @@ func _restart(replay: bool) -> void:
 	_new_run(run.run_seed if replay else _random_seed())
 
 
-func _tuning_closed() -> void:
+func _set_speed(s: int) -> void:
+	speed = s
+	if s > 0:
+		_play_speed = s
+	_top.show_speed(s)
+
+
+func _open_menu() -> void:
+	_menu_open = true
+	_overlays.show_menu(_dev_mode())
+
+
+## The menu, the log or a dev panel closed: back to whatever the run is waiting on.
+func _close_menu() -> void:
+	_menu_open = false
 	_refresh()
 	_overlays.show_for_phase()
 
@@ -119,32 +152,20 @@ func _tuning_closed() -> void:
 # --- Refresh ---------------------------------------------------------------
 
 func _refresh() -> void:
-	var building := run.phase == RunState.Phase.BUILD
-	_build_panel.visible = building
-	_hand_view.visible = building
-	_sim_box.visible = run.phase == RunState.Phase.SIM
-	if building:
-		_build_panel.refresh()
+	_hand_view.visible = run.phase == RunState.Phase.BUILD
+	if _hand_view.visible:
 		_hand_view.refresh()
-	_relic_label.text = StatusText.relics(run)
 	_refresh_live()
 
 
-## Parts that change every frame while the sim runs.
+## Parts that change while the sim runs.
 func _refresh_live() -> void:
-	_status.text = StatusText.status(run)
+	_top.refresh()
 	_clock_label.text = StatusText.clock(run)
-	_heroes_label.text = StatusText.heroes(run)
-	_market_label.text = StatusText.market(run)
-	_append_story()
-
-
-func _append_story() -> void:
-	while _shown_story < run.story.size():
-		var line := run.story[_shown_story]
-		_shown_story += 1
-		var bold := line.begins_with("Round ") or line.begins_with("The hearth") or line.begins_with("Night 3") or line.begins_with("No one")
-		_story_label.append_text(("[b]%s[/b]" if bold else "%s") % line + "\n")
+	_threat.refresh()
+	_alerts.refresh()
+	_heroes.refresh()
+	_story.refresh()
 
 
 # --- Seeds -----------------------------------------------------------------
@@ -178,110 +199,76 @@ func _build_ui() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	var root := HBoxContainer.new()
+	var root := VBoxContainer.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
-	root.add_theme_constant_override("separation", 8)
+	root.add_theme_constant_override("separation", 6)
 	add_child(root)
 
-	# Left: decisions.
-	var left_scroll := ScrollContainer.new()
-	left_scroll.custom_minimum_size.x = 340
-	left_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	root.add_child(left_scroll)
-	var left := VBoxContainer.new()
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left.add_theme_constant_override("separation", 6)
-	left_scroll.add_child(left)
+	_top = TopBar.new(_dev_mode())
+	_top.speed_changed.connect(_set_speed)
+	_top.skip_pressed.connect(_skip_ahead)
+	_top.menu_pressed.connect(_open_menu)
+	_top.show_speed(speed)
+	root.add_child(_top)
 
-	_status = UiKit.rich(left, 140)
-	_status.add_theme_font_size_override("normal_font_size", 13)
-	_status.add_theme_font_size_override("bold_font_size", 14)
-
-	_build_panel = BuildPanel.new()
-	_build_panel.changed.connect(_refresh)
-	_build_panel.begin_pressed.connect(_begin_round)
-	left.add_child(_build_panel)
-
-	_sim_box = VBoxContainer.new()
-	left.add_child(_sim_box)
-	UiKit.heading(_sim_box, "Speed")
-	var speeds := HBoxContainer.new()
-	_sim_box.add_child(speeds)
-	var group := ButtonGroup.new()
-	for s: int in SPEEDS:
-		var b := Button.new()
-		b.text = "%dx" % s
-		b.toggle_mode = true
-		b.button_group = group
-		b.button_pressed = s == speed
-		b.pressed.connect(func() -> void: speed = s)
-		speeds.add_child(b)
-	if _dev_mode():
-		UiKit.button(_sim_box, "Skip to the next decision (dev)", _skip_ahead)
-
-	left.add_child(HSeparator.new())
-	_market_label = UiKit.rich(left, 0)
-	_market_label.fit_content = true
-	_market_label.add_theme_font_size_override("normal_font_size", 12)
-	_market_label.add_theme_font_size_override("bold_font_size", 13)
-	left.add_child(HSeparator.new())
-	_relic_label = UiKit.rich(left, 0)
-	_relic_label.fit_content = true
-
-	left.add_child(HSeparator.new())
-	var seed_row := HBoxContainer.new()
-	left.add_child(seed_row)
-	_seed_edit = LineEdit.new()
-	_seed_edit.placeholder_text = "seed"
-	_seed_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	seed_row.add_child(_seed_edit)
-	var restart := Button.new()
-	restart.text = "Restart with seed"
-	restart.pressed.connect(func() -> void:
-		_new_run(int(_seed_edit.text) if _seed_edit.text.is_valid_int() else _random_seed()))
-	seed_row.add_child(restart)
-	UiKit.button(left, "Run history", func() -> void: _overlays.show_history())
-	if _dev_mode():
-		UiKit.button(left, "Tune market (dev)", func() -> void: _overlays.show_tuning())
-
-	# Right: clock line, map, then heroes + story.
-	var right := VBoxContainer.new()
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	root.add_child(right)
-	_clock_label = UiKit.rich(right, 26)
-	_clock_label.add_theme_font_size_override("normal_font_size", 15)
-	_clock_label.add_theme_font_size_override("bold_font_size", 15)
-	# The map, with the building cards as a heads-up hand along its bottom edge while building.
+	# The map, with the clock and alerts in its top-left corner, the attack in its top-right, and the
+	# building cards as a heads-up hand along its bottom edge while building.
 	var map_box := Control.new()
 	map_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	map_box.size_flags_stretch_ratio = 2.6
-	right.add_child(map_box)
+	root.add_child(map_box)
 	_arena = ArenaView.new()
 	_arena.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_arena.clip_contents = true
 	map_box.add_child(_arena)
+	var corner := VBoxContainer.new()
+	corner.position = Vector2(10, 8)
+	corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	corner.add_theme_constant_override("separation", 6)
+	map_box.add_child(corner)
+	_clock_label = RichTextLabel.new()
+	_clock_label.bbcode_enabled = true
+	_clock_label.fit_content = true
+	_clock_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_clock_label.scroll_active = false
+	_clock_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_clock_label.add_theme_font_size_override("normal_font_size", 15)
+	_clock_label.add_theme_font_size_override("bold_font_size", 15)
+	corner.add_child(_clock_label)
+	_alerts = Alerts.new()
+	corner.add_child(_alerts)
+	_threat = ThreatCard.new()
+	_threat.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_threat.position = Vector2(-ThreatCard.WIDTH - 10, 8)
+	_threat.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_threat.begin_pressed.connect(_begin_round)
+	map_box.add_child(_threat)
 	_hand_view = BuildHandView.new()
 	_hand_view.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	_hand_view.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_hand_view.changed.connect(_refresh)
 	map_box.add_child(_hand_view)
-	var bottom := HBoxContainer.new()
-	bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	right.add_child(bottom)
-	_heroes_label = UiKit.rich(bottom, 0)
-	_heroes_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_heroes_label.add_theme_font_size_override("normal_font_size", 13)
-	_heroes_label.add_theme_font_size_override("bold_font_size", 13)
-	_story_label = UiKit.rich(bottom, 0)
-	_story_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_story_label.scroll_following = true
-	_story_label.add_theme_font_size_override("normal_font_size", 13)
-	_story_label.add_theme_font_size_override("bold_font_size", 13)
 
-	# Overlay for picks, relics and the end screen: dims the screen, panel in the middle.
+	# Underneath: the heroes as portraits, and the story's last lines.
+	var bottom := HBoxContainer.new()
+	bottom.add_theme_constant_override("separation", 10)
+	root.add_child(bottom)
+	_heroes = HeroStrip.new()
+	_heroes.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_heroes.size_flags_stretch_ratio = 1.5
+	_heroes.hero_pressed.connect(func(hero: Unit) -> void: _arena.look_at_point(hero.pos))
+	bottom.add_child(_heroes)
+	_story = StoryLog.new()
+	_story.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_story.open_pressed.connect(func() -> void:
+		_menu_open = true
+		_overlays.show_log())
+	bottom.add_child(_story)
+
+	# Overlay for picks, relics, the end screen and the menu: dims the screen, panel in the middle.
 	_overlays = Overlays.new()
 	_overlays.pick_taken.connect(_take_pick)
 	_overlays.relic_picked.connect(_pick_relic)
 	_overlays.new_run_requested.connect(_restart)
-	_overlays.tuning_closed.connect(_tuning_closed)
+	_overlays.seed_run_requested.connect(_new_run)
+	_overlays.closed.connect(_close_menu)
 	add_child(_overlays)

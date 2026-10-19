@@ -1,15 +1,20 @@
 class_name Overlays
 extends PanelContainer
-## The dimmed pop-ups over the screen: the dawn pick, the relic pick, the end of
-## a run, Run history and the dev tuning panel. Choices go back to the screen
+## The dimmed pop-ups over the screen: the dawn pick and the relic pick (as cards, detail on hover),
+## the end of a run, the menu (Esc), the full story log, Run history and the dev tuning panel. Choices go back to the screen
 ## as signals; nothing here changes the run directly.
 
 signal pick_taken(index: int)
 signal relic_picked(relic_id: String)
 ## replay = true restarts on the same seed, false on a new one.
 signal new_run_requested(replay: bool)
-## The tuning panel closed: the screen refreshes and shows the right overlay again.
-signal tuning_closed
+## Start a new run on this seed (from the menu).
+signal seed_run_requested(seed_value: int)
+## The menu, log or tuning panel closed: the screen refreshes and shows the right overlay again.
+signal closed
+
+const PICK_SIZE := Vector2(196, 176)
+const RELIC_SIZE := Vector2(210, 150)
 
 var run: RunState
 var _box: VBoxContainer
@@ -75,27 +80,12 @@ func show_pick() -> void:
 		_box.add_child(away)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_box.add_child(row)
 	for i in run.pick_offer.size():
-		var card := run.pick_offer[i]
-		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(230, 170)
-		btn.autowrap_mode = TextServer.AUTOWRAP_WORD
-		if card["kind"] == "promote":
-			btn.text = _promote_text(card)
-		elif card["kind"] == "hero":
-			var hero: Unit = card["hero"]
-			var c: Dictionary = content.hero_classes[hero.type_id]
-			var likes: Array = content.traits[hero.trait_id].get("lodging", [])
-			btn.text = "HERO: %s\n%s %s\nHP %d, damage %d%s\nLikes to sleep in: %s\nCosts %d shells. Eats %s a day." % [hero.display_name,
-				content.traits[hero.trait_id]["name"], c["name"], int(hero.max_hp), int(hero.attack),
-				", ranged" if hero.attack_range > 60 else "",
-				" or ".join(likes.map(func(id: String) -> String: return content.buildings[id]["name"].to_lower())), card["cost"], _food_each()]
-			btn.tooltip_text = _trait_hint(hero.trait_id)
-		else:
-			var def: Dictionary = content.townsfolk[card["role"]]
-			btn.text = "%s\n\n%s\nFree. Eats %s a day." % [def["name"], def["text"], _food_each()]
+		var btn := _pick_card(run.pick_offer[i])
 		btn.disabled = not run.can_take_pick(i)
+		UiKit.fade_if_disabled(btn)
 		btn.pressed.connect(func() -> void: pick_taken.emit(i))
 		row.add_child(btn)
 	var skip := Button.new()
@@ -110,18 +100,68 @@ func _food_each() -> String:
 	return "%s food" % (str(int(n)) if n == floorf(n) else str(n))
 
 
-func _promote_text(card: Dictionary) -> String:
+## One dawn card: what kind, who, the cost and one line; the full detail is in its tooltip.
+func _pick_card(card: Dictionary) -> Button:
 	var content := run.content
-	var u: Unit = card["unit"]
-	if card["role"] == "warrior":
-		var hero: Unit = card["hero"]
-		return "PROMOTE a veteran warrior\n(%d kills, here since round %d)\nbecomes %s, %s %s, level %d\nNeeds a bed like any hero.\nCosts %d shells" % [
-			u.kills, u.joined_round, hero.display_name, content.traits[hero.trait_id]["name"],
-			content.hero_classes[hero.type_id]["name"], hero.level, card["cost"]]
-	var t: Dictionary = content.promotions["craftsperson"]["traits"][card["trait"]]
-	return "PROMOTE a craftsperson\n(%d goods made at the %s)\nbecomes %s, master of the %s\n%s: %s\nCosts %d shells" % [
-		int(u.made[card["workshop"]]), content.buildings[card["workshop"]]["name"].to_lower(), card["name"],
-		content.buildings[card["workshop"]]["name"].to_lower(), t["name"], t["text"], card["cost"]]
+	var eats := "Eats %s a day" % _food_each()
+	var btn: Button
+	match card["kind"]:
+		"hero":
+			var hero: Unit = card["hero"]
+			var c: Dictionary = content.hero_classes[hero.type_id]
+			var likes: Array = content.traits[hero.trait_id].get("lodging", [])
+			var beds := " or ".join(likes.map(func(id: String) -> String: return content.buildings[id]["name"].to_lower()))
+			btn = UiKit.card("Hero", hero.display_name, "%d shells" % card["cost"], "%s %s" % [content.traits[hero.trait_id]["name"], c["name"].to_lower()],
+				"Sleeps in: %s" % beds, PICK_SIZE, Color(c["color"]), false, Color(c["color"]))
+			btn.tooltip_text = "%s, %s %s\nHealth %d, damage %d%s\nLikes to sleep in: %s\n%s\n%s." % [hero.display_name,
+				content.traits[hero.trait_id]["name"], c["name"].to_lower(), int(hero.max_hp), int(hero.attack),
+				", ranged" if hero.attack_range > 60 else "", beds, _trait_hint(hero.trait_id), eats]
+		"family":
+			var who := {}
+			for role: String in card["roles"]:
+				who[role] = int(who.get(role, 0)) + 1
+			var parts := PackedStringArray()
+			for role: String in who:
+				parts.append("%d %s" % [who[role], content.townsfolk[role]["name"].to_lower()])
+			btn = UiKit.card("Family", "A family", "Free", ", ".join(parts), "Needs %d beds" % card["roles"].size(), PICK_SIZE, UiKit.CARD_BORDER)
+			btn.tooltip_text = "A whole family moves in at once: %s.\nEach eats %s a day." % [", ".join(parts), _food_each()]
+		"promote":
+			btn = _promote_card(card)
+		_:
+			var def: Dictionary = content.townsfolk[card["role"]]
+			btn = UiKit.card("Townsperson", def["name"], "Free", def["text"], eats, PICK_SIZE, UiKit.CARD_BORDER)
+			btn.tooltip_text = "%s\n%s." % [def["text"], eats]
+	return btn
+
+
+func _promote_card(card: Dictionary) -> Button:
+	var content := run.content
+	var cost := "%d shells" % card["cost"]
+	var btn: Button
+	match card["role"]:
+		"warrior":
+			var u: Unit = card["unit"]
+			var hero: Unit = card["hero"]
+			var cls: String = content.hero_classes[hero.type_id]["name"]
+			btn = UiKit.card("Promote a veteran warrior", hero.display_name, cost, "becomes a %s %s" % [
+				content.traits[hero.trait_id]["name"].to_lower(), cls.to_lower()], "Needs a bed like any hero", PICK_SIZE, UiKit.RECOMMEND_COLOR, true)
+			btn.tooltip_text = "A warrior with %d kills, here since round %d, becomes %s, %s %s, level %d.\nNeeds a bed like any hero." % [
+				u.kills, u.joined_round, hero.display_name, content.traits[hero.trait_id]["name"], cls.to_lower(), hero.level]
+		"champion":
+			var hero: Unit = card["hero"]
+			var knight: String = content.hero_classes[content.promotions["champion"]["becomes"]]["name"]
+			btn = UiKit.card("Knight a champion", hero.display_name, cost, "becomes a %s" % knight.to_lower(), "Level %d" % hero.level,
+				PICK_SIZE, UiKit.RECOMMEND_COLOR, true)
+			btn.tooltip_text = "%s, a level %d champion, is knighted and becomes a %s." % [hero.display_name, hero.level, knight.to_lower()]
+		_:
+			var u: Unit = card["unit"]
+			var shop: String = content.buildings[card["workshop"]]["name"].to_lower()
+			var t: Dictionary = content.promotions["craftsperson"]["traits"][card["trait"]]
+			btn = UiKit.card("Promote a craftsperson", card["name"], cost, "master of the %s: %s" % [shop, t["name"].to_lower()],
+				"", PICK_SIZE, UiKit.RECOMMEND_COLOR, true)
+			btn.tooltip_text = "A craftsperson who made %d goods at the %s becomes %s, master of the %s.\n%s: %s" % [
+				int(u.made[card["workshop"]]), shop, card["name"], shop, t["name"], t["text"]]
+	return btn
 
 
 func _trait_hint(trait_id: String) -> String:
@@ -161,13 +201,18 @@ func show_relic_pick() -> void:
 	_clear()
 	_title("Round %d survived! Choose a relic" % run.round_number)
 	_night_summary()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_box.add_child(row)
 	for id in run.relic_offer:
 		var r: Dictionary = content.relics[id]
-		var btn := Button.new()
-		btn.text = "%s\n%s" % [r["name"], r["text"]]
-		btn.custom_minimum_size = Vector2(420, 60)
+		var btn := UiKit.card("Relic", r["name"], "", r["text"], "", RELIC_SIZE, UiKit.HEADING_COLOR, false, UiKit.HEADING_COLOR)
+		# A relic's one line is the whole story, so it gets room instead of being cut short.
+		(btn.get_child(0).get_child(2) as Label).add_theme_font_size_override("font_size", 12)
+		btn.tooltip_text = r["text"]
 		btn.pressed.connect(func() -> void: relic_picked.emit(id))
-		_box.add_child(btn)
+		row.add_child(btn)
 	var skip := Button.new()
 	skip.text = "Skip"
 	skip.pressed.connect(func() -> void: relic_picked.emit(""))
@@ -260,10 +305,8 @@ func show_history() -> void:
 	close.pressed.connect(func() -> void:
 		if was_end_screen:
 			show_end()
-		elif run.phase == RunState.Phase.RELIC:
-			show_relic_pick()
 		else:
-			hide())
+			closed.emit())
 	buttons.add_child(close)
 	show()
 
@@ -321,7 +364,54 @@ func show_tuning() -> void:
 		DisplayServer.clipboard_set(JSON.stringify({"price_levels": content.market["price_levels"], "recipes": content.market["recipes"]}))
 		copy.text = "Copied!")
 	buttons.add_child(copy)
-	UiKit.button(buttons, "Back", func() -> void: tuning_closed.emit())
+	UiKit.button(buttons, "Back", func() -> void: closed.emit())
+	show()
+
+
+## The Esc menu: resume, the seed (replay it or try another), a new run, Run history and dev tools.
+func show_menu(dev_mode: bool) -> void:
+	_clear()
+	_title("Paused")
+	var seed_row := HBoxContainer.new()
+	_box.add_child(seed_row)
+	var seed_edit := LineEdit.new()
+	seed_edit.text = str(run.run_seed)
+	seed_edit.placeholder_text = "seed"
+	seed_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	seed_row.add_child(seed_edit)
+	var restart := Button.new()
+	restart.text = "Start run with this seed"
+	restart.pressed.connect(func() -> void:
+		if seed_edit.text.is_valid_int():
+			seed_run_requested.emit(int(seed_edit.text))
+		else:
+			new_run_requested.emit(false))
+	seed_row.add_child(restart)
+	UiKit.button(_box, "New run (new seed)", func() -> void: new_run_requested.emit(false))
+	UiKit.button(_box, "Run history", show_history)
+	if dev_mode:
+		UiKit.button(_box, "Tune market (dev)", show_tuning)
+	UiKit.note(_box, "Space pauses, V tilts the map, point at anything for details.", 12)
+	UiKit.button(_box, "Resume (Esc)", func() -> void: closed.emit()).custom_minimum_size.y = 40
+	show()
+
+
+## The whole story of the run so far.
+func show_log() -> void:
+	_clear()
+	_title("The story so far")
+	var text := RichTextLabel.new()
+	text.bbcode_enabled = true
+	text.custom_minimum_size = Vector2(760, 460)
+	text.scroll_following = true
+	text.add_theme_font_size_override("normal_font_size", 13)
+	text.add_theme_font_size_override("bold_font_size", 13)
+	var lines := PackedStringArray()
+	for line in run.story:
+		lines.append(StoryLog.as_bbcode(line))
+	text.text = "\n".join(lines)
+	_box.add_child(text)
+	UiKit.button(_box, "Back", func() -> void: closed.emit())
 	show()
 
 
