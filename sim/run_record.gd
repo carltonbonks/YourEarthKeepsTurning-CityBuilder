@@ -47,7 +47,9 @@ extends RefCounted
 ## 21: tribespeople's leanings: a dawn pick entry has "offered_leanings" (one per offered card, "" for none) when any card
 ##     had one, and "leaning" when the card taken had one; per round "gathered_leaned" (good -> amount brought in by
 ##     gatherers leaning toward it) and "leanings_end" (leaning -> townsfolk with it at the round's end).
-const RECORD_FORMAT := 21
+## 22: leaning bands: per round "gathered_band" (good -> extra a band's bigger loads brought in) and "bands_end"
+##     (leaning -> band tier reached at the round's end, 1 = first tier; leanings with no band are left out).
+const RECORD_FORMAT := 22
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -115,7 +117,7 @@ func begin_round() -> void:
 		"prices": run.prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
 		"age": run.age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
 		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0, "towers_broken": 0,
-		"gathered": {}, "gathered_leaned": {}, "trips_cut_short": {}, "tended": {},
+		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
 		"camps_cleared": 0, "camp_spoils": 0,
 		"build_hands": [{"cards": run.hand.labels()}]}
@@ -130,6 +132,15 @@ func end_round() -> void:
 		if u.leaning != "":
 			leanings[u.leaning] = int(leanings.get(u.leaning, 0)) + 1
 	entry["leanings_end"] = leanings
+	var bands := {}
+	var counts := run.world.folk_ai.count_leanings()
+	for key: String in counts:
+		var parts := key.split("/")
+		var tiers: Array = run.content.townsfolk[parts[0]].get("band_tiers", [])
+		var reached := tiers.filter(func(t: Dictionary) -> bool: return int(counts[key]) >= int(t["size"])).size()
+		if reached > 0:
+			bands[parts[1]] = reached
+	entry["bands_end"] = bands
 	rounds.append(entry)
 	entry = {}
 

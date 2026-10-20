@@ -143,9 +143,14 @@ func _pick_card(card: Dictionary) -> Button:
 			var def: Dictionary = content.townsfolk[card["role"]]
 			if card.has("leaning"):
 				var lean: Dictionary = def["leanings"][card["leaning"]]
-				btn = UiKit.card(def["name"], lean["name"], UiKit.cost_text(run.stock, {}), lean["text"], eats, PICK_SIZE, UiKit.CARD_BORDER)
-				btn.tooltip_text = "%s\n%s Still fetches anything the town is short of, but picks trips for %s first.\n%s." % [
-					def["text"], lean["text"], ", ".join(lean["goods"]).replace("_", " "), eats]
+				var key: String = card["role"] + "/" + card["leaning"]
+				var size := int(run.world.folk_ai.count_leanings().get(key, 0))
+				var grows := run.world.folk_ai.tier_for(card["role"], size + 1) != run.world.folk_ai.tier_for(card["role"], size)
+				var top: String = ("Forms a band" if size + 1 == int(def["band_tiers"][0]["size"]) else "Band grows stronger") if grows else def["name"]
+				btn = UiKit.card(top, lean["name"], UiKit.cost_text(run.stock, {}), lean["text"], eats, PICK_SIZE, UiKit.CARD_BORDER, grows)
+				btn.tooltip_text = "%s\n%s Still fetches anything the town is short of, but picks trips for %s first.\n%s\n%s." % [
+					def["text"], lean["text"], ", ".join(lean["goods"]).replace("_", " "),
+					Tooltips.band_line(run, card["role"], card["leaning"], true), eats]
 			else:
 				btn = UiKit.card("Townsperson", def["name"], UiKit.cost_text(run.stock, {}), def["text"], eats, PICK_SIZE, UiKit.CARD_BORDER)
 				btn.tooltip_text = "%s\n%s." % [def["text"], eats]

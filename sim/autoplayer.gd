@@ -237,8 +237,11 @@ func pick(run: RunState) -> int:
 					score = -50.0
 			"tribesperson":
 				score = 4.0 - run.count_role("tribesperson") * 0.6
-				# Leanings are left to chance: favouring whatever the town was shortest of that dawn cost the bots
-				# 5-13 win-rate points (40 seeds), since the shortage moves on while the newcomer stays.
+				# Between two leanings, grow the bigger band. Favouring whatever the town was shortest of that dawn
+				# instead cost the bots 5-13 win-rate points (40 seeds), since the shortage moves on while the newcomer stays.
+				if card.has("leaning"):
+					var counts := run.world.folk_ai.count_leanings()
+					score += 0.05 * mini(int(counts.get("tribesperson/" + card["leaning"], 0)), 5)
 			"warrior":
 				score = 3.0 - run.count_role("warrior") * 0.8
 			"craftsperson":

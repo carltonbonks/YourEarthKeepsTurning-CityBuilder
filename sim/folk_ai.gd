@@ -20,6 +20,8 @@ var _inbound := {}
 var _wants := {}
 ## Living townsfolk whose role stands and fights (tag fighter), counted each step (Horde Drum).
 var fighters := 0
+## Living townsfolk per role and leaning ("role/leaning" -> count), counted each step: a band's size (band_tier).
+var leaning_counts := {}
 
 
 func _init(world: World) -> void:
@@ -33,6 +35,7 @@ func begin_step() -> void:
 	_inbound.clear()
 	_wants = {}
 	fighters = 0
+	leaning_counts = count_leanings()
 	for unit in w.folk:
 		if unit.alive and w.content.unit_has_tag(unit, "fighter"):
 			fighters += 1
@@ -40,7 +43,7 @@ func begin_step() -> void:
 			_warrior_slot[unit] = _warrior_slot.size()
 		elif unit.alive:
 			if unit.task == "gather":
-				_claim(unit.task_index, carry_of(unit))
+				_claim(unit.task_index, carry_of(unit, w.nodes[unit.task_index]["gives"]))
 			if unit.carry_amount > 0:
 				_inbound[unit.carrying] = int(_inbound.get(unit.carrying, 0)) + unit.carry_amount
 
@@ -237,11 +240,15 @@ func _worker_tick(unit: Unit) -> void:
 			if w.walk_toward(unit, node["pos"], 10.0):
 				unit.task_timer -= w.dt
 				if unit.task_timer <= 0.0:
-					var take := mini(int(node["amount"]), carry_of(unit))
+					var take := mini(int(node["amount"]), carry_of(unit, node["gives"]))
+					# What the band added: this take less what the gatherer would have carried alone.
+					var band_extra := take - mini(int(node["amount"]), carry_of(unit))
 					node["amount"] = int(node["amount"]) - take
 					w.run.record.note_count("gathered", take, node["gives"])
 					if leans_to(unit, node["gives"]):
 						w.run.record.note_count("gathered_leaned", take, node["gives"])
+					if band_extra > 0:
+						w.run.record.note_count("gathered_band", band_extra, node["gives"])
 					unit.carrying = node["gives"]
 					unit.carry_amount = take
 					unit.task = "return"
@@ -286,8 +293,9 @@ func _choose_work(unit: Unit) -> void:
 		return
 	unit.task = "gather"
 	unit.task_index = best
-	unit.task_timer = gather_time(unit)
-	_claim(best, carry_of(unit))
+	var gives: String = w.nodes[best]["gives"]
+	unit.task_timer = gather_time(unit, gives)
+	_claim(best, carry_of(unit, gives))
 
 
 ## Picks the gathering trip worth the most to the town, or -1. Each trip is scored by how badly the town
@@ -297,15 +305,13 @@ func _choose_work(unit: Unit) -> void:
 ## Craftspeople only fetch wood. A gatherer's leaning makes trips for its goods worth leaning_weight times more.
 func plan_trip(unit: Unit) -> int:
 	var time_left := w.content.num("day_seconds") - w.content.num("dusk_seconds") - w.time_of_day()
-	var gather := gather_time(unit)
-	if time_left <= gather:
+	if time_left <= gather_time(unit):
 		return -1
 	if _wants.is_empty():
 		_wants = w.run.resource_wants()
 	var wants := _wants
 	var floor_need := w.content.num("gather_need_floor")
 	var slack := w.content.num("gather_trip_slack")
-	var carry := carry_of(unit)
 	var need := {}
 	for good: String in wants:
 		var short := float(wants[good]) - float(w.run.stock[good]) - float(_inbound.get(good, 0))
@@ -317,7 +323,7 @@ func plan_trip(unit: Unit) -> int:
 		var good: String = node["gives"]
 		if not need.has(good) or (unit.type_id == "craftsperson" and good != "wood") or not _can_gather(node):
 			continue
-		var take := mini(carry, int(node["amount"]) - int(_claimed.get(i, 0)))
+		var take := mini(carry_of(unit, good), int(node["amount"]) - int(_claimed.get(i, 0)))
 		if take <= 0:
 			continue
 		var d := unit.pos.distance_to(node["pos"])
@@ -325,6 +331,7 @@ func plan_trip(unit: Unit) -> int:
 		if w.nearest_enemy(node["pos"], 120.0) != null:
 			d += 400.0
 		var walk := d / maxf(unit.speed, 1.0) * slack
+		var gather := gather_time(unit, good)
 		if walk + gather > time_left:
 			continue
 		var score := float(need[good]) * take / (walk * 2.0 + gather)
@@ -341,15 +348,46 @@ func leans_to(unit: Unit, good: String) -> bool:
 	return unit.leaning != "" and w.content.townsfolk[unit.type_id]["leanings"][unit.leaning]["goods"].has(good)
 
 
-## How much a townsperson brings back from one gathering trip (tools and relics included).
-func carry_of(unit: Unit) -> int:
+## How much a townsperson brings back from one gathering trip of a good (tools, relics and its band included).
+func carry_of(unit: Unit, good := "") -> int:
 	var carry := float(w.content.townsfolk[unit.type_id].get("carry", 2)) + w.run.tool_bonus(unit.type_id, "carry")
+	if leans_to(unit, good):
+		carry += float(band_tier(unit).get("carry", 0))
 	return int(carry * (1.0 + w.run.mod("carry_mult")))
 
 
-## Seconds a townsperson spends gathering at a node (tools included).
-func gather_time(unit: Unit) -> float:
-	return float(w.content.townsfolk[unit.type_id].get("gather_seconds", 3)) / (1.0 + w.run.tool_bonus(unit.type_id, "gather_mult"))
+## Seconds a townsperson spends gathering a good at a node (tools and its band included).
+func gather_time(unit: Unit, good := "") -> float:
+	var mult := w.run.tool_bonus(unit.type_id, "gather_mult")
+	if leans_to(unit, good):
+		mult += float(band_tier(unit).get("gather_mult", 0))
+	return float(w.content.townsfolk[unit.type_id].get("gather_seconds", 3)) / (1.0 + mult)
+
+
+## Living townsfolk per role and leaning, keyed "role/leaning".
+func count_leanings() -> Dictionary:
+	var out := {}
+	for unit in w.folk:
+		if unit.alive and unit.leaning != "":
+			var key := unit.type_id + "/" + unit.leaning
+			out[key] = int(out.get(key, 0)) + 1
+	return out
+
+
+## The highest band tier a role's townsfolk sharing a leaning reach at this size (data band_tiers), or {}.
+func tier_for(role: String, size: int) -> Dictionary:
+	var best := {}
+	for tier: Dictionary in w.content.townsfolk[role].get("band_tiers", []):
+		if size >= int(tier["size"]):
+			best = tier
+	return best
+
+
+## The band tier a townsperson's leaning reaches this step, or {} when it has no leaning or too few share it.
+func band_tier(unit: Unit) -> Dictionary:
+	if unit.leaning == "" or not unit.alive:
+		return {}
+	return tier_for(unit.type_id, int(leaning_counts.get(unit.type_id + "/" + unit.leaning, 0)))
 
 
 ## A node townsfolk may gather from now: stocked, theirs to work, of the town's age, and safe.
