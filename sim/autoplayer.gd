@@ -258,9 +258,10 @@ func pick(run: RunState) -> int:
 ## Relics it likes most first, ranked by how often bot runs that held them won (40 runs x 3 styles,
 ## blind picks, 2026-10-20). Anything not listed ranks after these; ties keep the offer's order.
 const RELIC_RANK := ["lone_wolf_pelt", "horde_drum", "broken_crown", "levy_horn", "ram_thorn_stakes", "tithe_bowl",
-	"grave_salt", "ancestor_mask", "owl_eyes", "sacred_spring", "witchs_thread", "chieftains_torc", "elders_tale",
+	"grave_salt", "ancestor_mask", "raiders_spears", "wolfskin_cloaks", "pack_train", "ram_timbers", "owl_eyes", "sacred_spring", "witchs_thread", "chieftains_torc", "elders_tale",
 	"turncoats_torc", "fire_arrows", "bone_flute", "moneylenders_knot", "hollow_drum", "bear_tooth_charm",
-	"blood_brother_knot", "wanderers_fire", "ember_stone", "oxhide_sledges", "seed_cache", "ridgeheart"]
+	"blood_brother_knot", "wanderers_fire", "smoked_haunches", "grave_goods", "bone_ward", "splintered_ram", "ember_stone",
+	"oxhide_sledges", "seed_cache", "ridgeheart"]
 
 
 ## Takes the offered relic it ranks highest (never skips: every relic helps somewhat).

@@ -86,6 +86,8 @@
 	"relic_choices": 3,
 	"_pact_note": "On pact_rounds the relic offer is drawn from relics tagged pact (strong, with a real cost; data/relics.json), topped up from the rest if too few are left; other rounds never offer pacts.",
 	"pact_rounds": [4, 8, 12],
+	"_spoils_note": "After each round the relic offer gains one card of spoils (relics tagged spoils, data/relics.json) from the kind of enemy the attack was made of; spoils_kinds names each kind on the card (enemy tag -> what the band of them is called).",
+	"spoils_kinds": {"human": "warband", "beast": "pack", "undead": "barrow-dead", "siege": "siege train"},
 
 	"_energy_note": "Hero energy: drains per second while awake (faster out in the wilds) and per attack, comes back while resting at a lodging (energy_rest x the lodging's rest, x home bonus in a preferred lodging, x rest_rough when sleeping by the hearth). Heroes get up once they reach wake_at. At 0 energy a hero is exhausted and hits for exhausted_attack of normal.",
 	"hero_energy_max": 100,

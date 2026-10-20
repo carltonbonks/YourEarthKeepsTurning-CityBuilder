@@ -231,10 +231,23 @@ func show_relic_pick() -> void:
 	for id in run.relic_offer:
 		var r: Dictionary = content.relics[id]
 		var kind := "Pact" if content.has_tag("relic", id, "pact") else "Relic"
-		var btn := UiKit.card(kind, r["name"], "", r["text"], "", RELIC_SIZE, UiKit.HEADING_COLOR, false, UiKit.HEADING_COLOR)
+		var text: String = r["text"]
+		var footer := ""
+		if id == run.spoils.get("id", ""):
+			kind = "Spoils of the %s" % str(content.balance.get("spoils_kinds", {}).get(run.spoils["kind"], run.spoils["kind"]))
+			var now := run.spoils_now()
+			var parts := PackedStringArray()
+			for good: String in now["goods"]:
+				parts.append("%d %s" % [now["goods"][good], good])
+			for role: String in now["folk"]:
+				parts.append("%d %s" % [now["folk"][role], content.townsfolk[role]["name"].to_lower()])
+			if not parts.is_empty():
+				footer = "Now: " + ", ".join(parts)
+			text += "\n%d of them came. Instead of a relic." % int(run.spoils["foes"])
+		var btn := UiKit.card(kind, r["name"], "", text, footer, RELIC_SIZE, UiKit.HEADING_COLOR, false, UiKit.HEADING_COLOR)
 		# A relic's one line is the whole story, so it gets room instead of being cut short.
 		(btn.get_child(0).get_child(2) as Label).add_theme_font_size_override("font_size", 12)
-		btn.tooltip_text = r["text"]
+		btn.tooltip_text = text + ("\n" + footer if footer != "" else "")
 		btn.pressed.connect(func() -> void: relic_picked.emit(id))
 		row.add_child(btn)
 	_skip_button("Skip the relic", func() -> void: relic_picked.emit(""))

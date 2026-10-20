@@ -49,7 +49,9 @@ extends RefCounted
 ##     gatherers leaning toward it) and "leanings_end" (leaning -> townsfolk with it at the round's end).
 ## 22: leaning bands: per round "gathered_band" (good -> extra a band's bigger loads brought in) and "bands_end"
 ##     (leaning -> band tier reached at the round's end, 1 = first tier; leanings with no band are left out).
-const RECORD_FORMAT := 22
+## 23: spoils of a beaten attack: per round "spoils" (when one was offered) = {id, kind (enemy tag), foes (how many of
+##     that kind came), taken, goods (good -> amount it brought, when taken)}; its id is also in "relic_offer".
+const RECORD_FORMAT := 23
 
 var run: RunState
 ## Finished rounds, oldest first.

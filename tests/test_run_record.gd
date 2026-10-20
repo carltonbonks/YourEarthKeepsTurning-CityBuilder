@@ -23,7 +23,7 @@ func test_record_captures_builds_picks_and_wave() -> void:
 	check_eq(r1["picks"][0]["offered"].size(), 3, "offered cards recorded")
 	check(r1.has("battle"), "wave summary recorded")
 	check(not r1["wave_sides"].is_empty(), "wave sides recorded")
-	check_eq(r1["relic_offer"].size(), 3, "relic offer recorded")
+	check_eq(r1["relic_offer"].size(), 3 + (1 if r1.has("spoils") else 0), "relic offer recorded, with the spoils")
 
 
 func test_unfinished_run_includes_current_round() -> void:
