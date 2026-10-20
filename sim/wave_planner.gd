@@ -17,6 +17,7 @@ func generate(for_round: int) -> Array[String]:
 	var content := run.content
 	var rng := SeededRng.stream(run.run_seed, "wave", for_round)
 	var budget := content.int_num("wave_budget_base") + content.int_num("wave_budget_per_round") * (for_round - 1)
+	budget = roundi(budget * (1.0 + run.mod("wave_mult")))
 	var wave: Array[String] = []
 	var ids := content.enemies.keys()
 	ids.sort()
@@ -48,7 +49,7 @@ func plan(for_round: int) -> Array[String]:
 	run.wave_eased = 0
 	run.held_back = []
 	var cap := content.num("catch_up_max_ratio")
-	if cap <= 0.0:
+	if cap <= 0.0 or run.has_effect("no_catch_up"):
 		return wave
 	var limit := cap * float(Power.town(run.world)["total"])
 	var keep := ceili(wave.size() * content.num("catch_up_min_share"))

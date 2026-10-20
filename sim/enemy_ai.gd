@@ -50,6 +50,9 @@ func enemy_tick(enemy: Unit) -> void:
 		enemy.target = null
 	elif not holding_grudge and (enemy.target == null or not enemy.target.alive or enemy.pos.distance_to(enemy.target.pos) > aggro * 3.0):
 		enemy.target = w.nearest_friend(enemy.pos, aggro)
+		# Wolf-mother's Skull: beasts let townsfolk be unless one strikes them (a grudge).
+		if enemy.target != null and enemy.target.is_folk() and w.run.has_effect("beast_peace") and w.content.unit_has_tag(enemy, "beast"):
+			enemy.target = null
 	if enemy.target != null:
 		w.fight(enemy, enemy.target)
 		return
@@ -66,6 +69,7 @@ func enemy_tick(enemy: Unit) -> void:
 		var dmg := enemy.attack * war_chant()
 		if w.content.unit_has_tag(enemy, "siege"):
 			w.run.record.note_count("siege_damage", roundi(dmg))
+			thorns(enemy)
 		w.hearth_hp -= dmg
 		w.wave_stats["keep_damage"] = float(w.wave_stats["keep_damage"]) + dmg
 		w.night_report["hearth_damage"] = float(w.night_report["hearth_damage"]) + dmg
@@ -174,6 +178,9 @@ func spawn_wave() -> void:
 
 ## A small raid on an early night, from a random side, not warned of.
 func spawn_probe() -> void:
+	if w.run.has_effect("no_probes"):
+		w.run.relic_fired("no_probes")
+		return
 	var types := w.run.waves.probe(w.run.round_number, w.day_index())
 	var side := SeededRng.stream(w.run.run_seed, "probe", w.run.round_number * 10 + w.day_index()).randi_range(0, 3) * PI / 2.0
 	for i in types.size():
@@ -184,6 +191,14 @@ func spawn_probe() -> void:
 	w.night_report["raiders"] = int(w.night_report["raiders"]) + types.size()
 	if not types.is_empty():
 		w.run.tell("Raiders probe the camp from the %s." % ["east", "south", "west", "north"][int(round(side / (PI / 2.0))) % 4])
+
+
+## Ram-thorn Stakes: a siege engine that strikes a gate or the hearth is hurt in turn.
+func thorns(enemy: Unit) -> void:
+	var hurt := w.run.mod("siege_thorns")
+	if hurt > 0.0 and enemy.alive:
+		w.damage(null, enemy, hurt)
+		w.run.relic_fired("siege_thorns")
 
 
 func war_chant() -> float:

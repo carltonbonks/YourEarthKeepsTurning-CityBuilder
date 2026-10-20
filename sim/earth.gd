@@ -99,6 +99,9 @@ static func _in_span(a: float, s0: float, s1: float) -> bool:
 
 ## How fast plate k of ring ri turns on shift n, in radians: its ring's turn plus its own slow sway.
 func turn_of(ri: int, k: int, n: int) -> float:
+	# Stillstone holds the near ring still.
+	if ri == 0 and w.run.has_effect("still_ring"):
+		return 0.0
 	var ring := rings[ri]
 	return float(ring["turn"]) + float(ring["sway"]) * sin(TAU * n / float(ring["periods"][k]) + float(ring["phases"][k]))
 
@@ -439,6 +442,7 @@ func _move_things(plans: Array) -> void:
 func _swallow_node(node: Dictionary) -> void:
 	var embers: String = def["embers"]
 	last["swallowed"][node["type"]] = int(last["swallowed"].get(node["type"], 0)) + 1
+	_feed_the_deep(int(w.run.mod("swallow_node_shells")), false)
 	if node["type"] == embers:
 		_remove_node(node)
 		return
@@ -462,6 +466,7 @@ func _remove_node(node: Dictionary) -> void:
 ## A den goes under: its wanderers with it, and the dens after it move up one place.
 func _swallow_den(di: int) -> void:
 	last["dens_swallowed"] = int(last["dens_swallowed"]) + 1
+	_feed_the_deep(int(w.run.mod("swallow_den_shells")), w.run.has_effect("swallow_item"))
 	w.run.tell("The earth swallows the %s, and everything in it." % w.content.world["dens"][w.dens[di]["type"]]["name"].to_lower())
 	for e in w.enemies:
 		if e.den_index == di:
@@ -469,6 +474,18 @@ func _swallow_den(di: int) -> void:
 		elif e.den_index > di:
 			e.den_index -= 1
 	w.dens.remove_at(di)
+
+
+## Hungry Deep Idol: the town is paid for what the earth takes, and a den gives up an item to a hero.
+func _feed_the_deep(shells: int, item: bool) -> void:
+	if shells <= 0:
+		return
+	w.run.stock["shells"] = int(w.run.stock["shells"]) + shells
+	w.run.relic_fired("swallow_shells", shells)
+	var heroes := w.run.living_heroes()
+	if item and not heroes.is_empty():
+		var rng := SeededRng.stream(w.run.run_seed, "deep_gift", shifts)
+		w.hero_ai.give_item(rng.pick(heroes), Loot.roll(w.content, rng, w.run.round_number, w.run.age))
 
 
 ## Closing colliding seams push their ridge up a step; every other seam's ridge wears down a step.
@@ -494,8 +511,10 @@ func _open_rifts(plans: Array, rng: SeededRng) -> void:
 				continue
 			raw.append({"ring": ri, "a0": float(res["lead"]), "a1": float(res["trail"])})
 			last["rifts"] = int(last["rifts"]) + 1
+			# Rift Seed: every wide rift grows something.
+			var chance := 1.0 if w.run.has_effect("rift_growth") else float(def["rift_node_chance"])
 			if rd["rift_nodes"].is_empty() or float(res["degrees"]) < float(def["rift_min_degrees"]) \
-					or rng.randf() >= float(def["rift_node_chance"]):
+					or rng.randf() >= chance:
 				continue
 			var type: String = rng.pick(rd["rift_nodes"])
 			var ndef: Dictionary = w.content.world["nodes"][type]
@@ -506,6 +525,8 @@ func _open_rifts(plans: Array, rng: SeededRng) -> void:
 			var at := Vector2.from_angle((float(res["lead"]) + float(res["trail"])) / 2.0) * r
 			_add(type, at, float(def["rift_node_share"]))
 			last["grown"][type] = int(last["grown"].get(type, 0)) + 1
+			if w.run.has_effect("rift_growth"):
+				w.run.relic_fired("rift_growth")
 
 
 ## A ridge tall enough raises one upthrust node of the town's age beside its pass.
@@ -518,10 +539,13 @@ func _raise_upthrust(rng: SeededRng) -> void:
 		for held: int in ring["upthrust"]:
 			if held >= 0 and not w.nodes[held].get("gone", false):
 				standing += 1
+	# Ridgeheart: a step lower, and more of them.
+	var height := maxi(1, int(def["upthrust_height"]) - int(w.run.mod("upthrust_ease")))
+	var cap := int(def["upthrust_cap"]) + int(w.run.mod("upthrust_more"))
 	for ri in rings.size():
 		var ring := rings[ri]
 		for k in ring["seams"].size():
-			if int(ring["ridges"][k]) < int(def["upthrust_height"]) or standing >= int(def["upthrust_cap"]):
+			if int(ring["ridges"][k]) < height or standing >= cap:
 				continue
 			var held := int(ring["upthrust"][k])
 			if held >= 0 and not w.nodes[held].get("gone", false) and w.nodes[held]["type"] == type:

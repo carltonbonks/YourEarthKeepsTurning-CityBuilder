@@ -41,7 +41,10 @@ extends RefCounted
 ##     "swallowed" (node type -> count sunk at subducting seams), "dens_swallowed", "ridges" (colliding seams that pushed
 ##     their ridge up), "raised" (node type -> upthrust nodes ridges raised), "rifts" (seams that opened), "grown" (node
 ##     type -> fresh nodes in rifts), "roads_refunded" (squares of paving swallowed and paid back).
-const RECORD_FORMAT := 19
+## 20: rule-changing relics: per round "relic_effects" (effect key from data/relics.json -> times its rule fired,
+##     or shells/fuel it brought, e.g. "kill_shells", "turncoat_chance", "risen_per_night") and "relic_gifts" (relics
+##     Broken Crown handed out with it). Relics now include pacts (tag "pact"), offered on pact_rounds.
+const RECORD_FORMAT := 20
 
 var run: RunState
 ## Finished rounds, oldest first.

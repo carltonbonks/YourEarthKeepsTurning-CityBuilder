@@ -37,13 +37,14 @@ func offer_picks() -> void:
 		pool.append({"kind": "family", "role": "family", "cost": 0, "roles": content.balance["family_roles"].duplicate()})
 	run.pick_offer = []
 	var promote := _promotion_card(rng)
-	var slots := content.int_num("pick_choices") - (0 if promote.is_empty() else 1)
+	var slots := maxi(1, content.int_num("pick_choices") + int(run.mod("pick_bonus"))) - (0 if promote.is_empty() else 1)
 	while run.pick_offer.size() < slots and not pool.is_empty():
 		var card: Dictionary = rng.pick(pool)
 		pool.erase(card)
 		run.pick_offer.append(card)
 	if not promote.is_empty():
 		run.pick_offer.append(promote)
+	run.picks_left = 1 + int(run.mod("extra_picks"))
 	run.phase = RunState.Phase.PICK
 
 
@@ -233,7 +234,7 @@ func update_moods() -> void:
 			changes["bought something they wanted"] = content.num("mood_bought")
 		if int(hero.mood_events.get("prize", 0)) > 0:
 			changes["won prizes"] = content.num("mood_prize")
-		if comrades > 0:
+		if comrades > 0 and not run.has_effect("mourning_share"):
 			changes["lost comrades"] = content.num("mood_comrade_died") * comrades
 		if content.unit_has_tag(hero, "proud") and hero.items.values().any(func(item: Dictionary) -> bool:
 				return content.items["bases"][item["base"]].get("steel", false)):

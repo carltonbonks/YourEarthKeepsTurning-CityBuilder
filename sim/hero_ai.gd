@@ -43,6 +43,8 @@ func hero_tick(hero: Unit) -> void:
 		return
 	var drain := w.content.num("energy_drain_wilds") if hero.pos.length() > w.content.num("settlement_radius") else w.content.num("energy_drain")
 	drain *= maxf(0.2, 1.0 - Loot.total(w.content, hero, "energy"))
+	if _lone():
+		drain *= 1.0 - w.run.mod("lone_tire")
 	var was_awake := hero.energy > 0.0
 	hero.energy = maxf(0.0, hero.energy - drain * w.dt)
 	if hero.energy <= float(t.get("tired_at", 25)) and hero.pos.length() > w.content.num("settlement_radius"):
@@ -293,6 +295,13 @@ func apply_hero_stats(hero: Unit) -> void:
 		+ Loot.total(w.content, hero, "hp") + w.run.mod("hero_hp"))
 	hero.attack = float(c["attack"]) + (hero.level - 1) * w.content.num("level_attack") \
 		+ Loot.total(w.content, hero, "attack") + w.run.mod("hero_attack")
+	# Trophy Belt: damage for every so many kills. Witch's Thread: cursed gear's HP penalty is lifted.
+	if w.run.has_effect("trophy_every"):
+		hero.attack += w.run.mod("trophy_damage") * (hero.kills / int(w.run.mod("trophy_every")))
+	if w.run.has_effect("curse_lift"):
+		for s: String in hero.items:
+			if hero.items[s]["affixes"].has("cursed"):
+				hero.max_hp -= float(w.content.items["affixes"]["cursed"].get("hp", 0.0))
 	hero.attack_range = float(c["range"])
 	hero.cooldown = float(c["cooldown"])
 	hero.speed = float(c["speed"]) + Loot.total(w.content, hero, "speed")
@@ -332,7 +341,72 @@ func maybe_drop(hero: Unit, victim: Unit) -> void:
 	var drops: Dictionary = w.content.items["drops"]
 	var chance := float(drops["boss"]) if victim.is_boss else float(drops["den"] if victim.den_index >= 0 else drops["wave"])
 	if w.rng.randf() < chance:
-		give_item(hero, Loot.roll(w.content, w.rng, w.run.round_number, w.run.age))
+		var item := Loot.roll(w.content, w.rng, w.run.round_number, w.run.age)
+		if w.run.has_effect("cursed_drops") and not item["affixes"].has("cursed") and w.rng.randf() < w.run.mod("cursed_drops"):
+			item["affixes"].append("cursed")
+			w.run.relic_fired("cursed_drops")
+		give_item(hero, item)
+
+
+# --- Relics on heroes ----------------------------------------------------------
+
+## Lone Wolf's Pelt: the town has few enough heroes for it to work.
+func _lone() -> bool:
+	return w.run.has_effect("lone_heroes") and w.run.living_heroes().size() <= int(w.run.mod("lone_heroes"))
+
+
+## How much harder a hero hits from relics that depend on the moment: few heroes (Lone Wolf's Pelt),
+## another hero close by (Blood-brother Knot), night or day (Owl Eyes).
+func relic_damage_mult(hero: Unit) -> float:
+	var mult := 1.0
+	if _lone():
+		mult *= 1.0 + w.run.mod("lone_damage")
+	if w.run.has_effect("kin_damage"):
+		var radius := w.run.mod("kin_radius")
+		for other in w.run.heroes:
+			if other != hero and other.alive and other.pos.distance_to(hero.pos) <= radius:
+				mult *= 1.0 + w.run.mod("kin_damage")
+				break
+	mult *= 1.0 + w.run.mod("night_damage" if w.is_night() else "day_damage")
+	return maxf(0.1, mult)
+
+
+## Chosen One's Brand: extra XP share for the town's highest-level hero (most XP, then the longest here, breaks ties),
+## less for the rest.
+func chosen_xp(hero: Unit) -> float:
+	if not w.run.has_effect("chosen_xp"):
+		return 0.0
+	var chosen: Unit = null
+	for h in w.run.heroes:
+		if h.alive and (chosen == null or h.level > chosen.level or (h.level == chosen.level and h.xp > chosen.xp)):
+			chosen = h
+	return w.run.mod("chosen_xp") if chosen == hero else w.run.mod("others_xp")
+
+
+## Trophy Belt: a hero who reaches another milestone of kills grows stronger at once.
+func count_trophy(hero: Unit) -> void:
+	var every := int(w.run.mod("trophy_every"))
+	if every > 0 and hero.kills % every == 0:
+		apply_hero_stats(hero)
+		w.run.relic_fired("trophy_every")
+		w.run.tell("%s adds a trophy to their belt (%d kills)." % [hero.display_name, hero.kills])
+
+
+## Mourning Bell: a fallen hero's XP, all of it, is shared among the living heroes.
+func mourn(fallen: Unit) -> void:
+	var share := w.run.mod("mourning_share")
+	if share <= 0.0:
+		return
+	var living := w.run.heroes.filter(func(h: Unit) -> bool: return h.alive and h != fallen)
+	if living.is_empty():
+		return
+	var total := fallen.xp
+	for lv in range(1, fallen.level):
+		total += w.content.num("xp_per_level") * lv
+	for h: Unit in living:
+		h.xp += total * share / living.size()
+	w.run.relic_fired("mourning_share")
+	w.run.tell("The bell tolls for %s; what they learned passes to the others." % fallen.display_name)
 
 
 ## How much a hero wants a good on a stall (0 or less: not at all).
