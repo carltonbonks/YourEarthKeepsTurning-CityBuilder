@@ -5,7 +5,8 @@ extends Control
 ## By default the map is tilted (isometric): the ground is turned 45 degrees and squashed, buildings
 ## stand up as blocks, and everything standing is drawn back to front so nearer things cover farther
 ## ones. V switches to the flat top-down view. The sim never knows: only the view's projection changes.
-## Mouse wheel zooms, dragging pans, hovering shows a tooltip (see Tooltips).
+## Mouse wheel zooms, dragging pans, hovering shows a tooltip (see Tooltips). As each night falls the
+## camera closes in on the town and afterwards goes back (NightCamera), unless the player moves it.
 
 const HERO_RADIUS := 9.0
 const FOLK_RADIUS := 5.5
@@ -22,6 +23,8 @@ const BUILDING_HEIGHT := 14.0
 const TOWER_HEIGHT := 32.0
 ## How long the land takes to slide into place after the earth turns, in milliseconds (view only).
 const SLIDE_MS := 1800.0
+## The controls hint shows for this many rounds.
+const HELP_ROUNDS := 2
 ## What each kind of standing thing is, for the back-to-front pass.
 enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO }
 
@@ -41,20 +44,33 @@ var _paved_at := {}
 ## The earth's last shift as seen here ([shift count, world]) and when the slide that shows it began.
 var _shift_seen := [-1, null]
 var _slide_from_ms := -1.0
+var night := NightCamera.new()
 
 
 func reset_camera() -> void:
 	zoom = 1.2
 	pan = Vector2.ZERO
+	night = NightCamera.new()
 
 
 ## Points the view at a ground point, zooming in a little if the view is wide.
 func look_at_point(p: Vector2) -> void:
+	night.release()
 	pan = p
 	zoom = maxf(zoom, 2.0)
 
 
-func _process(_delta: float) -> void:
+## The zoom at which a circle of this radius round the hearth fills `fill` of the view.
+func zoom_to_fit(radius: float, fill: float) -> float:
+	var base := _scale() / zoom
+	# Tilted, the circle is twice as wide as it is tall on screen.
+	var fit := minf(fill * size.y / radius, fill * size.x / (2.0 * radius)) if iso else fill * minf(size.x, size.y) / (2.0 * radius)
+	return clampf(fit / maxf(base, 0.0001), MIN_ZOOM, MAX_ZOOM)
+
+
+func _process(delta: float) -> void:
+	if run != null:
+		night.update(self, delta)
 	queue_redraw()
 
 
@@ -63,6 +79,7 @@ func _gui_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and (mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN):
 			var before := _to_world(mb.position)
+			night.release()
 			zoom = clampf(zoom * (1.15 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15), MIN_ZOOM, MAX_ZOOM)
 			pan += before - _to_world(mb.position)
 			accept_event()
@@ -76,6 +93,7 @@ func _gui_input(event: InputEvent) -> void:
 		if _dragging and _mouse.distance_to(_press_at) > 5.0:
 			_moved = true
 		if _dragging and _moved:
+			night.release()
 			pan -= _unproject((event as InputEventMouseMotion).relative / _scale())
 
 
@@ -214,8 +232,10 @@ func _draw() -> void:
 	var dark := _darkness()
 	if dark > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.12, dark))
-	var help := "Mouse wheel to zoom, drag to look around, V for %s view, point at anything for details" % ("flat" if iso else "tilted")
-	draw_string(font, Vector2(8, size.y - 8), help, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#8a9088"))
+	# The controls hint is for a first run's opening rounds, and never under the building cards.
+	if run.round_number <= HELP_ROUNDS and run.phase != RunState.Phase.BUILD:
+		var help := "Mouse wheel to zoom, drag to look around, V for %s view, point at anything for details" % ("flat" if iso else "tilted")
+		draw_string(font, Vector2(8, size.y - 8), help, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#8a9088"))
 	if _mouse.x >= 0.0 and not _dragging:
 		var tip := hovered(_mouse)
 		if not tip.is_empty():

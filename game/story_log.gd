@@ -25,9 +25,10 @@ func _init() -> void:
 	_text.add_theme_font_size_override("bold_font_size", 12)
 	add_child(_text)
 	var open := Button.new()
-	open.text = "Full\nlog"
+	open.text = "Log"
 	open.tooltip_text = "Everything that has happened this run"
-	open.focus_mode = Control.FOCUS_NONE
+	open.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	UiKit.secondary(open, 13)
 	open.pressed.connect(func() -> void: open_pressed.emit())
 	add_child(open)
 

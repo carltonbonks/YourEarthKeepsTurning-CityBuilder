@@ -2,7 +2,9 @@ class_name BuildHandView
 extends PanelContainer
 ## The round's building cards (run.hand) as a heads-up hand along the bottom of the map, like the
 ## dawn pick: basics (homes and food, always on offer), the dealt cards, the ageing-up card, tool sets
-## and the caravan in later ages, and the redraw. A card the town needs says why at the top ("Recommended: ..."). Shown only while building.
+## and the caravan in later ages, and the redraw. A card the town needs says why on a gold strip at
+## the top ("Food runs out in 2 days"); a card the town can't take says why on a red strip at the
+## bottom ("Need 3 more wood"). Costs show red where the town is short. Shown only while building.
 ## Every choice goes through run.hand; `changed` asks the screen to refresh.
 
 signal changed
@@ -45,10 +47,9 @@ func refresh() -> void:
 	if run.hand.cards.is_empty() and run.hand.milestone.is_empty():
 		var none := UiKit.note(_row, "No cards left this round.", 12)
 		none.custom_minimum_size.x = 120
-	var redraw := Button.new()
-	redraw.text = "Redraw\nunused\n(%d shells)%s" % [run.hand.redraw_cost(), "" if run.hand.redraws == 0 else "\nused"]
+	var redraw := UiKit.secondary(Button.new(), 13)
+	redraw.text = "Redraw\n%d shells" % run.hand.redraw_cost() if run.hand.redraws == 0 else "Redrawn\nthis round"
 	redraw.custom_minimum_size = Vector2(86, CARD_SIZE.y)
-	redraw.focus_mode = Control.FOCUS_NONE
 	redraw.disabled = not run.hand.can_redraw()
 	redraw.tooltip_text = "Once a round: the cards you haven't used are swapped for a fresh deal."
 	redraw.pressed.connect(_act.bind(run.hand.redraw))
@@ -88,9 +89,9 @@ func _card(type: String, need: String, kind: String) -> Button:
 	var def: Dictionary = run.content.buildings[type]
 	var owned := run.world.count_buildings(type, false)
 	var why := recommendation(type, need)
-	var top := ("Recommended: " + why) if why != "" else ("Always on offer" if kind == "basic" else ("Ageing up" if kind == "age" else ""))
+	var top := why if why != "" else ("Always on offer" if kind == "basic" else ("Ageing up" if kind == "age" else "New building"))
 	var border := RECOMMEND_COLOR if why != "" else (UiKit.HEADING_COLOR if kind == "age" else UiKit.CARD_BORDER)
-	var btn := UiKit.card(top, ("RAISE: " if kind == "age" else "") + def["name"], _cost_text(def["cost"]), def["text"],
+	var btn := UiKit.card(top, def["name"], UiKit.cost_text(run.stock, def["cost"]), def["text"],
 		"You have %d" % owned if owned > 0 else "", BASIC_SIZE if kind == "basic" else CARD_SIZE, border, why != "",
 		UiKit.HEADING_COLOR if kind == "age" else Color.WHITE)
 	btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], def["work"]]
@@ -101,7 +102,7 @@ func _card(type: String, need: String, kind: String) -> Button:
 	if not problems.is_empty():
 		btn.tooltip_text += "\n" + "\n".join(PackedStringArray(problems))
 	btn.disabled = not run.hand.can_order(type)
-	UiKit.fade_if_disabled(btn)
+	UiKit.fade_if_disabled(btn, _why_not(blocked, def["cost"]))
 	btn.pressed.connect(_act.bind(run.hand.order.bind(type)))
 	return btn
 
@@ -118,22 +119,22 @@ func _age_cards() -> void:
 		if run.tools.has(id) or not content.age_reached(run.age, def.get("age", "")):
 			continue
 		var btn := UiKit.card("Tool set for %ss" % content.townsfolk[def["role"]]["name"].to_lower(), def["name"],
-			_cost_text(def["cost"]), def["text"], "", CARD_SIZE, Color("#8fa0b8"))
+			UiKit.cost_text(run.stock, def["cost"]), def["text"], "", CARD_SIZE, Color("#8fa0b8"))
 		btn.tooltip_text = "%s\nOnce only. Every ingot spent here is one the smiths can't turn into hero gear.\nYou have %d bronze%s." % [
 			def["text"], run.stock["bronze"], ", %d iron, %d steel" % [run.stock["iron"], run.stock["steel"]] if content.age_reached(run.age, "medieval") else ""]
 		btn.disabled = not run.can_buy_tools(id)
-		UiKit.fade_if_disabled(btn)
+		UiKit.fade_if_disabled(btn, UiKit.shortfall(run.stock, def["cost"]))
 		btn.pressed.connect(_act.bind(run.buy_tools.bind(id)))
 		_row.add_child(btn)
 	var trader: Dictionary = content.ages["trader"]
 	for good: String in run.trader_stock:
 		if int(run.trader_stock[good]) <= 0:
 			continue
-		var btn := UiKit.card(trader["name"], "1 %s" % good, "%d shells" % run.trader_price(good), "",
+		var btn := UiKit.card(trader["name"], "1 %s" % good, UiKit.cost_text(run.stock, {"shells": run.trader_price(good)}), "",
 			"%d left this round" % run.trader_stock[good], BASIC_SIZE, Color("#c0a060"))
 		btn.tooltip_text = trader["text"]
 		btn.disabled = not run.can_trade(good)
-		UiKit.fade_if_disabled(btn)
+		UiKit.fade_if_disabled(btn, UiKit.shortfall(run.stock, {"shells": run.trader_price(good)}))
 		btn.pressed.connect(_act.bind(run.trade.bind(good)))
 		_row.add_child(btn)
 
@@ -157,11 +158,13 @@ static func build_blocker(r: RunState, type: String) -> String:
 	return " ".join(out)
 
 
-static func _cost_text(cost: Dictionary) -> String:
-	var parts := PackedStringArray()
-	for r: String in cost:
-		parts.append("%d %s" % [cost[r], r])
-	return ", ".join(parts)
+## The one thing in the way, for the red strip on a card the town can't order: what it lacks
+## (a building, the age, people) before what it can't pay.
+func _why_not(blocked: String, cost: Dictionary) -> String:
+	if blocked != "":
+		return blocked.get_slice(".", 0)
+	var short := UiKit.shortfall(run.stock, cost)
+	return short if short != "" else "Can't order more"
 
 
 func _act(choice: Callable) -> void:

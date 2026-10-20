@@ -3,10 +3,11 @@ extends SceneTree
 ## Needs a display (not --headless); in a container: xvfb-run ~/godot/godot --path . -s res://tools/snapshot.gd -- seed=4821 round=5 style=market out=/tmp/map.png
 ## mid=1 stops partway through the round's first day instead of at the build phase; zoom= zooms the map;
 ## gates=2 has the bot order up to 2 gates; flat=1 shows the flat top-down map instead of the tilted one;
-## pick=1 shows the round's first dawn pick instead.
+## pick=1 shows the round's first dawn pick instead; night=1 plays the round's first day into its night
+## so the camera has closed in on the town (NightCamera).
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -38,14 +39,23 @@ func _init() -> void:
 		run.choose_pick(bot.pick(run))
 		for i in 150:
 			run.step()
+	if args["night"] == "1" and run.phase == RunState.Phase.BUILD:
+		bot.build(run)
+		run.begin_round()
+		run.choose_pick(bot.pick(run))
+		while not run.world.is_night():
+			run.step()
+		for i in 60:
+			run.step()
 	main._overlays.hide()
 	if args["pick"] == "1" and run.phase == RunState.Phase.BUILD:
 		bot.build(run)
 		run.begin_round()
 		main._overlays.show_for_phase()
 	main._refresh()
-	main._arena.zoom = float(args["zoom"])
 	main._arena.iso = args["flat"] != "1"
+	if args["night"] != "1":
+		main._arena.zoom = float(args["zoom"])
 	for i in 4:
 		await process_frame
 	var image := root.get_texture().get_image()

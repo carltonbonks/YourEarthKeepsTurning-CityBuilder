@@ -37,10 +37,11 @@ func _init() -> void:
 	_title.add_theme_font_size_override("normal_font_size", 13)
 	_title.add_theme_font_size_override("bold_font_size", 13)
 	box.add_child(_title)
+	# The verdict is what decides how to spend the round, so it comes first and biggest.
+	_verdict = UiKit.note(box, "", 17)
 	_bar = UiKit.bar(box, 0.5, Color("#7fb0e0"), 8.0)
 	(_bar as ColorRect).color = Color("#c05040")
 	_numbers = UiKit.note(box, "", 11)
-	_verdict = UiKit.note(box, "", 13)
 	_eased = Label.new()
 	_eased.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_eased.add_theme_font_size_override("font_size", 12)
@@ -51,9 +52,8 @@ func _init() -> void:
 	gold.set_content_margin_all(4)
 	_eased.add_theme_stylebox_override("normal", gold)
 	box.add_child(_eased)
-	_begin = UiKit.button(self, "", func() -> void: begin_pressed.emit())
-	_begin.custom_minimum_size.y = 44
-	_begin.add_theme_font_size_override("font_size", 17)
+	_begin = UiKit.primary(UiKit.button(self, "", func() -> void: begin_pressed.emit()), 18)
+	_begin.custom_minimum_size.y = 48
 
 
 func refresh() -> void:
