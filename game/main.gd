@@ -17,6 +17,10 @@ var run: RunState
 var speed := 2
 ## The speed Space returns to after a pause.
 var _play_speed := 2
+## True while the night is close (NightCamera.approach), and the speed it was at before the night
+## held it to NightCamera.NIGHT_SPEED (0 if it didn't), to put back at dawn.
+var _night_held := false
+var _speed_before_night := 0
 var _tick_acc := 0.0
 var _live_acc := 0.0
 var _menu_open := false
@@ -41,6 +45,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_hold_night_speed()
 	if run.phase != RunState.Phase.SIM or _overlays.visible:
 		return
 	_live_acc += delta
@@ -82,6 +87,8 @@ func _new_run(seed_value: int) -> void:
 	_run_id = RunHistory.new_run_id(seed_value)
 	_arena.run = run
 	_arena.reset_camera()
+	_night_held = false
+	_speed_before_night = 0
 	for part: Variant in [_top, _hand_view, _threat, _alerts, _heroes, _story, _overlays]:
 		part.set("run", run)
 	_alerts.reset()
@@ -135,6 +142,30 @@ func _set_speed(s: int) -> void:
 	if s > 0:
 		_play_speed = s
 	_top.show_speed(s)
+
+
+## As night falls the game drops to NightCamera.NIGHT_SPEED if it was faster, so the fight can be
+## watched; at dawn it goes back to the old speed, unless the player picked another in between.
+func _hold_night_speed() -> void:
+	var night := NightCamera.approach(run) > 0.0
+	if night == _night_held:
+		return
+	_night_held = night
+	var slow := NightCamera.NIGHT_SPEED
+	if night:
+		var current := speed if speed > 0 else _play_speed
+		if current > slow:
+			_speed_before_night = current
+			if speed > 0:
+				_set_speed(slow)
+			else:
+				_play_speed = slow
+	elif _speed_before_night > 0:
+		if speed == slow:
+			_set_speed(_speed_before_night)
+		elif speed == 0 and _play_speed == slow:
+			_play_speed = _speed_before_night
+		_speed_before_night = 0
 
 
 func _open_menu() -> void:

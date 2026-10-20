@@ -6,7 +6,7 @@ extends ScrollContainer
 
 signal hero_pressed(hero: Unit)
 
-const CHIP_WIDTH := 168.0
+const CHIP_WIDTH := 150.0
 
 var run: RunState
 var _row: HBoxContainer
@@ -18,6 +18,8 @@ var _parts: Array = []
 
 func _init() -> void:
 	vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# A big roster still scrolls (wheel or drag), but no bar eats the strip's height.
+	horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	custom_minimum_size.y = 62
 	_row = HBoxContainer.new()
 	_row.add_theme_constant_override("separation", 6)

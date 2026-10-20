@@ -90,3 +90,58 @@ func test_every_kind_of_card_shows() -> void:
 	check(texts.has("Promote a craftsperson"), "the master craftsperson card shows")
 	run.dispose()
 	screen.free()
+
+
+func test_night_closes_in_on_the_town_and_holds_the_speed() -> void:
+	var screen: Control = load("res://game/main.tscn").instantiate()
+	screen.call("_ready")
+	screen.call("_new_run", 4821)
+	var run: RunState = screen.get("run")
+	var arena: ArenaView = screen.get("_arena")
+	arena.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	arena.size = Vector2(1600, 830)
+	var bot := AutoPlayer.new()
+	bot.build(run)
+	run.begin_round()
+	run.choose_pick(bot.pick(run))
+	arena.zoom = 1.5
+	arena.pan = Vector2(200, -100)
+	screen.call("_set_speed", 8)
+	var tick := func() -> void:
+		arena.night.update(arena, 1.0 / 60.0)
+		screen.call("_hold_night_speed")
+	var day := run.content.num("day_seconds")
+	while run.world.time_of_day() < day - NightCamera.LEAD_SECONDS - 1.0:
+		run.step()
+	tick.call()
+	check_eq(arena.zoom, 1.5, "by day the camera stays where the player put it")
+	check_eq(screen.get("speed"), 8, "by day the game keeps its speed")
+	while not run.world.is_night():
+		run.step()
+	tick.call()
+	check(arena.zoom > 1.5 and arena.pan.length() < 1.0, "at nightfall the camera has closed in on the town")
+	var town := NightCamera.town_radius(run)
+	check(town > float(run.content.town["rings"][0]["radius"]), "the town's reach covers its buildings")
+	check(is_equal_approx(arena.zoom, maxf(1.5, arena.zoom_to_fit(town, NightCamera.FILL))), "the town fills most of the view")
+	check_eq(screen.get("speed"), NightCamera.NIGHT_SPEED, "the night plays out at 2x")
+	while run.phase == RunState.Phase.SIM:
+		run.step()
+	for i in 120:
+		tick.call()
+	check_eq(arena.zoom, 1.5, "after the night the zoom goes back")
+	check_eq(arena.pan, Vector2(200, -100), "after the night the camera goes back")
+	check_eq(screen.get("speed"), 8, "at dawn the old speed comes back")
+	# The player takes the camera during the next night: it stays where they leave it.
+	run.choose_pick(-1)
+	while not run.world.is_night():
+		run.step()
+	tick.call()
+	arena.night.release()
+	arena.zoom = 3.0
+	while run.phase == RunState.Phase.SIM:
+		run.step()
+	for i in 120:
+		tick.call()
+	check_eq(arena.zoom, 3.0, "a camera the player moved at night stays put")
+	run.dispose()
+	screen.free()

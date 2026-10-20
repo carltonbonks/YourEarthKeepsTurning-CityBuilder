@@ -69,7 +69,8 @@ func show_pick() -> void:
 	sub.text = "Shells: %d   Room: %d / %d%s" % [run.stock["shells"], run.population(), run.housing(),
 		"" if room else "\nNo room for anyone new. Build huts at the start of the next round."]
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.add_theme_color_override("font_color", Color("#c8c8c8") if room else Color("#e0a050"))
+	sub.add_theme_font_size_override("font_size", 17)
+	sub.add_theme_color_override("font_color", Color("#e8e8e8") if room else Color("#e0a050"))
 	_box.add_child(sub)
 	if run.hunger_turned_away != "":
 		var away := Label.new()
@@ -85,14 +86,25 @@ func show_pick() -> void:
 	for i in run.pick_offer.size():
 		var btn := _pick_card(run.pick_offer[i])
 		btn.disabled = not run.can_take_pick(i)
-		UiKit.fade_if_disabled(btn)
+		UiKit.fade_if_disabled(btn, _why_not_pick(run.pick_offer[i]))
 		btn.pressed.connect(func() -> void: pick_taken.emit(i))
 		row.add_child(btn)
-	var skip := Button.new()
-	skip.text = "Nobody today"
-	skip.pressed.connect(func() -> void: pick_taken.emit(-1))
-	_box.add_child(skip)
+	_skip_button("Nobody today", func() -> void: pick_taken.emit(-1))
 	show()
+
+
+## What stops the town taking a dawn card: no room, or not enough shells.
+func _why_not_pick(card: Dictionary) -> String:
+	if card["kind"] != "promote" and run.population() + run.people.card_people(card) > run.housing():
+		return "No room: build homes"
+	return UiKit.shortfall(run.stock, {"shells": card["cost"]})
+
+
+## The quiet way out of a pick, centred under the cards.
+func _skip_button(text: String, on_press: Callable) -> void:
+	var row := CenterContainer.new()
+	_box.add_child(row)
+	UiKit.button(row, text, on_press).custom_minimum_size = Vector2(220, 36)
 
 
 func _food_each() -> String:
@@ -111,7 +123,7 @@ func _pick_card(card: Dictionary) -> Button:
 			var c: Dictionary = content.hero_classes[hero.type_id]
 			var likes: Array = content.traits[hero.trait_id].get("lodging", [])
 			var beds := " or ".join(likes.map(func(id: String) -> String: return content.buildings[id]["name"].to_lower()))
-			btn = UiKit.card("Hero", hero.display_name, "%d shells" % card["cost"], "%s %s" % [content.traits[hero.trait_id]["name"], c["name"].to_lower()],
+			btn = UiKit.card("Hero", hero.display_name, UiKit.cost_text(run.stock, {"shells": card["cost"]}), "%s %s" % [content.traits[hero.trait_id]["name"], c["name"].to_lower()],
 				"Sleeps in: %s" % beds, PICK_SIZE, Color(c["color"]), false, Color(c["color"]))
 			btn.tooltip_text = "%s, %s %s\nHealth %d, damage %d%s\nLikes to sleep in: %s\n%s\n%s." % [hero.display_name,
 				content.traits[hero.trait_id]["name"], c["name"].to_lower(), int(hero.max_hp), int(hero.attack),
@@ -123,20 +135,20 @@ func _pick_card(card: Dictionary) -> Button:
 			var parts := PackedStringArray()
 			for role: String in who:
 				parts.append("%d %s" % [who[role], content.townsfolk[role]["name"].to_lower()])
-			btn = UiKit.card("Family", "A family", "Free", ", ".join(parts), "Needs %d beds" % card["roles"].size(), PICK_SIZE, UiKit.CARD_BORDER)
+			btn = UiKit.card("Family", "A family", UiKit.cost_text(run.stock, {}), ", ".join(parts), "Needs %d beds" % card["roles"].size(), PICK_SIZE, UiKit.CARD_BORDER)
 			btn.tooltip_text = "A whole family moves in at once: %s.\nEach eats %s a day." % [", ".join(parts), _food_each()]
 		"promote":
 			btn = _promote_card(card)
 		_:
 			var def: Dictionary = content.townsfolk[card["role"]]
-			btn = UiKit.card("Townsperson", def["name"], "Free", def["text"], eats, PICK_SIZE, UiKit.CARD_BORDER)
+			btn = UiKit.card("Townsperson", def["name"], UiKit.cost_text(run.stock, {}), def["text"], eats, PICK_SIZE, UiKit.CARD_BORDER)
 			btn.tooltip_text = "%s\n%s." % [def["text"], eats]
 	return btn
 
 
 func _promote_card(card: Dictionary) -> Button:
 	var content := run.content
-	var cost := "%d shells" % card["cost"]
+	var cost := UiKit.cost_text(run.stock, {"shells": card["cost"]})
 	var btn: Button
 	match card["role"]:
 		"warrior":
@@ -213,10 +225,7 @@ func show_relic_pick() -> void:
 		btn.tooltip_text = r["text"]
 		btn.pressed.connect(func() -> void: relic_picked.emit(id))
 		row.add_child(btn)
-	var skip := Button.new()
-	skip.text = "Skip"
-	skip.pressed.connect(func() -> void: relic_picked.emit(""))
-	_box.add_child(skip)
+	_skip_button("Skip the relic", func() -> void: relic_picked.emit(""))
 	show()
 
 
@@ -232,7 +241,7 @@ func show_end() -> void:
 	summary.autowrap_mode = TextServer.AUTOWRAP_WORD
 	summary.custom_minimum_size.x = 420
 	_box.add_child(summary)
-	UiKit.button(_box, "New run (new seed)", func() -> void: new_run_requested.emit(false))
+	UiKit.primary(UiKit.button(_box, "New run", func() -> void: new_run_requested.emit(false)))
 	UiKit.button(_box, "Replay seed %d" % run.run_seed, func() -> void: new_run_requested.emit(true))
 	UiKit.button(_box, "Run history", show_history)
 	show()
@@ -392,7 +401,7 @@ func show_menu(dev_mode: bool) -> void:
 	if dev_mode:
 		UiKit.button(_box, "Tune market (dev)", show_tuning)
 	UiKit.note(_box, "Space pauses, V tilts the map, point at anything for details.", 12)
-	UiKit.button(_box, "Resume (Esc)", func() -> void: closed.emit()).custom_minimum_size.y = 40
+	UiKit.primary(UiKit.button(_box, "Resume (Esc)", func() -> void: closed.emit())).custom_minimum_size.y = 44
 	show()
 
 

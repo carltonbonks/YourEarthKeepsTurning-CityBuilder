@@ -49,12 +49,13 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `game/threat_card.gd` | `ThreatCard`: the round's attack (sides, town vs attack power bar and verdict, the catch-up banner) and the Begin round button, in the map's top-right corner. |
 | `game/alerts.gd` | `Alerts`: short alerts that pop up when a problem starts and fade. `Alerts.active(run)` is the read-only rule (tested in `tests/test_alerts.gd`). |
 | `game/hero_strip.gd` | `HeroStrip`: heroes as small portraits under the map (health, mood, what they are doing); hover for gear and bed, click to point the map at them. |
-| `game/story_log.gd` | `StoryLog`: the story's last three lines and the Full log button. |
-| `game/build_hand_view.gd` | `BuildHandView`: the building cards as a heads-up hand along the bottom of the map, with each card's "Recommended: ..." line (`recommendation`), tool sets and caravan goods in later ages, and the redraw. `build_blocker` says why a card can't be ordered yet. |
+| `game/story_log.gd` | `StoryLog`: the story's last three lines and the Log button. |
+| `game/build_hand_view.gd` | `BuildHandView`: the building cards as a heads-up hand along the bottom of the map, with each card's gold "why the town wants it" strip (`recommendation`), tool sets and caravan goods in later ages, and the redraw. `build_blocker` and the cost shortfall go on a red strip on a card that can't be ordered. |
 | `game/overlays.gd` | `Overlays`: dawn pick and relic pick (as cards), end screen, Esc menu, full story log, Run history, dev tuning. Sends choices back as signals. |
 | `game/status_text.gd` | `StatusText`: the top bar's chip text and hover cards, and the clock line, built from the run. Read-only. |
-| `game/ui_kit.gd` | `UiKit`: small shared builders (heading, button, rich text, note, `card` for the card look, `bar`). |
+| `game/ui_kit.gd` | `UiKit`: small shared builders (heading, button, rich text, note, `card` for the card look, `bar`) and the screen's look for choices: `primary` (the one gold button that moves the game on), `secondary` (outlined: skip, redraw, back), `cost_text` (costs red where the town is short) and `fade_if_disabled(btn, why)` (says on the card what stands in the way). |
 | `game/arena_view.gd` | Draws the map with placeholder shapes, tilted (isometric, everything standing drawn back to front) or flat (V toggles); zoom, pan, hover. Read-only: only the projection (`_to_screen` / `_to_world`) knows about the tilt. |
+| `game/night_camera.gd` | `NightCamera`: as each night falls the map eases in on the town until it fills most of the view, then back to where the player had it (the player moving the camera cancels it until the next night). `main.gd` holds the game at 2x through the night. View only. |
 | `game/tooltips.gd` | Hover text for map things (stalls list their goods), tag notes and supply warnings. Read-only. Tip dictionaries from here also feed `TipChip`. |
 | `game/run_history.gd` | Saves runs to `user://runs/`, download/copy for sharing. |
 | `data/*.json` | All content and balance numbers. Each file starts with a `_note` explaining its keys; keep it current when you add a key. |
