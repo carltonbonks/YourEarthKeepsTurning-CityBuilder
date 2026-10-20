@@ -6,6 +6,8 @@ extends PanelContainer
 
 signal pick_taken(index: int)
 signal relic_picked(relic_id: String)
+## The founding traditions chosen before round 1 ([] for none).
+signal traditions_chosen(ids: Array)
 ## replay = true restarts on the same seed, false on a new one.
 signal new_run_requested(replay: bool)
 ## Start a new run on this seed (from the menu).
@@ -47,6 +49,9 @@ func _init() -> void:
 
 ## Shows whatever the run is waiting on (a pick, a relic, the end), or hides.
 func show_for_phase() -> void:
+	if run.awaiting_traditions():
+		show_traditions()
+		return
 	match run.phase:
 		RunState.Phase.PICK:
 			show_pick()
@@ -90,6 +95,54 @@ func show_pick() -> void:
 		btn.pressed.connect(func() -> void: pick_taken.emit(i))
 		row.add_child(btn)
 	_skip_button("Nobody today", func() -> void: pick_taken.emit(-1))
+	show()
+
+
+## Before round 1: pick the founding traditions as cards (click to choose, again to drop), then found the town.
+func show_traditions(chosen: Array = []) -> void:
+	var content := run.content
+	var to_pick := content.int_num("traditions_to_pick")
+	_clear()
+	_title("Who are your people? Choose %d traditions" % to_pick)
+	var note := Label.new()
+	note.text = "Each tilts the run: which buildings you are dealt, which tribespeople come and band together, and one lasting gift."
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD
+	note.custom_minimum_size.x = 640
+	_box.add_child(note)
+	var ids := content.traditions.keys()
+	ids.sort()
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	var center := CenterContainer.new()
+	center.add_child(grid)
+	_box.add_child(center)
+	for id: String in ids:
+		var t: Dictionary = content.traditions[id]
+		var picked := chosen.has(id)
+		var start := ", ".join(t.get("start", {}).keys().map(func(g: String) -> String: return "%d %s" % [t["start"][g], g]))
+		var btn := UiKit.card("Chosen" if picked else "Tradition", t["name"], "", t["text"], "Start with " + start if start != "" else "",
+			RELIC_SIZE, UiKit.HEADING_COLOR, picked, UiKit.HEADING_COLOR)
+		(btn.get_child(0).get_child(2) as Label).add_theme_font_size_override("font_size", 12)
+		btn.tooltip_text = t["text"]
+		btn.disabled = not picked and chosen.size() >= to_pick
+		btn.pressed.connect(func() -> void:
+			var next := chosen.duplicate()
+			if picked:
+				next.erase(id)
+			else:
+				next.append(id)
+			show_traditions(next))
+		grid.add_child(btn)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 10)
+	_box.add_child(row)
+	var found := UiKit.primary(UiKit.button(row, "Found the town", func() -> void: traditions_chosen.emit(chosen)))
+	found.disabled = chosen.size() < to_pick
+	UiKit.button(row, "No traditions", func() -> void: traditions_chosen.emit([]))
 	show()
 
 
@@ -143,9 +196,15 @@ func _pick_card(card: Dictionary) -> Button:
 			var def: Dictionary = content.townsfolk[card["role"]]
 			if card.has("leaning"):
 				var lean: Dictionary = def["leanings"][card["leaning"]]
-				btn = UiKit.card(def["name"], lean["name"], UiKit.cost_text(run.stock, {}), lean["text"], eats, PICK_SIZE, UiKit.CARD_BORDER)
-				btn.tooltip_text = "%s\n%s Still fetches anything the town is short of, but picks trips for %s first.\n%s." % [
-					def["text"], lean["text"], ", ".join(lean["goods"]).replace("_", " "), eats]
+				var key: String = card["role"] + "/" + card["leaning"]
+				var size := int(run.world.folk_ai.count_leanings().get(key, 0))
+				var level := run.world.folk_ai.band_level(card["role"], card["leaning"], size)
+				var grows := run.world.folk_ai.band_level(card["role"], card["leaning"], size + 1) > level
+				var top: String = ("Forms a band" if level == 0 else "Band grows stronger") if grows else def["name"]
+				btn = UiKit.card(top, lean["name"], UiKit.cost_text(run.stock, {}), lean["text"], eats, PICK_SIZE, UiKit.CARD_BORDER, grows)
+				btn.tooltip_text = "%s\n%s Still fetches anything the town is short of, but picks trips for %s first.\n%s\n%s." % [
+					def["text"], lean["text"], ", ".join(lean["goods"]).replace("_", " "),
+					Tooltips.band_line(run, card["role"], card["leaning"], true), eats]
 			else:
 				btn = UiKit.card("Townsperson", def["name"], UiKit.cost_text(run.stock, {}), def["text"], eats, PICK_SIZE, UiKit.CARD_BORDER)
 				btn.tooltip_text = "%s\n%s." % [def["text"], eats]
@@ -226,10 +285,23 @@ func show_relic_pick() -> void:
 	for id in run.relic_offer:
 		var r: Dictionary = content.relics[id]
 		var kind := "Pact" if content.has_tag("relic", id, "pact") else "Relic"
-		var btn := UiKit.card(kind, r["name"], "", r["text"], "", RELIC_SIZE, UiKit.HEADING_COLOR, false, UiKit.HEADING_COLOR)
+		var text: String = r["text"]
+		var footer := ""
+		if id == run.spoils.get("id", ""):
+			kind = "Spoils of the %s" % str(content.balance.get("spoils_kinds", {}).get(run.spoils["kind"], run.spoils["kind"]))
+			var now := run.spoils_now()
+			var parts := PackedStringArray()
+			for good: String in now["goods"]:
+				parts.append("%d %s" % [now["goods"][good], good])
+			for role: String in now["folk"]:
+				parts.append("%d %s" % [now["folk"][role], content.townsfolk[role]["name"].to_lower()])
+			if not parts.is_empty():
+				footer = "Now: " + ", ".join(parts)
+			text += "\n%d of them came. Instead of a relic." % int(run.spoils["foes"])
+		var btn := UiKit.card(kind, r["name"], "", text, footer, RELIC_SIZE, UiKit.HEADING_COLOR, false, UiKit.HEADING_COLOR)
 		# A relic's one line is the whole story, so it gets room instead of being cut short.
 		(btn.get_child(0).get_child(2) as Label).add_theme_font_size_override("font_size", 12)
-		btn.tooltip_text = r["text"]
+		btn.tooltip_text = text + ("\n" + footer if footer != "" else "")
 		btn.pressed.connect(func() -> void: relic_picked.emit(id))
 		row.add_child(btn)
 	_skip_button("Skip the relic", func() -> void: relic_picked.emit(""))

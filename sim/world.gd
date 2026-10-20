@@ -575,7 +575,8 @@ func damage(attacker: Unit, victim: Unit, amount: float) -> void:
 		return
 	var e: Dictionary = content.enemies[victim.type_id]
 	attacker.kills += 1
-	attacker.xp += float(e["xp"]) * (1.0 + run.mod("xp_mult") + hero_ai.chosen_xp(attacker))
+	attacker.xp += float(e["xp"]) * (1.0 + run.mod("xp_mult") + hero_ai.chosen_xp(attacker)
+		+ (content.num("hearty_xp") if attacker.well_fed else 0.0))
 	var earned := int(e["loot"]) + int(run.mod("loot_shells")) + int(Loot.total(content, attacker, "loot"))
 	var tithe := int(earned * run.mod("hero_tithe"))
 	if tithe > 0:

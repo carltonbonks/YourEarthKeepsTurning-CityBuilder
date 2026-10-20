@@ -15,6 +15,8 @@ static func hero(run: RunState, u: Unit) -> Dictionary:
 	t["lines"].append("%s %s, level %d" % [c.traits[u.trait_id]["name"], c.hero_classes[u.type_id]["name"].to_lower(), u.level])
 	t["lines"].append("Health %d/%d, attack %s" % [roundi(u.hp), roundi(u.max_hp), _num(u.attack)])
 	t["lines"].append("Energy %d, mood %d, %d shells, %d kills" % [roundi(u.energy), roundi(u.mood), u.gold, u.kills])
+	if u.well_fed:
+		t["lines"].append("Well fed: +%d%% XP until dawn" % roundi(c.num("hearty_xp") * 100.0))
 	for slot: String in ["weapon", "armor", "charm"]:
 		if u.items.has(slot):
 			t["lines"].append("%s: %s" % [slot.capitalize(), Loot.describe(c, u.items[slot])])
@@ -37,6 +39,7 @@ static func folk(run: RunState, u: Unit) -> Dictionary:
 	t["lines"].append(def["text"])
 	if u.leaning != "":
 		t["lines"].append(def["leanings"][u.leaning]["text"])
+		t["lines"].append(band_line(run, u.type_id, u.leaning))
 	t["lines"].append("Health %d/%d, attack %s" % [roundi(u.hp), roundi(u.max_hp), _num(u.attack)])
 	if u.master_of != "":
 		t["lines"].append("Master of the %s" % c.buildings[u.master_of]["name"].to_lower())
@@ -45,6 +48,45 @@ static func folk(run: RunState, u: Unit) -> Dictionary:
 	if u.intent != "":
 		t["lines"].append("Now: %s" % u.intent)
 	return t
+
+
+## How the townsfolk sharing a leaning stand as a band: its tier's bonus and what the next tier needs.
+## joining counts one more (a dawn card about to be taken).
+static func band_line(run: RunState, role: String, leaning: String, joining := false) -> String:
+	var def: Dictionary = run.content.townsfolk[role]
+	var tiers: Array = def.get("band_tiers", [])
+	if tiers.is_empty():
+		return ""
+	var lean: Dictionary = def["leanings"][leaning]
+	var plural := "%ss" % lean["name"].to_lower()
+	var size := int(run.world.folk_ai.count_leanings().get(role + "/" + leaning, 0)) + (1 if joining else 0)
+	var goods := " or ".join(lean["goods"]).replace("_", " ")
+	var folk_ai := run.world.folk_ai
+	var now := folk_ai.tier_for(role, leaning, size)
+	var next := {}
+	for tier: Dictionary in tiers:
+		if size < folk_ai.band_size_needed(role, leaning, tier):
+			next = tier
+			break
+	if now.is_empty():
+		return "%d %s%s; %d make a band (%s)." % [size, plural, " with this one" if joining else "",
+			folk_ai.band_size_needed(role, leaning, next), band_bonus(now, next, goods)]
+	var out := "Band of %d %s: %s." % [size, plural, band_bonus({}, now, goods)]
+	if not next.is_empty():
+		out += " At %d: %s." % [folk_ai.band_size_needed(role, leaning, next), band_bonus(now, next, goods)]
+	return out
+
+
+## What a band tier gives on top of the one below it, in words.
+static func band_bonus(below: Dictionary, tier: Dictionary, goods: String) -> String:
+	var parts := PackedStringArray()
+	var carry := int(tier.get("carry", 0))
+	if carry > int(below.get("carry", 0)):
+		parts.append("+%d %s a trip" % [carry, goods])
+	var faster := float(tier.get("gather_mult", 0))
+	if faster > float(below.get("gather_mult", 0)):
+		parts.append("gather %d%% faster" % roundi(faster * 100.0))
+	return ", ".join(parts) if not parts.is_empty() else "no change"
 
 
 ## A creature type, with or without a live unit (dens show the type they spawn).

@@ -26,6 +26,11 @@ var style := "balanced"
 ## balance_run.gd sets these with gates= and gate_round=.
 var gates := 2
 var gate_round := 3
+## Whether it founds the town on its style's traditions (TRADITIONS) or on none (balance_run.gd traditions=0).
+var traditions := true
+const TRADITIONS := {"balanced": ["hunters", "stoneworkers"], "workers": ["stoneworkers", "woodfolk"],
+	"heroes": ["hunters", "traders"], "market": ["traders", "smiths"], "bronze": ["smiths", "woodfolk"],
+	"medieval": ["woodfolk", "stoneworkers"]}
 ## Gardens: one a round while food in store would last fewer than this many days (0 = never). balance_run.gd: gardens=.
 var garden_days := 3.0
 ## Orders the forester and charcoal pit when the cards recommend them. balance_run.gd: upkeep=0 turns it off.
@@ -50,6 +55,8 @@ func play_run(run: RunState) -> void:
 
 ## Orders from the round's building cards, then redraws once when shells are spare and orders again.
 func build(run: RunState) -> void:
+	if run.awaiting_traditions():
+		run.choose_traditions(TRADITIONS.get(style, []) if traditions else [])
 	_build_pass(run)
 	if int(run.stock["shells"]) >= redraw_above and run.hand.can_redraw():
 		run.hand.redraw()
@@ -237,8 +244,11 @@ func pick(run: RunState) -> int:
 					score = -50.0
 			"tribesperson":
 				score = 4.0 - run.count_role("tribesperson") * 0.6
-				# Leanings are left to chance: favouring whatever the town was shortest of that dawn cost the bots
-				# 5-13 win-rate points (40 seeds), since the shortage moves on while the newcomer stays.
+				# Between two leanings, grow the bigger band. Favouring whatever the town was shortest of that dawn
+				# instead cost the bots 5-13 win-rate points (40 seeds), since the shortage moves on while the newcomer stays.
+				if card.has("leaning"):
+					var counts := run.world.folk_ai.count_leanings()
+					score += 0.05 * mini(int(counts.get("tribesperson/" + card["leaning"], 0)), 5)
 			"warrior":
 				score = 3.0 - run.count_role("warrior") * 0.8
 			"craftsperson":
@@ -257,7 +267,9 @@ func pick(run: RunState) -> int:
 const RELIC_RANK := ["lone_wolf_pelt", "horde_drum", "broken_crown", "levy_horn", "ram_thorn_stakes", "tithe_bowl",
 	"grave_salt", "ancestor_mask", "owl_eyes", "sacred_spring", "witchs_thread", "chieftains_torc", "elders_tale",
 	"turncoats_torc", "fire_arrows", "bone_flute", "moneylenders_knot", "hollow_drum", "bear_tooth_charm",
-	"blood_brother_knot", "wanderers_fire", "ember_stone", "oxhide_sledges", "seed_cache", "ridgeheart"]
+	"blood_brother_knot", "wanderers_fire", "ember_stone", "oxhide_sledges", "seed_cache", "ridgeheart",
+	# Spoils last: taking a pack-train's goods over a relic cost the bots 8-20 win-rate points (40 seeds).
+	"raiders_spears", "wolfskin_cloaks", "bone_ward", "splintered_ram", "pack_train", "ram_timbers", "smoked_haunches", "grave_goods"]
 
 
 ## Takes the offered relic it ranks highest (never skips: every relic helps somewhat).

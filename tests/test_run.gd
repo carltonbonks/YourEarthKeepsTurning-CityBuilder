@@ -189,7 +189,7 @@ func test_relic_pick_advances_round_and_pays_income() -> void:
 	var run := _run()
 	_to_round_end(run)
 	check_eq(run.phase, RunState.Phase.RELIC, "relic pick after the round")
-	check_eq(run.relic_offer.size(), 3, "three relics offered")
+	check_eq(run.relic_offer.size(), 3 + (0 if run.spoils.is_empty() else 1), "three relics offered, and the attack's spoils")
 	var shells: int = run.stock["shells"]
 	run.choose_relic(run.relic_offer[0])
 	check_eq(run.round_number, 2, "round advanced")
@@ -310,5 +310,6 @@ func test_gardens_bring_food_every_dawn() -> void:
 	run.stock["food"] = 50
 	var need := run.food_needed_today()
 	run.daily_upkeep()
-	check_eq(run.stock["food"], 50 + grows - need, "garden food arrives before the town eats")
+	var hearty := int(run.record.entry["hearty_meals"]) * run.content.int_num("hearty_food")
+	check_eq(run.stock["food"], 50 + grows - need - hearty, "garden food arrives before the town eats (and heroes eat hearty)")
 	check_eq(run.record.entry["food_grown"], grows, "food grown is recorded")

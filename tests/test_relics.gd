@@ -62,7 +62,7 @@ func test_pact_rounds_offer_pacts_and_other_rounds_never_do() -> void:
 	var c := run.content
 	for r in range(1, 14):
 		run.round_number = r
-		var offer := run._roll_relic_offer()
+		var offer := run._roll_relic_offer().filter(func(id: String) -> bool: return not c.has_tag("relic", id, "spoils"))
 		var pacts := offer.filter(func(id: String) -> bool: return c.has_tag("relic", id, "pact")).size()
 		if run.is_pact_round():
 			check_eq(pacts, offer.size(), "round %d offers only pacts" % r)
@@ -81,7 +81,8 @@ func test_broken_crown_gives_two_relics_and_shrinks_offers() -> void:
 	check_eq(run.relics.size(), 3, "the crown and two gifts")
 	check(run.relics.slice(1).all(func(id: String) -> bool: return not run.content.has_tag("relic", id, "pact")), "gifts are not pacts")
 	run.round_number = 2
-	check_eq(run._roll_relic_offer().size(), run.content.int_num("relic_choices") - 1, "one card fewer")
+	var relics := run._roll_relic_offer().filter(func(id: String) -> bool: return not run.content.has_tag("relic", id, "spoils"))
+	check_eq(relics.size(), run.content.int_num("relic_choices") - 1, "one card fewer")
 	run.dispose()
 
 

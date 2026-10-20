@@ -94,6 +94,12 @@ func _new_run(seed_value: int) -> void:
 	_alerts.reset()
 	_story.refresh()
 	_menu_open = false
+	_refresh()
+	_overlays.show_for_phase()
+
+
+func _found(ids: Array) -> void:
+	run.choose_traditions(ids)
 	_overlays.hide()
 	_refresh()
 
@@ -299,6 +305,7 @@ func _build_ui() -> void:
 	_overlays = Overlays.new()
 	_overlays.pick_taken.connect(_take_pick)
 	_overlays.relic_picked.connect(_pick_relic)
+	_overlays.traditions_chosen.connect(_found)
 	_overlays.new_run_requested.connect(_restart)
 	_overlays.seed_run_requested.connect(_new_run)
 	_overlays.closed.connect(_close_menu)

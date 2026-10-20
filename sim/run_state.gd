@@ -33,6 +33,11 @@ var fallen_folk := 0
 var relics: Array[String] = []
 var relic_acquired_round := {}
 var relic_offer: Array[String] = []
+## Founding traditions chosen before round 1 (data/traditions.json), and whether that choice is made (or skipped).
+var traditions: Array[String] = []
+var traditions_settled := false
+## The spoils in this round's relic offer: {id, kind (enemy tag), foes (how many of that kind came)}, or {}.
+var spoils := {}
 ## Max hearth HP the town has earned for good (Ancestor Bones).
 var bonus_hearth_hp := 0.0
 ## Dawn cards still to take this dawn (Twin Fires gives two), and townsfolk cards taken this run (Hearth-mother's Doll).
@@ -107,7 +112,51 @@ func mod(key: String) -> float:
 	for id in relics:
 		var effects: Dictionary = content.relics[id]["effects"]
 		total += float(effects.get(key, 0.0))
+	for id in traditions:
+		total += float(content.traditions[id].get("effects", {}).get(key, 0.0))
 	return total
+
+
+# --- Founding traditions -----------------------------------------------------
+
+## True while the run waits for its founding traditions: round 1's build phase, before they are chosen or skipped.
+func awaiting_traditions() -> bool:
+	return not traditions_settled and round_number == 1 and phase == Phase.BUILD
+
+
+## Founds the town on up to traditions_to_pick traditions (an empty list founds it on none). Their start goods
+## arrive, their effects apply and round 1's building hand is dealt again with their buildings favoured.
+func choose_traditions(ids: Array) -> void:
+	assert(awaiting_traditions())
+	traditions_settled = true
+	for id: String in ids:
+		if content.traditions.has(id) and not traditions.has(id) and traditions.size() < content.int_num("traditions_to_pick"):
+			traditions.append(id)
+	for id in traditions:
+		var start: Dictionary = content.traditions[id].get("start", {})
+		for good: String in start:
+			stock[good] = int(stock.get(good, 0)) + int(start[good])
+		tell("The people keep the ways of the %s." % content.traditions[id]["name"])
+	for u in world.folk:
+		world.folk_ai.apply_folk_stats(u)
+	for h in heroes:
+		world.hero_ai.apply_hero_stats(h)
+	hand.deal()
+
+
+## The leanings the town's traditions favour.
+func tradition_leanings() -> Array[String]:
+	var out: Array[String] = []
+	for id in traditions:
+		var leaning := str(content.traditions[id].get("leaning", ""))
+		if leaning != "":
+			out.append(leaning)
+	return out
+
+
+## Whether one of the town's traditions favours this building's cards.
+func tradition_favours(building: String) -> bool:
+	return traditions.any(func(id: String) -> bool: return content.traditions[id].get("buildings", []).has(building))
 
 
 ## The hearth's health: the base, relics, and standing buildings that strengthen it (the Stone keep).
@@ -230,6 +279,8 @@ func craft_tier(recipe_id: String) -> int:
 ## Ends the build phase; the first dawn of the round follows.
 func begin_round() -> void:
 	assert(phase == Phase.BUILD)
+	# Starting round 1 without choosing founds the town on no traditions.
+	traditions_settled = true
 	world.start_round()
 	people.offer_picks()
 
@@ -447,7 +498,9 @@ func daily_upkeep() -> void:
 	var need := food_needed_today()
 	if int(stock["food"]) >= need:
 		stock["food"] = int(stock["food"]) - need
+		people.serve_hearty_meals(need)
 		return
+	people.serve_hearty_meals(-1)
 	stock["food"] = 0
 	people.hungry_today = true
 	if not world.folk.is_empty():
@@ -559,6 +612,10 @@ func _finish_round() -> void:
 	people.heroes_sell_finds()
 	relic_offer = _roll_relic_offer()
 	record.note_value("relic_offer", relic_offer.duplicate())
+	if not spoils.is_empty():
+		var noted := spoils.duplicate()
+		noted["taken"] = false
+		record.note_value("spoils", noted)
 	phase = Phase.RELIC
 
 
@@ -579,7 +636,9 @@ func _lose() -> void:
 ## Takes a relic from the offer ("" skips), then starts the next round.
 func choose_relic(relic_id: String) -> void:
 	assert(phase == Phase.RELIC)
-	if relic_id != "" and relic_id in relic_offer:
+	if relic_id != "" and relic_id == spoils.get("id", ""):
+		_take_spoils()
+	elif relic_id != "" and relic_id in relic_offer:
 		_gain_relic(relic_id)
 		tell("Relic taken: %s." % content.relics[relic_id]["name"])
 		# Broken Crown: more relics at once, drawn from the ordinary ones.
@@ -598,8 +657,13 @@ func choose_relic(relic_id: String) -> void:
 				tell("The crown's shards become %s." % content.relics[gift]["name"])
 			record.note_value("relic_gifts", gifted)
 	record.note_value("relic_pick", relic_id)
+	if not spoils.is_empty():
+		var noted := spoils.duplicate()
+		noted["taken"] = relic_id == spoils["id"]
+		record.note_value("spoils", noted)
 	record.end_round()
 	relic_offer = []
+	spoils = {}
 	round_number += 1
 	var earned := income()
 	stock["shells"] = int(stock["shells"]) + earned
@@ -703,7 +767,7 @@ func is_pact_round() -> bool:
 ## Relics not yet owned that can be offered now: pacts or the rest, in a fixed order.
 func _relic_pool(pacts: bool) -> Array:
 	var pool: Array = content.relics.keys().filter(func(id: String) -> bool:
-		return not relics.has(id) and content.has_tag("relic", id, "pact") == pacts \
+		return not relics.has(id) and content.has_tag("relic", id, "pact") == pacts and not content.has_tag("relic", id, "spoils") \
 			and int(content.relics[id].get("from_round", 0)) <= round_number)
 	pool.sort()
 	return pool
@@ -725,4 +789,63 @@ func _roll_relic_offer() -> Array[String]:
 			var pick: String = rng.pick(pool)
 			pool.erase(pick)
 			offer.append(pick)
+	spoils = _roll_spoils()
+	if not spoils.is_empty():
+		offer.append(spoils["id"])
 	return offer
+
+
+## The spoils of this round's attack: a kind (an enemy tag some spoils are of) drawn weighted by how many of that
+## kind came, then one of its spoils not already kept. {} when nothing in the attack has spoils.
+func _roll_spoils() -> Dictionary:
+	var rng := SeededRng.stream(run_seed, "spoils", round_number)
+	var by_kind := {}
+	for id: String in content.relics:
+		if content.has_tag("relic", id, "spoils") and not relics.has(id):
+			var kind: String = content.relics[id]["spoils_of"]
+			if not by_kind.has(kind):
+				by_kind[kind] = []
+			by_kind[kind].append(id)
+	var kinds: Array = by_kind.keys()
+	kinds.sort()
+	var counts := {}
+	var total := 0
+	for kind: String in kinds:
+		var n := next_wave.filter(func(e: String) -> bool: return content.has_tag("enemy", e, kind)).size()
+		if n > 0:
+			counts[kind] = n
+			total += n
+	if total == 0:
+		return {}
+	var roll := rng.randi_range(1, total)
+	for kind: String in counts:
+		roll -= int(counts[kind])
+		if roll <= 0:
+			by_kind[kind].sort()
+			return {"id": rng.pick(by_kind[kind]), "kind": kind, "foes": counts[kind]}
+	return {}
+
+
+## What taking this round's spoils brings at once: goods (good -> amount) and folk (role -> how many).
+func spoils_now() -> Dictionary:
+	var now: Dictionary = content.relics[spoils["id"]].get("take_now", {})
+	var goods := {}
+	var per_foe: Dictionary = now.get("per_foe", {})
+	for good: String in per_foe:
+		goods[good] = int(ceil(float(per_foe[good]) * int(spoils["foes"])))
+	return {"goods": goods, "folk": now.get("folk", {})}
+
+
+func _take_spoils() -> void:
+	var id: String = spoils["id"]
+	var now := spoils_now()
+	for good: String in now["goods"]:
+		stock[good] = int(stock.get(good, 0)) + int(now["goods"][good])
+	for role: String in now["folk"]:
+		for i in int(now["folk"][role]):
+			world.folk_ai.add_folk(role)
+	spoils["goods"] = now["goods"]
+	# Spoils with lasting effects are kept like relics; the rest are only what they bring now.
+	if not content.relics[id]["effects"].is_empty():
+		_gain_relic(id)
+	tell("Spoils taken: %s." % content.relics[id]["name"])

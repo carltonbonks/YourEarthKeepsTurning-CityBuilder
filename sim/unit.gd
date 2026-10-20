@@ -77,6 +77,8 @@ var made := {}
 ## A promoted craftsperson: the workshop type they master and their craft trait (data/promotions.json).
 var master_of := ""
 var craft_trait := ""
+## Heroes: ate a hearty meal this dawn (earns more XP until the next dawn).
+var well_fed := false
 ## Townsfolk: the leaning their dawn card came with (a key of their role's "leanings"), or "".
 var leaning := ""
 

@@ -174,6 +174,8 @@ func _fill(rng: SeededRng, avoid: Array = []) -> void:
 			weight *= content.num("build_need_weight")
 		if run.world.count_buildings(type, false) == 0:
 			weight *= content.num("build_new_weight")
+		if run.tradition_favours(type):
+			weight *= content.num("tradition_card_weight")
 		# A redraw leans away from what was just in hand, so it feels like a fresh deal.
 		if avoid.has(type):
 			weight *= 0.25

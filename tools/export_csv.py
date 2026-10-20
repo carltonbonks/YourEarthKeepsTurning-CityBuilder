@@ -148,6 +148,12 @@ def main(raw_folder, out_folder):
                 **{k: rd.get(k, "") for k in ["camp_joined", "camp_raiders", "camps_cleared", "camp_spoils"]},
                 "gathered_total": sum(rd.get("gathered", {}).values()) if "gathered" in rd else "",
                 "gathered_leaned_total": sum(rd.get("gathered_leaned", {}).values()) if "gathered_leaned" in rd else "",
+                "hearty_meals": rd.get("hearty_meals", ""),
+                "spoils": rd.get("spoils", {}).get("id", ""),
+                "spoils_kind": rd.get("spoils", {}).get("kind", ""),
+                "spoils_taken": rd["spoils"]["taken"] if "spoils" in rd else "",
+                "gathered_band_total": sum(rd.get("gathered_band", {}).values()) if "gathered_band" in rd else "",
+                **{"band_end_" + k: rd.get("bands_end", {}).get(k, 0) if "bands_end" in rd else "" for k in LEANINGS},
                 **{"leaning_end_" + k: rd.get("leanings_end", {}).get(k, 0) if "leanings_end" in rd else "" for k in LEANINGS},
                 "tended_total": sum(rd.get("tended", {}).values()) if "tended" in rd else "",
                 **({"earth_" + k: (sum(rd["shift"][k].values()) if isinstance(rd["shift"][k], dict) else rd["shift"][k])

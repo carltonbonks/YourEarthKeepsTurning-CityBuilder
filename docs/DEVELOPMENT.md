@@ -25,6 +25,7 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `sim/content.gd` | `Content`: loads every `data/*.json` once. The only place data is read. Helpers such as `has_tag` / `unit_has_tag`, `age_reached`, `recipes_for`. |
 | `sim/run_state.gd` | `RunState`: one run. Phases (BUILD, PICK, SIM, RELIC, WON, LOST), stock, building orders, taking dawn cards, relics (`mod()`), ages, tool sets and the caravan, upkeep (food, fuel, fields). Its three parts below hold the rest. |
 | `sim/people.gd` | `People` (`run.people`): dealing the dawn cards (townsfolk, heroes, families, Promote cards), promotions and knighting, making and adding heroes, hero mood and heroes leaving, levelling, healing and selling finds between rounds. |
+| `data/traditions.json` | Founding traditions picked before round 1 (`RunState.choose_traditions`): their effects count in `RunState.mod()` like relics', `BuildHand` favours their buildings, `People.offer_picks` their leaning, `FolkAI.band_level` bands it sooner. |
 | `sim/build_hand.gd` | `BuildHand` (`run.hand`): the round's building cards. Deals a hand weighted toward what the town needs (`need`), the ageing-up card (`milestone`), ordering from a card (`order`, which calls `RunState.build`) and the once-a-round redraw. The player and `AutoPlayer` order only through it; `RunState.build` is the raw rule tests use for setup. |
 | `sim/wave_planner.gd` | `WavePlanner` (`run.waves`): each round's wave from its budget, bosses on their `boss_round`, catch-up easing (`plan`), early-night probes, the wave preview (`counts`). |
 | `sim/run_record.gd` | `RunRecord` (`run.record`): the run's history. `to_record()`, `RECORD_FORMAT` and its changelog, the round being played (`entry`) and every `note_*` logger other parts call. |
@@ -87,6 +88,7 @@ Descriptive tags no rule reads yet are fine: they show in tooltips by name and g
 | `undead` | the chapel's `prize`, the reliquary's `bane` in `data/items.json` (`Loot.bane`), `World.hit` | the chapel pays per kill; reliquaries hit them harder; Grave Salt doubles damage |
 | `siege` | `EnemyAI.enemy_tick`, `World._batter` | ignores people, goes for gates and the hearth (battering rams); Ram-thorn Stakes hurt it |
 | `pact` (relics) | `RunState._relic_pool` | a strong relic with a cost, offered only on `pact_rounds` |
+| `spoils` (relics) | `RunState._relic_pool`, `RunState._roll_spoils` | the spoils of a beaten attack: never in the ordinary pool, one added to the relic offer for the enemy tag (`spoils_of`) the attack was made of |
 | `proud` | `People.update_moods` | knights: sleeping rough hurts twice as much, wearing steel cheers them |
 
 When a rule reads a tag:

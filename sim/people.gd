@@ -32,8 +32,10 @@ func offer_picks() -> void:
 		var leanings := leanings_open(role)
 		if leanings.is_empty():
 			pool.append({"kind": "folk", "role": role, "cost": 0})
+		# A leaning the town's traditions favour is always among those dealt (the first one, if several).
+		var favoured := run.tradition_leanings().filter(func(l: String) -> bool: return leanings.has(l))
 		for i in mini(leanings.size(), int(content.townsfolk[role].get("leaning_cards", 1))):
-			var leaning: String = rng.pick(leanings)
+			var leaning: String = favoured[0] if i == 0 and not favoured.is_empty() else rng.pick(leanings)
 			leanings.erase(leaning)
 			pool.append({"kind": "folk", "role": role, "cost": 0, "leaning": leaning})
 	if world.hero_ai.count_lodgings() > 0:
@@ -334,3 +336,17 @@ func heroes_sell_finds() -> void:
 		run.tell("%s sells %d found item%s %s for %d shells; the settlement keeps %d." % [hero.display_name,
 			hero.spares.size(), "" if hero.spares.size() == 1 else "s", where, total, tax])
 		hero.spares.clear()
+
+
+## Hearty meals at dawn, once everyone has eaten the town's daily need: each hero in turn eats hearty_food more
+## while the store would still hold hearty_reserve_days of that need, and is well fed (more XP) until the next dawn.
+## need < 0: the town went short, so nobody is well fed.
+func serve_hearty_meals(need: int) -> void:
+	var content := run.content
+	var extra := content.int_num("hearty_food")
+	var reserve := need * content.num("hearty_reserve_days")
+	for hero in run.heroes:
+		hero.well_fed = need >= 0 and hero.alive and int(run.stock["food"]) - extra >= reserve
+		if hero.well_fed:
+			run.stock["food"] = int(run.stock["food"]) - extra
+			run.record.note_count("hearty_meals", 1)
