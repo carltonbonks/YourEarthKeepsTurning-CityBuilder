@@ -51,7 +51,8 @@ extends RefCounted
 ##     (leaning -> band tier reached at the round's end, 1 = first tier; leanings with no band are left out).
 ## 23: spoils of a beaten attack: per round "spoils" (when one was offered) = {id, kind (enemy tag), foes (how many of
 ##     that kind came), taken, goods (good -> amount it brought, when taken)}; its id is also in "relic_offer".
-const RECORD_FORMAT := 23
+## 24: hearty meals: per round "hearty_meals" (extra meals heroes ate at dawn, each making them well fed for the day).
+const RECORD_FORMAT := 24
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -121,7 +122,7 @@ func begin_round() -> void:
 		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0, "towers_broken": 0,
 		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
-		"camps_cleared": 0, "camp_spoils": 0,
+		"camps_cleared": 0, "camp_spoils": 0, "hearty_meals": 0,
 		"build_hands": [{"cards": run.hand.labels()}]}
 
 

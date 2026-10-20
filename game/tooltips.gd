@@ -15,6 +15,8 @@ static func hero(run: RunState, u: Unit) -> Dictionary:
 	t["lines"].append("%s %s, level %d" % [c.traits[u.trait_id]["name"], c.hero_classes[u.type_id]["name"].to_lower(), u.level])
 	t["lines"].append("Health %d/%d, attack %s" % [roundi(u.hp), roundi(u.max_hp), _num(u.attack)])
 	t["lines"].append("Energy %d, mood %d, %d shells, %d kills" % [roundi(u.energy), roundi(u.mood), u.gold, u.kills])
+	if u.well_fed:
+		t["lines"].append("Well fed: +%d%% XP until dawn" % roundi(c.num("hearty_xp") * 100.0))
 	for slot: String in ["weapon", "armor", "charm"]:
 		if u.items.has(slot):
 			t["lines"].append("%s: %s" % [slot.capitalize(), Loot.describe(c, u.items[slot])])

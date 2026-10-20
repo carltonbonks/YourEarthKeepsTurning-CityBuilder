@@ -334,3 +334,17 @@ func heroes_sell_finds() -> void:
 		run.tell("%s sells %d found item%s %s for %d shells; the settlement keeps %d." % [hero.display_name,
 			hero.spares.size(), "" if hero.spares.size() == 1 else "s", where, total, tax])
 		hero.spares.clear()
+
+
+## Hearty meals at dawn, once everyone has eaten the town's daily need: each hero in turn eats hearty_food more
+## while the store would still hold hearty_reserve_days of that need, and is well fed (more XP) until the next dawn.
+## need < 0: the town went short, so nobody is well fed.
+func serve_hearty_meals(need: int) -> void:
+	var content := run.content
+	var extra := content.int_num("hearty_food")
+	var reserve := need * content.num("hearty_reserve_days")
+	for hero in run.heroes:
+		hero.well_fed = need >= 0 and hero.alive and int(run.stock["food"]) - extra >= reserve
+		if hero.well_fed:
+			run.stock["food"] = int(run.stock["food"]) - extra
+			run.record.note_count("hearty_meals", 1)

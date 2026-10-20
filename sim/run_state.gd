@@ -449,7 +449,9 @@ func daily_upkeep() -> void:
 	var need := food_needed_today()
 	if int(stock["food"]) >= need:
 		stock["food"] = int(stock["food"]) - need
+		people.serve_hearty_meals(need)
 		return
+	people.serve_hearty_meals(-1)
 	stock["food"] = 0
 	people.hungry_today = true
 	if not world.folk.is_empty():

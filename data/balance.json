@@ -121,5 +121,9 @@
 	"mood_prize": 3,
 	"mood_comrade_died": -10,
 	"mood_hungry": -5,
+	"_hearty_note": "Hearty meals: at each dawn, once everyone has eaten, each hero eats hearty_food more while the store would still hold hearty_reserve_days of the town's daily food; a well-fed hero earns hearty_xp more XP (0.3 = +30%) until the next dawn (sim/people.gd serve_hearty_meals).",
+	"hearty_food": 1,
+	"hearty_reserve_days": 2,
+	"hearty_xp": 0.3,
 	"mood_cold": -6
 }
