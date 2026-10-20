@@ -1,0 +1,32 @@
+{
+	"_note": "The shifting earth (sim/earth.gd). Past the town the land is rings of earth plates, the cuts staggered ring to ring like bricks. Once between rounds every ring turns round the still town (everything nearer the hearth than the first ring's r0 never moves). Each ring runs from r0 to r1 and has plates plates; turn = degrees the whole ring turns each shift (positive is clockwise on screen); sway = how far each plate's own speed swings either way, in degrees a shift, following a slow wave of sway_period_min to sway_period_max shifts (rolled per plate from the seed), so a seam closes for a few rounds and then opens. Where a plate catches the one ahead the seam closes: each seam is rolled once per run as subducting (subduct_share of seams: one plate dives and what sits on its edge is swallowed; a swallowed resource node turns to embers, a den is swallowed with its monsters, paving is refunded) or colliding (a ridge rises along the seam: solid ground ridge_half_width either side, with a pass of pass_width in the middle; it grows one step each colliding shift and wears down one step each other shift; once it is upthrust_height steps high it raises one upthrust node, while fewer than upthrust_cap upthrust nodes stand on the map; upthrust = node type by age). Where a plate pulls away the seam opens a rift: the new strip is raw ground (walked at the thicket speed) until the next shift, and a rift at least rift_min_degrees wide grows a fresh node with rift_node_chance, a type from the ring's rift_nodes (none in the wilds), starting at rift_node_share of full, while the map has fewer than rift_node_cap times that type's starting count. Seams closing or opening by less than quiet_degrees do nothing. min_plate_degrees: a plate never shrinks below this (the seam waits instead). embers = the node type a swallowed node becomes. enabled = false keeps the earth still (for tests that need a fixed map). colors = how the map draws seams (faintly), ridges and raw ground; the map never shows what the next shift will do; texts = hover text for seams, ridges and raw ground.",
+	"enabled": true,
+	"rings": [
+		{"name": "Near", "r0": 280, "r1": 420, "plates": 4, "turn": 8, "sway": 6, "rift_nodes": ["berries", "brush", "grove"]},
+		{"name": "Middle", "r0": 420, "r1": 580, "plates": 5, "turn": -10, "sway": 5, "rift_nodes": ["grove", "rocks", "brush"]},
+		{"name": "Far", "r0": 580, "r1": 800, "plates": 6, "turn": 12, "sway": 4, "rift_nodes": []}
+	],
+	"sway_period_min": 6,
+	"sway_period_max": 10,
+	"subduct_share": 0.5,
+	"quiet_degrees": 1.0,
+	"min_plate_degrees": 24,
+	"ridge_half_width": 7,
+	"pass_width": 36,
+	"upthrust_height": 2,
+	"upthrust_cap": 3,
+	"upthrust": {"neolithic": "obsidian", "bronze": "cassiterite", "medieval": "obsidian"},
+	"rift_min_degrees": 4,
+	"rift_node_chance": 0.25,
+	"rift_node_share": 0.5,
+	"rift_node_cap": 1.5,
+	"embers": "embers",
+	"colors": {"seam": "#5d5a48", "ridge": "#8f7d62", "raw": "#3b2b1e"},
+	"texts": {
+		"subduct": {"name": "Subducting seam", "text": "One plate dives under the other here. When it closes, what sits on the diving plate's edge sinks: resources turn to embers, dens go under."},
+		"collide": {"name": "Colliding seam", "text": "The plates ride up into each other here. When it closes, everything is pushed to the seam and a ridge rises; a tall ridge breaks open rare stone."},
+		"rift": {"name": "Rift", "text": "The plates pull apart here. The new ground is raw and slow for a round, and fresh plants often take root in it."},
+		"ridge": {"name": "Ridge", "text": "Rock pushed up where two plates collide. Nobody can cross it except at the pass in the middle. It wears down when the plates stop pushing."},
+		"raw": {"name": "Raw ground", "text": "Fresh earth from a rift: everyone walks through it slowly until the next shift."}
+	}
+}

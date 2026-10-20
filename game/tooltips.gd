@@ -182,7 +182,10 @@ static func node(run: RunState, n: Dictionary) -> Dictionary:
 		t["lines"].append("Townsfolk only go once no monster is near")
 	elif not n["heroes_only"]:
 		t["lines"].append("Townsfolk gather it")
-	t["lines"].append("Regrows %d each dawn" % run.world.node_regrowth(n))
+	if run.world.regrows(n):
+		t["lines"].append("Regrows %d each dawn" % run.world.node_regrowth(n))
+	else:
+		t["lines"].append("Never grows back")
 	t["tags"] = tag_notes(run, "node", n["type"])
 	return t
 
@@ -195,6 +198,28 @@ static func den(run: RunState, d: Dictionary) -> Dictionary:
 	var spawn_name: String = t["title"]
 	t["title"] = c.world["dens"][d["type"]]["name"]
 	t["lines"].insert(0, "Sends out %s. Hero territory: heroes hunt here for loot and XP." % spawn_name.to_lower())
+	return t
+
+
+## Ridges and raw rift ground (kind "ridge" or "raw", see "texts" in data/plates.json).
+static func earth(run: RunState, kind: String) -> Dictionary:
+	var text: Dictionary = run.content.plates["texts"][kind]
+	var t := new_tip(text["name"])
+	t["lines"].append(text["text"])
+	return t
+
+
+## A seam between two earth plates (an Earth.forecast entry): what kind it is and its ridge, not what comes next.
+static func seam(run: RunState, entry: Dictionary) -> Dictionary:
+	var earth := run.world.earth
+	var ring: Dictionary = earth.rings[int(entry["ring"])]
+	var kind: String = ring["kinds"][int(entry["seam"])]
+	var text: Dictionary = run.content.plates["texts"][kind]
+	var t := new_tip("%s (%s ring)" % [text["name"], String(ring["name"]).to_lower()])
+	t["lines"].append(text["text"])
+	var ridge := int(ring["ridges"][int(entry["seam"])])
+	if ridge > 0:
+		t["lines"].append("Its ridge stands %d high." % ridge)
 	return t
 
 

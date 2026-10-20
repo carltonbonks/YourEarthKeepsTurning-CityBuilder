@@ -147,6 +147,10 @@ def main(raw_folder, out_folder):
                 **{k: rd.get(k, "") for k in ["camp_joined", "camp_raiders", "camps_cleared", "camp_spoils"]},
                 "gathered_total": sum(rd.get("gathered", {}).values()) if "gathered" in rd else "",
                 "tended_total": sum(rd.get("tended", {}).values()) if "tended" in rd else "",
+                **({"earth_" + k: (sum(rd["shift"][k].values()) if isinstance(rd["shift"][k], dict) else rd["shift"][k])
+                    for k in ["swallowed", "dens_swallowed", "ridges", "raised", "rifts", "grown", "roads_refunded"]}
+                   if "shift" in rd else {"earth_" + k: "" for k in ["swallowed", "dens_swallowed", "ridges", "raised",
+                                                                    "rifts", "grown", "roads_refunded"]}),
                 **{"trips_cut_short_" + k: rd.get("trips_cut_short", {}).get(k, 0) if "trips_cut_short" in rd else ""
                    for k in ["dusk", "emptied", "unsafe"]},
                 "families": sum(1 for p in rd.get("picks", []) if p.get("taken") == "family"),

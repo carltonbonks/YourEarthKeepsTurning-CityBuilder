@@ -31,6 +31,8 @@ var dens: Array[Dictionary] = []
 ## The ground and how units find their way (see Pathing), and the town's plots, gates and paving (see Town).
 var pathing: Pathing
 var town: Town
+## The earth plates past the town, which turn between rounds (see Earth).
+var earth: Earth
 ## {type, plot, pos, work_left, cooldown_left, goods (stalls), craft, craft_left, craft_tier, made (workshops)}
 var buildings: Array[Dictionary] = []
 
@@ -87,6 +89,7 @@ func _init(run_state: RunState) -> void:
 	_place_nodes()
 	_place_dens()
 	_place_den_nodes()
+	earth = Earth.new(self)
 	reset_night_report()
 
 
@@ -254,7 +257,8 @@ func _dawn() -> void:
 		run.tell("At first light the last %d raiders slip back into the wilds." % stayed.size())
 	enemies = enemies.filter(func(e: Unit) -> bool: return not e.is_probe)
 	for node in nodes:
-		node["amount"] = mini(int(node["max"]), int(node["amount"]) + content.int_num("node_regrow_per_day"))
+		if regrows(node):
+			node["amount"] = mini(int(node["max"]), int(node["amount"]) + content.int_num("node_regrow_per_day"))
 	_tend_nodes()
 	pathing.wear_trails()
 	town.patch_walls()
@@ -285,6 +289,8 @@ func tends_node(tends: Dictionary, pos: Vector2, node: Dictionary) -> bool:
 
 ## How much a node regrows each dawn: node_regrow_per_day, plus what buildings tending it add.
 func node_regrowth(node: Dictionary) -> int:
+	if not regrows(node):
+		return 0
 	var total := content.int_num("node_regrow_per_day")
 	for b in buildings:
 		var tends: Dictionary = content.buildings[b["type"]].get("tends", {})
@@ -359,9 +365,14 @@ func _add_node(id: String, at: Vector2) -> void:
 		"heroes_only": def.get("heroes_only", false), "wild": def.get("wild", false), "age": def.get("age", "")})
 
 
-## A node counts once the town has reached its age.
+## A node counts once the town has reached its age, until the shifting earth takes it away.
 func node_active(node: Dictionary) -> bool:
-	return content.age_reached(run.age, node.get("age", ""))
+	return not node.get("gone", false) and content.age_reached(run.age, node.get("age", ""))
+
+
+## False for nodes that never grow back ("regrows": false in world.json, like seam embers).
+func regrows(node: Dictionary) -> bool:
+	return bool(content.world["nodes"][node["type"]].get("regrows", true))
 
 
 ## Townsfolk only go to a wild node when no monster is anywhere near it, and never to one the war camp holds.
