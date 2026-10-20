@@ -105,6 +105,8 @@ func test_longhouse_brings_hero_cards() -> void:
 			if card["kind"] == "hero":
 				heroes_seen += 1
 				check_eq(card["cost"], run.content.int_num("hero_card_cost"), "hero card costs shells")
+		# Each dawn deals from its own seeded stream, so look at a different round's dawn each time.
+		run.round_number += 1
 		run.people.offer_picks()
 	check(heroes_seen > 0, "hero cards appear once the longhouse stands")
 

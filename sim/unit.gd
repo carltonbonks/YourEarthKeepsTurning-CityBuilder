@@ -77,6 +77,8 @@ var made := {}
 ## A promoted craftsperson: the workshop type they master and their craft trait (data/promotions.json).
 var master_of := ""
 var craft_trait := ""
+## Townsfolk: the leaning their dawn card came with (a key of their role's "leanings"), or "".
+var leaning := ""
 
 # Enemy-only.
 var spawn_time := 0.0

@@ -141,8 +141,14 @@ func _pick_card(card: Dictionary) -> Button:
 			btn = _promote_card(card)
 		_:
 			var def: Dictionary = content.townsfolk[card["role"]]
-			btn = UiKit.card("Townsperson", def["name"], UiKit.cost_text(run.stock, {}), def["text"], eats, PICK_SIZE, UiKit.CARD_BORDER)
-			btn.tooltip_text = "%s\n%s." % [def["text"], eats]
+			if card.has("leaning"):
+				var lean: Dictionary = def["leanings"][card["leaning"]]
+				btn = UiKit.card(def["name"], lean["name"], UiKit.cost_text(run.stock, {}), lean["text"], eats, PICK_SIZE, UiKit.CARD_BORDER)
+				btn.tooltip_text = "%s\n%s Still fetches anything the town is short of, but picks trips for %s first.\n%s." % [
+					def["text"], lean["text"], ", ".join(lean["goods"]).replace("_", " "), eats]
+			else:
+				btn = UiKit.card("Townsperson", def["name"], UiKit.cost_text(run.stock, {}), def["text"], eats, PICK_SIZE, UiKit.CARD_BORDER)
+				btn.tooltip_text = "%s\n%s." % [def["text"], eats]
 	return btn
 
 
