@@ -337,11 +337,7 @@ func occupy(k: int, b: int) -> void:
 	for i in plots[k]["cells"]:
 		if pathing.ground[i] >= Pathing.FIRST_ROAD:
 			lifted[pathing.ground[i]] = int(lifted.get(pathing.ground[i], 0)) + 1
-	for kind: int in lifted:
-		var cost: Dictionary = road_def(kind)["cost"]
-		for r: String in cost:
-			var back := int(cost[r]) * int(lifted[kind]) / int(w.content.town["stretch_cells"])
-			w.run.stock[r] = int(w.run.stock.get(r, 0)) + back
+	refund_roads(lifted)
 	if not lifted.is_empty():
 		w.run.tell("The stones under the new %s are lifted and stacked." % w.content.buildings[w.buildings[b]["type"]]["name"].to_lower())
 	# Trails and paths are simply built over.
@@ -349,6 +345,15 @@ func occupy(k: int, b: int) -> void:
 		pathing.set_ground(i, Pathing.PLAIN)
 		pathing.traffic[i] = 0.0
 	_set_plot_solid(k, true)
+
+
+## Pays back lifted paving: lifted = road kind -> squares.
+func refund_roads(lifted: Dictionary) -> void:
+	for kind: int in lifted:
+		var cost: Dictionary = road_def(kind)["cost"]
+		for r: String in cost:
+			var back := int(cost[r]) * int(lifted[kind]) / int(w.content.town["stretch_cells"])
+			w.run.stock[r] = int(w.run.stock.get(r, 0)) + back
 
 
 ## Squares of paved road on plot k.

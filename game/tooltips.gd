@@ -182,7 +182,12 @@ static func node(run: RunState, n: Dictionary) -> Dictionary:
 		t["lines"].append("Townsfolk only go once no monster is near")
 	elif not n["heroes_only"]:
 		t["lines"].append("Townsfolk gather it")
-	t["lines"].append("Regrows %d each dawn" % run.world.node_regrowth(n))
+	if run.world.regrows(n):
+		t["lines"].append("Regrows %d each dawn" % run.world.node_regrowth(n))
+	else:
+		t["lines"].append("Never grows back")
+	if run.world.earth.doomed(n["pos"]):
+		t["warnings"].append("The earth swallows this at the next shift")
 	t["tags"] = tag_notes(run, "node", n["type"])
 	return t
 
@@ -195,6 +200,37 @@ static func den(run: RunState, d: Dictionary) -> Dictionary:
 	var spawn_name: String = t["title"]
 	t["title"] = c.world["dens"][d["type"]]["name"]
 	t["lines"].insert(0, "Sends out %s. Hero territory: heroes hunt here for loot and XP." % spawn_name.to_lower())
+	if run.world.earth.doomed(d["pos"]):
+		t["warnings"].append("The earth swallows this den, and everything in it, at the next shift")
+	return t
+
+
+## Ridges and raw rift ground (kind "ridge" or "raw", see "texts" in data/plates.json).
+static func earth(run: RunState, kind: String) -> Dictionary:
+	var text: Dictionary = run.content.plates["texts"][kind]
+	var t := new_tip(text["name"])
+	t["lines"].append(text["text"])
+	return t
+
+
+## A seam between two earth plates, with what the next shift does to it (an Earth.forecast entry).
+static func seam(run: RunState, entry: Dictionary) -> Dictionary:
+	var earth := run.world.earth
+	var ring: Dictionary = earth.rings[int(entry["ring"])]
+	var kind: String = ring["kinds"][int(entry["seam"])]
+	var text: Dictionary = run.content.plates["texts"][kind]
+	var t := new_tip("%s (%s ring)" % [text["name"], String(ring["name"]).to_lower()])
+	t["lines"].append(text["text"])
+	var ridge := int(ring["ridges"][int(entry["seam"])])
+	if ridge > 0:
+		t["lines"].append("Its ridge stands %d high." % ridge)
+	match entry["kind"]:
+		"subduct", "collide":
+			t["lines"].append("Next shift: it closes by %d degrees." % roundi(float(entry["degrees"])))
+		"rift":
+			t["lines"].append("Next shift: it opens %d degrees into a rift." % roundi(float(entry["degrees"])))
+		_:
+			t["lines"].append("Next shift: the plates either side move together.")
 	return t
 
 

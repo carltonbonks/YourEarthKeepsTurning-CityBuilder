@@ -548,7 +548,10 @@ func choose_relic(relic_id: String) -> void:
 	var earned := income()
 	stock["shells"] = int(stock["shells"]) + earned
 	tell("Round %d. Traders leave %d shells." % [round_number, earned])
+	world.earth.shift()
 	_enter_build()
+	if not world.earth.last.is_empty():
+		record.note_value("shift", world.earth.last.duplicate(true))
 
 
 func _enter_build() -> void:

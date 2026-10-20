@@ -25,6 +25,7 @@ var ages: Dictionary  ## data/ages.json: the tech ages in order, tool sets and t
 var promotions: Dictionary  ## data/promotions.json: when townsfolk can be promoted and into what.
 var town: Dictionary  ## data/town.json: town rings and plots, obstacles, ground, trails and roads.
 var tags: Dictionary  ## data/tags.json: what each tag that a rule reads means, for tooltips.
+var plates: Dictionary  ## data/plates.json: the shifting earth past the town (see Earth).
 
 
 static func load_default() -> Content:
@@ -46,6 +47,7 @@ static func load_default() -> Content:
 	c.promotions = _strip(_read("promotions.json"))
 	c.town = _strip(_read("town.json"))
 	c.tags = _strip(_read("tags.json"))
+	c.plates = _strip(_read("plates.json"))
 	return c
 
 

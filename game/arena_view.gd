@@ -20,6 +20,8 @@ const HALF_ROOT2 := 0.70710678
 ## Placeholder heights of standing buildings, in world units. Buildings that shoot stand taller.
 const BUILDING_HEIGHT := 14.0
 const TOWER_HEIGHT := 32.0
+## How long the land takes to slide into place after the earth turns, in milliseconds (view only).
+const SLIDE_MS := 1800.0
 ## What each kind of standing thing is, for the back-to-front pass.
 enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO }
 
@@ -36,6 +38,9 @@ var _ground_cache: Array = []
 var _ground_seen := [-1, null]
 ## Square index -> world time it was paved (or re-laid), for the glow.
 var _paved_at := {}
+## The earth's last shift as seen here ([shift count, world]) and when the slide that shows it began.
+var _shift_seen := [-1, null]
+var _slide_from_ms := -1.0
 
 
 func reset_camera() -> void:
@@ -141,8 +146,10 @@ func _draw() -> void:
 	# Ground: the wilds, then the settlement clearing. Flat circles become ellipses when tilted.
 	draw_rect(Rect2(Vector2.ZERO, size), Color("#161a17"))
 	_ground_circle(Vector2.ZERO, radius, Color("#25301f"), 96)
+	_watch_shift()
 	for thicket in w.town.thickets:
-		_ground_circle(thicket["pos"], float(thicket["radius"]), Color(content.town["thickets"]["color"]), 24)
+		_ground_circle(_slid(thicket["pos"]), float(thicket["radius"]), Color(content.town["thickets"]["color"]), 24)
+	_draw_earth()
 	_ground_circle(Vector2.ZERO, content.num("settlement_radius"), Color("#33402a"), 64)
 	draw_polyline(_closed(_ground_ring(Vector2.ZERO, content.num("settlement_radius"), 64)), Color("#4d5c3a"), 1.0)
 	_draw_plots()
@@ -226,10 +233,13 @@ func _draw_node(node: Dictionary, font: Font) -> void:
 	var def: Dictionary = run.content.world["nodes"][node["type"]]
 	var left := float(node["amount"]) / float(node["max"])
 	var r := _node_radius(node)
-	var p := _stand(node["pos"], r)
-	_shadow(node["pos"], r)
+	var at := _slid(node["pos"])
+	var p := _stand(at, r)
+	_shadow(at, r)
 	var col := Color(def["color"])
 	draw_circle(p, r, col if left > 0.0 else Color(col, 0.25))
+	if _doomed(node["pos"]):
+		draw_arc(p, r + 3.0, 0, TAU, 20, Color(run.content.plates["colors"]["subduct"]), 2.0)
 	if zoom > 1.6:
 		draw_string(font, p + Vector2(r + 2, 4), "%s %d" % [def["name"], node["amount"]], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#c8c8b0"))
 
@@ -245,10 +255,13 @@ func _draw_den(den: Dictionary, font: Font) -> void:
 	if den.get("camp", false):
 		# The land the war camp holds: townsfolk won't gather inside this ring.
 		draw_polyline(_closed(_ground_ring(den["pos"], run.content.num("camp_hold_radius"), 40)), Color(0.8, 0.3, 0.2, 0.45), 1.5)
-	var p := _stand(den["pos"], r)
-	_shadow(den["pos"], r)
+	var at := _slid(den["pos"])
+	var p := _stand(at, r)
+	_shadow(at, r)
 	draw_circle(p, r, Color(def["color"]))
 	draw_arc(p, r, 0, TAU, 24, Color("#a05050"), 2.0)
+	if _doomed(den["pos"]):
+		draw_arc(p, r + 4.0, 0, TAU, 24, Color(run.content.plates["colors"]["subduct"]), 2.5)
 	draw_string(font, p + Vector2(-r, r + 12), def["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#d0a0a0"))
 
 
@@ -448,6 +461,13 @@ func hovered(at: Vector2) -> Dictionary:
 		if w.node_active(node) and _near(node["pos"], at, maxf(3.0, 14.0 * _scale() * 1.6)):
 			return Tooltips.node(run, node)
 	var square := w.pathing.index_of(_to_world(at))
+	if w.earth.is_ridge(square):
+		return Tooltips.earth(run, "ridge")
+	var seam: Dictionary = w.earth.seam_near(_to_world(at), 6.0 / _scale())
+	if not seam.is_empty():
+		return Tooltips.seam(run, seam)
+	if w.earth.raw_at(_to_world(at)) and w.pathing.ground[square] == Pathing.THICKET:
+		return Tooltips.earth(run, "raw")
 	if w.pathing.ground[square] != Pathing.PLAIN :
 		return Tooltips.ground(run, square)
 	return {}
@@ -555,6 +575,97 @@ func _draw_plots() -> void:
 			draw_colored_polygon(shape, Color(run.content.town["obstacles"][plot["obstacle"]]["color"]))
 		else:
 			draw_polyline(_closed(shape), Color(0.6, 0.65, 0.45, 0.18), 1.0)
+
+
+## The earth plates: raw rifts, ridges, the seams and the ring edges. While building, each seam is coloured by
+## what the next shift will do to it and arrows show which way each plate will turn.
+func _draw_earth() -> void:
+	var earth := run.world.earth
+	if not earth.enabled():
+		return
+	var colors: Dictionary = run.content.plates["colors"]
+	var building := run.phase == RunState.Phase.BUILD
+	for strip in earth.raw:
+		var ring: Dictionary = earth.rings[int(strip["ring"])]
+		draw_colored_polygon(_screen_poly(_sector(float(ring["r0"]), float(ring["r1"]), strip["a0"], strip["a1"])),
+			Color(colors["raw"], 0.85))
+	var cell := run.world.pathing.cell
+	for i in earth.ridge_cells():
+		_ground_square(run.world.pathing.center(i), cell * 0.55, Color(colors["ridge"]))
+	for ring in earth.rings:
+		draw_polyline(_closed(_ground_ring(Vector2.ZERO, float(ring["r0"]), 96)), Color(colors["seam"], 0.45), 1.0)
+	for entry: Dictionary in earth.forecast():
+		var ring: Dictionary = earth.rings[int(entry["ring"])]
+		var dir := Vector2.from_angle(float(entry["angle"]))
+		var col := Color(colors["seam"])
+		var width := 1.5
+		if building and colors.has(entry["kind"]):
+			col = Color(colors[entry["kind"]])
+			width = 3.0
+		draw_line(_to_screen(dir * float(ring["r0"])), _to_screen(dir * float(ring["r1"])), col, width)
+	if not building:
+		return
+	for ri in earth.rings.size():
+		var ring: Dictionary = earth.rings[ri]
+		var seams: Array = ring["seams"]
+		var r := (float(ring["r0"]) + float(ring["r1"])) / 2.0
+		for k in seams.size():
+			var a0 := float(seams[k])
+			var mid := a0 + fposmod(float(seams[(k + 1) % seams.size()]) - a0, TAU) / 2.0
+			var turn := earth.next_turn(Vector2.from_angle(mid) * r)
+			_turn_arrow(r, mid - turn / 2.0, mid + turn / 2.0, Color("#d8d0b0", 0.7))
+
+
+## An arrow along the circle of radius r from angle a0 to a1.
+func _turn_arrow(r: float, a0: float, a1: float, color: Color) -> void:
+	var points := PackedVector2Array()
+	for n in 9:
+		points.append(_to_screen(Vector2.from_angle(lerpf(a0, a1, n / 8.0)) * r))
+	draw_polyline(points, color, 2.0)
+	var tip := points[-1]
+	var back := (points[-2] - tip).normalized() * 8.0
+	draw_line(tip, tip + back.rotated(0.5), color, 2.0)
+	draw_line(tip, tip + back.rotated(-0.5), color, 2.0)
+
+
+## Ground points outlining the strip of rings between radii r0 and r1, from angle a0 clockwise to a1.
+func _sector(r0: float, r1: float, a0: float, a1: float) -> PackedVector2Array:
+	var width := fposmod(a1 - a0, TAU)
+	var steps := maxi(2, ceili(width / 0.04))
+	var points := PackedVector2Array()
+	for n in steps + 1:
+		points.append(Vector2.from_angle(a0 + width * n / steps) * r1)
+	for n in range(steps, -1, -1):
+		points.append(Vector2.from_angle(a0 + width * n / steps) * r0)
+	return points
+
+
+## Starts the slide when the earth has just turned (not when a run is first shown).
+func _watch_shift() -> void:
+	var w := run.world
+	var seen := [w.earth.shifts, w]
+	if seen == _shift_seen:
+		return
+	if _shift_seen[1] == w and w.earth.shifts > int(_shift_seen[0]):
+		_slide_from_ms = Time.get_ticks_msec()
+	_shift_seen = seen
+
+
+## Where a thing on the plates is drawn while the land slides into place after a shift.
+func _slid(p: Vector2) -> Vector2:
+	if _slide_from_ms < 0.0:
+		return p
+	var t := (Time.get_ticks_msec() - _slide_from_ms) / SLIDE_MS
+	if t >= 1.0:
+		_slide_from_ms = -1.0
+		return p
+	var ease_t := 1.0 - pow(1.0 - t, 3.0)
+	return p.rotated(-(1.0 - ease_t) * run.world.earth.last_turn(p))
+
+
+## True while building if the next shift will swallow whatever stands at p.
+func _doomed(p: Vector2) -> bool:
+	return run.phase == RunState.Phase.BUILD and run.world.earth.doomed(p)
 
 
 ## Trails, worn paths and roads.

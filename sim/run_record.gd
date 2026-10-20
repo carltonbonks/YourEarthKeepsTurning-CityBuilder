@@ -37,7 +37,11 @@ extends RefCounted
 ## 17: the war camp: per round "camp_joined" (held-back raiders who joined the war camp as the round began),
 ##     "camp_raiders" (raiders in the camp then), "camps_cleared" and "camp_spoils" (shells the town took).
 ## 18: per round "tended" (good -> how much nodes regrew thanks to buildings that tend them, the Forester's hut).
-const RECORD_FORMAT := 18
+## 19: the shifting earth: per round "shift" (from round 2) = what the earth did as the round began: "shift" (its number),
+##     "swallowed" (node type -> count sunk at subducting seams), "dens_swallowed", "ridges" (colliding seams that pushed
+##     their ridge up), "raised" (node type -> upthrust nodes ridges raised), "rifts" (seams that opened), "grown" (node
+##     type -> fresh nodes in rifts), "roads_refunded" (squares of paving swallowed and paid back).
+const RECORD_FORMAT := 19
 
 var run: RunState
 ## Finished rounds, oldest first.
