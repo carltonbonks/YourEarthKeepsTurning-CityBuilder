@@ -89,6 +89,8 @@ var is_probe := false  ## Part of a small raid on an early night.
 var grudge_until := -1.0
 ## A sentient enemy shot by a tower goes for that building (index into World.buildings), -1 for none.
 var target_tower := -1
+## A fallen enemy raised to fight for the town until dawn (Bone Flute): not counted as a townsperson.
+var risen := false
 
 
 func is_hero() -> bool:

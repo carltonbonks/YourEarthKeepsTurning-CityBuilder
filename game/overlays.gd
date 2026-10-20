@@ -211,7 +211,7 @@ func _night_summary() -> void:
 func show_relic_pick() -> void:
 	var content := run.content
 	_clear()
-	_title("Round %d survived! Choose a relic" % run.round_number)
+	_title(("Round %d survived! Choose a pact" if run.is_pact_round() else "Round %d survived! Choose a relic") % run.round_number)
 	_night_summary()
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
@@ -219,7 +219,8 @@ func show_relic_pick() -> void:
 	_box.add_child(row)
 	for id in run.relic_offer:
 		var r: Dictionary = content.relics[id]
-		var btn := UiKit.card("Relic", r["name"], "", r["text"], "", RELIC_SIZE, UiKit.HEADING_COLOR, false, UiKit.HEADING_COLOR)
+		var kind := "Pact" if content.has_tag("relic", id, "pact") else "Relic"
+		var btn := UiKit.card(kind, r["name"], "", r["text"], "", RELIC_SIZE, UiKit.HEADING_COLOR, false, UiKit.HEADING_COLOR)
 		# A relic's one line is the whole story, so it gets room instead of being cut short.
 		(btn.get_child(0).get_child(2) as Label).add_theme_font_size_override("font_size", 12)
 		btn.tooltip_text = r["text"]

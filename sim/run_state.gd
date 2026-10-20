@@ -33,6 +33,11 @@ var fallen_folk := 0
 var relics: Array[String] = []
 var relic_acquired_round := {}
 var relic_offer: Array[String] = []
+## Max hearth HP the town has earned for good (Ancestor Bones).
+var bonus_hearth_hp := 0.0
+## Dawn cards still to take this dawn (Twin Fires gives two), and townsfolk cards taken this run (Hearth-mother's Doll).
+var picks_left := 1
+var folk_cards_taken := 0
 ## Dawn cards: {kind: "folk"|"hero"|"promote"|"family", role: String, cost: int, hero: Unit (for hero cards),
 ## roles: Array (for a family)}.
 var pick_offer: Array[Dictionary] = []
@@ -64,6 +69,7 @@ var departed: Array[Unit] = []
 var hunger_turned_away := ""
 
 var _next_id := 1
+var _effects_between_rounds := {}
 
 
 func _init(game_content: Content, seed_value: int) -> void:
@@ -106,7 +112,7 @@ func mod(key: String) -> float:
 
 ## The hearth's health: the base, relics, and standing buildings that strengthen it (the Stone keep).
 func hearth_max_hp() -> float:
-	var total := content.num("hearth_max_hp") + mod("hearth_max_hp")
+	var total := content.num("hearth_max_hp") + mod("hearth_max_hp") + bonus_hearth_hp
 	if world == null:
 		return total
 	for b in world.buildings:
@@ -117,7 +123,21 @@ func hearth_max_hp() -> float:
 
 ## Shells the settlement earns at the start of each round.
 func income() -> int:
-	return int(content.num("income_shells_per_round") + mod("income"))
+	return maxi(0, int((content.num("income_shells_per_round") + mod("income")) * (1.0 + mod("income_mult"))))
+
+
+## Whether this run owns a relic with this effect.
+func has_effect(key: String) -> bool:
+	return mod(key) != 0.0
+
+
+## Counts a relic's rule firing in the round record ("relic_effects": effect key -> times). Between rounds
+## (interest, the earth's turns) there is no round entry yet, so the count waits for the next one.
+func relic_fired(effect: String, times := 1) -> void:
+	if record.entry.is_empty():
+		_effects_between_rounds[effect] = int(_effects_between_rounds.get(effect, 0)) + times
+		return
+	record.note_count("relic_effects", times, effect)
 
 
 func living_heroes() -> Array[Unit]:
@@ -302,7 +322,8 @@ func can_take_pick(index: int) -> bool:
 func choose_pick(index: int) -> void:
 	assert(phase == Phase.PICK)
 	var taken := ""
-	if can_take_pick(index):
+	var took := can_take_pick(index)
+	if took:
 		var card := pick_offer[index]
 		stock["shells"] = int(stock["shells"]) - int(card["cost"])
 		if card["kind"] == "hero":
@@ -322,10 +343,22 @@ func choose_pick(index: int) -> void:
 			world.folk_ai.add_folk(card["role"])
 			taken = card["role"]
 			tell("A %s joins the settlement." % content.townsfolk[card["role"]]["name"].to_lower())
+			folk_cards_taken += 1
+			var every := int(mod("twin_every"))
+			if every > 0 and folk_cards_taken % every == 0:
+				world.folk_ai.add_folk(card["role"])
+				relic_fired("twin_every")
+				tell("The %s brings a twin along." % content.townsfolk[card["role"]]["name"].to_lower())
 	var entry := {"day": world.day_index() + 1, "offered": pick_offer.map(people.card_label), "taken": taken}
 	if hunger_turned_away != "":
 		entry["hunger_turned_away"] = hunger_turned_away
 	record.note_list("picks", entry)
+	picks_left -= 1
+	# Twin Fires: another newcomer from the cards left, unless the player skipped.
+	if took and picks_left > 0 and pick_offer.size() > 1:
+		pick_offer.remove_at(index)
+		relic_fired("extra_picks")
+		return
 	pick_offer = []
 	hunger_turned_away = ""
 	phase = Phase.SIM
@@ -415,10 +448,10 @@ func daily_upkeep() -> void:
 
 
 func fuel_needed_tonight() -> int:
-	var need := content.num("fuel_per_night_base") + population() * content.num("fuel_per_person_per_night") - mod("fuel_saving")
+	var need := content.num("fuel_per_night_base") + population() * content.num("fuel_per_person_per_night")
 	for type: String in content.buildings:
 		need += world.count_buildings(type) * float(content.buildings[type].get("fuel", 0.0))
-	return maxi(0, int(ceil(need)))
+	return maxi(0, int(ceil(need * (1.0 + mod("fuel_mult")) - mod("fuel_saving"))))
 
 
 ## What gatherers should fetch next: whatever is shortest against two days of need.
@@ -499,6 +532,11 @@ func _finish_round() -> void:
 	if world.hearth_hp <= 0.0:
 		_lose()
 		return
+	if world.deaths.is_empty() and has_effect("hearth_per_safe_round"):
+		bonus_hearth_hp += mod("hearth_per_safe_round")
+		world.hearth_hp += mod("hearth_per_safe_round")
+		relic_fired("hearth_per_safe_round")
+		tell("Nobody died this round: the ancestors' bones lend the hearth strength.")
 	if round_number >= content.int_num("rounds_to_win"):
 		phase = Phase.WON
 		tell("The people endured all %d rounds!" % round_number)
@@ -529,18 +567,23 @@ func _lose() -> void:
 func choose_relic(relic_id: String) -> void:
 	assert(phase == Phase.RELIC)
 	if relic_id != "" and relic_id in relic_offer:
-		var before_max := hearth_max_hp()
-		relics.append(relic_id)
-		relic_acquired_round[relic_id] = round_number + 1
-		var effects: Dictionary = content.relics[relic_id]["effects"]
-		world.hearth_hp = clampf(world.hearth_hp + hearth_max_hp() - before_max, 1.0, hearth_max_hp())
-		for i in int(effects.get("free_hero", 0)):
-			var hero := people.make_hero()
-			people.add_hero(hero)
-			tell("%s follows the wanderer's fire to your camp." % describe(hero))
-		for u in world.folk:
-			world.folk_ai.apply_folk_stats(u)
+		_gain_relic(relic_id)
 		tell("Relic taken: %s." % content.relics[relic_id]["name"])
+		# Broken Crown: more relics at once, drawn from the ordinary ones.
+		var gifts := int(content.relics[relic_id]["effects"].get("gain_relics", 0))
+		if gifts > 0:
+			var rng := SeededRng.stream(run_seed, "relic_gifts", round_number)
+			var pool := _relic_pool(false)
+			var gifted: Array[String] = []
+			for i in gifts:
+				if pool.is_empty():
+					break
+				var gift: String = rng.pick(pool)
+				pool.erase(gift)
+				_gain_relic(gift)
+				gifted.append(gift)
+				tell("The crown's shards become %s." % content.relics[gift]["name"])
+			record.note_value("relic_gifts", gifted)
 	record.note_value("relic_pick", relic_id)
 	record.end_round()
 	relic_offer = []
@@ -548,7 +591,16 @@ func choose_relic(relic_id: String) -> void:
 	var earned := income()
 	stock["shells"] = int(stock["shells"]) + earned
 	tell("Round %d. Traders leave %d shells." % [round_number, earned])
+	if has_effect("interest"):
+		var interest := mini(int(mod("interest_cap")), int(int(stock["shells"]) * mod("interest")))
+		if interest > 0:
+			stock["shells"] = int(stock["shells"]) + interest
+			relic_fired("interest", interest)
+			tell("Shells lent out come back with %d more." % interest)
 	world.earth.shift()
+	for i in int(mod("earth_turns")):
+		world.earth.shift()
+		relic_fired("earth_turns")
 	_enter_build()
 	if not world.earth.last.is_empty():
 		record.note_value("shift", world.earth.last.duplicate(true))
@@ -571,6 +623,9 @@ func _enter_build() -> void:
 		tell("The %s has come with %s." % [trader["name"].to_lower(), ", ".join(trader_stock.keys())])
 	hand.deal()
 	record.begin_round()
+	for effect: String in _effects_between_rounds:
+		relic_fired(effect, int(_effects_between_rounds[effect]))
+	_effects_between_rounds = {}
 
 
 func is_over() -> bool:
@@ -610,13 +665,51 @@ func tell(line: String) -> void:
 	story.append(line)
 
 
+## Owns a relic and applies what happens the moment it is taken (a free hero, a stronger hearth, warriors' stats).
+func _gain_relic(relic_id: String) -> void:
+	var before_max := hearth_max_hp()
+	relics.append(relic_id)
+	relic_acquired_round[relic_id] = round_number + 1
+	var effects: Dictionary = content.relics[relic_id]["effects"]
+	world.hearth_hp = clampf(world.hearth_hp + hearth_max_hp() - before_max, 1.0, hearth_max_hp())
+	for i in int(effects.get("free_hero", 0)):
+		var hero := people.make_hero()
+		people.add_hero(hero)
+		tell("%s follows the wanderer's fire to your camp." % describe(hero))
+	for u in world.folk:
+		world.folk_ai.apply_folk_stats(u)
+	for h in heroes:
+		world.hero_ai.apply_hero_stats(h)
+
+
+## Whether this round's relic offer is a pact round (see pact_rounds in data/balance.json).
+func is_pact_round() -> bool:
+	return content.balance.get("pact_rounds", []).any(func(r: float) -> bool: return int(r) == round_number)
+
+
+## Relics not yet owned that can be offered now: pacts or the rest, in a fixed order.
+func _relic_pool(pacts: bool) -> Array:
+	var pool: Array = content.relics.keys().filter(func(id: String) -> bool:
+		return not relics.has(id) and content.has_tag("relic", id, "pact") == pacts \
+			and int(content.relics[id].get("from_round", 0)) <= round_number)
+	pool.sort()
+	return pool
+
+
+## On pact rounds the offer is pacts, topped up from the rest if too few are left.
 func _roll_relic_offer() -> Array[String]:
 	var rng := SeededRng.stream(run_seed, "relics", round_number)
-	var pool: Array = content.relics.keys().filter(func(id: String) -> bool: return not relics.has(id))
-	pool.sort()
+	var choices := maxi(1, content.int_num("relic_choices") + int(mod("relic_choices")))
+	var pool := _relic_pool(is_pact_round())
 	var offer: Array[String] = []
-	while offer.size() < content.int_num("relic_choices") and not pool.is_empty():
+	while offer.size() < choices and not pool.is_empty():
 		var pick: String = rng.pick(pool)
 		pool.erase(pick)
 		offer.append(pick)
+	if offer.size() < choices and is_pact_round():
+		pool = _relic_pool(false)
+		while offer.size() < choices and not pool.is_empty():
+			var pick: String = rng.pick(pool)
+			pool.erase(pick)
+			offer.append(pick)
 	return offer

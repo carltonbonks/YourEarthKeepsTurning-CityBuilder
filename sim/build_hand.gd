@@ -27,7 +27,8 @@ func deal() -> void:
 
 ## Deals new cards in place of the unused ones, once a round, for shells.
 func can_redraw() -> bool:
-	return run.phase == RunState.Phase.BUILD and redraws == 0 and int(run.stock["shells"]) >= redraw_cost()
+	return run.phase == RunState.Phase.BUILD and redraws == 0 and int(run.stock["shells"]) >= redraw_cost() \
+		and not run.has_effect("no_redraw")
 
 
 func redraw() -> bool:
@@ -151,7 +152,8 @@ func _makes_fuel(type: String) -> bool:
 
 ## How many cards a hand holds: build_hand_size, plus build_hand_per_age for every age past the first.
 func size() -> int:
-	return run.content.int_num("build_hand_size") + run.content.int_num("build_hand_per_age") * run.content.ages["order"].find(run.age)
+	return run.content.int_num("build_hand_size") + run.content.int_num("build_hand_per_age") * run.content.ages["order"].find(run.age) \
+		+ int(run.mod("hand_bonus"))
 
 
 func _fill(rng: SeededRng, avoid: Array = []) -> void:

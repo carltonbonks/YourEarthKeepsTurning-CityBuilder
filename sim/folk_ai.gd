@@ -18,6 +18,8 @@ var _claimed := {}
 var _inbound := {}
 ## The town's wants this step (RunState.resource_wants), worked out the first time someone plans a trip.
 var _wants := {}
+## Living townsfolk whose role stands and fights (tag fighter), counted each step (Horde Drum).
+var fighters := 0
 
 
 func _init(world: World) -> void:
@@ -30,7 +32,10 @@ func begin_step() -> void:
 	_claimed.clear()
 	_inbound.clear()
 	_wants = {}
+	fighters = 0
 	for unit in w.folk:
+		if unit.alive and w.content.unit_has_tag(unit, "fighter"):
+			fighters += 1
 		if unit.type_id == "warrior":
 			_warrior_slot[unit] = _warrior_slot.size()
 		elif unit.alive:
@@ -82,11 +87,26 @@ func folk_tick(unit: Unit) -> void:
 	# Rest at night heals anyone not in a fight.
 	if w.is_night() and w.nearest_enemy(unit.pos, 120.0) == null:
 		unit.hp = minf(unit.max_hp, unit.hp + w.content.num("folk_night_heal") * w.dt)
-	match unit.type_id:
-		"warrior":
-			_warrior_tick(unit)
-		_:
-			_worker_tick(unit)
+	if unit.type_id == "warrior" or levied(unit):
+		_warrior_tick(unit)
+	else:
+		_worker_tick(unit)
+
+
+## Levy Horn: on the warned night tribespeople fight like warriors.
+func levied(unit: Unit) -> bool:
+	return unit.type_id == "tribesperson" and w.is_wave_night() and w.run.has_effect("levy")
+
+
+## A townsperson's blow after relics: Horde Drum (fighters hit harder the more of them there are)
+## and Levy Horn (levied tribespeople hit as hard as warriors).
+func relic_damage(unit: Unit, amount: float) -> float:
+	if levied(unit):
+		amount = maxf(amount, float(w.content.townsfolk["warrior"]["attack"]) * amount / maxf(1.0, unit.attack))
+	var per := int(w.run.mod("horde_per"))
+	if per > 0 and w.content.unit_has_tag(unit, "fighter"):
+		amount += w.run.mod("horde_damage") * ((fighters - 1) / per)
+	return amount
 
 
 func _warrior_tick(unit: Unit) -> void:

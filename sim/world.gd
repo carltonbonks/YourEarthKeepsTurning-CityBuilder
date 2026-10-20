@@ -54,6 +54,11 @@ var wave_stats := {}
 ## What happened since the last dawn pick: {raiders, kills, hearth_damage, deaths: [names], left: [names]}.
 ## RunState reads it at each dawn and at the end of the round.
 var night_report := {}
+## Relic rules that count per night: skeletons raised and raiders turned (reset at nightfall).
+var risen_tonight := 0
+var turncoats_tonight := 0
+## Townsfolk joining mid-step (turncoats, the risen), added once everyone has acted.
+var _joining: Array[Dictionary] = []
 ## Enemies chasing a fleeing worker (seen last tick); warriors answer the call.
 var alarms: Array[Unit] = []
 var new_alarms: Array[Unit] = []
@@ -142,7 +147,7 @@ func reset_night_report() -> void:
 func roll_wave_sides() -> void:
 	wave_sides = []
 	var side_rng := SeededRng.stream(run.run_seed, "sides", run.round_number)
-	var side_count := 2 if run.round_number >= content.int_num("wave_two_sides_from_round") else 1
+	var side_count := 2 if run.round_number >= content.int_num("wave_two_sides_from_round") and not run.has_effect("one_side") else 1
 	var first := side_rng.randi_range(0, 3)
 	wave_sides.append(first * PI / 2.0)
 	if side_count == 2:
@@ -203,6 +208,7 @@ func step() -> void:
 	_friend_grid_ok = false
 	enemy_ai.towers_tick()
 	_cleanup()
+	_join_folk()
 	shots = shots.filter(func(s: Dictionary) -> bool: return time - float(s["time"]) < 0.25)
 
 	if hearth_hp <= 0.0 or (folk.is_empty() and not run.heroes.any(func(h: Unit) -> bool: return h.alive)):
@@ -220,6 +226,8 @@ func step() -> void:
 
 
 func _nightfall() -> void:
+	risen_tonight = 0
+	turncoats_tonight = 0
 	var need := run.fuel_needed_tonight()
 	cold_tonight = false
 	if int(run.stock["fuel"]) >= need:
@@ -252,6 +260,7 @@ func _end_of_night_effects() -> void:
 
 func _dawn() -> void:
 	_end_of_night_effects()
+	_lay_risen()
 	var stayed := enemies.filter(func(e: Unit) -> bool: return e.alive and e.is_probe)
 	if not stayed.is_empty():
 		run.tell("At first light the last %d raiders slip back into the wilds." % stayed.size())
@@ -312,6 +321,7 @@ func nodes_fullness(tag: String) -> float:
 
 func _finish_round() -> void:
 	_end_of_night_effects()
+	_lay_risen()
 	# Wanderers slink back to their dens at the end of a round.
 	enemies = enemies.filter(func(e: Unit) -> bool: return e.alive and e.den_index >= 0)
 	pause = Pause.ROUND_OVER
@@ -473,6 +483,7 @@ func _batter(unit: Unit, square: int) -> void:
 	shots.append({"from": unit.pos, "to": pathing.center(square), "ranged": false, "time": time})
 	if content.unit_has_tag(unit, "siege"):
 		run.record.note_count("siege_damage", roundi(unit.attack * enemy_ai.war_chant()))
+		enemy_ai.thorns(unit)
 	if pathing.hit_wall(square, unit.attack * enemy_ai.war_chant()):
 		run.record.note_breach()
 		if not bool(night_report.get("breached", false)):
@@ -508,6 +519,11 @@ func hit(attacker: Unit, victim: Unit) -> void:
 	if victim.is_enemy():
 		if attacker.is_hero():
 			amount += Loot.bane(content, attacker, victim)
+			amount *= hero_ai.relic_damage_mult(attacker)
+		elif attacker.is_folk():
+			amount = folk_ai.relic_damage(attacker, amount)
+		if content.unit_has_tag(victim, "undead"):
+			amount *= 1.0 + run.mod("undead_damage")
 		amount *= enemy_ai.armour_left(victim, _blow_is(attacker, "metal"), _blow_is(attacker, "steel"))
 	damage(attacker, victim, amount)
 
@@ -531,7 +547,11 @@ func damage(attacker: Unit, victim: Unit, amount: float) -> void:
 		return
 	victim.alive = false
 	victim.hp = 0.0
+	if victim.risen:
+		return
 	if not victim.is_enemy():
+		if victim.is_hero():
+			hero_ai.mourn(victim)
 		var killer := attacker.type_id if attacker != null else ""
 		var death := {"name": victim.display_name, "role": victim.type_id, "hero": victim.is_hero(),
 			"killer": killer, "day": day_index() + 1, "night": is_night()}
@@ -548,25 +568,72 @@ func damage(attacker: Unit, victim: Unit, amount: float) -> void:
 	night_report["kills"] = int(night_report["kills"]) + 1
 	market.carcass(victim)
 	enemy_ai.on_camper_killed(victim, attacker)
+	_relic_kill(victim)
 	if attacker != null and attacker.is_folk():
 		attacker.kills += 1
 	if attacker == null or not attacker.is_hero():
 		return
 	var e: Dictionary = content.enemies[victim.type_id]
 	attacker.kills += 1
-	attacker.xp += float(e["xp"]) * (1.0 + run.mod("xp_mult"))
-	attacker.gold += int(e["loot"]) + int(run.mod("loot_shells")) + int(Loot.total(content, attacker, "loot"))
+	attacker.xp += float(e["xp"]) * (1.0 + run.mod("xp_mult") + hero_ai.chosen_xp(attacker))
+	var earned := int(e["loot"]) + int(run.mod("loot_shells")) + int(Loot.total(content, attacker, "loot"))
+	var tithe := int(earned * run.mod("hero_tithe"))
+	if tithe > 0:
+		run.stock["shells"] = int(run.stock["shells"]) + tithe
+		run.relic_fired("hero_tithe", tithe)
+	attacker.gold += earned - tithe
+	hero_ai.count_trophy(attacker)
 	market.pay_prizes(attacker, victim)
 	hero_ai.maybe_drop(attacker, victim)
 	if victim.is_boss:
 		run.tell("%s slays %s!" % [attacker.display_name, victim.display_name])
 
 
+## Relics that act when an enemy falls, whoever felled it: shells and fuel for the town,
+## raiders who turn their coats, and the fallen raised to fight for the town tonight.
+func _relic_kill(victim: Unit) -> void:
+	if run.has_effect("kill_shells"):
+		run.stock["shells"] = int(run.stock["shells"]) + int(run.mod("kill_shells"))
+		run.relic_fired("kill_shells", int(run.mod("kill_shells")))
+	if run.has_effect("kill_fuel") and victim.pos.length() <= content.num("settlement_radius"):
+		run.stock["fuel"] = int(run.stock["fuel"]) + int(run.mod("kill_fuel"))
+		run.relic_fired("kill_fuel", int(run.mod("kill_fuel")))
+	if run.has_effect("turncoat_chance") and not victim.is_boss and content.unit_has_tag(victim, "human") \
+			and turncoats_tonight < int(run.mod("turncoat_max")) and rng.randf() < run.mod("turncoat_chance"):
+		turncoats_tonight += 1
+		_joining.append({"role": "warrior", "pos": victim.pos, "risen": false})
+		run.relic_fired("turncoat_chance")
+		run.tell("A %s throws down their arms and begs to join you. They fight as a warrior now." % victim.display_name.to_lower())
+	elif is_night() and risen_tonight < int(run.mod("risen_per_night")):
+		risen_tonight += 1
+		_joining.append({"role": "warrior", "pos": victim.pos, "risen": true})
+		run.relic_fired("risen_per_night")
+		if risen_tonight == 1:
+			run.tell("The bone flute plays: the fallen rise to fight for the town until dawn.")
+
+
+## Adds the townsfolk who joined during this step where they stood.
+func _join_folk() -> void:
+	for j in _joining:
+		var unit := folk_ai.add_folk(j["role"])
+		unit.pos = j["pos"]
+		if j["risen"]:
+			unit.risen = true
+			unit.display_name = "Risen bones"
+	_joining = []
+
+
+## The risen crumble at dawn (or when the round ends).
+func _lay_risen() -> void:
+	folk = folk.filter(func(u: Unit) -> bool: return not u.risen)
+
+
 func _cleanup() -> void:
 	for unit in folk.duplicate():
 		if not unit.alive:
 			folk.erase(unit)
-			run.fallen_folk += 1
+			if not unit.risen:
+				run.fallen_folk += 1
 	enemies = enemies.filter(func(e: Unit) -> bool: return e.alive or not e.spawned)
 	if not dens.is_empty() and dens[-1].get("cleared", false):
 		dens.pop_back()

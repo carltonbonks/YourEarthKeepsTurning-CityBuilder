@@ -65,7 +65,7 @@ def main(raw_folder, out_folder):
     os.makedirs(out_folder, exist_ok=True)
     records = load_records(raw_folder)
     tables = {name: [] for name in
-              ["runs", "rounds", "picks", "builds", "wave_enemies", "deaths", "nights", "relic_offers", "heroes",
+              ["runs", "rounds", "picks", "builds", "wave_enemies", "deaths", "nights", "relic_offers", "relic_effects", "heroes",
                "loot", "whims", "market_sales", "crafted", "promotions", "build_cards"]}
 
     for r in records:
@@ -157,6 +157,7 @@ def main(raw_folder, out_folder):
                 "wave_to_town_power": round(rd["power"]["wave"] / rd["power"]["town"]["total"], 2)
                 if rd.get("power", {}).get("town", {}).get("total") else "",
                 "relic_pick": rd.get("relic_pick", ""),
+                "relic_gifts": "|".join(rd.get("relic_gifts", [])),
                 "loot_found": len(rd.get("loot", [])),
                 "loot_worn": sum(1 for i in rd.get("loot", []) if i.get("equipped")),
                 "items_sold": len(rd.get("sales", [])),
@@ -233,6 +234,8 @@ def main(raw_folder, out_folder):
             for w in rd.get("whims", []):
                 tables["whims"].append({"run_id": rid, "round": rn, "day": w.get("day", ""),
                                         "hero": w.get("hero", ""), "whim": w.get("whim", "")})
+            for effect, count in rd.get("relic_effects", {}).items():
+                tables["relic_effects"].append({"run_id": rid, "round": rn, "effect": effect, "count": count})
             for relic in rd.get("relic_offer", []):
                 tables["relic_offers"].append({"run_id": rid, "round": rn, "relic": relic,
                                                "picked": 1 if rd.get("relic_pick") == relic else 0})
@@ -247,6 +250,7 @@ def main(raw_folder, out_folder):
         "nights": ["run_id", "round", "night", "raiders", "kills", "hearth_damage", "deaths", "left_hungry", "left_unhappy", "cold",
                    "wave_night"],
         "relic_offers": ["run_id", "round", "relic", "picked"],
+        "relic_effects": ["run_id", "round", "effect", "count"],
         "heroes": ["run_id", "name", "class", "trait", "level", "kills", "alive", "weapon", "armor", "charm", "items",
                    "gold", "max_hp", "energy", "lodging", "mood", "departed"],
         "loot": ["run_id", "round", "day", "hero", "trait", "base", "slot", "tier", "affixes", "value", "worn"],

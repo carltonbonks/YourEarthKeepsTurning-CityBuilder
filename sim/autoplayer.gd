@@ -13,6 +13,7 @@ extends RefCounted
 ## the charcoal burner, bloomery, blacksmith, townhouses, fields, guildhall, chapel and iron tool sets;
 ## it takes family cards whenever the houses have room.
 ## Every style takes a Promote card when one is offered and affordable.
+## Every style takes the offered relic it ranks highest (RELIC_RANK).
 ## Every style can only order buildings on the round's cards (run.hand), and redraws once when shells are spare.
 ## Every style builds the stone-layers' yard from round 5 so craftspeople pave the busiest paths,
 ## orders the forester and charcoal pit when they are needed (see _upkeep),
@@ -44,7 +45,7 @@ func play_run(run: RunState) -> void:
 			RunState.Phase.SIM:
 				run.run_until_pause()
 			RunState.Phase.RELIC:
-				run.choose_relic(run.relic_offer[0] if not run.relic_offer.is_empty() else "")
+				run.choose_relic(pick_relic(run))
 
 
 ## Orders from the round's building cards, then redraws once when shells are spare and orders again.
@@ -246,4 +247,25 @@ func pick(run: RunState) -> int:
 		if score > best_score:
 			best_score = score
 			best = i
+	return best
+
+
+## Relics it likes most first, ranked by how often bot runs that held them won (40 runs x 3 styles,
+## blind picks, 2026-10-20). Anything not listed ranks after these; ties keep the offer's order.
+const RELIC_RANK := ["lone_wolf_pelt", "horde_drum", "broken_crown", "levy_horn", "ram_thorn_stakes", "tithe_bowl",
+	"grave_salt", "ancestor_mask", "owl_eyes", "sacred_spring", "witchs_thread", "chieftains_torc", "elders_tale",
+	"turncoats_torc", "fire_arrows", "bone_flute", "moneylenders_knot", "hollow_drum", "bear_tooth_charm",
+	"blood_brother_knot", "wanderers_fire", "ember_stone", "oxhide_sledges", "seed_cache", "ridgeheart"]
+
+
+## Takes the offered relic it ranks highest (never skips: every relic helps somewhat).
+func pick_relic(run: RunState) -> String:
+	var best := ""
+	var best_rank := INF
+	for id in run.relic_offer:
+		var rank := RELIC_RANK.find(id)
+		var score := float(rank) if rank >= 0 else 100.0
+		if score < best_rank:
+			best_rank = score
+			best = id
 	return best

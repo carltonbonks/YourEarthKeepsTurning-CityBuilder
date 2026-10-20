@@ -81,10 +81,12 @@ Descriptive tags no rule reads yet are fine: they show in tooltips by name and g
 | Tag | Read by | Effect |
 | --- | --- | --- |
 | `sentient` | `World.damage`, `EnemyAI.towers_tick` | turns on whoever hits it for a while, towers (`tower_hp`) included |
-| `fighter` | `Power.town` | a townsfolk role that counts toward the town's power level |
-| `beast` | the hunting lodge's `prize` in `data/buildings.json`, used by `Market` | the lodge pays shells and extra hides per kill |
-| `undead` | the chapel's `prize`, and the reliquary's `bane` in `data/items.json` (`Loot.bane`) | the chapel pays per kill; reliquaries hit them harder |
-| `siege` | `EnemyAI.enemy_tick`, `World._batter` | ignores people, goes for gates and the hearth (battering rams) |
+| `fighter` | `Power.town`, `FolkAI.begin_step` | a townsfolk role that counts toward the town's power level; Horde Drum counts fighters |
+| `beast` | the hunting lodge's `prize` in `data/buildings.json`, used by `Market`; `EnemyAI.enemy_tick` | the lodge pays shells and extra hides per kill; Wolf-mother's Skull keeps beasts off townsfolk |
+| `human` | `World._relic_kill` | Turncoat's Torc may turn a fallen human raider into a warrior |
+| `undead` | the chapel's `prize`, the reliquary's `bane` in `data/items.json` (`Loot.bane`), `World.hit` | the chapel pays per kill; reliquaries hit them harder; Grave Salt doubles damage |
+| `siege` | `EnemyAI.enemy_tick`, `World._batter` | ignores people, goes for gates and the hearth (battering rams); Ram-thorn Stakes hurt it |
+| `pact` (relics) | `RunState._relic_pool` | a strong relic with a cost, offered only on `pact_rounds` |
 | `proud` | `People.update_moods` | knights: sleeping rough hurts twice as much, wearing steel cheers them |
 
 When a rule reads a tag:
