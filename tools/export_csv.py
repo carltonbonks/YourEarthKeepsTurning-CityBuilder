@@ -19,6 +19,7 @@ import sys
 RESOURCES = ["food", "fuel", "wood", "stone", "shells", "flint", "hides", "bone", "obsidian",
              "copper", "cassiterite", "tin", "bronze", "bog_iron", "charcoal", "iron", "steel"]
 ROLES = ["tribesperson", "warrior", "craftsperson"]
+LEANINGS = ["forager", "woodcutter", "quarrier", "brushcutter", "prospector"]
 
 
 def load_records(folder):
@@ -146,6 +147,8 @@ def main(raw_folder, out_folder):
                 "towers_broken": rd.get("towers_broken", 0),
                 **{k: rd.get(k, "") for k in ["camp_joined", "camp_raiders", "camps_cleared", "camp_spoils"]},
                 "gathered_total": sum(rd.get("gathered", {}).values()) if "gathered" in rd else "",
+                "gathered_leaned_total": sum(rd.get("gathered_leaned", {}).values()) if "gathered_leaned" in rd else "",
+                **{"leaning_end_" + k: rd.get("leanings_end", {}).get(k, 0) if "leanings_end" in rd else "" for k in LEANINGS},
                 "tended_total": sum(rd.get("tended", {}).values()) if "tended" in rd else "",
                 **({"earth_" + k: (sum(rd["shift"][k].values()) if isinstance(rd["shift"][k], dict) else rd["shift"][k])
                     for k in ["swallowed", "dens_swallowed", "ridges", "raised", "rifts", "grown", "roads_refunded"]}
@@ -189,6 +192,8 @@ def main(raw_folder, out_folder):
                     "hero_offered": 1 if any(o.startswith("hero:") for o in offered) else 0,
                     "taken": taken or "(skipped)", "taken_kind": "hero" if taken.startswith("hero:") else ("none" if not taken else "townsfolk"),
                     "hunger_turned_away": p.get("hunger_turned_away", ""),
+                    **{"offered_leaning_%d" % (i + 1): (p.get("offered_leanings", []) + ["", "", ""])[i] for i in range(3)},
+                    "taken_leaning": p.get("leaning", ""),
                 })
             for a in rd.get("actions", []):
                 if a.get("kind", "build") not in ("build", "price"):
@@ -243,7 +248,8 @@ def main(raw_folder, out_folder):
     columns = {
         "runs": list(tables["runs"][0].keys()) if tables["runs"] else ["run_id"],
         "rounds": list(tables["rounds"][0].keys()) if tables["rounds"] else ["run_id"],
-        "picks": ["run_id", "round", "day", "offered_1", "offered_2", "offered_3", "hero_offered", "taken", "taken_kind", "hunger_turned_away"],
+        "picks": ["run_id", "round", "day", "offered_1", "offered_2", "offered_3", "hero_offered", "taken", "taken_kind", "hunger_turned_away",
+                  "offered_leaning_1", "offered_leaning_2", "offered_leaning_3", "taken_leaning"],
         "builds": ["run_id", "round", "building"],
         "wave_enemies": ["run_id", "round", "enemy", "count"],
         "deaths": ["run_id", "round", "day", "at_night", "name", "role", "is_hero", "killer"],

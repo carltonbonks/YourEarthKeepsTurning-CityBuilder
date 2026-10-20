@@ -237,6 +237,9 @@ func pick(run: RunState) -> int:
 					score = -50.0
 			"tribesperson":
 				score = 4.0 - run.count_role("tribesperson") * 0.6
+				# Of two tribespeople, take the one leaning toward what the town is shortest of.
+				if card.has("leaning") and run.content.townsfolk["tribesperson"]["leanings"][card["leaning"]]["goods"].has(run.most_needed_resource()):
+					score += 0.5
 			"warrior":
 				score = 3.0 - run.count_role("warrior") * 0.8
 			"craftsperson":

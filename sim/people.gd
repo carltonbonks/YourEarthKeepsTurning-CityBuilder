@@ -27,8 +27,15 @@ func offer_picks() -> void:
 	var roles := content.townsfolk.keys()
 	roles.sort()
 	for role: String in roles:
-		if role != run.hunger_turned_away:
+		if role == run.hunger_turned_away:
+			continue
+		var leanings := leanings_open(role)
+		if leanings.is_empty():
 			pool.append({"kind": "folk", "role": role, "cost": 0})
+		for i in mini(leanings.size(), int(content.townsfolk[role].get("leaning_cards", 1))):
+			var leaning: String = rng.pick(leanings)
+			leanings.erase(leaning)
+			pool.append({"kind": "folk", "role": role, "cost": 0, "leaning": leaning})
 	if world.hero_ai.count_lodgings() > 0:
 		var hero := make_hero(true)
 		pool.append({"kind": "hero", "role": "hero", "cost": hero_card_cost(hero.type_id), "hero": hero})
@@ -46,6 +53,17 @@ func offer_picks() -> void:
 		run.pick_offer.append(promote)
 	run.picks_left = 1 + int(run.mod("extra_picks"))
 	run.phase = RunState.Phase.PICK
+
+
+## The leanings a role's dawn cards can come with in the town's age, sorted.
+func leanings_open(role: String) -> Array[String]:
+	var out: Array[String] = []
+	var all: Dictionary = run.content.townsfolk[role].get("leanings", {})
+	for id: String in all:
+		if run.content.age_reached(run.age, str(all[id].get("age", ""))):
+			out.append(id)
+	out.sort()
+	return out
 
 
 ## What a hero card of this class costs (a class may set its own card_cost).

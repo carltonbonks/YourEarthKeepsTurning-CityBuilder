@@ -51,9 +51,10 @@ func _claim(node_index: int, amount: int) -> void:
 	_inbound[good] = int(_inbound.get(good, 0)) + amount
 
 
-func add_folk(role: String) -> Unit:
+func add_folk(role: String, leaning := "") -> Unit:
 	var def: Dictionary = w.content.townsfolk[role]
 	var unit := Unit.new()
+	unit.leaning = leaning
 	unit.id = w.run.new_id()
 	unit.team = Unit.Team.FOLK
 	unit.type_id = role
@@ -239,6 +240,8 @@ func _worker_tick(unit: Unit) -> void:
 					var take := mini(int(node["amount"]), carry_of(unit))
 					node["amount"] = int(node["amount"]) - take
 					w.run.record.note_count("gathered", take, node["gives"])
+					if leans_to(unit, node["gives"]):
+						w.run.record.note_count("gathered_leaned", take, node["gives"])
 					unit.carrying = node["gives"]
 					unit.carry_amount = take
 					unit.task = "return"
@@ -291,7 +294,7 @@ func _choose_work(unit: Unit) -> void:
 ## needs the good (after what is already on its way in) times what this gatherer can carry back from what
 ## the node will have left once the others heading there have taken theirs, over the time the round trip takes.
 ## A trip that can't reach the node and finish gathering before dusk isn't started.
-## Craftspeople only fetch wood.
+## Craftspeople only fetch wood. A gatherer's leaning makes trips for its goods worth leaning_weight times more.
 func plan_trip(unit: Unit) -> int:
 	var time_left := w.content.num("day_seconds") - w.content.num("dusk_seconds") - w.time_of_day()
 	var gather := gather_time(unit)
@@ -325,10 +328,17 @@ func plan_trip(unit: Unit) -> int:
 		if walk + gather > time_left:
 			continue
 		var score := float(need[good]) * take / (walk * 2.0 + gather)
+		if leans_to(unit, good):
+			score *= float(w.content.townsfolk[unit.type_id].get("leaning_weight", 1.0))
 		if score > best_score:
 			best_score = score
 			best = i
 	return best
+
+
+## True when a townsperson's leaning is toward this good.
+func leans_to(unit: Unit, good: String) -> bool:
+	return unit.leaning != "" and w.content.townsfolk[unit.type_id]["leanings"][unit.leaning]["goods"].has(good)
 
 
 ## How much a townsperson brings back from one gathering trip (tools and relics included).

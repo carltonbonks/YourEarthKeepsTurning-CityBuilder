@@ -39,7 +39,7 @@ var bonus_hearth_hp := 0.0
 var picks_left := 1
 var folk_cards_taken := 0
 ## Dawn cards: {kind: "folk"|"hero"|"promote"|"family", role: String, cost: int, hero: Unit (for hero cards),
-## roles: Array (for a family)}.
+## roles: Array (for a family), leaning: String (for a folk card whose role has leanings)}.
 var pick_offer: Array[Dictionary] = []
 ## Enemy type ids of this round's wave, in spawn order.
 var next_wave: Array[String] = []
@@ -311,6 +311,13 @@ func trade(good: String) -> bool:
 
 # --- Dawn picks ------------------------------------------------------------
 
+## A townsperson's name with its leaning, e.g. "Forager" (or the role's name without one).
+func folk_name(role: String, leaning: String) -> String:
+	if leaning == "":
+		return content.townsfolk[role]["name"]
+	return content.townsfolk[role]["leanings"][leaning]["name"]
+
+
 func can_take_pick(index: int) -> bool:
 	if phase != Phase.PICK or index < 0 or index >= pick_offer.size():
 		return false
@@ -340,16 +347,22 @@ func choose_pick(index: int) -> void:
 			taken = "family"
 			tell("A family of %d comes to settle." % card["roles"].size())
 		else:
-			world.folk_ai.add_folk(card["role"])
+			var leaning: String = card.get("leaning", "")
+			world.folk_ai.add_folk(card["role"], leaning)
 			taken = card["role"]
-			tell("A %s joins the settlement." % content.townsfolk[card["role"]]["name"].to_lower())
+			tell("A %s joins the settlement." % folk_name(card["role"], leaning).to_lower())
 			folk_cards_taken += 1
 			var every := int(mod("twin_every"))
 			if every > 0 and folk_cards_taken % every == 0:
-				world.folk_ai.add_folk(card["role"])
+				world.folk_ai.add_folk(card["role"], leaning)
 				relic_fired("twin_every")
-				tell("The %s brings a twin along." % content.townsfolk[card["role"]]["name"].to_lower())
+				tell("The %s brings a twin along." % folk_name(card["role"], leaning).to_lower())
 	var entry := {"day": world.day_index() + 1, "offered": pick_offer.map(people.card_label), "taken": taken}
+	var leanings := pick_offer.map(func(c: Dictionary) -> String: return str(c.get("leaning", "")))
+	if leanings.any(func(l: String) -> bool: return l != ""):
+		entry["offered_leanings"] = leanings
+	if took and pick_offer[index].has("leaning"):
+		entry["leaning"] = pick_offer[index]["leaning"]
 	if hunger_turned_away != "":
 		entry["hunger_turned_away"] = hunger_turned_away
 	record.note_list("picks", entry)

@@ -33,8 +33,10 @@ static func hero(run: RunState, u: Unit) -> Dictionary:
 static func folk(run: RunState, u: Unit) -> Dictionary:
 	var c := run.content
 	var def: Dictionary = c.townsfolk[u.type_id]
-	var t := new_tip(def["name"])
+	var t := new_tip(run.folk_name(u.type_id, u.leaning))
 	t["lines"].append(def["text"])
+	if u.leaning != "":
+		t["lines"].append(def["leanings"][u.leaning]["text"])
 	t["lines"].append("Health %d/%d, attack %s" % [roundi(u.hp), roundi(u.max_hp), _num(u.attack)])
 	if u.master_of != "":
 		t["lines"].append("Master of the %s" % c.buildings[u.master_of]["name"].to_lower())

@@ -44,7 +44,10 @@ extends RefCounted
 ## 20: rule-changing relics: per round "relic_effects" (effect key from data/relics.json -> times its rule fired,
 ##     or shells/fuel it brought, e.g. "kill_shells", "turncoat_chance", "risen_per_night") and "relic_gifts" (relics
 ##     Broken Crown handed out with it). Relics now include pacts (tag "pact"), offered on pact_rounds.
-const RECORD_FORMAT := 20
+## 21: tribespeople's leanings: a dawn pick entry has "offered_leanings" (one per offered card, "" for none) when any card
+##     had one, and "leaning" when the card taken had one; per round "gathered_leaned" (good -> amount brought in by
+##     gatherers leaning toward it) and "leanings_end" (leaning -> townsfolk with it at the round's end).
+const RECORD_FORMAT := 21
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -112,7 +115,7 @@ func begin_round() -> void:
 		"prices": run.prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
 		"age": run.age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
 		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0, "towers_broken": 0,
-		"gathered": {}, "trips_cut_short": {}, "tended": {},
+		"gathered": {}, "gathered_leaned": {}, "trips_cut_short": {}, "tended": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
 		"camps_cleared": 0, "camp_spoils": 0,
 		"build_hands": [{"cards": run.hand.labels()}]}
@@ -122,6 +125,11 @@ func end_round() -> void:
 	entry["stock_end"] = run.stock.duplicate()
 	entry["town"] = town_snapshot()
 	entry["townsfolk_end"] = folk_counts()
+	var leanings := {}
+	for u in run.world.folk:
+		if u.leaning != "":
+			leanings[u.leaning] = int(leanings.get(u.leaning, 0)) + 1
+	entry["leanings_end"] = leanings
 	rounds.append(entry)
 	entry = {}
 

@@ -1,7 +1,15 @@
 {
-	"_note": "Townsfolk roles, handled as groups. They do their job on their own; you only choose who joins at dawn. tags describe the role; fighter = stands and fights, and counts toward the town's power level (sim/power.gd).",
+	"_note": "Townsfolk roles, handled as groups. They do their job on their own; you only choose who joins at dawn. tags describe the role; fighter = stands and fights, and counts toward the town's power level (sim/power.gd). leanings (optional): a role's dawn cards come with a leaning, rolled when the card is dealt from those whose age (if any) the town has reached; the newcomer still gathers anything, but scores trips for its goods leaning_weight times higher (sim/folk_ai.gd plan_trip). leaning_cards: how many cards of that role, each with a different leaning, go into the dawn pool. Newcomers from family cards and the town's first people have no leaning.",
 	"tribesperson": {"name": "Tribesperson", "text": "Gathers food, fuel, wood and stone, and patches the hearth. Weak: must be protected.",
-		"hp": 18, "attack": 2, "range": 18, "cooldown": 1.2, "speed": 55, "carry": 2, "gather_seconds": 3, "repair_per_wood": 6, "color": "#c8b48a"},
+		"hp": 18, "attack": 2, "range": 18, "cooldown": 1.2, "speed": 55, "carry": 2, "gather_seconds": 3, "repair_per_wood": 6, "color": "#c8b48a",
+		"leaning_weight": 1.5, "leaning_cards": 2,
+		"leanings": {
+			"forager": {"name": "Forager", "text": "Would rather pick berries and bring food home.", "goods": ["food"]},
+			"woodcutter": {"name": "Woodcutter", "text": "Would rather fell timber and bring wood home.", "goods": ["wood"]},
+			"quarrier": {"name": "Quarrier", "text": "Would rather break rock: stone and flint.", "goods": ["stone", "flint"]},
+			"brushcutter": {"name": "Brushcutter", "text": "Would rather gather brush and embers to keep the fire fed.", "goods": ["fuel"]},
+			"prospector": {"name": "Prospector", "text": "Would rather dig ore: copper, cassiterite and bog iron.", "goods": ["copper", "cassiterite", "bog_iron"], "age": "bronze"}
+		}},
 	"warrior": {"tags": ["fighter"], "name": "Warrior", "text": "Patrols the settlement and fights anything that comes close. Never leaves home.",
 		"hp": 45, "attack": 6, "range": 24, "cooldown": 1.0, "speed": 60, "patrol_radius": 130, "color": "#c0603a"},
 	"craftsperson": {"name": "Craftsperson", "text": "Raises the buildings you order. Gathers wood when there is nothing to build.",

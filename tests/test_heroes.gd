@@ -74,6 +74,8 @@ func test_any_lodging_brings_hero_cards() -> void:
 		for card in run.pick_offer:
 			if card["kind"] == "hero":
 				seen += 1
+		# Each dawn deals from its own seeded stream, so look at a different round's dawn each time.
+		run.round_number += 1
 		run.people.offer_picks()
 	check(seen > 0, "a mead hall alone lets heroes appear at dawn")
 
