@@ -375,19 +375,33 @@ func count_leanings() -> Dictionary:
 
 
 ## The highest band tier a role's townsfolk sharing a leaning reach at this size (data band_tiers), or {}.
-func tier_for(role: String, size: int) -> Dictionary:
-	var best := {}
+## A leaning the town's traditions favour bands tradition_band_ease sooner.
+func tier_for(role: String, leaning: String, size: int) -> Dictionary:
+	var tiers: Array = w.content.townsfolk[role].get("band_tiers", [])
+	var level := band_level(role, leaning, size)
+	return tiers[level - 1] if level > 0 else {}
+
+
+## How many band tiers a role's townsfolk sharing a leaning reach at this size (0 for none).
+func band_level(role: String, leaning: String, size: int) -> int:
+	var ease := w.content.int_num("tradition_band_ease") if w.run.tradition_leanings().has(leaning) else 0
+	var level := 0
 	for tier: Dictionary in w.content.townsfolk[role].get("band_tiers", []):
-		if size >= int(tier["size"]):
-			best = tier
-	return best
+		if size >= int(tier["size"]) - ease:
+			level += 1
+	return level
+
+
+## The size a band tier needs for this leaning (traditions included).
+func band_size_needed(role: String, leaning: String, tier: Dictionary) -> int:
+	return int(tier["size"]) - (w.content.int_num("tradition_band_ease") if w.run.tradition_leanings().has(leaning) else 0)
 
 
 ## The band tier a townsperson's leaning reaches this step, or {} when it has no leaning or too few share it.
 func band_tier(unit: Unit) -> Dictionary:
 	if unit.leaning == "" or not unit.alive:
 		return {}
-	return tier_for(unit.type_id, int(leaning_counts.get(unit.type_id + "/" + unit.leaning, 0)))
+	return tier_for(unit.type_id, unit.leaning, int(leaning_counts.get(unit.type_id + "/" + unit.leaning, 0)))
 
 
 ## A node townsfolk may gather from now: stocked, theirs to work, of the town's age, and safe.

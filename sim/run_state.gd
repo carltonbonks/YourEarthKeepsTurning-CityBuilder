@@ -33,6 +33,9 @@ var fallen_folk := 0
 var relics: Array[String] = []
 var relic_acquired_round := {}
 var relic_offer: Array[String] = []
+## Founding traditions chosen before round 1 (data/traditions.json), and whether that choice is made (or skipped).
+var traditions: Array[String] = []
+var traditions_settled := false
 ## The spoils in this round's relic offer: {id, kind (enemy tag), foes (how many of that kind came)}, or {}.
 var spoils := {}
 ## Max hearth HP the town has earned for good (Ancestor Bones).
@@ -109,7 +112,51 @@ func mod(key: String) -> float:
 	for id in relics:
 		var effects: Dictionary = content.relics[id]["effects"]
 		total += float(effects.get(key, 0.0))
+	for id in traditions:
+		total += float(content.traditions[id].get("effects", {}).get(key, 0.0))
 	return total
+
+
+# --- Founding traditions -----------------------------------------------------
+
+## True while the run waits for its founding traditions: round 1's build phase, before they are chosen or skipped.
+func awaiting_traditions() -> bool:
+	return not traditions_settled and round_number == 1 and phase == Phase.BUILD
+
+
+## Founds the town on up to traditions_to_pick traditions (an empty list founds it on none). Their start goods
+## arrive, their effects apply and round 1's building hand is dealt again with their buildings favoured.
+func choose_traditions(ids: Array) -> void:
+	assert(awaiting_traditions())
+	traditions_settled = true
+	for id: String in ids:
+		if content.traditions.has(id) and not traditions.has(id) and traditions.size() < content.int_num("traditions_to_pick"):
+			traditions.append(id)
+	for id in traditions:
+		var start: Dictionary = content.traditions[id].get("start", {})
+		for good: String in start:
+			stock[good] = int(stock.get(good, 0)) + int(start[good])
+		tell("The people keep the ways of the %s." % content.traditions[id]["name"])
+	for u in world.folk:
+		world.folk_ai.apply_folk_stats(u)
+	for h in heroes:
+		world.hero_ai.apply_hero_stats(h)
+	hand.deal()
+
+
+## The leanings the town's traditions favour.
+func tradition_leanings() -> Array[String]:
+	var out: Array[String] = []
+	for id in traditions:
+		var leaning := str(content.traditions[id].get("leaning", ""))
+		if leaning != "":
+			out.append(leaning)
+	return out
+
+
+## Whether one of the town's traditions favours this building's cards.
+func tradition_favours(building: String) -> bool:
+	return traditions.any(func(id: String) -> bool: return content.traditions[id].get("buildings", []).has(building))
 
 
 ## The hearth's health: the base, relics, and standing buildings that strengthen it (the Stone keep).
@@ -232,6 +279,8 @@ func craft_tier(recipe_id: String) -> int:
 ## Ends the build phase; the first dawn of the round follows.
 func begin_round() -> void:
 	assert(phase == Phase.BUILD)
+	# Starting round 1 without choosing founds the town on no traditions.
+	traditions_settled = true
 	world.start_round()
 	people.offer_picks()
 

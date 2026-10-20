@@ -26,6 +26,11 @@ var style := "balanced"
 ## balance_run.gd sets these with gates= and gate_round=.
 var gates := 2
 var gate_round := 3
+## Whether it founds the town on its style's traditions (TRADITIONS) or on none (balance_run.gd traditions=0).
+var traditions := true
+const TRADITIONS := {"balanced": ["hunters", "stoneworkers"], "workers": ["stoneworkers", "woodfolk"],
+	"heroes": ["hunters", "traders"], "market": ["traders", "smiths"], "bronze": ["smiths", "woodfolk"],
+	"medieval": ["woodfolk", "stoneworkers"]}
 ## Gardens: one a round while food in store would last fewer than this many days (0 = never). balance_run.gd: gardens=.
 var garden_days := 3.0
 ## Orders the forester and charcoal pit when the cards recommend them. balance_run.gd: upkeep=0 turns it off.
@@ -50,6 +55,8 @@ func play_run(run: RunState) -> void:
 
 ## Orders from the round's building cards, then redraws once when shells are spare and orders again.
 func build(run: RunState) -> void:
+	if run.awaiting_traditions():
+		run.choose_traditions(TRADITIONS.get(style, []) if traditions else [])
 	_build_pass(run)
 	if int(run.stock["shells"]) >= redraw_above and run.hand.can_redraw():
 		run.hand.redraw()

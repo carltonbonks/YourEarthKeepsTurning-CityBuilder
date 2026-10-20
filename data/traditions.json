@@ -1,0 +1,15 @@
+{
+	"_note": "Founding traditions: before round 1 the player picks traditions_to_pick (data/balance.json) of these, or none. Each tilts the run: buildings (their cards come up tradition_card_weight times as often in the building hand), leaning (that leaning is always one of the two tribesperson cards shuffled into each dawn's pool, so it is offered more often, and its bands form tradition_band_ease sooner), effects (summed with relics' in RunState.mod(), same keys as data/relics.json) and start (goods added when chosen). sim/run_state.gd choose_traditions.",
+	"hunters": {"name": "Hunters", "text": "Born to the chase. Hunting lodges, hide racks and drying racks come up often, foragers band sooner, and heroes hit 1 harder.",
+		"buildings": ["hunting_lodge", "hide_rack", "drying_rack", "smoke_hut"], "leaning": "forager", "effects": {"hero_attack": 1}, "start": {"food": 8}},
+	"woodfolk": {"name": "Woodfolk", "text": "People of the deep woods. Foresters, charcoal pits and longhouses come up often, woodcutters band sooner, and you start with 10 more wood.",
+		"buildings": ["forester", "charcoal_pit", "longhouse"], "leaning": "woodcutter", "effects": {}, "start": {"wood": 10}},
+	"stoneworkers": {"name": "Stoneworkers", "text": "Wall-builders. Stone-layers' yards, gates and watch posts come up often, quarriers band sooner, and towers shoot 2 harder.",
+		"buildings": ["stone_yard", "gate", "watch_post", "knapper"], "leaning": "quarrier", "effects": {"tower_attack": 2}, "start": {"stone": 4}},
+	"firekeepers": {"name": "Firekeepers", "text": "Keepers of the flame. Charcoal pits, spirit shrines and smoke huts come up often, brushcutters band sooner, and the fire burns 1 less fuel a night.",
+		"buildings": ["charcoal_pit", "shrine", "smoke_hut"], "leaning": "brushcutter", "effects": {"fuel_saving": 1}, "start": {"fuel": 6}},
+	"traders": {"name": "Traders", "text": "Shell-counters and hagglers. The market, its stalls and the mead hall come up often, and traders leave 5 more shells every round.",
+		"buildings": ["market", "provisions_stall", "arms_stall", "hide_stall", "charm_stall", "tavern"], "effects": {"income": 5}, "start": {"shells": 15}},
+	"smiths": {"name": "Smiths", "text": "Workers of flint and metal. Knappers, bone carvers, smelters and bronzesmiths come up often, prospectors band sooner, and heroes pay 20% less for gear.",
+		"buildings": ["knapper", "bone_carver", "smelter", "bronzesmith"], "leaning": "prospector", "effects": {"gear_discount": 0.2}, "start": {"stone": 3}}
+}

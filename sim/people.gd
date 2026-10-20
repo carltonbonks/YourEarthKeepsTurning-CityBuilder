@@ -32,8 +32,10 @@ func offer_picks() -> void:
 		var leanings := leanings_open(role)
 		if leanings.is_empty():
 			pool.append({"kind": "folk", "role": role, "cost": 0})
+		# A leaning the town's traditions favour is always among those dealt (the first one, if several).
+		var favoured := run.tradition_leanings().filter(func(l: String) -> bool: return leanings.has(l))
 		for i in mini(leanings.size(), int(content.townsfolk[role].get("leaning_cards", 1))):
-			var leaning: String = rng.pick(leanings)
+			var leaning: String = favoured[0] if i == 0 and not favoured.is_empty() else rng.pick(leanings)
 			leanings.erase(leaning)
 			pool.append({"kind": "folk", "role": role, "cost": 0, "leaning": leaning})
 	if world.hero_ai.count_lodgings() > 0:

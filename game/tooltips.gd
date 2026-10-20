@@ -61,18 +61,19 @@ static func band_line(run: RunState, role: String, leaning: String, joining := f
 	var plural := "%ss" % lean["name"].to_lower()
 	var size := int(run.world.folk_ai.count_leanings().get(role + "/" + leaning, 0)) + (1 if joining else 0)
 	var goods := " or ".join(lean["goods"]).replace("_", " ")
-	var now := run.world.folk_ai.tier_for(role, size)
+	var folk_ai := run.world.folk_ai
+	var now := folk_ai.tier_for(role, leaning, size)
 	var next := {}
 	for tier: Dictionary in tiers:
-		if size < int(tier["size"]):
+		if size < folk_ai.band_size_needed(role, leaning, tier):
 			next = tier
 			break
 	if now.is_empty():
-		return "%d %s%s; %d make a band (%s)." % [size, plural, " with this one" if joining else "", int(next["size"]),
-			band_bonus(now, next, goods)]
+		return "%d %s%s; %d make a band (%s)." % [size, plural, " with this one" if joining else "",
+			folk_ai.band_size_needed(role, leaning, next), band_bonus(now, next, goods)]
 	var out := "Band of %d %s: %s." % [size, plural, band_bonus({}, now, goods)]
 	if not next.is_empty():
-		out += " At %d: %s." % [int(next["size"]), band_bonus(now, next, goods)]
+		out += " At %d: %s." % [folk_ai.band_size_needed(role, leaning, next), band_bonus(now, next, goods)]
 	return out
 
 

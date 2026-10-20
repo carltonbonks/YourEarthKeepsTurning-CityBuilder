@@ -52,7 +52,8 @@ extends RefCounted
 ## 23: spoils of a beaten attack: per round "spoils" (when one was offered) = {id, kind (enemy tag), foes (how many of
 ##     that kind came), taken, goods (good -> amount it brought, when taken)}; its id is also in "relic_offer".
 ## 24: hearty meals: per round "hearty_meals" (extra meals heroes ate at dawn, each making them well fed for the day).
-const RECORD_FORMAT := 24
+## 25: founding traditions: "traditions" (the ids chosen before round 1, [] for none).
+const RECORD_FORMAT := 25
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -92,6 +93,7 @@ func to_record() -> Dictionary:
 		"townsfolk": folk_counts(),
 		"townsfolk_lost": run.fallen_folk,
 		"relics": run.relics.duplicate(),
+		"traditions": run.traditions.duplicate(),
 		"prices": run.prices.duplicate(),
 		"age": run.age,
 		"age_up_round": run.age_up_round,
@@ -139,8 +141,7 @@ func end_round() -> void:
 	var counts := run.world.folk_ai.count_leanings()
 	for key: String in counts:
 		var parts := key.split("/")
-		var tiers: Array = run.content.townsfolk[parts[0]].get("band_tiers", [])
-		var reached := tiers.filter(func(t: Dictionary) -> bool: return int(counts[key]) >= int(t["size"])).size()
+		var reached := run.world.folk_ai.band_level(parts[0], parts[1], int(counts[key]))
 		if reached > 0:
 			bands[parts[1]] = reached
 	entry["bands_end"] = bands
