@@ -310,5 +310,6 @@ func test_gardens_bring_food_every_dawn() -> void:
 	run.stock["food"] = 50
 	var need := run.food_needed_today()
 	run.daily_upkeep()
-	check_eq(run.stock["food"], 50 + grows - need, "garden food arrives before the town eats")
+	var hearty := int(run.record.entry["hearty_meals"]) * run.content.int_num("hearty_food")
+	check_eq(run.stock["food"], 50 + grows - need - hearty, "garden food arrives before the town eats (and heroes eat hearty)")
 	check_eq(run.record.entry["food_grown"], grows, "food grown is recorded")
