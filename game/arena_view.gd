@@ -238,8 +238,6 @@ func _draw_node(node: Dictionary, font: Font) -> void:
 	_shadow(at, r)
 	var col := Color(def["color"])
 	draw_circle(p, r, col if left > 0.0 else Color(col, 0.25))
-	if _doomed(node["pos"]):
-		draw_arc(p, r + 3.0, 0, TAU, 20, Color(run.content.plates["colors"]["subduct"]), 2.0)
 	if zoom > 1.6:
 		draw_string(font, p + Vector2(r + 2, 4), "%s %d" % [def["name"], node["amount"]], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#c8c8b0"))
 
@@ -260,8 +258,6 @@ func _draw_den(den: Dictionary, font: Font) -> void:
 	_shadow(at, r)
 	draw_circle(p, r, Color(def["color"]))
 	draw_arc(p, r, 0, TAU, 24, Color("#a05050"), 2.0)
-	if _doomed(den["pos"]):
-		draw_arc(p, r + 4.0, 0, TAU, 24, Color(run.content.plates["colors"]["subduct"]), 2.5)
 	draw_string(font, p + Vector2(-r, r + 12), def["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#d0a0a0"))
 
 
@@ -577,14 +573,13 @@ func _draw_plots() -> void:
 			draw_polyline(_closed(shape), Color(0.6, 0.65, 0.45, 0.18), 1.0)
 
 
-## The earth plates: raw rifts, ridges, the seams and the ring edges. While building, each seam is coloured by
-## what the next shift will do to it and arrows show which way each plate will turn.
+## The earth plates: raw rifts, ridges, and faint lines for the ring edges and seams. The earth just shifts:
+## the map shows the land as it is, not what the next shift will do (Yusuf, 2026-10-20).
 func _draw_earth() -> void:
 	var earth := run.world.earth
 	if not earth.enabled():
 		return
 	var colors: Dictionary = run.content.plates["colors"]
-	var building := run.phase == RunState.Phase.BUILD
 	for strip in earth.raw:
 		var ring: Dictionary = earth.rings[int(strip["ring"])]
 		draw_colored_polygon(_screen_poly(_sector(float(ring["r0"]), float(ring["r1"]), strip["a0"], strip["a1"])),
@@ -592,40 +587,12 @@ func _draw_earth() -> void:
 	var cell := run.world.pathing.cell
 	for i in earth.ridge_cells():
 		_ground_square(run.world.pathing.center(i), cell * 0.55, Color(colors["ridge"]))
+	var faint := Color(colors["seam"], 0.3)
 	for ring in earth.rings:
-		draw_polyline(_closed(_ground_ring(Vector2.ZERO, float(ring["r0"]), 96)), Color(colors["seam"], 0.45), 1.0)
-	for entry: Dictionary in earth.forecast():
-		var ring: Dictionary = earth.rings[int(entry["ring"])]
-		var dir := Vector2.from_angle(float(entry["angle"]))
-		var col := Color(colors["seam"])
-		var width := 1.5
-		if building and colors.has(entry["kind"]):
-			col = Color(colors[entry["kind"]])
-			width = 3.0
-		draw_line(_to_screen(dir * float(ring["r0"])), _to_screen(dir * float(ring["r1"])), col, width)
-	if not building:
-		return
-	for ri in earth.rings.size():
-		var ring: Dictionary = earth.rings[ri]
-		var seams: Array = ring["seams"]
-		var r := (float(ring["r0"]) + float(ring["r1"])) / 2.0
-		for k in seams.size():
-			var a0 := float(seams[k])
-			var mid := a0 + fposmod(float(seams[(k + 1) % seams.size()]) - a0, TAU) / 2.0
-			var turn := earth.next_turn(Vector2.from_angle(mid) * r)
-			_turn_arrow(r, mid - turn / 2.0, mid + turn / 2.0, Color("#d8d0b0", 0.7))
-
-
-## An arrow along the circle of radius r from angle a0 to a1.
-func _turn_arrow(r: float, a0: float, a1: float, color: Color) -> void:
-	var points := PackedVector2Array()
-	for n in 9:
-		points.append(_to_screen(Vector2.from_angle(lerpf(a0, a1, n / 8.0)) * r))
-	draw_polyline(points, color, 2.0)
-	var tip := points[-1]
-	var back := (points[-2] - tip).normalized() * 8.0
-	draw_line(tip, tip + back.rotated(0.5), color, 2.0)
-	draw_line(tip, tip + back.rotated(-0.5), color, 2.0)
+		draw_polyline(_closed(_ground_ring(Vector2.ZERO, float(ring["r0"]), 96)), faint, 1.0)
+		for a: float in ring["seams"]:
+			var dir := Vector2.from_angle(a)
+			draw_line(_to_screen(dir * float(ring["r0"])), _to_screen(dir * float(ring["r1"])), faint, 1.0)
 
 
 ## Ground points outlining the strip of rings between radii r0 and r1, from angle a0 clockwise to a1.
@@ -661,11 +628,6 @@ func _slid(p: Vector2) -> Vector2:
 		return p
 	var ease_t := 1.0 - pow(1.0 - t, 3.0)
 	return p.rotated(-(1.0 - ease_t) * run.world.earth.last_turn(p))
-
-
-## True while building if the next shift will swallow whatever stands at p.
-func _doomed(p: Vector2) -> bool:
-	return run.phase == RunState.Phase.BUILD and run.world.earth.doomed(p)
 
 
 ## Trails, worn paths and roads.

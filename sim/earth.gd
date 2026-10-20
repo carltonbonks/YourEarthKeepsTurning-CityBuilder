@@ -10,8 +10,8 @@ extends RefCounted
 ##   that grows each colliding shift and in time raises an upthrust node;
 ## - an opening seam is a rift: raw, slow ground until the next shift, often with a fresh node.
 ## Everything on a plate rides it: resource nodes, dens and the war camp, thickets, trails and roads,
-## and anyone standing out there. The next shift is known in advance (`forecast`, `doomed`), so the
-## map can show it. Numbers are in data/plates.json.
+## and anyone standing out there. The next shift can be worked out in advance (`forecast`, `doomed`) for
+## tests and for later buildings, relics and heroes that read the earth; the map doesn't show it. Numbers are in data/plates.json.
 
 var w: World
 var def: Dictionary

@@ -265,20 +265,11 @@ func test_record_has_each_shift() -> void:
 		check_eq(int(shift.get("shift", 0)), 1, "it was the first shift")
 
 
-func test_hover_text_warns_of_the_next_shift() -> void:
+func test_hover_text_names_the_seam_without_a_forecast() -> void:
 	var run := _run()
-	var w := run.world
-	var earth := w.earth
-	check(not _shift_until(earth, "subduct").is_empty(), "a seam subducts")
-	var p := Vector2.INF
-	for ri in earth.rings.size():
-		p = _doomed_point(earth, ri)
-		if p != Vector2.INF:
-			break
-	w.nodes.append({"type": "grove", "gives": "wood", "pos": p, "amount": 24, "max": 24, "heroes_only": false, "wild": false, "age": ""})
-	var tip := Tooltips.node(run, w.nodes[-1])
-	check(tip["warnings"].any(func(line: String) -> bool: return "swallows" in line), "a doomed grove warns of it")
+	var earth := run.world.earth
 	var entry: Dictionary = earth.forecast()[0]
 	var seam := Tooltips.seam(run, entry)
-	check(seam["lines"].any(func(line: String) -> bool: return line.begins_with("Next shift")), "a seam says what the next shift does")
+	check("seam" in String(seam["title"]).to_lower(), "a seam names its kind")
+	check(not seam["lines"].any(func(line: String) -> bool: return "Next shift" in line), "but not what the next shift does")
 	run.dispose()
