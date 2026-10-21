@@ -148,7 +148,7 @@ func show_traditions(chosen: Array = []) -> void:
 
 ## What stops the town taking a dawn card: no room, or not enough shells.
 func _why_not_pick(card: Dictionary) -> String:
-	if card["kind"] != "promote" and run.population() + run.people.card_people(card) > run.housing():
+	if not card["kind"] in ["promote", "venture"] and run.population() + run.people.card_people(card) > run.housing():
 		return "No room: build homes"
 	return UiKit.shortfall(run.stock, {"shells": card["cost"]})
 
@@ -192,6 +192,8 @@ func _pick_card(card: Dictionary) -> Button:
 			btn.tooltip_text = "A whole family moves in at once: %s.\nEach eats %s a day." % [", ".join(parts), _food_each()]
 		"promote":
 			btn = _promote_card(card)
+		"venture":
+			btn = _venture_card(card)
 		_:
 			var def: Dictionary = content.townsfolk[card["role"]]
 			if card.has("leaning"):
@@ -208,6 +210,20 @@ func _pick_card(card: Dictionary) -> Button:
 			else:
 				btn = UiKit.card("Townsperson", def["name"], UiKit.cost_text(run.stock, {}), def["text"], eats, PICK_SIZE, UiKit.CARD_BORDER)
 				btn.tooltip_text = "%s\n%s." % [def["text"], eats]
+	return btn
+
+
+## A venture: send tribespeople out, some never come back, the rest bring goods home.
+func _venture_card(card: Dictionary) -> Button:
+	var v: Dictionary = run.content.ventures[card["venture"]]
+	var terms := run.people.venture_terms(card["venture"])
+	var lose: Array = terms["lose"]
+	var losing := "%d" % lose[0] if lose[0] == lose[1] else "%d-%d" % [lose[0], lose[1]]
+	var brings := ", ".join(terms["goods"].keys().map(func(g: String) -> String: return "%d %s" % [terms["goods"][g], g.replace("_", " ")]))
+	var btn := UiKit.card("Venture: send %d tribespeople" % terms["send"], v["name"], "[color=#ff7a6a]%s won't come back[/color]" % losing,
+		"Brings home %s" % brings, "Instead of a newcomer", PICK_SIZE, UiKit.CARD_BORDER)
+	btn.tooltip_text = "%s\nSend %d tribespeople (you have %d). %s of them never come home; the rest bring %s.\nInstead of a newcomer today." % [
+		v["text"], terms["send"], run.count_role("tribesperson"), losing, brings]
 	return btn
 
 

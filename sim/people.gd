@@ -46,13 +46,17 @@ func offer_picks() -> void:
 		pool.append({"kind": "family", "role": "family", "cost": 0, "roles": content.balance["family_roles"].duplicate()})
 	run.pick_offer = []
 	var promote := _promotion_card(rng)
-	var slots := maxi(1, content.int_num("pick_choices") + int(run.mod("pick_bonus"))) - (0 if promote.is_empty() else 1)
+	var venture := _venture_card()
+	var slots := maxi(1, content.int_num("pick_choices") + int(run.mod("pick_bonus"))) - (0 if promote.is_empty() else 1) \
+		- (0 if venture.is_empty() else 1)
 	while run.pick_offer.size() < slots and not pool.is_empty():
 		var card: Dictionary = rng.pick(pool)
 		pool.erase(card)
 		run.pick_offer.append(card)
 	if not promote.is_empty():
 		run.pick_offer.append(promote)
+	if not venture.is_empty():
+		run.pick_offer.append(venture)
 	run.picks_left = 1 + int(run.mod("extra_picks"))
 	run.phase = RunState.Phase.PICK
 
@@ -73,10 +77,10 @@ func hero_card_cost(class_id: String) -> int:
 	return int(run.content.hero_classes[class_id].get("card_cost", run.content.int_num("hero_card_cost")))
 
 
-## How many people a dawn card brings into town (0 for a promotion).
+## How many people a dawn card brings into town (0 for a promotion or a venture).
 func card_people(card: Dictionary) -> int:
 	match card["kind"]:
-		"promote":
+		"promote", "venture":
 			return 0
 		"family":
 			return card["roles"].size()
@@ -86,9 +90,68 @@ func card_people(card: Dictionary) -> int:
 func card_label(card: Dictionary) -> String:
 	if card["kind"] == "promote":
 		return "promote:" + card["role"]
+	if card["kind"] == "venture":
+		return "venture:" + card["venture"]
 	if card["kind"] == "family":
 		return "family"
 	return "hero:" + card["hero"].type_id if card["kind"] == "hero" else card["role"]
+
+
+# --- Ventures ---------------------------------------------------------------
+
+## Now and then a venture card: send tribespeople out for goods, some never come back (data/ventures.json).
+## {} when none comes up this dawn or the town can't spare enough tribespeople.
+func _venture_card() -> Dictionary:
+	var content := run.content
+	var rng := SeededRng.stream(run.run_seed, "venture", run.round_number * 10 + run.world.day_index())
+	if content.ventures.is_empty() or rng.randf() >= content.num("venture_chance"):
+		return {}
+	var spare := run.count_role("tribesperson") - content.int_num("venture_keep_home")
+	var open: Array = content.ventures.keys().filter(func(id: String) -> bool:
+		return content.age_reached(run.age, str(content.ventures[id].get("age", ""))) and int(content.ventures[id]["send"]) <= spare)
+	if open.is_empty():
+		return {}
+	open.sort()
+	var id: String = rng.pick(open)
+	return {"kind": "venture", "role": "venture", "cost": 0, "venture": id}
+
+
+## What a venture risks and brings, with relics counted: send, lose (lowest and highest) and goods.
+func venture_terms(id: String) -> Dictionary:
+	var v: Dictionary = run.content.ventures[id]
+	var safety := int(run.mod("venture_safety"))
+	var grow := 1.0 + run.content.num("venture_growth_per_round") * (run.round_number - 1)
+	grow *= 1.0 + run.mod("venture_bonus")
+	var goods := {}
+	for good: String in v["gain"]:
+		goods[good] = int(ceil(float(v["gain"][good]) * grow))
+	return {"send": int(v["send"]), "lose": [maxi(0, int(v["lose"][0]) - safety), maxi(0, int(v["lose"][1]) - safety)], "goods": goods}
+
+
+## Sends the tribespeople out: some never come back (chosen at random), the goods come home.
+## Returns {lost, goods} for the record.
+func go_venturing(card: Dictionary) -> Dictionary:
+	var id: String = card["venture"]
+	var terms := venture_terms(id)
+	var rng := SeededRng.stream(run.run_seed, "venture_lost", run.round_number * 10 + run.world.day_index())
+	var lost := rng.randi_range(terms["lose"][0], terms["lose"][1])
+	var tribe: Array = run.world.folk.filter(func(u: Unit) -> bool: return u.type_id == "tribesperson" and u.alive)
+	for i in mini(lost, tribe.size()):
+		var gone: Unit = tribe[rng.randi_range(0, tribe.size() - 1)]
+		tribe.erase(gone)
+		run.world.folk.erase(gone)
+	for good: String in terms["goods"]:
+		run.stock[good] = int(run.stock.get(good, 0)) + int(terms["goods"][good])
+	for effect: String in ["venture_safety", "venture_bonus"]:
+		if run.has_effect(effect):
+			run.relic_fired(effect)
+	var brought := ", ".join(terms["goods"].keys().map(func(g: String) -> String: return "%d %s" % [terms["goods"][g], g.replace("_", " ")]))
+	var name: String = run.content.ventures[id]["name"]
+	if lost == 0:
+		run.tell("%s: all %d tribespeople come home, with %s." % [name, terms["send"], brought])
+	else:
+		run.tell("%s: %d of %d tribespeople never come home. The rest bring %s." % [name, lost, terms["send"], brought])
+	return {"lost": lost, "goods": terms["goods"]}
 
 
 # --- Promotions -------------------------------------------------------------

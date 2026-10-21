@@ -53,7 +53,9 @@ extends RefCounted
 ##     that kind came), taken, goods (good -> amount it brought, when taken)}; its id is also in "relic_offer".
 ## 24: hearty meals: per round "hearty_meals" (extra meals heroes ate at dawn, each making them well fed for the day).
 ## 25: founding traditions: "traditions" (the ids chosen before round 1, [] for none).
-const RECORD_FORMAT := 25
+## 26: ventures: a dawn pick can take "venture:<id>" (data/ventures.json); that entry has "venture_lost" (tribespeople
+##     who never came home) and "venture_goods" (good -> amount brought).
+const RECORD_FORMAT := 26
 
 var run: RunState
 ## Finished rounds, oldest first.
