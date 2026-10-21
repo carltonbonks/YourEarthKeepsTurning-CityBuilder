@@ -5,9 +5,11 @@ extends PanelContainer
 ## and the caravan in later ages, and the redraw. A card the town needs says why on a gold strip at
 ## the top ("Food runs out in 2 days"); a card the town can't take says why on a red strip at the
 ## bottom ("Need 3 more wood"). Costs show red where the town is short. Shown only while building.
-## Every choice goes through run.hand; `changed` asks the screen to refresh.
+## Every choice goes through run.hand; `changed` asks the screen to refresh. Hovering a building
+## card sends `previewing` with its type (and "" on leaving), so the map can blink the plot it would take.
 
 signal changed
+signal previewing(type: String)
 
 const RECOMMEND_COLOR := UiKit.RECOMMEND_COLOR
 const CARD_SIZE := Vector2(150, 132)
@@ -36,6 +38,7 @@ func _init() -> void:
 
 
 func refresh() -> void:
+	previewing.emit("")
 	for child in _row.get_children():
 		child.queue_free()
 	for type: String in run.hand.basics():
@@ -106,6 +109,8 @@ func _card(type: String, need: String, kind: String) -> Button:
 	btn.disabled = not run.hand.can_order(type)
 	UiKit.fade_if_disabled(btn, _why_not(blocked, def["cost"]))
 	btn.pressed.connect(_act.bind(run.hand.order.bind(type)))
+	btn.mouse_entered.connect(func() -> void: previewing.emit(type))
+	btn.mouse_exited.connect(func() -> void: previewing.emit(""))
 	return btn
 
 

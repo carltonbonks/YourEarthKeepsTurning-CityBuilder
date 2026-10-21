@@ -161,7 +161,14 @@ func _refresh() -> void:
 	_hand_view.visible = run.phase == RunState.Phase.BUILD
 	if _hand_view.visible:
 		_hand_view.refresh()
+	else:
+		_arena.preview_plot = -1
 	_refresh_live()
+
+
+## A building card is hovered: the map blinks the plot it would go on ("" clears it).
+func _preview_building(type: String) -> void:
+	_arena.preview_plot = run.world.town.choose_plot(type) if type != "" else -1
 
 
 ## Parts that change while the sim runs.
@@ -252,6 +259,7 @@ func _build_ui() -> void:
 	_hand_view.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	_hand_view.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_hand_view.changed.connect(_refresh)
+	_hand_view.previewing.connect(_preview_building)
 	map_box.add_child(_hand_view)
 
 	# Underneath: the heroes as portraits, and the story's last lines.

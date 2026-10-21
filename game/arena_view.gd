@@ -45,6 +45,8 @@ var _paved_at := {}
 var _shift_seen := [-1, null]
 var _slide_from_ms := -1.0
 var night := NightCamera.new()
+## The plot the hovered building card would go on, blinked on the map; -1 for none.
+var preview_plot := -1
 
 
 func reset_camera() -> void:
@@ -172,6 +174,7 @@ func _draw() -> void:
 	draw_polyline(_closed(_ground_ring(Vector2.ZERO, content.num("settlement_radius"), 64)), Color("#4d5c3a"), 1.0)
 	_draw_plots()
 	_draw_ground()
+	_draw_preview()
 	_ground_circle(Vector2.ZERO, World.HEARTH_RADIUS, Color("#5a4030"), 32)
 
 	# Warned attack sides: red wedges at the map edge until the wave arrives.
@@ -579,7 +582,7 @@ func _draw_hero(hero: Unit, font: Font) -> void:
 	draw_string(font, p + Vector2(r + 3, 4), hero.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
 
 
-## Ring plots: free ones in opened rings as faint outlines, obstacles filled in.
+## Ring plots: free ones in opened rings as nearly invisible outlines (Yusuf, 2026-10-21), obstacles filled in.
 func _draw_plots() -> void:
 	var town := run.world.town
 	for k in town.plots.size():
@@ -590,7 +593,17 @@ func _draw_plots() -> void:
 		if plot["obstacle"] != "":
 			draw_colored_polygon(shape, Color(run.content.town["obstacles"][plot["obstacle"]]["color"]))
 		else:
-			draw_polyline(_closed(shape), Color(0.6, 0.65, 0.45, 0.18), 1.0)
+			draw_polyline(_closed(shape), Color(0.6, 0.65, 0.45, 0.05), 1.0)
+
+
+## The plot a hovered building card would take, blinking about twice a second.
+func _draw_preview() -> void:
+	if preview_plot < 0 or preview_plot >= run.world.town.plots.size():
+		return
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012)
+	var shape := _screen_poly(run.world.town.plot_outline(preview_plot))
+	draw_colored_polygon(shape, Color(1.0, 0.85, 0.35, 0.2 + 0.35 * pulse))
+	draw_polyline(_closed(shape), Color(1.0, 0.9, 0.5, 0.55 + 0.45 * pulse), 2.5)
 
 
 ## The earth plates: raw rifts, ridges, and faint lines for the ring edges and seams. The earth just shifts:
