@@ -13,6 +13,8 @@ var cards: Array[Dictionary] = []
 var milestone := {}
 ## Redraws used this round.
 var redraws := 0
+## A card held over to the next round's hand (like freezing the shop in Hearthstone Battlegrounds), or "".
+var held := ""
 
 
 func _init(run_state: RunState) -> void:
@@ -22,7 +24,25 @@ func _init(run_state: RunState) -> void:
 ## Deals a fresh hand for the round (called as the build phase begins).
 func deal() -> void:
 	redraws = 0
+	var kept := held
+	held = ""
 	_fill(SeededRng.stream(run.run_seed, "build_cards", run.round_number * 10))
+	# A held card comes back on top of the new hand, as long as it can still go up.
+	if kept != "" and eligible(kept) and not cards.any(func(c: Dictionary) -> bool: return c["building"] == kept):
+		cards.append({"building": kept, "need": need(kept), "held": true})
+
+
+## Holds a card in hand over to the next round (one at a time; holding it again lets it go). Free.
+func can_hold(type: String) -> bool:
+	return run.phase == RunState.Phase.BUILD and cards.any(func(c: Dictionary) -> bool: return c["building"] == type)
+
+
+func hold(type: String) -> bool:
+	if not can_hold(type):
+		return false
+	held = "" if held == type else type
+	run.record.note_action({"kind": "hold", "building": type, "held": held == type})
+	return true
 
 
 ## Deals new cards in place of the unused ones, once a round, for shells.
@@ -38,6 +58,9 @@ func redraw() -> bool:
 	redraws += 1
 	var before := cards.map(func(c: Dictionary) -> String: return c["building"])
 	_fill(SeededRng.stream(run.run_seed, "build_cards", run.round_number * 10 + redraws), before)
+	# A redraw never takes away the held card.
+	if held != "" and not cards.any(func(c: Dictionary) -> bool: return c["building"] == held):
+		cards.append({"building": held, "need": need(held)})
 	run.record.note_action({"kind": "redraw", "cost": redraw_cost()})
 	run.record.note_list("build_hands", {"cards": labels()})
 	return true
@@ -74,6 +97,8 @@ func order(type: String) -> bool:
 		return false
 	if run.content.buildings[type].get("basic", false):
 		return true
+	if held == type:
+		held = ""
 	if milestone.get("building", "") == type:
 		milestone = {}
 	else:
