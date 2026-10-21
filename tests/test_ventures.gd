@@ -90,3 +90,18 @@ func test_pathfinders_cord_makes_ventures_safer_and_richer() -> void:
 	check(int(after["goods"]["stone"]) > int(before["goods"]["stone"]), "more stone")
 	var calm := run.people.venture_terms("timber_float")
 	check_eq(int(calm["lose"][0]), 0, "never fewer than none")
+
+
+func test_the_screen_learns_who_never_came_home() -> void:
+	var run := _run(12)
+	run.pick_offer = [{"kind": "venture", "role": "venture", "cost": 0, "venture": "warthog_cull"}]
+	run.phase = RunState.Phase.PICK
+	var tribe := run.count_role("tribesperson")
+	run.choose_pick(0)
+	check_eq(run.last_venture["venture"], "warthog_cull", "the venture taken is kept for the screen")
+	check_eq(int(run.last_venture["lost"]), tribe - run.count_role("tribesperson"), "with how many never came home")
+	check_eq(int(run.last_venture["send"]), int(run.people.venture_terms("warthog_cull")["send"]), "out of how many sent")
+	run.pick_offer = [{"kind": "folk", "role": "tribesperson", "cost": 0}]
+	run.phase = RunState.Phase.PICK
+	run.choose_pick(0)
+	check(run.last_venture.is_empty(), "the next pick that isn't a venture clears it")

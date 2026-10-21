@@ -5,10 +5,11 @@ extends SceneTree
 ## gates=2 has the bot order up to 2 gates; flat=1 shows the flat top-down map instead of the tilted one;
 ## pick=1 shows the round's first dawn pick instead; night=1 plays the round's first day into its night
 ## so the camera has closed in on the town (NightCamera); preview=<building id> blinks where that building would go,
-## as hovering its card does.
+## as hovering its card does; venture=<id> (with pick=1) deals that venture as the first dawn card, and
+## venture_taken=1 takes it and shows who never came home.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": ""}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "venture": "", "venture_taken": "0"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -52,7 +53,11 @@ func _init() -> void:
 	if args["pick"] == "1" and run.phase == RunState.Phase.BUILD:
 		bot.build(run)
 		run.begin_round()
+		if args["venture"] != "":
+			run.pick_offer[0] = {"kind": "venture", "role": "venture", "cost": 0, "venture": args["venture"]}
 		main._overlays.show_for_phase()
+		if args["venture_taken"] == "1":
+			main._take_pick(0)
 	main._refresh()
 	if args["preview"] != "":
 		main._preview_building(args["preview"])

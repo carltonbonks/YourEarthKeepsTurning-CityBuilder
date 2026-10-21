@@ -222,9 +222,42 @@ func _venture_card(card: Dictionary) -> Button:
 	var brings := ", ".join(terms["goods"].keys().map(func(g: String) -> String: return "%d %s" % [terms["goods"][g], g.replace("_", " ")]))
 	var btn := UiKit.card("Venture: send %d tribespeople" % terms["send"], v["name"], "[color=#ff7a6a]%s won't come back[/color]" % losing,
 		"Brings home %s" % brings, "Instead of a newcomer", PICK_SIZE, UiKit.CARD_BORDER)
-	btn.tooltip_text = "%s\nSend %d tribespeople (you have %d). %s of them never come home; the rest bring %s.\nInstead of a newcomer today." % [
+	btn.tooltip_text = "%s\nSend %d tribespeople (you have %d). %s of them never come home; the rest bring %s.\nInstead of a newcomer today.\nA bold red X is a sure death, a faint one may or may not come home." % [
 		v["text"], terms["send"], run.count_role("tribesperson"), losing, brings]
+	# One figure per person sent, crossed out red for those who won't come back, under the cost line.
+	var box: Control = btn.get_child(0)
+	var figures := VentureFigures.make(terms["send"], lose[0], lose[1] - lose[0], 18.0)
+	box.add_child(figures)
+	box.move_child(figures, 3)
 	return btn
+
+
+## Just after a venture: who never came home (a red X each) and what the rest brought.
+func show_venture_result() -> void:
+	var result := run.last_venture
+	_clear()
+	_title(run.content.ventures[result["venture"]]["name"])
+	var row := CenterContainer.new()
+	row.add_child(VentureFigures.make(result["send"], result["lost"], 0, 28.0))
+	_box.add_child(row)
+	var lost := int(result["lost"])
+	var line := Label.new()
+	line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	line.add_theme_font_size_override("font_size", 18)
+	if lost == 0:
+		line.text = "All %d tribespeople came home." % result["send"]
+		line.add_theme_color_override("font_color", VentureFigures.HOME_COLOR)
+	else:
+		line.text = "%d of %d tribespeople never came home." % [lost, result["send"]]
+		line.add_theme_color_override("font_color", VentureFigures.X_COLOR)
+	_box.add_child(line)
+	var goods: Dictionary = result["goods"]
+	var brought := ", ".join(goods.keys().map(func(g: String) -> String: return "%d %s" % [goods[g], g.replace("_", " ")]))
+	UiKit.note(_box, "They bring home %s." % brought, 15, Color("#e8e8e8")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var center := CenterContainer.new()
+	_box.add_child(center)
+	UiKit.primary(UiKit.button(center, "Carry on", func() -> void: closed.emit())).custom_minimum_size = Vector2(220, 36)
+	show()
 
 
 func _promote_card(card: Dictionary) -> Button:
