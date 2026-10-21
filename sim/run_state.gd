@@ -508,6 +508,9 @@ func food_grown_daily() -> int:
 			count = mini(count, count_role(worked["role"]) / int(worked["per"]))
 			each = roundi(each * (1.0 + tool_bonus(worked["role"], "field_mult")))
 		total += count * each
+	# Cluster combos (data/combos.json) that bring extra food.
+	for i in world.buildings.size():
+		total += int(world.town.combo_effect(i, "daily_food"))
 	return total
 
 
@@ -631,6 +634,7 @@ func _finish_round() -> void:
 		record.end_round()
 		return
 	people.heal_between_rounds()
+	people.pedlar_carousel()
 	people.heroes_sell_finds()
 	relic_offer = _roll_relic_offer()
 	record.note_value("relic_offer", relic_offer.duplicate())

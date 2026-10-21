@@ -149,6 +149,8 @@ def main(raw_folder, out_folder):
                 "gathered_total": sum(rd.get("gathered", {}).values()) if "gathered" in rd else "",
                 "gathered_leaned_total": sum(rd.get("gathered_leaned", {}).values()) if "gathered_leaned" in rd else "",
                 "hearty_meals": rd.get("hearty_meals", ""),
+                "combos_end": sum(rd["combos_end"].values()) if "combos_end" in rd else "",
+                "carousel_picks": len(rd["carousel"]) if "carousel" in rd else "",
                 "spoils": rd.get("spoils", {}).get("id", ""),
                 "spoils_kind": rd.get("spoils", {}).get("kind", ""),
                 "spoils_taken": rd["spoils"]["taken"] if "spoils" in rd else "",
