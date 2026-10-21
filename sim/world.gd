@@ -246,6 +246,7 @@ func step() -> void:
 		var wave_left := enemies.filter(func(e: Unit) -> bool: return e.alive and e.den_index < 0)
 		if wave_left.is_empty() or time >= night_end + content.num("night_seconds") * 2.0:
 			for e in wave_left:
+				run.record.note_impact("defences", "hearth", "taken", minf(e.attack * 3.0, maxf(0.0, hearth_hp)))
 				hearth_hp -= e.attack * 3.0
 				e.alive = false
 			if not wave_left.is_empty():
@@ -570,8 +571,11 @@ func _blow_is(attacker: Unit, kind: String) -> bool:
 	return attacker.is_folk() and run.has_tools_with(attacker.type_id, kind)
 
 
-func damage(attacker: Unit, victim: Unit, amount: float) -> void:
+## `source` names the defence that struck when there is no attacker ("hearth", a tower's type, "relic"), for the impact tally.
+func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
+	var before := maxf(0.0, victim.hp)
 	victim.hp -= amount
+	run.record.note_blow(attacker, victim, clampf(amount, 0.0, before), source, victim.hp <= 0.0 and before > 0.0)
 	if victim.hp > 0.0:
 		# Sentient creatures turn on whoever hurt them.
 		if victim.is_enemy() and attacker != null and content.unit_has_tag(victim, "sentient"):

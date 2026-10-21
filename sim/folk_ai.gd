@@ -160,6 +160,7 @@ func _worker_tick(unit: Unit) -> void:
 		unit.intent = "hauling %s" % unit.carrying
 		if w.walk_toward(unit, unit.home.limit_length(World.HEARTH_RADIUS + 8.0)):
 			w.bring_in(unit.carrying, unit.carry_amount)
+			w.run.record.note_impact("folk", unit.type_id, "goods", unit.carry_amount, unit.carrying)
 			unit.carry_amount = 0
 			unit.task = ""
 		return
@@ -186,6 +187,7 @@ func _worker_tick(unit: Unit) -> void:
 				if float(site["work_left"]) <= 0.0:
 					w.run.tell("A %s is finished." % w.content.buildings[site["type"]]["name"].to_lower())
 					w.run.on_building_done(site["type"])
+					w.run.record.note_impact("folk", unit.type_id, "raised", 1.0)
 					w.town.on_built(unit.task_index)
 					unit.task = ""
 		"craft":
@@ -217,7 +219,8 @@ func _worker_tick(unit: Unit) -> void:
 			if w.walk_toward(unit, w.pathing.center(square), 3.0):
 				unit.task_timer -= work_rate(unit) * w.dt
 				if unit.task_timer <= 0.0:
-					w.town.pave(square)
+					if w.town.pave(square):
+						w.run.record.note_impact("folk", unit.type_id, "paved", 1.0)
 					unit.task = ""
 		"repair":
 			unit.intent = "patching the hearth"
@@ -229,7 +232,9 @@ func _worker_tick(unit: Unit) -> void:
 						unit.task = ""
 						return
 					w.run.stock["wood"] = int(w.run.stock["wood"]) - 1
-					w.hearth_hp = minf(w.run.hearth_max_hp(), w.hearth_hp + float(def.get("repair_per_wood", 4)))
+					var mended := minf(w.run.hearth_max_hp() - w.hearth_hp, float(def.get("repair_per_wood", 4)))
+					w.hearth_hp += mended
+					w.run.record.note_impact("folk", unit.type_id, "patched", mended)
 		"gather":
 			var node: Dictionary = w.nodes[unit.task_index]
 			unit.intent = "gathering %s" % node["gives"]
