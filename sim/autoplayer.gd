@@ -61,24 +61,6 @@ func build(run: RunState) -> void:
 	if int(run.stock["shells"]) >= redraw_above and run.hand.can_redraw():
 		run.hand.redraw()
 		_build_pass(run)
-	_hold_card(run)
-
-
-## Holds the dearest card it couldn't pay for, so it comes back next round.
-func _hold_card(run: RunState) -> void:
-	var best := ""
-	var best_cost := 0
-	for card: Dictionary in run.hand.cards:
-		var type: String = card["building"]
-		var cost: Dictionary = run.content.buildings[type]["cost"]
-		var total := 0
-		for good: String in cost:
-			total += int(cost[good])
-		if not run.can_afford(cost) and total > best_cost:
-			best = type
-			best_cost = total
-	if best != "" and run.hand.held != best:
-		run.hand.hold(best)
 
 
 ## Orders a building if a card for it is in hand.

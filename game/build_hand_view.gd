@@ -114,25 +114,9 @@ func _card(type: String, need: String, kind: String) -> Button:
 	btn.disabled = not run.hand.can_order(type)
 	UiKit.fade_if_disabled(btn, _why_not(blocked, def["cost"]))
 	btn.pressed.connect(_act.bind(run.hand.order.bind(type)))
-	if kind == "card":
-		_hold_toggle(btn, type)
 	btn.mouse_entered.connect(func() -> void: previewing.emit(type))
 	btn.mouse_exited.connect(func() -> void: previewing.emit(""))
 	return btn
-
-
-## A small Hold button in a dealt card's corner: keeps the card for the next round's hand.
-func _hold_toggle(card: Button, type: String) -> void:
-	var held := run.hand.held == type
-	var toggle := UiKit.primary(Button.new(), 10) if held else UiKit.secondary(Button.new(), 10)
-	toggle.text = "Held" if held else "Hold"
-	toggle.tooltip_text = "Held: this card comes back in next round's hand." if held \
-		else "Keep this card for next round's hand (one card at a time, free)."
-	toggle.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	toggle.position = Vector2(card.custom_minimum_size.x - 44, 2)
-	toggle.custom_minimum_size = Vector2(40, 18)
-	toggle.pressed.connect(_act.bind(run.hand.hold.bind(type)))
-	card.add_child(toggle)
 
 
 ## Later-age cards beside the buildings: tool sets (a lasting upgrade for one townsfolk group, once
