@@ -360,6 +360,21 @@ func trade(good: String) -> bool:
 	return true
 
 
+## How many of a good the buyout would take: all the trader has left, or as many as the shells pay for.
+func buyout_count(good: String) -> int:
+	if phase != Phase.BUILD:
+		return 0
+	return mini(int(trader_stock.get(good, 0)), int(stock["shells"]) / trader_price(good))
+
+
+## Buys as many of a good as the trader has left and the shells pay for; returns how many.
+func buyout(good: String) -> int:
+	var n := buyout_count(good)
+	for i in n:
+		trade(good)
+	return n
+
+
 # --- Dawn picks ------------------------------------------------------------
 
 ## A townsperson's name with its leaning, e.g. "Forager" (or the role's name without one).

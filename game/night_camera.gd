@@ -4,8 +4,7 @@ extends RefCounted
 ## until it fills most of the view, and once the night is over it eases back to wherever the player
 ## had it. View only, like ArenaView: it reads the clock and the town, never the rules.
 ## The player can take the camera back at any time (wheel, drag, or clicking a hero); it then stays
-## where they put it until the next night. main.gd also holds the game at NIGHT_SPEED through the
-## night when it was running faster, and puts the old speed back at dawn.
+## where they put it until the next night. It never changes the game's speed (Yusuf, 2026-10-21).
 
 ## How long before nightfall the zoom starts, in game seconds (it follows game time, so a pause pauses it).
 const LEAD_SECONDS := 8.0
@@ -15,8 +14,6 @@ const RETURN_SECONDS := 1.4
 const FILL := 0.9
 ## Room left round the outermost building, so raiders at the walls are in view, in world units.
 const MARGIN := 70.0
-## The fastest the game runs while the night plays out.
-const NIGHT_SPEED := 2
 
 ## 0 is the player's camera, 1 is closed in on the town.
 var weight := 0.0

@@ -189,6 +189,16 @@ func test_caravan_sells_tin_at_a_markup() -> void:
 	check(run.trade("tin"), "tin bought")
 	check_eq(int(run.stock["tin"]), 1, "tin arrives")
 	check_eq(int(run.stock["shells"]), 100 - run.trader_price("tin"), "at the caravan's price")
+	# The buyout takes as many as the shells pay for, never more than the caravan has.
+	var left := int(run.trader_stock["tin"])
+	run.stock["shells"] = run.trader_price("tin") + 1
+	check_eq(run.buyout_count("tin"), 1, "the buyout is limited by shells")
+	check_eq(run.buyout("tin"), 1, "one more tin bought")
+	check_eq(int(run.stock["shells"]), 1, "the buyout pays the caravan's price for each")
+	run.stock["shells"] = 1000
+	check_eq(run.buyout("tin"), left - 1, "with shells to spare the buyout takes all that is left")
+	check_eq(int(run.trader_stock["tin"]), 0, "the caravan has no tin left")
+	check_eq(run.buyout("tin"), 0, "nothing left to buy out")
 	var local := int(run.content.world["nodes"]["cassiterite"]["price"])
 	check(run.trader_price("cassiterite") > local * 2, "the caravan charges far more than heroes do")
 
