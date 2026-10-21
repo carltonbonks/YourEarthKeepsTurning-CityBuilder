@@ -5,6 +5,7 @@
 
 # Export output
 build/
+build_info.txt
 
 # OS and editor clutter
 .DS_Store
