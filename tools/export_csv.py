@@ -115,6 +115,7 @@ def main(raw_folder, out_folder):
             tables["rounds"].append({
                 "run_id": rid, "round": rn, "wave_size": sum(wave.values()),
                 "wave_sides": "+".join(rd.get("wave_sides", [])), "wave_side_count": len(rd.get("wave_sides", [])),
+                "wave_side_dens": "+".join(d or "open" for d in rd["wave_side_dens"]) if "wave_side_dens" in rd else "",
                 "hearth_hp_start": rd.get("keep_hp_start", ""), "hearth_damage": battle.get("keep_damage", ""),
                 "hearth_hp_after": battle.get("keep_hp_after", ""), "wave_seconds": battle.get("seconds", ""),
                 "hero_retreats": battle.get("retreats", ""),
@@ -162,6 +163,8 @@ def main(raw_folder, out_folder):
                     for k in ["swallowed", "dens_swallowed", "ridges", "raised", "rifts", "grown", "roads_refunded"]}
                    if "shift" in rd else {"earth_" + k: "" for k in ["swallowed", "dens_swallowed", "ridges", "raised",
                                                                     "rifts", "grown", "roads_refunded"]}),
+                "earth_woke": rd["shift"].get("woke", "") if "shift" in rd else "",
+                "earth_woke_ring": rd["shift"].get("woke_ring", "") if "shift" in rd else "",
                 **{"trips_cut_short_" + k: rd.get("trips_cut_short", {}).get(k, 0) if "trips_cut_short" in rd else ""
                    for k in ["dusk", "emptied", "unsafe"]},
                 "families": sum(1 for p in rd.get("picks", []) if p.get("taken") == "family"),

@@ -58,7 +58,10 @@ extends RefCounted
 ## 27: cluster combos: per round "combos_end" (combo id from data/combos.json -> buildings in it at the round's end).
 ## 28: the pedlar's carousel: per round "carousel" (on carousel rounds) = one entry per pick, in order: {hero, level,
 ##     base, tier, affixes, equipped}, plus "carousel_left" (items nobody took).
-const RECORD_FORMAT := 28
+## 29: the earth wakes and the attack rides the dens: a round's "shift" also has "woke" (the kind of seam that woke and did
+##     something big: "subduct", "collide", "rift", or "" for none) and "woke_ring" (its ring, -1 for none); per round
+##     "wave_side_dens" (per warned side, the den type the warband came by, "" for open country).
+const RECORD_FORMAT := 29
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -121,7 +124,8 @@ func folk_counts() -> Dictionary:
 
 func begin_round() -> void:
 	entry = {"round": run.round_number, "stock_start": run.stock.duplicate(), "keep_hp_start": roundi(run.world.hearth_hp),
-		"wave": run.waves.counts(), "wave_sides": run.world.side_names(), "townsfolk_start": folk_counts(),
+		"wave": run.waves.counts(), "wave_sides": run.world.side_names(),
+		"wave_side_dens": run.world.wave_side_dens.duplicate(), "townsfolk_start": folk_counts(),
 		"heroes_start": run.living_heroes().size(), "actions": [], "picks": [],
 		"whims": [], "loot": [], "sales": [], "hero_spending": {},
 		"prices": run.prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},

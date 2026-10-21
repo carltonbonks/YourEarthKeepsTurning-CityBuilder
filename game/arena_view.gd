@@ -23,6 +23,9 @@ const BUILDING_HEIGHT := 14.0
 const TOWER_HEIGHT := 32.0
 ## How long the land takes to slide into place after the earth turns, in milliseconds (view only).
 const SLIDE_MS := 1800.0
+## After a shift, the places the earth changed pulse this long (sank red, grew green, rich stone gold).
+const PULSE_MS := 8000.0
+const PULSE_COLORS := {"sank": Color("#e06048"), "den_sank": Color("#e06048"), "grew": Color("#8fd070"), "raised": Color("#ffd28a")}
 ## The controls hint shows for this many rounds.
 const HELP_ROUNDS := 2
 ## What each kind of standing thing is, for the back-to-front pass.
@@ -44,6 +47,7 @@ var _paved_at := {}
 ## The earth's last shift as seen here ([shift count, world]) and when the slide that shows it began.
 var _shift_seen := [-1, null]
 var _slide_from_ms := -1.0
+var _pulse_from_ms := -1.0
 var night := NightCamera.new()
 ## The plot the hovered building card would go on, blinked on the map; -1 for none.
 var preview_plot := -1
@@ -235,6 +239,7 @@ func _draw() -> void:
 	var dark := _darkness()
 	if dark > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.12, dark))
+	_draw_earth_pulses()
 	# The controls hint is for a first run's opening rounds, and never under the building cards.
 	if run.round_number <= HELP_ROUNDS and run.phase != RunState.Phase.BUILD:
 		var help := "Mouse wheel to zoom, drag to look around, V for %s view, point at anything for details" % ("flat" if iso else "tilted")
@@ -648,7 +653,25 @@ func _watch_shift() -> void:
 		return
 	if _shift_seen[1] == w and w.earth.shifts > int(_shift_seen[0]):
 		_slide_from_ms = Time.get_ticks_msec()
+		_pulse_from_ms = _slide_from_ms
 	_shift_seen = seen
+
+
+## Rings that swell out from each place the last shift changed, for a few seconds after it.
+func _draw_earth_pulses() -> void:
+	if _pulse_from_ms < 0.0:
+		return
+	var t := Time.get_ticks_msec() - _pulse_from_ms
+	if t >= PULSE_MS:
+		_pulse_from_ms = -1.0
+		return
+	var fade := 1.0 - t / PULSE_MS
+	var phase := fmod(t, 1200.0) / 1200.0
+	for ev: Dictionary in run.world.earth.events:
+		var col: Color = PULSE_COLORS.get(ev["kind"], Color.WHITE)
+		col.a = fade * (1.0 - phase)
+		var p := _to_screen(_slid(ev["pos"]))
+		draw_arc(p, 8.0 + phase * (40.0 if ev["great"] else 24.0), 0, TAU, 32, col, 3.0 if ev["great"] else 2.0)
 
 
 ## Where a thing on the plates is drawn while the land slides into place after a shift.

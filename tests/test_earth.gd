@@ -168,7 +168,8 @@ func test_tall_ridges_raise_upthrust_stone() -> void:
 	var raised := 0
 	for n in 13:
 		earth.shift()
-		raised += int(earth.last["raised"].get("obsidian", 0))
+		# Ridges grown step by step stay under the cap; a waking seam's rich vein is counted on its own.
+		raised += earth.events.filter(func(ev: Dictionary) -> bool: return ev["kind"] == "raised" and not ev["great"]).size()
 	check(raised >= 1, "a ridge broke open obsidian in a neolithic run")
 	check(raised <= int(run.content.plates["upthrust_cap"]) * 3, "but not without limit")
 	run.dispose()
@@ -272,4 +273,134 @@ func test_hover_text_names_the_seam_without_a_forecast() -> void:
 	var seam := Tooltips.seam(run, entry)
 	check("seam" in String(seam["title"]).to_lower(), "a seam names its kind")
 	check(not seam["lines"].any(func(line: String) -> bool: return "Next shift" in line), "but not what the next shift does")
+	run.dispose()
+
+
+## Shifts until the seam that wakes next is of `kind`; returns {ring, seam, kind, angle} ({} if never).
+func _shift_until_wake(earth: Earth, kind: String, limit := 40) -> Dictionary:
+	for n in limit:
+		var next := earth._woken(earth._next_plan())
+		if not next.is_empty() and next["kind"] == kind:
+			return next
+		earth.shift()
+	return {}
+
+
+func test_one_seam_wakes_each_shift() -> void:
+	var run := _run()
+	var earth := run.world.earth
+	var woke := 0
+	for n in 13:
+		earth.shift()
+		if not earth.woke.is_empty():
+			woke += 1
+			check_eq(earth.last["woke"], earth.woke["kind"], "the shift reports the seam that woke")
+	check(woke >= 10, "nearly every shift wakes a seam (%d of 13)" % woke)
+	run.dispose()
+
+
+func test_a_waking_subducting_seam_swallows_a_wide_band() -> void:
+	var run := _run()
+	var w := run.world
+	var earth := w.earth
+	var next := _shift_until_wake(earth, "subduct")
+	check(not next.is_empty(), "a subducting seam wakes within a run")
+	var ring: Dictionary = earth.rings[int(next["ring"])]
+	var r := (float(ring["r0"]) + float(ring["r1"])) / 2.0
+	# A spot that rides its plate freely (the closing seam alone would spare it) but lands in the waking band.
+	var plans := earth._next_plan()
+	var p := Vector2.INF
+	for step in 400:
+		var q := Vector2.from_angle(float(ring["seams"][int(next["seam"])]) + (step - 200) * 0.0025) * r
+		var c := earth._carry(q, plans)
+		if c["fate"] == "ride" and earth._under_wake(c["to"], next):
+			p = q
+			break
+	check(p != Vector2.INF, "the band reaches past the closing seam")
+	w.nodes.append({"type": "grove", "gives": "wood", "pos": p, "amount": 10, "max": 24,
+		"heroes_only": false, "wild": false, "age": ""})
+	var node: Dictionary = w.nodes[-1]
+	check(earth.doomed(p), "what the waking seam will take counts as doomed")
+	earth.shift()
+	check_eq(node["type"], "embers", "the grove in the band went under")
+	var ev: Array = earth.events.filter(func(e: Dictionary) -> bool: return e["kind"] == "sank" and e["type"] == "grove")
+	check(not ev.is_empty() and ev[0]["great"] and ev[0]["worked"], "reported as the waking seam's, and as one the town worked")
+	run.dispose()
+
+
+func test_a_waking_colliding_seam_breaks_open_a_rich_vein() -> void:
+	var run := _run()
+	var w := run.world
+	var earth := w.earth
+	check(not _shift_until_wake(earth, "collide").is_empty(), "a colliding seam wakes within a run")
+	earth.shift()
+	var rich: Array = earth.events.filter(func(e: Dictionary) -> bool: return e["kind"] == "raised" and e["great"])
+	check_eq(rich.size(), 1, "one rich vein")
+	var obsidian: Dictionary = run.content.world["nodes"]["obsidian"]
+	var node: Dictionary = w.nodes[-1]
+	check_eq(node["type"], "obsidian", "of the age's upthrust stone")
+	check(int(node["amount"]) > int(obsidian["amount"]), "holding more than an ordinary outcrop")
+	run.dispose()
+
+
+func test_a_waking_rift_opens_a_valley() -> void:
+	var run := _run()
+	var earth := run.world.earth
+	check(not _shift_until_wake(earth, "rift").is_empty(), "a rift wakes within a run")
+	earth.shift()
+	var grew: Array = earth.events.filter(func(e: Dictionary) -> bool: return e["kind"] == "grew" and e["great"])
+	check_eq(grew.size(), int(run.content.plates["wake"]["rift_nodes"]), "a valley of fresh patches")
+	for e: Dictionary in grew:
+		check_eq(earth.ring_at(e["pos"]), int(earth.woke["ring"]), "in the waking seam's ring")
+	run.dispose()
+
+
+func test_the_attack_comes_by_a_den_and_turns_with_it() -> void:
+	var run := _run()
+	var w := run.world
+	w.roll_wave_sides()
+	check_eq(w.wave_sides.size(), 1, "one side early on")
+	var den_type: String = w.wave_side_dens[0]
+	check(den_type != "", "the warband comes by a den's way")
+	var den: Dictionary = w.dens.filter(func(d: Dictionary) -> bool: return d["type"] == den_type)[0]
+	check(absf(angle_difference(w.wave_sides[0], Vector2(den["pos"]).angle())) < 0.001, "from where the den stands")
+	w.earth.shift()
+	w.roll_wave_sides()
+	var moved: Dictionary = w.dens.filter(func(d: Dictionary) -> bool: return d["type"] == w.wave_side_dens[0])[0]
+	check(absf(angle_difference(w.wave_sides[0], Vector2(moved["pos"]).angle())) < 0.001, "and after a turn, from where the earth carried it")
+	var ways := EarthReport.ways(run)
+	check("den" in ways[0] or "mound" in ways[0], "the threat card names the den")
+	run.dispose()
+
+
+func test_two_sides_stay_apart_and_open_country_once_the_dens_are_gone() -> void:
+	var run := _run()
+	var w := run.world
+	run.round_number = run.content.int_num("wave_two_sides_from_round")
+	w.roll_wave_sides()
+	check_eq(w.wave_sides.size(), 2, "two sides later on")
+	var apart := deg_to_rad(run.content.num("wave_sides_apart"))
+	check(absf(angle_difference(w.wave_sides[0], w.wave_sides[1])) >= apart - 0.001, "far enough apart")
+	w.dens.clear()
+	w.roll_wave_sides()
+	check_eq(w.wave_side_dens, ["", ""] as Array[String], "with every den swallowed, open country")
+	check(absf(angle_difference(w.wave_sides[0], w.wave_sides[1])) >= apart - 0.001, "still apart")
+	check(" ".join(EarthReport.ways(run)).contains("open country"), "and the threat card says so")
+	run.dispose()
+
+
+func test_the_earth_report_says_what_the_turn_did() -> void:
+	var run := _run()
+	var earth := run.world.earth
+	check_eq(EarthReport.headline(run), "", "nothing to report before the first turn")
+	var said := false
+	for n in 13:
+		earth.shift()
+		var head := EarthReport.headline(run)
+		check(head.begins_with("The earth turned"), "a headline every turn")
+		var lines := EarthReport.lines(run)
+		check(lines.size() <= EarthReport.MAX_LINES, "a few lines at most")
+		if not lines.is_empty():
+			said = true
+	check(said, "something to say in a run's turns")
 	run.dispose()

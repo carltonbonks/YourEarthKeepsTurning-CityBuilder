@@ -26,8 +26,14 @@ var shifts := 0
 ## Rift strips that stay raw ground until the next shift: {ring, a0, a1} (radians, a0 to a1 clockwise).
 var raw: Array[Dictionary] = []
 ## What the last shift did (see RunRecord "shift"): {shift, swallowed, dens_swallowed, ridges, raised,
-## rifts, grown, roads_refunded}. Empty before the first shift.
+## rifts, grown, roads_refunded, woke (the kind of seam that woke, "" for none), woke_ring}. Empty before the first shift.
 var last := {}
+## Where the last shift did each thing, for the earth report and the map's pulses: {kind ("sank", "den_sank",
+## "grew", "raised"), type (node or den type), pos, worked (a node the town had gathered from), great (done by the
+## seam that woke)}.
+var events: Array[Dictionary] = []
+## The seam that woke in the last shift: {ring, seam, kind, angle}, or {} when none did.
+var woke := {}
 ## The last shift's turn per ring and plate, in radians (for the map's slide).
 var last_turns: Array = []
 var _ridge_cells := PackedInt32Array()
@@ -222,9 +228,13 @@ func seam_near(p: Vector2, reach: float) -> Dictionary:
 	return {}
 
 
-## True if the next shift will swallow whatever stands at p.
+## True if the next shift will swallow whatever stands at p (at a closing seam, or by the seam that wakes).
 func doomed(p: Vector2) -> bool:
-	return enabled() and _carry(p, _next_plan())["fate"] == "swallowed"
+	if not enabled():
+		return false
+	var plans := _next_plan()
+	var c := _carry(p, plans)
+	return c["fate"] == "swallowed" or _under_wake(c["to"], _woken(plans))
 
 
 ## How far plate land at p turns in the next shift (radians; 0 on the still ground).
@@ -270,7 +280,9 @@ func shift() -> void:
 	var plans := plan(n)
 	var rng := SeededRng.stream(w.run.run_seed, "earth_shift", n)
 	last = {"shift": n, "swallowed": {}, "dens_swallowed": 0, "ridges": 0, "raised": {}, "rifts": 0, "grown": {},
-		"roads_refunded": 0}
+		"roads_refunded": 0, "woke": "", "woke_ring": -1}
+	events = []
+	woke = _woken(plans)
 	var roads_before := _count_roads()
 	_clear_slow_ground()
 	_move_ground(plans)
@@ -279,6 +291,7 @@ func shift() -> void:
 		rings[ri]["seams"] = plans[ri]["seams"]
 	_grow_ridges(plans)
 	_open_rifts(plans, rng)
+	_wake(rng)
 	_raise_upthrust(rng)
 	_stamp_ground()
 	_off_ridges()
@@ -416,6 +429,7 @@ func _move_things(plans: Array) -> void:
 	for di in w.dens.size():
 		var den := w.dens[di]
 		var c := _carry(den["pos"], plans)
+		den["turned"] = rad_to_deg(angle_difference(Vector2(den["pos"]).angle(), Vector2(c["to"]).angle()))
 		den["pos"] = c["to"]
 		# The war camp is men in tents: they move off the seam, they don't go under.
 		if c["fate"] == "swallowed" and not den.get("camp", false):
@@ -439,9 +453,11 @@ func _move_things(plans: Array) -> void:
 		u.path = PackedVector2Array()
 
 
-func _swallow_node(node: Dictionary) -> void:
+func _swallow_node(node: Dictionary, great := false) -> void:
 	var embers: String = def["embers"]
 	last["swallowed"][node["type"]] = int(last["swallowed"].get(node["type"], 0)) + 1
+	events.append({"kind": "sank", "type": node["type"], "pos": node["pos"],
+		"worked": int(node["amount"]) < int(node["max"]), "great": great})
 	_feed_the_deep(int(w.run.mod("swallow_node_shells")), false)
 	if node["type"] == embers:
 		_remove_node(node)
@@ -464,8 +480,9 @@ func _remove_node(node: Dictionary) -> void:
 
 
 ## A den goes under: its wanderers with it, and the dens after it move up one place.
-func _swallow_den(di: int) -> void:
+func _swallow_den(di: int, great := false) -> void:
 	last["dens_swallowed"] = int(last["dens_swallowed"]) + 1
+	events.append({"kind": "den_sank", "type": w.dens[di]["type"], "pos": w.dens[di]["pos"], "worked": false, "great": great})
 	_feed_the_deep(int(w.run.mod("swallow_den_shells")), w.run.has_effect("swallow_item"))
 	w.run.tell("The earth swallows the %s, and everything in it." % w.content.world["dens"][w.dens[di]["type"]]["name"].to_lower())
 	for e in w.enemies:
@@ -523,10 +540,78 @@ func _open_rifts(plans: Array, rng: SeededRng) -> void:
 				continue
 			var r := rng.randf_range(float(ring["r0"]) + 20.0, float(ring["r1"]) - 20.0)
 			var at := Vector2.from_angle((float(res["lead"]) + float(res["trail"])) / 2.0) * r
-			_add(type, at, float(def["rift_node_share"]))
-			last["grown"][type] = int(last["grown"].get(type, 0)) + 1
+			_grow(type, at, float(def["rift_node_share"]), false)
 			if w.run.has_effect("rift_growth"):
 				w.run.relic_fired("rift_growth")
+
+
+## The seam that wakes this shift (see "wake" in data/plates.json): the one that closes or opens furthest,
+## weighted by its ring's wake_weight and its kind's weight; a rift only where its ring grows something. {} when none moves.
+func _woken(plans: Array) -> Dictionary:
+	var best := {}
+	var best_score := 0.0
+	for ri in rings.size():
+		var rd: Dictionary = def["rings"][ri]
+		for k in rings[ri]["seams"].size():
+			var res: Dictionary = plans[ri]["results"][k]
+			if not res["kind"] in ["subduct", "collide", "rift"] or (res["kind"] == "rift" and rd["rift_nodes"].is_empty()):
+				continue
+			var score := float(res["degrees"]) * float(rd.get("wake_weight", 1.0)) * float(def["wake"]["weights"][res["kind"]])
+			if score > best_score:
+				best_score = score
+				best = {"ring": ri, "seam": k, "kind": res["kind"], "angle": float(plans[ri]["seams"][k])}
+	return best
+
+
+## The seam that woke does something big: a subducting seam swallows everything on its diving side within
+## swallow_band of it, a colliding one breaks open a rich upthrust node at once, a rift opens a valley of fresh nodes.
+func _wake(rng: SeededRng) -> void:
+	if woke.is_empty():
+		return
+	var wd: Dictionary = def["wake"]
+	var ri := int(woke["ring"])
+	var k := int(woke["seam"])
+	var ring := rings[ri]
+	var a := float(woke["angle"])
+	last["woke"] = woke["kind"]
+	last["woke_ring"] = ri
+	match woke["kind"]:
+		"subduct":
+			for node in w.nodes:
+				if not node.get("gone", false) and _under_wake(node["pos"], woke):
+					_swallow_node(node, true)
+			for di in range(w.dens.size() - 1, -1, -1):
+				if not w.dens[di].get("camp", false) and _under_wake(w.dens[di]["pos"], woke):
+					_swallow_den(di, true)
+		"collide":
+			ring["ridges"][k] = maxi(int(ring["ridges"][k]), int(def["upthrust_height"]))
+			var type: String = def["upthrust"].get(w.run.age, "")
+			var held := int(ring["upthrust"][k])
+			if type != "" and (held < 0 or w.nodes[held].get("gone", false)):
+				var r := (float(ring["r0"]) + float(ring["r1"])) / 2.0
+				var side := 1.0 if rng.randf() < 0.5 else -1.0
+				ring["upthrust"][k] = _raise(type, Vector2.from_angle(a + side * _margin(r)) * r, float(wd["rich"]), true)
+		"rift":
+			var types: Array = def["rings"][ri]["rift_nodes"]
+			var strip := {"a0": a, "a1": a}
+			for each in raw:
+				if int(each["ring"]) == ri and _in_span(a, each["a0"], each["a1"]):
+					strip = each
+			var width := fposmod(float(strip["a1"]) - float(strip["a0"]), TAU)
+			for i in int(wd["rift_nodes"]):
+				var at := float(strip["a0"]) + width * (i + 0.5) / float(wd["rift_nodes"])
+				var r := rng.randf_range(float(ring["r0"]) + 20.0, float(ring["r1"]) - 20.0)
+				_grow(rng.pick(types), Vector2.from_angle(at) * r, float(wd["rift_share"]), true)
+
+
+## True if p (where the shift carried it) goes under a waking subducting seam: on its diving side, within
+## swallow_band of it. The plate behind a seam lies at smaller angles; diver 0 is that one.
+func _under_wake(p: Vector2, wake: Dictionary) -> bool:
+	if wake.is_empty() or wake["kind"] != "subduct" or ring_at(p) != int(wake["ring"]):
+		return false
+	var side := -1.0 if int(rings[int(wake["ring"])]["divers"][int(wake["seam"])]) == 0 else 1.0
+	var off := angle_difference(float(wake["angle"]), p.angle())
+	return signf(off) == side and absf(off) * p.length() <= float(def["wake"]["swallow_band"])
 
 
 ## A ridge tall enough raises one upthrust node of the town's age beside its pass.
@@ -553,14 +638,29 @@ func _raise_upthrust(rng: SeededRng) -> void:
 			standing += 1
 			var r := (float(ring["r0"]) + float(ring["r1"])) / 2.0
 			var side := 1.0 if rng.randf() < 0.5 else -1.0
-			ring["upthrust"][k] = _add(type, Vector2.from_angle(float(ring["seams"][k]) + side * _margin(r)) * r, 1.0)
-			last["raised"][type] = int(last["raised"].get(type, 0)) + 1
+			ring["upthrust"][k] = _raise(type, Vector2.from_angle(float(ring["seams"][k]) + side * _margin(r)) * r, 1.0, false)
 
 
+## A fresh node in a rift.
+func _grow(type: String, at: Vector2, share: float, great: bool) -> int:
+	last["grown"][type] = int(last["grown"].get(type, 0)) + 1
+	events.append({"kind": "grew", "type": type, "pos": at, "worked": false, "great": great})
+	return _add(type, at, share)
+
+
+## An upthrust node beside a ridge.
+func _raise(type: String, at: Vector2, share: float, great: bool) -> int:
+	last["raised"][type] = int(last["raised"].get(type, 0)) + 1
+	events.append({"kind": "raised", "type": type, "pos": at, "worked": false, "great": great})
+	return _add(type, at, share)
+
+
+## share = how full it starts against the type's usual amount; above 1 it is a rich node that holds more.
 func _add(type: String, at: Vector2, share: float) -> int:
 	var ndef: Dictionary = w.content.world["nodes"][type]
+	var amount := maxi(1, roundi(int(ndef["amount"]) * share))
 	w.nodes.append({"type": type, "gives": ndef["gives"], "pos": at,
-		"amount": maxi(1, roundi(int(ndef["amount"]) * share)), "max": int(ndef["amount"]),
+		"amount": amount, "max": maxi(amount, int(ndef["amount"])),
 		"heroes_only": ndef.get("heroes_only", false), "wild": ndef.get("wild", false), "age": ndef.get("age", "")})
 	return w.nodes.size() - 1
 

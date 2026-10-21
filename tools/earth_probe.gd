@@ -17,6 +17,7 @@ func _init() -> void:
 	var den_moved := 0.0
 	var nodes_start := 0
 	var nodes_end := 0
+	var by_ring := {}
 	for s in runs:
 		var run := RunState.new(content, 1000 + s)
 		var w := run.world
@@ -25,13 +26,19 @@ func _init() -> void:
 		var den_at: Array = w.dens.map(func(d: Dictionary) -> Vector2: return d["pos"])
 		for n in shifts:
 			earth.shift()
+			for ev: Dictionary in earth.events:
+				var ring_key := "%s %s%s" % [["near", "middle", "far", "still"][earth.ring_at(ev["pos"])], ev["kind"], " (woke)" if ev["great"] else ""]
+				by_ring[ring_key] = int(by_ring.get(ring_key, 0)) + 1
+			if not earth.woke.is_empty():
+				var woke_key := "woke %s %s" % [["near", "middle", "far"][int(earth.woke["ring"])], earth.woke["kind"]]
+				by_ring[woke_key] = int(by_ring.get(woke_key, 0)) + 1
 			for key: String in earth.last:
 				var v: Variant = earth.last[key]
 				if v is Dictionary:
 					for t: String in v:
 						by_type["%s %s" % [key, t]] = int(by_type.get("%s %s" % [key, t], 0)) + int(v[t])
 						totals[key] = int(totals.get(key, 0)) + int(v[t])
-				elif key != "shift":
+				elif not key in ["shift", "woke", "woke_ring"]:
 					totals[key] = int(totals.get(key, 0)) + int(v)
 			for ring in earth.rings:
 				var seams: Array = ring["seams"]
@@ -51,6 +58,11 @@ func _init() -> void:
 	keys.sort()
 	for key: String in keys:
 		print("    %-24s %6.2f" % [key, float(by_type[key]) / runs])
+	print("  by ring:")
+	keys = by_ring.keys()
+	keys.sort()
+	for key: String in keys:
+		print("    %-28s %6.2f" % [key, float(by_ring[key]) / runs])
 	print("  nodes on the map  %.1f at the start, %.1f after the last shift" % [float(nodes_start) / runs, float(nodes_end) / runs])
 	print("  a den ends %.0f degrees round from where it started" % (den_moved / maxf(1.0, runs * content.num("den_count"))))
 	print("  thinnest plate %.1f degrees, tallest ridge %d" % [thinnest, tallest])

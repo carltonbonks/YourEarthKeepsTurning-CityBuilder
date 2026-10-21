@@ -42,6 +42,9 @@ var enemies: Array[Unit] = []
 ## Seconds since this round's first dawn.
 var time := 0.0
 var wave_sides: Array[float] = []
+## Per wave side, the den type the warband marches past, or "" for open country. The warband comes by the dens'
+## ways, so as the earth carries the dens round, the attack comes round with them.
+var wave_side_dens: Array[String] = []
 var wave_spawned := false
 var pause := Pause.NONE
 var cold_tonight := false
@@ -143,22 +146,44 @@ func reset_night_report() -> void:
 		"hero_deaths": 0, "cold": false}
 
 
-## Decides (reproducibly) which sides this round's wave comes from, so it can be warned of.
+## Decides (reproducibly) which sides this round's wave comes from, so it can be warned of. The warband marches
+## by the way of a den still standing (or the war camp), from wherever the earth has carried it; once no den is
+## left on a free side, it comes from open country on a compass side.
 func roll_wave_sides() -> void:
 	wave_sides = []
+	wave_side_dens = []
 	var side_rng := SeededRng.stream(run.run_seed, "sides", run.round_number)
 	var side_count := 2 if run.round_number >= content.int_num("wave_two_sides_from_round") and not run.has_effect("one_side") else 1
-	var first := side_rng.randi_range(0, 3)
-	wave_sides.append(first * PI / 2.0)
-	if side_count == 2:
-		wave_sides.append(((first + side_rng.randi_range(1, 3)) % 4) * PI / 2.0)
+	var apart := deg_to_rad(content.num("wave_sides_apart"))
+	var ways: Array = dens.filter(func(d: Dictionary) -> bool: return not d.get("cleared", false))
+	while wave_sides.size() < side_count:
+		var free := ways.filter(func(d: Dictionary) -> bool: return _side_free(Vector2(d["pos"]).angle(), apart))
+		if not free.is_empty():
+			var den: Dictionary = side_rng.pick(free)
+			ways.erase(den)
+			wave_sides.append(Vector2(den["pos"]).angle())
+			wave_side_dens.append(den["type"])
+			continue
+		var compass: Array = [0, 1, 2, 3].map(func(q: int) -> float: return q * PI / 2.0).filter(
+			func(a: float) -> bool: return _side_free(a, apart))
+		wave_sides.append(side_rng.pick(compass))
+		wave_side_dens.append("")
+
+
+func _side_free(angle: float, apart: float) -> bool:
+	return wave_sides.all(func(s: float) -> bool: return absf(angle_difference(s, angle)) >= apart)
+
+
+## The compass name of a direction from the hearth (east is angle 0, south is a quarter turn on: y points down).
+static func compass(angle: float) -> String:
+	return ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"][posmod(roundi(angle / (PI / 4.0)), 8)]
 
 
 ## The wave side names, for the UI and story.
 func side_names() -> Array[String]:
 	var names: Array[String] = []
 	for angle in wave_sides:
-		names.append(["east", "south", "west", "north"][int(round(angle / (PI / 2.0))) % 4])
+		names.append(compass(angle))
 	return names
 
 
