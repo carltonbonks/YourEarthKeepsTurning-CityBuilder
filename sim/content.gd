@@ -27,6 +27,7 @@ var town: Dictionary  ## data/town.json: town rings and plots, obstacles, ground
 var tags: Dictionary  ## data/tags.json: what each tag that a rule reads means, for tooltips.
 var plates: Dictionary  ## data/plates.json: the shifting earth past the town (see Earth).
 var traditions: Dictionary  ## data/traditions.json: founding traditions picked before round 1.
+var ventures: Dictionary  ## data/ventures.json: dawn cards that spend tribespeople for goods.
 
 
 static func load_default() -> Content:
@@ -50,6 +51,7 @@ static func load_default() -> Content:
 	c.tags = _strip(_read("tags.json"))
 	c.plates = _strip(_read("plates.json"))
 	c.traditions = _strip(_read("traditions.json"))
+	c.ventures = _strip(_read("ventures.json"))
 	return c
 
 

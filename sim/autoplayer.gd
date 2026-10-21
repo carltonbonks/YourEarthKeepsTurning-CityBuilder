@@ -234,6 +234,8 @@ func pick(run: RunState) -> int:
 		match "promote" if card["kind"] == "promote" else card["role"]:
 			"promote":
 				score = 6.0
+			"venture":
+				score = venture_score(run, card)
 			"family":
 				score = 8.0 if style == "medieval" else 3.5
 			"hero":
@@ -260,6 +262,16 @@ func pick(run: RunState) -> int:
 			best_score = score
 			best = i
 	return best
+
+
+## A venture is worth it when it brings one of the two goods the town is shortest of and plenty of tribespeople stay home.
+func venture_score(run: RunState, card: Dictionary) -> float:
+	var terms := run.people.venture_terms(card["venture"])
+	var short := run.needed_resources().slice(0, 2)
+	var helps: bool = terms["goods"].keys().any(func(g: String) -> bool: return short.has(g))
+	if not helps or run.count_role("tribesperson") - int(terms["lose"][1]) < 8:
+		return -30.0
+	return 4.5
 
 
 ## Relics it likes most first, ranked by how often bot runs that held them won (40 runs x 3 styles,

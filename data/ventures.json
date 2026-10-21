@@ -1,0 +1,17 @@
+{
+	"_note": "Ventures: dawn cards that spend tribespeople for goods (sim/people.gd _venture_card, RunState.choose_pick). At each dawn, with chance venture_chance (data/balance.json), one of the dawn cards is a venture of the town's age or earlier (age: the first age it can come up in), in place of a newcomer, if the town has at least send + venture_keep_home tribespeople. Taking it sends send tribespeople out; a number between lose[0] and lose[1] (rolled when taken) never come back, the rest return at once. gain: goods brought home, grown by venture_growth_per_round for every round past the first (rounded up). Relic keys: venture_safety (each venture loses that many fewer, never below 0), venture_bonus (share more goods).",
+	"warthog_cull": {"name": "Cull the warthogs", "text": "The warthogs are rooting up the berry patches. Drive them off and bring the meat home.",
+		"send": 5, "lose": [1, 3], "gain": {"food": 30, "hides": 4}},
+	"timber_float": {"name": "Float timber downriver", "text": "Fell the tall pines upstream and ride them down the white water.",
+		"send": 4, "lose": [0, 2], "gain": {"wood": 28}},
+	"far_cliffs": {"name": "Climb the far cliffs", "text": "Good stone and flint lie under the cliffs where the vultures nest.",
+		"send": 4, "lose": [1, 2], "gain": {"stone": 22, "flint": 5}},
+	"fire_the_brush": {"name": "Fire the brushland", "text": "Set the dry hills alight and gather the charred wood. The fire does not always go where it is told.",
+		"send": 3, "lose": [0, 2], "gain": {"fuel": 22}},
+	"tin_trek": {"name": "Trek to the tin hills", "text": "Ore lies in the hills past the dens. Not everyone walks back.",
+		"send": 5, "lose": [1, 3], "gain": {"cassiterite": 6, "copper": 6}, "age": "bronze"},
+	"herd_raid": {"name": "Raid the hill clan's herds", "text": "Take their cattle in the night. They will fight for them.",
+		"send": 6, "lose": [2, 4], "gain": {"food": 50, "hides": 8, "shells": 20}, "age": "bronze"},
+	"margraves_levy": {"name": "Answer the margrave's levy", "text": "Send young folk to serve in a lord's war far away. They will not come home, but the lord pays well.",
+		"send": 3, "lose": [3, 3], "gain": {"shells": 90}, "age": "medieval"}
+}

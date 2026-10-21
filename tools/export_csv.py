@@ -196,10 +196,12 @@ def main(raw_folder, out_folder):
                     "offered_2": offered[1] if len(offered) > 1 else "",
                     "offered_3": offered[2] if len(offered) > 2 else "",
                     "hero_offered": 1 if any(o.startswith("hero:") for o in offered) else 0,
-                    "taken": taken or "(skipped)", "taken_kind": "hero" if taken.startswith("hero:") else ("none" if not taken else "townsfolk"),
+                    "taken": taken or "(skipped)", "taken_kind": "hero" if taken.startswith("hero:") else ("venture" if taken.startswith("venture:") else ("none" if not taken else "townsfolk")),
                     "hunger_turned_away": p.get("hunger_turned_away", ""),
                     **{"offered_leaning_%d" % (i + 1): (p.get("offered_leanings", []) + ["", "", ""])[i] for i in range(3)},
                     "taken_leaning": p.get("leaning", ""),
+                    "venture_lost": p.get("venture_lost", ""),
+                    "venture_goods": sum(p.get("venture_goods", {}).values()) if "venture_goods" in p else "",
                 })
             for a in rd.get("actions", []):
                 if a.get("kind", "build") not in ("build", "price"):
@@ -255,7 +257,8 @@ def main(raw_folder, out_folder):
         "runs": list(tables["runs"][0].keys()) if tables["runs"] else ["run_id"],
         "rounds": list(tables["rounds"][0].keys()) if tables["rounds"] else ["run_id"],
         "picks": ["run_id", "round", "day", "offered_1", "offered_2", "offered_3", "hero_offered", "taken", "taken_kind", "hunger_turned_away",
-                  "offered_leaning_1", "offered_leaning_2", "offered_leaning_3", "taken_leaning"],
+                  "offered_leaning_1", "offered_leaning_2", "offered_leaning_3", "taken_leaning",
+                  "venture_lost", "venture_goods"],
         "builds": ["run_id", "round", "building"],
         "wave_enemies": ["run_id", "round", "enemy", "count"],
         "deaths": ["run_id", "round", "day", "at_night", "name", "role", "is_hero", "killer"],

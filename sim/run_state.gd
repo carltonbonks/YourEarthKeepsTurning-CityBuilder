@@ -388,13 +388,14 @@ func can_take_pick(index: int) -> bool:
 	if phase != Phase.PICK or index < 0 or index >= pick_offer.size():
 		return false
 	var card := pick_offer[index]
-	return (card["kind"] == "promote" or population() + people.card_people(card) <= housing()) and int(stock["shells"]) >= int(card["cost"])
+	return (card["kind"] in ["promote", "venture"] or population() + people.card_people(card) <= housing()) and int(stock["shells"]) >= int(card["cost"])
 
 
 ## Takes a dawn card (-1 skips), then lets the day begin.
 func choose_pick(index: int) -> void:
 	assert(phase == Phase.PICK)
 	var taken := ""
+	var venture := {}
 	var took := can_take_pick(index)
 	if took:
 		var card := pick_offer[index]
@@ -406,6 +407,9 @@ func choose_pick(index: int) -> void:
 			tell("%s arrives and sleeps in %s." % [describe(hero), world.hero_ai.bed_name(hero.lodging)])
 		elif card["kind"] == "promote":
 			people.promote(card)
+			taken = people.card_label(card)
+		elif card["kind"] == "venture":
+			venture = people.go_venturing(card)
 			taken = people.card_label(card)
 		elif card["kind"] == "family":
 			for role: String in card["roles"]:
@@ -431,6 +435,9 @@ func choose_pick(index: int) -> void:
 		entry["leaning"] = pick_offer[index]["leaning"]
 	if hunger_turned_away != "":
 		entry["hunger_turned_away"] = hunger_turned_away
+	if not venture.is_empty():
+		entry["venture_lost"] = venture["lost"]
+		entry["venture_goods"] = venture["goods"]
 	record.note_list("picks", entry)
 	picks_left -= 1
 	# Twin Fires: another newcomer from the cards left, unless the player skipped.
