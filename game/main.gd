@@ -282,6 +282,9 @@ func _build_ui() -> void:
 	_story.open_pressed.connect(func() -> void:
 		_menu_open = true
 		_overlays.show_log())
+	_story.impact_pressed.connect(func() -> void:
+		_menu_open = true
+		_overlays.show_impact())
 	bottom.add_child(_story)
 
 	# Overlay for picks, relics, the end screen and the menu: dims the screen, panel in the middle.

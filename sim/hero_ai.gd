@@ -594,4 +594,6 @@ func sell_shards(hero: Unit) -> void:
 	hero.gold += pay
 	hero.carry_amount = 0
 	w.run.record.note_economy(hero.carrying, n)
+	w.run.record.impact_key(hero)
+	w.run.record.note_impact("heroes", hero.display_name, "goods", n, hero.carrying)
 	w.run.tell("%s brings back %d %s and sells it for %d shells." % [hero.display_name, n, hero.carrying, pay])
