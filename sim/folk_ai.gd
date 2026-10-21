@@ -159,7 +159,7 @@ func _worker_tick(unit: Unit) -> void:
 	if unit.task == "return":
 		unit.intent = "hauling %s" % unit.carrying
 		if w.walk_toward(unit, unit.home.limit_length(World.HEARTH_RADIUS + 8.0)):
-			w.run.stock[unit.carrying] = int(w.run.stock[unit.carrying]) + unit.carry_amount
+			w.bring_in(unit.carrying, unit.carry_amount)
 			unit.carry_amount = 0
 			unit.task = ""
 		return

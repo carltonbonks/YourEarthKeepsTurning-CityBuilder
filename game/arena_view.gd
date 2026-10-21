@@ -49,6 +49,7 @@ var _shift_seen := [-1, null]
 var _slide_from_ms := -1.0
 var _pulse_from_ms := -1.0
 var night := NightCamera.new()
+var pickups := PickupPopups.new()
 ## The plot the hovered building card would go on, blinked on the map; -1 for none.
 var preview_plot := -1
 
@@ -77,6 +78,7 @@ func zoom_to_fit(radius: float, fill: float) -> float:
 func _process(delta: float) -> void:
 	if run != null:
 		night.update(self, delta)
+		pickups.update(run.world, Time.get_ticks_msec())
 	queue_redraw()
 
 
@@ -240,6 +242,9 @@ func _draw() -> void:
 	if dark > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.12, dark))
 	_draw_earth_pulses()
+	# Goods carried in rise over the hearth as "+2 stone", above the fire and its health bar.
+	var hearth_top := World.HEARTH_RADIUS * s * (ISO_SQUASH + 0.3 if iso else 1.0) + 16.0
+	pickups.draw(self, _to_screen(Vector2.ZERO) - Vector2(0.0, hearth_top), font, Time.get_ticks_msec(), main_color)
 	# The controls hint is for a first run's opening rounds, and never under the building cards.
 	if run.round_number <= HELP_ROUNDS and run.phase != RunState.Phase.BUILD:
 		var help := "Mouse wheel to zoom, drag to look around, V for %s view, point at anything for details" % ("flat" if iso else "tilted")
@@ -565,8 +570,16 @@ func _darkness() -> float:
 	return 0.0
 
 
+## A good's colour: the main four have their own; anything else takes the colour of the node it comes from, lightened.
 func main_color(resource: String) -> String:
-	return {"food": "#d98aa8", "fuel": "#e0b050", "wood": "#7fbf6a", "stone": "#b0b4bc"}.get(resource, "#ffffff")
+	var main: Dictionary = {"food": "#d98aa8", "fuel": "#e0b050", "wood": "#7fbf6a", "stone": "#b0b4bc"}
+	if main.has(resource):
+		return main[resource]
+	for id: String in run.content.world["nodes"]:
+		var def: Dictionary = run.content.world["nodes"][id]
+		if def["gives"] == resource and def.has("color"):
+			return Color(def["color"]).lightened(0.45).to_html(false)
+	return "#ffffff"
 
 
 func _draw_hero(hero: Unit, font: Font) -> void:

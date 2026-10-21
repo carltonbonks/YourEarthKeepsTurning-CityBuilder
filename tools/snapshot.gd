@@ -5,10 +5,10 @@ extends SceneTree
 ## gates=2 has the bot order up to 2 gates; flat=1 shows the flat top-down map instead of the tilted one;
 ## pick=1 shows the round's first dawn pick instead; night=1 plays the round's first day into its night
 ## so the camera has closed in on the town (NightCamera); preview=<building id> blinks where that building would go,
-## as hovering its card does.
+## as hovering its card does. steps= is how many steps mid=1 plays; goods carried in meanwhile show as one "+N" popup.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": ""}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "steps": "150"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -37,9 +37,13 @@ func _init() -> void:
 	if args["mid"] == "1" and run.phase == RunState.Phase.BUILD:
 		bot.build(run)
 		run.begin_round()
-		run.choose_pick(bot.pick(run))
-		for i in 150:
+		while run.phase == RunState.Phase.PICK:
+			run.choose_pick(bot.pick(run))
+		main._arena.pickups.update(run.world, Time.get_ticks_msec())
+		for i in int(args["steps"]):
 			run.step()
+		# Show what was carried in meanwhile as one "+N" popup over the hearth.
+		main._arena.pickups.update(run.world, Time.get_ticks_msec() + PickupPopups.BUCKET_MS)
 	if args["night"] == "1" and run.phase == RunState.Phase.BUILD:
 		bot.build(run)
 		run.begin_round()
