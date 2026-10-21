@@ -55,7 +55,8 @@ extends RefCounted
 ## 25: founding traditions: "traditions" (the ids chosen before round 1, [] for none).
 ## 26: ventures: a dawn pick can take "venture:<id>" (data/ventures.json); that entry has "venture_lost" (tribespeople
 ##     who never came home) and "venture_goods" (good -> amount brought).
-const RECORD_FORMAT := 26
+## 27: cluster combos: per round "combos_end" (combo id from data/combos.json -> buildings in it at the round's end).
+const RECORD_FORMAT := 27
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -147,6 +148,11 @@ func end_round() -> void:
 		if reached > 0:
 			bands[parts[1]] = reached
 	entry["bands_end"] = bands
+	var combos := {}
+	for i in run.world.buildings.size():
+		for id in run.world.town.combos_of(i):
+			combos[id] = int(combos.get(id, 0)) + 1
+	entry["combos_end"] = combos
 	rounds.append(entry)
 	entry = {}
 

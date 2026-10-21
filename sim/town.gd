@@ -202,6 +202,81 @@ func ring_neighbours(k: int) -> Array[int]:
 	return [first + posmod(k - first - 1, count), first + posmod(k - first + 1, count)]
 
 
+## The plots in plot k's cluster: the run of plots between two lanes in its ring. A lane plot (a gate's, or
+## a building that found nowhere else) counts the plots on either side of it instead.
+func cluster_plots(k: int) -> Array[int]:
+	var out: Array[int] = [k]
+	if plots[k]["lane"]:
+		out.append_array(ring_neighbours(k))
+		return out
+	var count := int(plots[k]["ring_count"])
+	for side: int in [-1, 1]:
+		var at := k
+		for step in count - 1:
+			var first := int(plots[at]["ring_first"])
+			at = first + posmod(at - first + side, count)
+			if at == k or plots[at]["lane"]:
+				break
+			if not out.has(at):
+				out.append(at)
+	return out
+
+
+## The other finished buildings in building i's cluster (indices into World.buildings).
+func cluster_mates(i: int) -> Array[int]:
+	var out: Array[int] = []
+	for k in cluster_plots(int(w.buildings[i]["plot"])):
+		var b := int(plots[k]["building"])
+		if b >= 0 and b != i and float(w.buildings[b]["work_left"]) <= 0.0:
+			out.append(b)
+	return out
+
+
+## The combos (data/combos.json) building i is part of now: it is finished and a partner stands in its cluster.
+func combos_of(i: int) -> Array[String]:
+	var out: Array[String] = []
+	var type: String = w.buildings[i]["type"]
+	if float(w.buildings[i]["work_left"]) > 0.0:
+		return out
+	var mates: Array = []
+	for id: String in w.content.combos:
+		var combo: Dictionary = w.content.combos[id]
+		if combo["building"] != type:
+			continue
+		if mates.is_empty():
+			mates = cluster_mates(i).map(func(b: int) -> String: return w.buildings[b]["type"])
+		if mates.any(func(t: String) -> bool: return combo["with"].has(t)):
+			out.append(id)
+	return out
+
+
+## The sum of one effect key over the combos building i is part of.
+func combo_effect(i: int, key: String) -> float:
+	var total := 0.0
+	for id in combos_of(i):
+		total += float(w.content.combos[id]["effect"].get(key, 0.0))
+	return total
+
+
+## Whether a building of this type on plot k would join a combo with a building already in that cluster,
+## either way round (ordered buildings count, so pairs ordered together find each other).
+func _completes_combo(type: String, k: int) -> bool:
+	var near: Array[String] = []
+	for p in cluster_plots(k):
+		var b := int(plots[p]["building"])
+		if b >= 0:
+			near.append(w.buildings[b]["type"])
+	if near.is_empty():
+		return false
+	for id: String in w.content.combos:
+		var combo: Dictionary = w.content.combos[id]
+		if combo["building"] == type and near.any(func(t: String) -> bool: return combo["with"].has(t)):
+			return true
+		if combo["with"].has(type) and near.has(combo["building"]):
+			return true
+	return false
+
+
 ## How many sides of plot k (0 to 2) have something standing on them.
 func _sides_closed(k: int) -> int:
 	var n := 0
@@ -258,6 +333,9 @@ func _plot_score(type: String, k: int) -> float:
 	for other in [k - 1, k + 1]:
 		if other >= 0 and other < plots.size() and plots[other]["ring"] == ring and int(plots[other]["building"]) >= 0:
 			score -= 12.0
+	# Buildings lean toward a cluster where they would complete a combo (data/combos.json).
+	if _completes_combo(type, k):
+		score -= float(w.content.town.get("combo_pull", 0.0))
 	# A little seeded jitter so towns grow a bit differently each run.
 	score += float(hash([w.run.run_seed, k, w.buildings.size()]) % 1000) / 1000.0 * 20.0
 	return score

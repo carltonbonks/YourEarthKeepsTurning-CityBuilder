@@ -94,12 +94,17 @@ func _card(type: String, need: String, kind: String) -> Button:
 	var def: Dictionary = run.content.buildings[type]
 	var owned := run.world.count_buildings(type, false)
 	var why := recommendation(type, need)
+	if why == "" and kind != "basic":
+		why = Tooltips.combo_hint(run, type)
 	var top := why if why != "" else ("Always on offer" if kind == "basic" else ("Ageing up" if kind == "age" else "New building"))
 	var border := RECOMMEND_COLOR if why != "" else (UiKit.HEADING_COLOR if kind == "age" else UiKit.CARD_BORDER)
 	var btn := UiKit.card(top, def["name"], UiKit.cost_text(run.stock, def["cost"]), def["text"],
 		"You have %d" % owned if owned > 0 else "", BASIC_SIZE if kind == "basic" else CARD_SIZE, border, why != "",
 		UiKit.HEADING_COLOR if kind == "age" else Color.WHITE)
 	btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], def["work"]]
+	var combos := Tooltips.combo_lines(run, type)
+	if not combos.is_empty():
+		btn.tooltip_text += "\n" + "\n".join(PackedStringArray(combos))
 	var blocked := build_blocker(run, type)
 	if blocked != "":
 		btn.tooltip_text += "\n" + blocked

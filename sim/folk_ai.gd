@@ -201,6 +201,7 @@ func _worker_tick(unit: Unit) -> void:
 				var rate := work_rate(unit)
 				if unit.master_of == shop["type"]:
 					rate *= float(w.run.craft_trait(unit).get("craft_rate", 1.0))
+				rate *= 1.0 + w.town.combo_effect(unit.task_index, "craft_speed")
 				shop["craft_left"] = float(shop["craft_left"]) - rate * w.dt
 				if float(shop["craft_left"]) <= 0.0:
 					w.market.finish_craft(unit.task_index, unit)
