@@ -56,7 +56,9 @@ extends RefCounted
 ## 26: ventures: a dawn pick can take "venture:<id>" (data/ventures.json); that entry has "venture_lost" (tribespeople
 ##     who never came home) and "venture_goods" (good -> amount brought).
 ## 27: cluster combos: per round "combos_end" (combo id from data/combos.json -> buildings in it at the round's end).
-const RECORD_FORMAT := 27
+## 28: the pedlar's carousel: per round "carousel" (on carousel rounds) = one entry per pick, in order: {hero, level,
+##     base, tier, affixes, equipped}, plus "carousel_left" (items nobody took).
+const RECORD_FORMAT := 28
 
 var run: RunState
 ## Finished rounds, oldest first.

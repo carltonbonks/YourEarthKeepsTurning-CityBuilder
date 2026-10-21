@@ -634,6 +634,7 @@ func _finish_round() -> void:
 		record.end_round()
 		return
 	people.heal_between_rounds()
+	people.pedlar_carousel()
 	people.heroes_sell_finds()
 	relic_offer = _roll_relic_offer()
 	record.note_value("relic_offer", relic_offer.duplicate())

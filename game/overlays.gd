@@ -289,11 +289,28 @@ func _night_summary() -> void:
 	_box.add_child(label)
 
 
+## What the heroes took from the pedlar's carousel this round, in pick order.
+func _carousel_summary() -> void:
+	if run.people.last_carousel.is_empty():
+		return
+	var parts := PackedStringArray()
+	for p: Dictionary in run.people.last_carousel:
+		parts.append("%s took a %s%s" % [p["hero"], p["item"], "" if p["equipped"] else " to sell"])
+	var label := Label.new()
+	label.text = "A pedlar came by. " + ", then ".join(parts) + "."
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	label.custom_minimum_size.x = 600
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_color_override("font_color", UiKit.HEADING_COLOR)
+	_box.add_child(label)
+
+
 func show_relic_pick() -> void:
 	var content := run.content
 	_clear()
 	_title(("Round %d survived! Choose a pact" if run.is_pact_round() else "Round %d survived! Choose a relic") % run.round_number)
 	_night_summary()
+	_carousel_summary()
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
