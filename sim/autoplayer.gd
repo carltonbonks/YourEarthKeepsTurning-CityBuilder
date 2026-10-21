@@ -35,7 +35,7 @@ const TRADITIONS := {"balanced": ["hunters", "stoneworkers"], "workers": ["stone
 var garden_days := 3.0
 ## Orders the forester and charcoal pit when the cards recommend them. balance_run.gd: upkeep=0 turns it off.
 var upkeep := true
-## Orders the Geomancer's lodge from round 3 and sets an omen each round (_omen). balance_run.gd: geomancer=0 turns it off.
+## Orders the Geomancer's lodge from round 3 (not the workers style) and sets an omen each round (_omen). balance_run.gd: geomancer=0 turns it off.
 var geomancer := true
 const OMEN_STILL_FROM := 9
 ## Redraws the building cards once a round when it has at least this many shells (after its first pass).
@@ -122,7 +122,8 @@ func _build_pass(run: RunState) -> void:
 		_order(run, "drying_rack")
 	if run.round_number >= 2:
 		_order(run, "watch_post")
-	if geomancer and run.round_number >= 3:
+	# A town with no heroes gets little from it: the lodge's wood cost the workers style about 8 points.
+	if geomancer and style != "workers" and run.round_number >= 3:
 		_order(run, "geomancer")
 	# Gates last, with whatever is left over.
 	_gates(run)
