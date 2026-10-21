@@ -65,6 +65,17 @@ static func score(content: Content, item: Dictionary, likes: Dictionary) -> floa
 	return s
 
 
+## An item dug out of an earth find: an ordinary drop find_tier_bonus tiers higher (past the usual cap),
+## always with the earthborn affix.
+static func earth_find(content: Content, rng: SeededRng, round_number: int, age := "") -> Dictionary:
+	var item := roll(content, rng, round_number, age)
+	item["tier"] = int(item["tier"]) + content.int_num("find_tier_bonus")
+	for a: String in content.items["affixes"]:
+		if content.items["affixes"][a].get("earth_only", false) and not item["affixes"].has(a):
+			item["affixes"].append(a)
+	return item
+
+
 ## A random dropped item. Tier grows with the round; some get one or two affixes.
 ## Bases from a later age only drop once the town has reached it.
 static func roll(content: Content, rng: SeededRng, round_number: int, age := "") -> Dictionary:
@@ -76,7 +87,8 @@ static func roll(content: Content, rng: SeededRng, round_number: int, age := "")
 			and (age == "" or content.age_reached(age, content.items["bases"][id].get("age", ""))) \
 			and (age != "" or not content.items["bases"][id].has("age")))
 	bases.sort()
-	var affix_ids: Array = content.items["affixes"].keys()
+	var affix_ids: Array = content.items["affixes"].keys().filter(func(a: String) -> bool:
+		return not content.items["affixes"][a].get("earth_only", false))
 	affix_ids.sort()
 	var affixes := []
 	if rng.randf() < float(drops["affix_chance"]):

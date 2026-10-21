@@ -26,10 +26,11 @@ var shifts := 0
 ## Rift strips that stay raw ground until the next shift: {ring, a0, a1} (radians, a0 to a1 clockwise).
 var raw: Array[Dictionary] = []
 ## What the last shift did (see RunRecord "shift"): {shift, swallowed, dens_swallowed, ridges, raised,
-## rifts, grown, roads_refunded, woke (the kind of seam that woke, "" for none), woke_ring}. Empty before the first shift.
+## rifts, grown, roads_refunded, woke (the kind of seam that woke, "" for none), woke_ring, omen (the geomancer's,
+## "" for none), finds (node type -> earth finds left)}. Empty before the first shift.
 var last := {}
 ## Where the last shift did each thing, for the earth report and the map's pulses: {kind ("sank", "den_sank",
-## "grew", "raised"), type (node or den type), pos, worked (a node the town had gathered from), great (done by the
+## "grew", "raised", "find"), type (node or den type), pos, worked (a node the town had gathered from), great (done by the
 ## seam that woke)}.
 var events: Array[Dictionary] = []
 ## The seam that woke in the last shift: {ring, seam, kind, angle}, or {} when none did.
@@ -105,8 +106,8 @@ static func _in_span(a: float, s0: float, s1: float) -> bool:
 
 ## How fast plate k of ring ri turns on shift n, in radians: its ring's turn plus its own slow sway.
 func turn_of(ri: int, k: int, n: int) -> float:
-	# Stillstone holds the near ring still.
-	if ri == 0 and w.run.has_effect("still_ring"):
+	# Stillstone, or the geomancer's stilling omen, holds the near ring still.
+	if ri == 0 and (w.run.has_effect("still_ring") or w.run.omen == "still"):
 		return 0.0
 	var ring := rings[ri]
 	return float(ring["turn"]) + float(ring["sway"]) * sin(TAU * n / float(ring["periods"][k]) + float(ring["phases"][k]))
@@ -161,8 +162,8 @@ func plan(n: int) -> Array:
 
 
 func _next_plan() -> Array:
-	if _plan_for != shifts:
-		_plan_cache = {"plan": plan(shifts + 1)}
+	if _plan_for != shifts or _plan_cache.get("omen", "") != w.run.omen:
+		_plan_cache = {"plan": plan(shifts + 1), "omen": w.run.omen}
 		_plan_for = shifts
 	return _plan_cache["plan"]
 
@@ -280,7 +281,7 @@ func shift() -> void:
 	var plans := plan(n)
 	var rng := SeededRng.stream(w.run.run_seed, "earth_shift", n)
 	last = {"shift": n, "swallowed": {}, "dens_swallowed": 0, "ridges": 0, "raised": {}, "rifts": 0, "grown": {},
-		"roads_refunded": 0, "woke": "", "woke_ring": -1}
+		"roads_refunded": 0, "woke": "", "woke_ring": -1, "omen": w.run.omen, "finds": {}}
 	events = []
 	woke = _woken(plans)
 	var roads_before := _count_roads()
@@ -454,6 +455,10 @@ func _move_things(plans: Array) -> void:
 
 
 func _swallow_node(node: Dictionary, great := false) -> void:
+	# An earth find nobody dug out goes back under.
+	if w.content.world["nodes"][node["type"]].get("find", false):
+		_remove_node(node)
+		return
 	var embers: String = def["embers"]
 	last["swallowed"][node["type"]] = int(last["swallowed"].get(node["type"], 0)) + 1
 	events.append({"kind": "sank", "type": node["type"], "pos": node["pos"],
@@ -483,6 +488,8 @@ func _remove_node(node: Dictionary) -> void:
 func _swallow_den(di: int, great := false) -> void:
 	last["dens_swallowed"] = int(last["dens_swallowed"]) + 1
 	events.append({"kind": "den_sank", "type": w.dens[di]["type"], "pos": w.dens[di]["pos"], "worked": false, "great": great})
+	# What the den held stays where it went under, for a hero to dig out.
+	_leave_find("hoard", w.dens[di]["pos"], great)
 	_feed_the_deep(int(w.run.mod("swallow_den_shells")), w.run.has_effect("swallow_item"))
 	w.run.tell("The earth swallows the %s, and everything in it." % w.content.world["dens"][w.dens[di]["type"]]["name"].to_lower())
 	for e in w.enemies:
@@ -505,15 +512,17 @@ func _feed_the_deep(shells: int, item: bool) -> void:
 		w.hero_ai.give_item(rng.pick(heroes), Loot.roll(w.content, rng, w.run.round_number, w.run.age))
 
 
-## Closing colliding seams push their ridge up a step; every other seam's ridge wears down a step.
+## Closing colliding seams push their ridge up a step; every other seam's ridge wears down a step
+## (under the raising omen, colliding ridges climb omen_ridge_steps and none wear).
 func _grow_ridges(plans: Array) -> void:
 	for ri in rings.size():
 		var ring := rings[ri]
 		for k in ring["seams"].size():
 			if plans[ri]["results"][k]["kind"] == "collide":
-				ring["ridges"][k] = int(ring["ridges"][k]) + 1
+				# The geomancer's raising omen pushes every colliding ridge up further.
+				ring["ridges"][k] = int(ring["ridges"][k]) + (int(def["omen_ridge_steps"]) if w.run.omen == "raise" else 1)
 				last["ridges"] = int(last["ridges"]) + 1
-			else:
+			elif w.run.omen != "raise":
 				ring["ridges"][k] = maxi(0, int(ring["ridges"][k]) - 1)
 
 
@@ -550,7 +559,11 @@ func _open_rifts(plans: Array, rng: SeededRng) -> void:
 func _woken(plans: Array) -> Dictionary:
 	var best := {}
 	var best_score := 0.0
+	# The geomancer's stirring omen wakes a seam of the near ring when one moves.
+	var only := 0 if w.run.omen == "stir" else -1
 	for ri in rings.size():
+		if only >= 0 and ri != only:
+			continue
 		var rd: Dictionary = def["rings"][ri]
 		for k in rings[ri]["seams"].size():
 			var res: Dictionary = plans[ri]["results"][k]
@@ -560,6 +573,17 @@ func _woken(plans: Array) -> Dictionary:
 			if score > best_score:
 				best_score = score
 				best = {"ring": ri, "seam": k, "kind": res["kind"], "angle": float(plans[ri]["seams"][k])}
+	if best.is_empty() and only >= 0:
+		return _woken_any(plans)
+	return best
+
+
+## _woken without the stirring omen's pull.
+func _woken_any(plans: Array) -> Dictionary:
+	var omen := w.run.omen
+	w.run.omen = ""
+	var best := _woken(plans)
+	w.run.omen = omen
 	return best
 
 
@@ -591,6 +615,8 @@ func _wake(rng: SeededRng) -> void:
 				var r := (float(ring["r0"]) + float(ring["r1"])) / 2.0
 				var side := 1.0 if rng.randf() < 0.5 else -1.0
 				ring["upthrust"][k] = _raise(type, Vector2.from_angle(a + side * _margin(r)) * r, float(wd["rich"]), true)
+				# Starstone comes up with it, on the other side of the seam.
+				_leave_find("starstone", Vector2.from_angle(a - side * _margin(r)) * r, true)
 		"rift":
 			var types: Array = def["rings"][ri]["rift_nodes"]
 			var strip := {"a0": a, "a1": a}
@@ -639,6 +665,15 @@ func _raise_upthrust(rng: SeededRng) -> void:
 			var r := (float(ring["r0"]) + float(ring["r1"])) / 2.0
 			var side := 1.0 if rng.randf() < 0.5 else -1.0
 			ring["upthrust"][k] = _raise(type, Vector2.from_angle(float(ring["seams"][k]) + side * _margin(r)) * r, 1.0, false)
+
+
+## An earth find (data/plates.json finds) that heroes dig out for an item.
+func _leave_find(kind: String, at: Vector2, great: bool) -> void:
+	var type: String = def["finds"][kind]
+	events.append({"kind": "find", "type": type, "pos": at, "worked": false, "great": great})
+	var finds: Dictionary = last.get_or_add("finds", {})
+	finds[type] = int(finds.get(type, 0)) + 1
+	_add(type, at, 1.0)
 
 
 ## A fresh node in a rift.
@@ -769,6 +804,9 @@ func _tell() -> void:
 		parts.append("%d fresh patch%s grow%s in the rifts" % [grown, "" if grown == 1 else "es", "s" if grown == 1 else ""])
 	for t: String in last["raised"]:
 		parts.append("a ridge breaks open: %s" % w.content.world["nodes"][t]["name"].to_lower())
+	var omen: String = last.get("omen", "")
+	if omen != "":
+		parts.push_front(String(w.content.plates["omens"][omen]["told"]))
 	var line := "The earth turns."
 	if not parts.is_empty():
 		line = "The earth turns: %s." % "; ".join(parts)

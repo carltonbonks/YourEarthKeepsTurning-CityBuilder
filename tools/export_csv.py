@@ -165,6 +165,9 @@ def main(raw_folder, out_folder):
                                                                     "rifts", "grown", "roads_refunded"]}),
                 "earth_woke": rd["shift"].get("woke", "") if "shift" in rd else "",
                 "earth_woke_ring": rd["shift"].get("woke_ring", "") if "shift" in rd else "",
+                "earth_omen": rd["shift"].get("omen", "") if "shift" in rd else "",
+                "earth_finds": sum(rd["shift"].get("finds", {}).values()) if "shift" in rd else "",
+                "finds_dug": sum(rd.get("finds_dug", {}).values()) if "finds_dug" in rd else "",
                 **{"trips_cut_short_" + k: rd.get("trips_cut_short", {}).get(k, 0) if "trips_cut_short" in rd else ""
                    for k in ["dusk", "emptied", "unsafe"]},
                 "families": sum(1 for p in rd.get("picks", []) if p.get("taken") == "family"),

@@ -131,7 +131,8 @@ func finish_craft(index: int, crafter: Unit = null) -> void:
 		var affixes := []
 		var chance := float(w.content.market["affix_chance"]) if master.is_empty() else float(master.get("affix_chance", 0.0))
 		if w.rng.randf() < chance:
-			var ids: Array = w.content.items["affixes"].keys().filter(func(a: String) -> bool: return a != "cursed")
+			var ids: Array = w.content.items["affixes"].keys().filter(func(a: String) -> bool:
+				return a != "cursed" and not w.content.items["affixes"][a].get("earth_only", false))
 			ids.sort()
 			affixes.append(w.rng.pick(ids))
 		good["item"] = Loot.make(r["item"], int(good["tier"]), affixes)
