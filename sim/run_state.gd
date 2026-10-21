@@ -72,6 +72,9 @@ var trader_stock := {}
 var departed: Array[Unit] = []
 ## The role of whoever left hungry this dawn ("" if nobody): none of that role come to the dawn pick.
 var hunger_turned_away := ""
+## The geomancer's omen for the next turn of the earth (an id from "omens" in data/plates.json, "" for none),
+## chosen while building once a building with "omens" stands; used up by that turn.
+var omen := ""
 
 var _next_id := 1
 var _effects_between_rounds := {}
@@ -251,6 +254,23 @@ func build(type: String) -> bool:
 # --- Market prices ----------------------------------------------------------
 
 ## Sets a stall kind's price level for the coming round ("cheap", "fair" or "dear").
+## True while building, once a building that reads the earth (a Geomancer's lodge) stands.
+func can_choose_omen() -> bool:
+	if phase != Phase.BUILD:
+		return false
+	for type: String in content.buildings:
+		if content.buildings[type].get("omens", false) and world.count_buildings(type) > 0:
+			return true
+	return false
+
+
+## Sets the omen for the next turn of the earth; choosing the one already set (or "") clears it.
+func choose_omen(id: String) -> void:
+	if not can_choose_omen() or (id != "" and not content.plates["omens"].has(id)):
+		return
+	omen = "" if id == omen else id
+
+
 func set_price(kind: String, level: String) -> void:
 	if phase != Phase.BUILD or not prices.has(kind) or not content.market["price_levels"].has(level) or prices[kind] == level:
 		return
@@ -704,6 +724,7 @@ func choose_relic(relic_id: String) -> void:
 	for i in int(mod("earth_turns")):
 		world.earth.shift()
 		relic_fired("earth_turns")
+	omen = ""
 	_enter_build()
 	if not world.earth.last.is_empty():
 		record.note_value("shift", world.earth.last.duplicate(true))

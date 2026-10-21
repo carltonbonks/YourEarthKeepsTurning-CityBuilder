@@ -50,7 +50,7 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `game/top_bar.gd` | `TopBar`: the thin bar of key numbers (round, hearth, people, food and fuel as days and nights left, wood/stone/shells, relics) with pause, speed and the menu button. |
 | `game/tip_chip.gd` | `TipChip`: a small panel whose hover card is built on demand from a Tooltips-style dictionary, styled like the map's tooltips. Use it for any new bit of screen that needs "more on hover". |
 | `game/threat_card.gd` | `ThreatCard`: the round's attack (sides and the den each comes by, town vs attack power bar and verdict, the catch-up banner), the earth report while building, and the Begin round button, in the map's top-right corner. |
-| `game/earth_report.gd` | `EarthReport`: what the earth's last turn did and which den's way each attack side follows, as short lines for the threat card (never a forecast). |
+| `game/earth_report.gd` | `EarthReport`: what the earth's last turn did (and the geomancer's omen it followed) and which den's way each attack side follows, as short lines for the threat card (never a forecast). The threat card also holds the omen buttons. |
 | `game/alerts.gd` | `Alerts`: short alerts that pop up when a problem starts and fade. `Alerts.active(run)` is the read-only rule (tested in `tests/test_alerts.gd`). |
 | `game/hero_strip.gd` | `HeroStrip`: heroes as small portraits under the map (health, mood, what they are doing); hover for gear and bed, click to point the map at them. |
 | `game/story_log.gd` | `StoryLog`: the story's last three lines and the Log button. |

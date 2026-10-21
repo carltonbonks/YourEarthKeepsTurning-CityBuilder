@@ -6,6 +6,8 @@ extends VBoxContainer
 ## button sits under it, with what the earth's last turn did (EarthReport) between them.
 
 signal begin_pressed
+## An omen button was pressed (an id from "omens" in data/plates.json).
+signal omen_pressed(id: String)
 
 const WIDTH := 280.0
 ## Attack power over town power above this reads as outmatched (bots lose about 1 round in 5 there).
@@ -18,6 +20,8 @@ var _ways: Label
 var _earth_box: VBoxContainer
 var _earth_title: Label
 var _earth_lines: Label
+var _omen_box: VBoxContainer
+var _omen_buttons := {}
 var _bar: ColorRect
 var _numbers: Label
 var _verdict: Label
@@ -69,6 +73,10 @@ func _init() -> void:
 	_earth_title.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_earth_lines = UiKit.note(_earth_box, "", 11)
 	_earth_lines.autowrap_mode = TextServer.AUTOWRAP_WORD
+	# The geomancer's omens for the next turn: one click sets one, a second click clears it.
+	_omen_box = VBoxContainer.new()
+	_omen_box.add_theme_constant_override("separation", 3)
+	add_child(_omen_box)
 	_begin = UiKit.primary(UiKit.button(self, "", func() -> void: begin_pressed.emit()), 18)
 	_begin.custom_minimum_size.y = 48
 
@@ -97,11 +105,28 @@ func refresh() -> void:
 	_ways.visible = building or not w.wave_spawned
 	var headline := EarthReport.headline(run)
 	_earth_box.get_parent().visible = building and headline != ""
+	_refresh_omens()
 	_earth_title.text = headline
 	_earth_lines.text = "\n".join(EarthReport.lines(run))
 	_earth_lines.visible = _earth_lines.text != ""
 	_begin.visible = building
 	_begin.text = "Begin round %d" % run.round_number
+
+
+func _refresh_omens() -> void:
+	_omen_box.visible = run.can_choose_omen()
+	if not _omen_box.visible:
+		return
+	if _omen_buttons.is_empty():
+		UiKit.note(_omen_box, "The geomancer's omen for the next turn of the earth:", 11, UiKit.HEADING_COLOR)
+		for id: String in run.content.plates["omens"]:
+			var b := UiKit.button(_omen_box, "", func() -> void: omen_pressed.emit(id))
+			b.add_theme_font_size_override("font_size", 12)
+			b.tooltip_text = run.content.plates["omens"][id]["text"]
+			_omen_buttons[id] = b
+	for id: String in _omen_buttons:
+		var name: String = run.content.plates["omens"][id]["name"]
+		(_omen_buttons[id] as Button).text = ("● " + name) if run.omen == id else name
 
 
 ## The hover card: who is coming, and what the power numbers mean.
@@ -128,4 +153,5 @@ static func earth_tip(r: RunState) -> Dictionary:
 	t["lines"].append("Between rounds the rings of land past the town turn; the town itself never moves.")
 	t["lines"].append("Each turn one seam wakes: it swallows the land on one side, raises a rich vein of stone, or splits open a valley of fresh plants.")
 	t["lines"].append("The places it changed pulse on the map for a few moments.")
+	t["lines"].append("A Geomancer's lodge lets you choose an omen for the next turn. Bold and greedy heroes dig out what the earth leaves: a sunk den's hoard, starstone by a ridge.")
 	return t

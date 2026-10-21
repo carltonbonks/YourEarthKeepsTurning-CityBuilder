@@ -337,7 +337,7 @@ func test_a_waking_colliding_seam_breaks_open_a_rich_vein() -> void:
 	var rich: Array = earth.events.filter(func(e: Dictionary) -> bool: return e["kind"] == "raised" and e["great"])
 	check_eq(rich.size(), 1, "one rich vein")
 	var obsidian: Dictionary = run.content.world["nodes"]["obsidian"]
-	var node: Dictionary = w.nodes[-1]
+	var node: Dictionary = w.nodes.filter(func(n: Dictionary) -> bool: return n["pos"] == rich[0]["pos"])[0]
 	check_eq(node["type"], "obsidian", "of the age's upthrust stone")
 	check(int(node["amount"]) > int(obsidian["amount"]), "holding more than an ordinary outcrop")
 	run.dispose()
@@ -403,4 +403,114 @@ func test_the_earth_report_says_what_the_turn_did() -> void:
 		if not lines.is_empty():
 			said = true
 	check(said, "something to say in a run's turns")
+	run.dispose()
+
+
+func test_the_geomancer_offers_omens_once_it_stands() -> void:
+	var run := _run()
+	check(not run.can_choose_omen(), "no omens without a geomancer")
+	run.choose_omen("still")
+	check_eq(run.omen, "", "so choosing does nothing")
+	run.world.add_building("geomancer")
+	run.world.buildings[-1]["work_left"] = 0.0
+	check(run.can_choose_omen(), "omens once the lodge stands, while building")
+	run.choose_omen("still")
+	check_eq(run.omen, "still", "an omen is set")
+	run.choose_omen("still")
+	check_eq(run.omen, "", "choosing it again clears it")
+	run.choose_omen("nonsense")
+	check_eq(run.omen, "", "an unknown omen is ignored")
+	run.dispose()
+
+
+func test_stilling_omen_holds_the_near_ring() -> void:
+	var run := _run()
+	var earth := run.world.earth
+	run.omen = "still"
+	var near: Array = run.world.nodes.filter(func(n: Dictionary) -> bool: return earth.ring_at(n["pos"]) == 0)
+	var at: Array = near.map(func(n: Dictionary) -> Vector2: return n["pos"])
+	earth.shift()
+	check(not near.is_empty(), "nodes in the near ring")
+	for i in near.size():
+		check(Vector2(near[i]["pos"]).distance_to(at[i]) < 0.01, "a near node stayed put")
+	check_eq(earth.last["omen"], "still", "the shift reports the omen it followed")
+	check(earth.woke.is_empty() or int(earth.woke["ring"]) != 0, "and no near seam woke")
+	run.dispose()
+
+
+func test_stirring_omen_wakes_a_near_seam() -> void:
+	var run := _run()
+	var earth := run.world.earth
+	var near := 0
+	for n in 13:
+		run.omen = "stir"
+		earth.shift()
+		if not earth.woke.is_empty() and int(earth.woke["ring"]) == 0:
+			near += 1
+	check(near >= 10, "nearly every stirred turn wakes a near seam (%d of 13)" % near)
+	run.dispose()
+
+
+func test_raising_omen_feeds_the_ridges() -> void:
+	var fed := _run()
+	var plain := _run()
+	var fed_steps := 0
+	var plain_steps := 0
+	for n in 6:
+		fed.omen = "raise"
+		fed.world.earth.shift()
+		plain.world.earth.shift()
+	for ring in fed.world.earth.rings:
+		for h: int in ring["ridges"]:
+			fed_steps += h
+	for ring in plain.world.earth.rings:
+		for h: int in ring["ridges"]:
+			plain_steps += h
+	check(fed_steps > plain_steps, "fed ridges stand taller (%d against %d)" % [fed_steps, plain_steps])
+	fed.dispose()
+	plain.dispose()
+
+
+func test_a_sunk_den_leaves_a_hoard_and_a_bold_hero_digs_it_out() -> void:
+	var run := _run()
+	var w := run.world
+	var earth := w.earth
+	earth.last = {"swallowed": {}, "dens_swallowed": 0}
+	var at: Vector2 = w.dens[0]["pos"]
+	earth._swallow_den(0)
+	var hoard: Array = w.nodes.filter(func(n: Dictionary) -> bool: return n["type"] == "sunk_hoard" and not n.get("gone", false))
+	check_eq(hoard.size(), 1, "the den left a hoard")
+	check_eq(hoard[0]["pos"], at, "where it went under")
+	check(not w.folk.any(func(u: Unit) -> bool: return u.task_index == w.nodes.find(hoard[0])), "townsfolk never gather it")
+	var hero: Unit = run.heroes[0] if not run.heroes.is_empty() else null
+	if hero == null:
+		run.dispose()
+		return
+	var greedy_wilds := 1.0
+	check(w.hero_ai.find_for(hero, greedy_wilds) == w.nodes.find(hoard[0]), "a keen hero finds it")
+	var before := hero.items.size() + hero.spares.size()
+	w.hero_ai.dig_find(hero, w.nodes.find(hoard[0]))
+	check(hoard[0]["gone"], "dug out and gone")
+	check_eq(hero.items.size() + hero.spares.size(), before + 1, "the hero gained an item")
+	run.dispose()
+
+
+func test_earth_finds_give_earthborn_gear_a_tier_up() -> void:
+	var content := Content.load_default()
+	var rng := SeededRng.new(7)
+	for n in 20:
+		var item := Loot.earth_find(content, rng, 1, "neolithic")
+		check(item["affixes"].has("earthborn"), "always earthborn")
+		check(int(item["tier"]) >= 2, "a tier above a round-1 drop")
+	for n in 200:
+		check(not Loot.roll(content, rng, 9, "neolithic")["affixes"].has("earthborn"), "never an ordinary drop")
+
+
+func test_a_waking_ridge_leaves_starstone() -> void:
+	var run := _run()
+	var earth := run.world.earth
+	check(not _shift_until_wake(earth, "collide").is_empty(), "a colliding seam wakes within a run")
+	earth.shift()
+	check(earth.events.any(func(e: Dictionary) -> bool: return e["kind"] == "find" and e["type"] == "starstone"), "starstone came up")
+	check(" ".join(EarthReport.lines(run)).contains("Starstone"), "and the report says so")
 	run.dispose()

@@ -61,7 +61,10 @@ extends RefCounted
 ## 29: the earth wakes and the attack rides the dens: a round's "shift" also has "woke" (the kind of seam that woke and did
 ##     something big: "subduct", "collide", "rift", or "" for none) and "woke_ring" (its ring, -1 for none); per round
 ##     "wave_side_dens" (per warned side, the den type the warband came by, "" for open country).
-const RECORD_FORMAT := 29
+## 30: the geomancer and earth finds: a round's "shift" also has "omen" (the geomancer's omen it followed, "" for none)
+##     and "finds" (node type -> earth finds it left: starstone, sunk hoards); per round "finds_dug" (node type ->
+##     finds heroes dug out, each an earthborn item, also in "loot").
+const RECORD_FORMAT := 30
 
 var run: RunState
 ## Finished rounds, oldest first.

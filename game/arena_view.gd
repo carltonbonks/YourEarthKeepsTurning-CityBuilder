@@ -25,7 +25,7 @@ const TOWER_HEIGHT := 32.0
 const SLIDE_MS := 1800.0
 ## After a shift, the places the earth changed pulse this long (sank red, grew green, rich stone gold).
 const PULSE_MS := 8000.0
-const PULSE_COLORS := {"sank": Color("#e06048"), "den_sank": Color("#e06048"), "grew": Color("#8fd070"), "raised": Color("#ffd28a")}
+const PULSE_COLORS := {"sank": Color("#e06048"), "den_sank": Color("#e06048"), "grew": Color("#8fd070"), "raised": Color("#ffd28a"), "find": Color("#c8c0f0")}
 ## The controls hint shows for this many rounds.
 const HELP_ROUNDS := 2
 ## What each kind of standing thing is, for the back-to-front pass.

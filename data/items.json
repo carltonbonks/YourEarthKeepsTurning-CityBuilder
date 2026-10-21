@@ -1,5 +1,5 @@
 {
-	"_note": "Items heroes find, buy, keep or sell. A base names the slot and its stats per tier (an item's stats are base x tier, plus each affix). Affixes are item traits. Stats: attack, hp, speed, energy (cuts how fast energy drains: 0.2 = 20% slower), loot (extra shells per kill), rest_heal (extra HP per second while resting). metal = hits pierce bronze shields; steel = hits also cut through mail (on a weapon). bane = extra attack per tier against creatures with that tag (the reliquary against the undead). age = only made or dropped once the town reaches that age. value = shells a trader pays: value_per_tier x tier + value_per_affix x affixes. drops: chance a kill drops an item (den wanderers are where the loot is).",
+	"_note": "Items heroes find, buy, keep or sell. A base names the slot and its stats per tier (an item's stats are base x tier, plus each affix). Affixes are item traits; earth_only ones never drop or sell, they come only from earth finds. Stats: attack, hp, speed, energy (cuts how fast energy drains: 0.2 = 20% slower), loot (extra shells per kill), rest_heal (extra HP per second while resting). metal = hits pierce bronze shields; steel = hits also cut through mail (on a weapon). bane = extra attack per tier against creatures with that tag (the reliquary against the undead). age = only made or dropped once the town reaches that age. value = shells a trader pays: value_per_tier x tier + value_per_affix x affixes. drops: chance a kill drops an item (den wanderers are where the loot is).",
 	"bases": {
 		"flint_blade": {"name": "flint blade", "slot": "weapon", "attack": 3},
 		"bone_spear": {"name": "bone spear", "slot": "weapon", "attack": 2, "speed": 6},
@@ -26,6 +26,7 @@
 		"tireless": {"name": "Tireless", "energy": 0.2},
 		"lucky": {"name": "Lucky", "loot": 1},
 		"blessed": {"name": "Blessed", "rest_heal": 1.5},
+		"earthborn": {"name": "Earthborn", "attack": 3, "hp": 12, "earth_only": true},
 		"cursed": {"name": "Cursed", "attack": 4, "hp": -10}
 	},
 	"value_per_tier": 10,
