@@ -92,7 +92,7 @@ func test_every_kind_of_card_shows() -> void:
 	screen.free()
 
 
-func test_night_closes_in_on_the_town_and_holds_the_speed() -> void:
+func test_night_closes_in_on_the_town_and_keeps_the_speed() -> void:
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
 	screen.call("_new_run", 4821)
@@ -109,7 +109,6 @@ func test_night_closes_in_on_the_town_and_holds_the_speed() -> void:
 	screen.call("_set_speed", 8)
 	var tick := func() -> void:
 		arena.night.update(arena, 1.0 / 60.0)
-		screen.call("_hold_night_speed")
 	var day := run.content.num("day_seconds")
 	while run.world.time_of_day() < day - NightCamera.LEAD_SECONDS - 1.0:
 		run.step()
@@ -123,14 +122,14 @@ func test_night_closes_in_on_the_town_and_holds_the_speed() -> void:
 	var town := NightCamera.town_radius(run)
 	check(town > float(run.content.town["rings"][0]["radius"]), "the town's reach covers its buildings")
 	check(is_equal_approx(arena.zoom, maxf(1.5, arena.zoom_to_fit(town, NightCamera.FILL))), "the town fills most of the view")
-	check_eq(screen.get("speed"), NightCamera.NIGHT_SPEED, "the night plays out at 2x")
+	check_eq(screen.get("speed"), 8, "the night keeps the speed the player picked")
 	while run.phase == RunState.Phase.SIM:
 		run.step()
 	for i in 120:
 		tick.call()
 	check_eq(arena.zoom, 1.5, "after the night the zoom goes back")
 	check_eq(arena.pan, Vector2(200, -100), "after the night the camera goes back")
-	check_eq(screen.get("speed"), 8, "at dawn the old speed comes back")
+	check_eq(screen.get("speed"), 8, "the speed never changed")
 	# The player takes the camera during the next night: it stays where they leave it.
 	run.choose_pick(-1)
 	while not run.world.is_night():

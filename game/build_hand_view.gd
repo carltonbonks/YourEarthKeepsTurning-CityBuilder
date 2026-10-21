@@ -12,6 +12,8 @@ signal changed
 const RECOMMEND_COLOR := UiKit.RECOMMEND_COLOR
 const CARD_SIZE := Vector2(150, 132)
 const BASIC_SIZE := Vector2(118, 132)
+## Height of the buyout button under each caravan card; the card shrinks to make room.
+const BUYOUT_HEIGHT := 28.0
 
 var run: RunState
 var _row: HBoxContainer
@@ -130,13 +132,25 @@ func _age_cards() -> void:
 	for good: String in run.trader_stock:
 		if int(run.trader_stock[good]) <= 0:
 			continue
-		var btn := UiKit.card(trader["name"], "1 %s" % good, UiKit.cost_text(run.stock, {"shells": run.trader_price(good)}), "",
-			"%d left this round" % run.trader_stock[good], BASIC_SIZE, Color("#c0a060"))
-		btn.tooltip_text = trader["text"]
+		# One card buys one; the buyout under it takes as many as the shells pay for.
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 4)
+		var btn := UiKit.card("Caravan · %d left" % run.trader_stock[good], "1 %s" % good,
+			UiKit.cost_text(run.stock, {"shells": run.trader_price(good)}), "", "", Vector2(BASIC_SIZE.x, BASIC_SIZE.y - BUYOUT_HEIGHT - 4), Color("#c0a060"))
+		btn.tooltip_text = "%s\n%s\n%d left this round." % [trader["name"], trader["text"], run.trader_stock[good]]
 		btn.disabled = not run.can_trade(good)
 		UiKit.fade_if_disabled(btn, UiKit.shortfall(run.stock, {"shells": run.trader_price(good)}))
 		btn.pressed.connect(_act.bind(run.trade.bind(good)))
-		_row.add_child(btn)
+		col.add_child(btn)
+		var n := run.buyout_count(good)
+		var all := UiKit.secondary(Button.new(), 12)
+		all.text = "Buy %d · %d shells" % [n, n * run.trader_price(good)] if n > 0 else "Buyout"
+		all.custom_minimum_size = Vector2(BASIC_SIZE.x, BUYOUT_HEIGHT)
+		all.disabled = n == 0
+		all.tooltip_text = "Buy as many %s as your shells pay for, up to all the caravan has left." % good
+		all.pressed.connect(_act.bind(run.buyout.bind(good)))
+		col.add_child(all)
+		_row.add_child(col)
 
 
 ## Why a building can't be ordered yet, beyond its cost ("" if nothing).
