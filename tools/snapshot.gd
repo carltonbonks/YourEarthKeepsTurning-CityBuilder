@@ -4,10 +4,11 @@ extends SceneTree
 ## mid=1 stops partway through the round's first day instead of at the build phase; zoom= zooms the map;
 ## gates=2 has the bot order up to 2 gates; flat=1 shows the flat top-down map instead of the tilted one;
 ## pick=1 shows the round's first dawn pick instead; night=1 plays the round's first day into its night
-## so the camera has closed in on the town (NightCamera).
+## so the camera has closed in on the town (NightCamera); preview=<building id> blinks where that building would go,
+## as hovering its card does.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": ""}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -53,6 +54,8 @@ func _init() -> void:
 		run.begin_round()
 		main._overlays.show_for_phase()
 	main._refresh()
+	if args["preview"] != "":
+		main._preview_building(args["preview"])
 	main._arena.iso = args["flat"] != "1"
 	if args["night"] != "1":
 		main._arena.zoom = float(args["zoom"])
