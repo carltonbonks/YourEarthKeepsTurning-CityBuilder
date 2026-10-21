@@ -10,7 +10,7 @@ Every change merged to `main` is published as a browser build:
 No install needed. Desktop Chrome, Edge or Firefox recommended.
 Add `?seed=1234` to the address to replay a specific run. Add `&dev=1` for developer tools such as skipping ahead.
 
-The screen is kept short: a thin bar of key numbers on top, the map, and your heroes and the latest story underneath. Point at anything (a number on the bar, a hero, a card, something on the map) for the detail. Space pauses, Esc opens the menu (seed, new run, Run history), V tilts the map.
+The screen is kept short: a thin bar of key numbers on top, the map, and your heroes and the latest story underneath. Point at anything (a number on the bar, a hero, a card, something on the map) for the detail. Space pauses, Esc opens the menu (seed, new run, Run history), V tilts the map. The **Impact** button under Log shows who did what, this round or over the whole run: damage each hero, kind of townsfolk, the hearth and the towers dealt and took, kills, townsfolk lost, and the work each kind did (goods brought home, things made, buildings raised, paving, hearth mended). The round-survived screen leads with its headline.
 
 ### How it plays
 

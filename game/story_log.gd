@@ -4,6 +4,8 @@ extends HBoxContainer
 ## and, in tiny text under it, which build is running (build_label).
 
 signal open_pressed
+## The Who did what button (Overlays.show_impact).
+signal impact_pressed
 
 const LINES := 3
 ## Written by CI just before the web export (see .github/workflows/ci.yml); absent in local runs.
@@ -37,6 +39,12 @@ func _init() -> void:
 	UiKit.secondary(open, 13)
 	open.pressed.connect(func() -> void: open_pressed.emit())
 	side.add_child(open)
+	var impact := Button.new()
+	impact.text = "Impact"
+	impact.tooltip_text = "Who did what: damage dealt and taken, kills and work, for each hero, kind of townsfolk and the hearth"
+	UiKit.secondary(impact, 13)
+	impact.pressed.connect(func() -> void: impact_pressed.emit())
+	side.add_child(impact)
 	var version := UiKit.note(side, build_label(), 9)
 	version.autowrap_mode = TextServer.AUTOWRAP_OFF
 	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
