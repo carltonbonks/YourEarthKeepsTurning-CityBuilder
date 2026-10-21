@@ -3,7 +3,7 @@ extends VBoxContainer
 ## The round's attack as a small card in the map's top-right corner: where it comes from, your town's
 ## power against the attack's as one bar with a plain verdict, and a gold banner when the warband holds
 ## raiders back (catch-up). The enemy list is in the hover card. While building, the Begin round
-## button sits under it.
+## button sits under it, with what the earth's last turn did (EarthReport) between them.
 
 signal begin_pressed
 
@@ -14,6 +14,10 @@ const EVEN := 0.9
 
 var run: RunState
 var _title: RichTextLabel
+var _ways: Label
+var _earth_box: VBoxContainer
+var _earth_title: Label
+var _earth_lines: Label
 var _bar: ColorRect
 var _numbers: Label
 var _verdict: Label
@@ -37,6 +41,8 @@ func _init() -> void:
 	_title.add_theme_font_size_override("normal_font_size", 13)
 	_title.add_theme_font_size_override("bold_font_size", 13)
 	box.add_child(_title)
+	_ways = UiKit.note(box, "", 11)
+	_ways.autowrap_mode = TextServer.AUTOWRAP_WORD
 	# The verdict is what decides how to spend the round, so it comes first and biggest.
 	_verdict = UiKit.note(box, "", 17)
 	_bar = UiKit.bar(box, 0.5, Color("#7fb0e0"), 8.0)
@@ -52,6 +58,17 @@ func _init() -> void:
 	gold.set_content_margin_all(4)
 	_eased.add_theme_stylebox_override("normal", gold)
 	box.add_child(_eased)
+	# What the earth's last turn did: a hover of its own, so the attack's hover stays about the attack.
+	var earth_chip := TipChip.new()
+	earth_chip.tip = func() -> Dictionary: return earth_tip(run) if run != null else {}
+	add_child(earth_chip)
+	_earth_box = VBoxContainer.new()
+	_earth_box.add_theme_constant_override("separation", 2)
+	earth_chip.add_child(_earth_box)
+	_earth_title = UiKit.note(_earth_box, "", 13, Color("#d8c08a"))
+	_earth_title.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_earth_lines = UiKit.note(_earth_box, "", 11)
+	_earth_lines.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_begin = UiKit.primary(UiKit.button(self, "", func() -> void: begin_pressed.emit()), 18)
 	_begin.custom_minimum_size.y = 48
 
@@ -76,6 +93,13 @@ func refresh() -> void:
 	_eased.text = "The warband holds back %d raider%s: your town looks too weak to be worth them all.%s" % [
 		run.wave_eased, "" if run.wave_eased == 1 else "s",
 		" %d make a war camp in the wilds." % run.camp_joined if run.camp_joined > 0 else ""]
+	_ways.text = "\n".join(EarthReport.ways(run))
+	_ways.visible = building or not w.wave_spawned
+	var headline := EarthReport.headline(run)
+	_earth_box.get_parent().visible = building and headline != ""
+	_earth_title.text = headline
+	_earth_lines.text = "\n".join(EarthReport.lines(run))
+	_earth_lines.visible = _earth_lines.text != ""
 	_begin.visible = building
 	_begin.text = "Begin round %d" % run.round_number
 
@@ -91,7 +115,17 @@ static func tip(r: RunState) -> Dictionary:
 		t["lines"].append("%s x%d" % [content.enemies[id]["name"], counts[id]])
 	t["lines"].append("Power counts heroes, warriors, the hearth and towers against every raider coming.")
 	t["lines"].append("Earlier nights bring only wanderers and small probes.")
+	t["lines"].append("The warband comes by a den's way. The earth carries the dens round between rounds, and the attack with them; a den the earth swallows takes its way with it.")
 	if r.wave_eased > 0:
 		t["lines"].append("Catch-up: the warband holds back raiders when your town has fallen far behind. A strong town never faces more for being strong.")
 		t["lines"].append("Held-back raiders make a war camp out in the wilds: it blocks gathering nearby until heroes clear it, and clearing it pays.")
+	return t
+
+
+## The earth report's hover card: how the earth works, in short.
+static func earth_tip(r: RunState) -> Dictionary:
+	var t := Tooltips.new_tip("The shifting earth")
+	t["lines"].append("Between rounds the rings of land past the town turn; the town itself never moves.")
+	t["lines"].append("Each turn one seam wakes: it swallows the land on one side, raises a rich vein of stone, or splits open a valley of fresh plants.")
+	t["lines"].append("The places it changed pulse on the map for a few moments.")
 	return t
