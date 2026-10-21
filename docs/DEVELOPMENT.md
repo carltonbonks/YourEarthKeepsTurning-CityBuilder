@@ -53,7 +53,8 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `game/earth_report.gd` | `EarthReport`: what the earth's last turn did (and the geomancer's omen it followed) and which den's way each attack side follows, as short lines for the threat card (never a forecast). The threat card also holds the omen buttons. |
 | `game/alerts.gd` | `Alerts`: short alerts that pop up when a problem starts and fade. `Alerts.active(run)` is the read-only rule (tested in `tests/test_alerts.gd`). |
 | `game/hero_strip.gd` | `HeroStrip`: heroes as small portraits under the map (health, mood, what they are doing); hover for gear and bed, click to point the map at them. |
-| `game/story_log.gd` | `StoryLog`: the story's last three lines and the Log button. |
+| `game/story_log.gd` | `StoryLog`: the story's last three lines and the Log and Impact buttons. |
+| `game/impact_view.gd` | `ImpactView`: who did what (each round's `impact` in the record, filled by `RunRecord.note_impact` / `note_blow` from `World.damage`, `FolkAI`, `Market` and `EnemyAI`) as tables per heroes, townsfolk roles and defences, this round or the whole run (`Overlays.show_impact`), and the headline over the relic pick. A new kind of work townsfolk do gets a `note_impact` call and a few words in `work_text`. |
 | `game/build_hand_view.gd` | `BuildHandView`: the building cards as a heads-up hand along the bottom of the map, with each card's gold "why the town wants it" strip (`recommendation`), tool sets and caravan goods in later ages, and the redraw. `build_blocker` and the cost shortfall go on a red strip on a card that can't be ordered. |
 | `game/overlays.gd` | `Overlays`: dawn pick and relic pick (as cards), end screen, Esc menu, full story log, Run history, dev tuning. Sends choices back as signals. |
 | `game/status_text.gd` | `StatusText`: the top bar's chip text and hover cards, and the clock line, built from the run. Read-only. |
