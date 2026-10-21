@@ -51,6 +51,22 @@ jobs:
       - name: Run tests
         run: GODOT=~/godot/godot tools/test.sh
 
+      - name: Stamp build version
+        # Shown in tiny text under the Log button (StoryLog.build_label). Pull requests know their
+        # number; a push to main finds it in the squash-merge subject, like "Some change (#41)".
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          pr="$PR_NUMBER"
+          if [ -z "$pr" ]; then
+            pr=$(git log -1 --format=%s | grep -oE '\(#[0-9]+\)$' | tr -dc '0-9' || true)
+          fi
+          label="${SHA:0:7}"
+          [ -n "$pr" ] && label="PR #$pr · $label"
+          echo "$label" > build_info.txt
+          echo "Build label: $label"
+
       - name: Export web build
         run: |
           mkdir -p build/web

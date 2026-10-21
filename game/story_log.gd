@@ -1,10 +1,13 @@
 class_name StoryLog
 extends HBoxContainer
-## The story's last few lines under the map, with a button for the whole log (Overlays.show_log).
+## The story's last few lines under the map, with a button for the whole log (Overlays.show_log)
+## and, in tiny text under it, which build is running (build_label).
 
 signal open_pressed
 
 const LINES := 3
+## Written by CI just before the web export (see .github/workflows/ci.yml); absent in local runs.
+const BUILD_INFO := "res://build_info.txt"
 
 var run: RunState:
 	set(value):
@@ -24,13 +27,21 @@ func _init() -> void:
 	_text.add_theme_font_size_override("normal_font_size", 12)
 	_text.add_theme_font_size_override("bold_font_size", 12)
 	add_child(_text)
+	var side := VBoxContainer.new()
+	side.add_theme_constant_override("separation", 2)
+	side.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	add_child(side)
 	var open := Button.new()
 	open.text = "Log"
 	open.tooltip_text = "Everything that has happened this run"
-	open.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	UiKit.secondary(open, 13)
 	open.pressed.connect(func() -> void: open_pressed.emit())
-	add_child(open)
+	side.add_child(open)
+	var version := UiKit.note(side, build_label(), 9)
+	version.autowrap_mode = TextServer.AUTOWRAP_OFF
+	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	version.tooltip_text = "The build you're playing"
+	version.mouse_filter = Control.MOUSE_FILTER_PASS
 
 
 func refresh() -> void:
@@ -41,6 +52,14 @@ func refresh() -> void:
 	for line in run.story.slice(maxi(0, _shown - LINES)):
 		lines.append(as_bbcode(line))
 	_text.text = "\n".join(lines)
+
+
+## Which build is running, such as "PR #41 · 1a2b3c4", or "dev build" when run outside CI.
+static func build_label(path := BUILD_INFO) -> String:
+	if not FileAccess.file_exists(path):
+		return "dev build"
+	var label := FileAccess.get_file_as_string(path).strip_edges()
+	return label if label != "" else "dev build"
 
 
 ## One story line, in bold when it marks a turn of the run (a new round, the attack, the end).
