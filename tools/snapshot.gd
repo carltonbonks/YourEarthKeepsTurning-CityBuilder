@@ -15,9 +15,10 @@ extends SceneTree
 ## deals a Promote card for a craftsperson with that craft trait as the first dawn card.
 ## ageup=1 plays on from that round until the town reaches a new age and shows the celebration (style=bronze or
 ## medieval gets there); levelup=1 levels up the first hero so the halo shows.
+## deals=<id,id,...> lays out those caravan trade cards (data/trades.json) in the build hand.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": ""}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -93,6 +94,10 @@ func _init() -> void:
 		main._overlays.show_for_phase()
 		if args["venture_taken"] == "1":
 			main._take_pick(0)
+	if args["deals"] != "" and run.phase == RunState.Phase.BUILD:
+		run.caravan.offers.clear()
+		for id in args["deals"].split(","):
+			run.caravan.offers.append({"deal": id, "need": run.caravan.need(id), "taken": false})
 	main._refresh()
 	main._arena.celebrations.update(run, Time.get_ticks_msec())
 	if args["ageup"] == "1":
