@@ -42,7 +42,8 @@ static func folk(run: RunState, u: Unit) -> Dictionary:
 		t["lines"].append(band_line(run, u.type_id, u.leaning))
 	t["lines"].append("Health %d/%d, attack %s" % [roundi(u.hp), roundi(u.max_hp), _num(u.attack)])
 	if u.master_of != "":
-		t["lines"].append("Master of the %s" % c.buildings[u.master_of]["name"].to_lower())
+		t["lines"].append("Master of the %s (%s): %s." % [c.buildings[u.master_of]["name"].to_lower(),
+			run.craft_trait(u)["name"].to_lower(), "; ".join(master_effects(c, u.craft_trait, u.master_of)).to_lower()])
 	if u.carry_amount > 0:
 		t["lines"].append("Carrying %d %s" % [u.carry_amount, u.carrying])
 	if u.intent != "":
@@ -301,6 +302,35 @@ static func war_camp(run: RunState, d: Dictionary) -> Dictionary:
 	t["lines"].append("Clear it for %d shells of plunder; the hero who ends it also finds an item." % [
 		int(d["joined"]) * c.int_num("camp_spoils_per_raider")])
 	return t
+
+
+## What a master's craft trait does at their workshop, in numbers against an ordinary craftsperson.
+## Gear bonuses only count where the workshop makes gear (a smelter makes metal, not gear).
+## short: the terse wording a dawn card has room for.
+static func master_effects(c: Content, trait_id: String, workshop: String, short := false) -> Array[String]:
+	var t: Dictionary = c.promotions["craftsperson"]["traits"][trait_id]
+	var out: Array[String] = []
+	var rate := float(t.get("craft_rate", 1.0))
+	if rate > 1.0:
+		out.append(("%sx speed" if short else "Works %sx as fast there") % _num(rate))
+	elif rate < 1.0:
+		out.append(("%d%% slower" if short else "Works %d%% slower there") % roundi((1.0 - rate) * 100.0))
+	var gear: bool = c.market["recipes"].values().any(func(r: Dictionary) -> bool:
+		return r["workshop"] == workshop and r.has("item"))
+	if not gear:
+		out.append("makes no gear, so only speed counts" if short else
+			"The %s makes no gear, so only the speed counts" % c.buildings[workshop]["name"].to_lower())
+		return out
+	var usual := roundi(float(c.market["affix_chance"]) * 100.0)
+	var affix := roundi(float(t.get("affix_chance", 0.0)) * 100.0)
+	if affix == 0:
+		out.append(("gear never has a trait (usual %d%%)" if short else "Their gear never has a trait (usually %d%%)") % usual)
+	elif affix != usual:
+		out.append(("%d%% of gear has a trait (usual %d%%)" if short else "%d%% of their gear has a trait (usually %d%%)") % [affix, usual])
+	var tier := int(t.get("extra_tier", 0))
+	if tier > 0:
+		out.append(("gear %d tier better" if short else "Their gear comes out %d tier%s better") % ([tier] if short else [tier, "" if tier == 1 else "s"]))
+	return out
 
 
 ## The pedlar's camp: what is left to buy, who guards it, who would walk out to it.

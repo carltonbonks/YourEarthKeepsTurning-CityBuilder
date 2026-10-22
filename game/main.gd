@@ -22,6 +22,8 @@ var _live_acc := 0.0
 var _menu_open := false
 ## Id of this run's file in Run history.
 var _run_id := ""
+## Off in tests, so they never write runs to disk.
+var save_runs := true
 
 var _top: TopBar
 var _hand_view: BuildHandView
@@ -120,7 +122,7 @@ func _skip_ahead() -> void:
 
 ## The sim stopped for a decision: save the run and show the right overlay.
 func _on_pause() -> void:
-	RunHistory.save(_run_id, run)
+	_save()
 	_refresh()
 	_overlays.show_for_phase()
 
@@ -136,9 +138,15 @@ func _take_pick(index: int) -> void:
 
 func _pick_relic(relic_id: String) -> void:
 	run.choose_relic(relic_id)
-	RunHistory.save(_run_id, run)
-	_overlays.hide()
+	_save()
 	_refresh()
+	# The next round's build phase may open on a choice of its own (a pedlar round).
+	_overlays.show_for_phase()
+
+
+func _save() -> void:
+	if save_runs:
+		RunHistory.save(_run_id, run)
 
 
 func _restart(replay: bool) -> void:
