@@ -111,6 +111,7 @@ func _init() -> void:
 		# A few steps on, so the new ground has been drawn once and glows.
 		for i in 10:
 			run.step()
+		main._refresh()
 	if args["levelup"] == "1" and not run.living_heroes().is_empty():
 		var hero: Unit = run.living_heroes()[0]
 		hero.xp = run.content.num("xp_per_level") * hero.level
