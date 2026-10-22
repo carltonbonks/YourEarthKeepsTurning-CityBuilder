@@ -48,6 +48,8 @@
 	"build_redraw_cost": 10,
 	"_rows_note": "Rows (data/combos.json): a draft offers at most row_cards rows; a row is offered only once the town has one of its buildings (a basic, a blueprint or one standing; Yusuf 2026-10-22), drafting it adds the other as a blueprint, and a drafted row orders both side by side for both costs less row_discount (0.2 = a fifth off, rounded down).",
 	"row_cards": 1,
+	"_upgrades_note": "Upgrades (data/upgrades.json): a draft offers at most upgrade_cards of them (on top of blueprint_offers, so it never takes a new building's place), for buildings the town has standing; taking one spends the draft.",
+	"upgrade_cards": 1,
 	"row_discount": 0.2,
 
 	"wave_budget_base": 6,

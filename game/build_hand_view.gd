@@ -132,7 +132,7 @@ func _draft_cards() -> void:
 	for child in draft.cards.get_children():
 		draft.cards.remove_child(child)
 		child.queue_free()
-	if run.hand.picks <= 0 or (run.hand.cards.is_empty() and run.hand.rows.is_empty() and not run.hand.ring_offer()):
+	if run.hand.picks <= 0 or (run.hand.cards.is_empty() and run.hand.rows.is_empty() and not run.hand.ring_offer() and run.hand.upgrade_offers.is_empty()):
 		draft.visible = false
 		return
 	draft.set_title("Draft %d blueprints" % run.hand.picks if run.hand.picks > 1 else "Draft a blueprint")
@@ -142,6 +142,8 @@ func _draft_cards() -> void:
 		draft.cards.add_child(_row_card(card["row"], card["need"], true))
 	if run.hand.ring_offer():
 		draft.cards.add_child(_ring_card())
+	for card: Dictionary in run.hand.upgrade_offers:
+		draft.cards.add_child(_upgrade_card(card["upgrade"]))
 	var redraw := UiKit.secondary(Button.new(), 13)
 	redraw.text = "Reroll\n%d shells" % run.hand.redraw_cost() if run.hand.redraws == 0 else "Rerolled\nthis round"
 	redraw.custom_minimum_size = Vector2(86, CARD_SIZE.y)
@@ -273,6 +275,21 @@ func _card(type: String, need: String, kind: String) -> Button:
 	btn.pressed.connect(_act.bind(run.hand.order.bind(type)))
 	btn.mouse_entered.connect(func() -> void: previewing.emit(type))
 	btn.mouse_exited.connect(func() -> void: previewing.emit(""))
+	return btn
+
+
+## An upgrade offer: changes a building the town has for the rest of the run, instead of a new blueprint.
+func _upgrade_card(id: String) -> Button:
+	var up: Dictionary = run.content.upgrades[id]
+	var rarity: String = up.get("rarity", "white")
+	var building: String = run.content.buildings[up["building"]]["name"]
+	var btn := UiKit.card("Upgrade your %s" % building.to_lower(), up["name"], "", up["text"], "Instead of a new blueprint",
+		CARD_SIZE, UiKit.HEADING_COLOR, false, Color.WHITE if rarity == "white" else run.content.rarity_color(rarity))
+	btn.tooltip_text = "Draft it: every %s, built or still to come, is changed for the rest of the run.\n%s" % [building.to_lower(), up["text"]]
+	if rarity != "white":
+		btn.tooltip_text = "%s upgrade (rarer ones come up less often).\n" % run.content.rarity_tier(rarity)["name"] + btn.tooltip_text
+	btn.disabled = not run.hand.can_draft_upgrade(id)
+	btn.pressed.connect(_act.bind(run.hand.draft_upgrade.bind(id)))
 	return btn
 
 

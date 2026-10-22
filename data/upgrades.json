@@ -1,0 +1,18 @@
+{
+	"_note": "Upgrade offers (Yusuf's pick 2026-10-22): a blueprint draft may offer one of these (at most upgrade_cards a draft, data/balance.json) for a building the town has standing. Taking it spends the draft and changes that building for the rest of the run, every one of it, built or still to come. add = numbers added to the building's data in data/buildings.json, by key; a dotted key reaches inside (lodging.beds). Each upgrade can be taken once. rarity = data/rarity.json (offer weight). sim/build_hand.gd (offers, draft_upgrade), RunState.take_upgrade.",
+	"sturdy_huts": {"name": "Sturdy huts", "building": "hut", "rarity": "blue", "text": "Huts hold 4 people instead of 3.", "add": {"housing": 1}},
+	"raised_beds": {"name": "Raised beds", "building": "garden", "rarity": "blue", "text": "Garden patches grow 1 more food every dawn.", "add": {"daily.food": 1}},
+	"fletchers": {"name": "Fletchers' arrows", "building": "watch_post", "text": "Watch posts hit 2 harder.", "add": {"attack": 2}},
+	"tall_posts": {"name": "Tall posts", "building": "watch_post", "rarity": "blue", "text": "Watch posts see and shoot 40 farther, and stand 30 sturdier.", "add": {"range": 40, "tower_hp": 30}},
+	"wide_longhouse": {"name": "Wide longhouse", "building": "longhouse", "text": "The longhouse sleeps 2 more heroes.", "add": {"lodging.beds": 2}},
+	"feather_beds": {"name": "Feather beds", "building": "tavern", "rarity": "blue", "text": "Heroes in the mead hall rest half again as fast.", "add": {"lodging.rest": 0.75}},
+	"healing_spring": {"name": "Healing spring", "building": "shrine", "rarity": "blue", "text": "Heroes in the spirit shrine heal twice as fast.", "add": {"lodging.heal": 2.5}},
+	"skinning_knives": {"name": "Skinning knives", "building": "hunting_lodge", "text": "The hunting lodge pays 2 more shells a beast and skins 1 more hide.", "add": {"prize.shells": 2, "prize.yields.hides": 1}},
+	"iron_bands": {"name": "Banded gates", "building": "gate", "rarity": "blue", "text": "Gates take half again as many blows to break.", "add": {"gate_hp": 30}},
+	"second_bench": {"name": "Second bench", "building": "knapper", "text": "The knapper fits 1 more craftsperson.", "add": {"workshop.slots": 1}},
+	"sparring_posts": {"name": "Sparring posts", "building": "training_yard", "rarity": "blue", "text": "Heroes drilling at the training yard learn twice as fast.", "add": {"drills.xp_per_second": 0.3}},
+	"second_kennel": {"name": "Bigger kennel", "building": "kennel", "rarity": "yellow", "text": "The kennel keeps hounds for 2 more heroes.", "add": {"hounds.heroes": 2}},
+	"bright_lamps": {"name": "Seer's lamps", "building": "seer_tent", "rarity": "orange", "text": "Every dawn shows yet another card.", "add": {"effects.pick_bonus": 1}},
+	"deep_kegs": {"name": "Deep kegs", "building": "brewhouse", "rarity": "yellow", "text": "Bands form with 1 more fewer member.", "add": {"effects.band_ease": 1}},
+	"forest_paths": {"name": "Forest paths", "building": "forester", "rarity": "blue", "text": "The forester tends plants half again as far.", "add": {"tends.radius": 120}}
+}

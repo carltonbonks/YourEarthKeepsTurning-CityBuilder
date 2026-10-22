@@ -113,6 +113,10 @@ func _draft(run: RunState) -> void:
 				run.hand.draft_row(c["row"])
 				return
 	var pick := _wanted_offer(run)
+	# An upgrade to something it already has, when nothing it wished for is offered.
+	if pick == "" and not run.hand.upgrade_offers.is_empty():
+		run.hand.draft_upgrade(run.hand.upgrade_offers[0]["upgrade"])
+		return
 	if pick == "":
 		for type: String in _shaping_list():
 			if run.hand.can_draft(type):

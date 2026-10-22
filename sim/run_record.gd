@@ -144,6 +144,7 @@ func to_record() -> Dictionary:
 		"townsfolk": folk_counts(),
 		"townsfolk_lost": run.fallen_folk,
 		"relics": run.relics.duplicate(),
+		"upgrades": run.upgrades.duplicate(),
 		"traditions": run.traditions.duplicate(),
 		"prices": run.prices.duplicate(),
 		"age": run.age,
