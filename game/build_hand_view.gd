@@ -1,11 +1,13 @@
 class_name BuildHandView
 extends PanelContainer
-## The round's building cards (run.hand) as a heads-up hand along the bottom of the map, like the
-## dawn pick: basics (homes and food, always on offer), the town's blueprints and drafted rows, the ageing-up
-## card, tool sets and the caravan in later ages, then, while a draft is left, the blueprint offers
-## (each says what it adds to the dawn picks) and the reroll. A card the town needs says why on a gold strip at
-## the top ("Food runs out in 2 days"); a card the town can't take says why on a red strip at the
-## bottom ("Need 3 more wood"). Costs show red where the town is short. Shown only while building.
+## The round's building cards (run.hand) as a heads-up hand along the bottom of the map, split into
+## sections with plain dividers so it's clear where each card comes from: Core (homes and food, always
+## on offer), Your blueprints (buildings and rows drafted this run), Upgrades (the ageing-up card and
+## tool sets, once there are any) and Trading (the caravan's goods, once it comes). While a draft is
+## left, the blueprint offers (each says what it adds to the dawn picks) and the reroll sit apart in
+## the DraftPopup window over the map. A card the town needs says why on a gold strip at the top
+## ("Food runs out in 2 days"); a card the town can't take says why on a red strip at the bottom
+## ("Need 3 more wood"). Costs show red where the town is short. Shown only while building.
 ## Every choice goes through run.hand; `changed` asks the screen to refresh. Hovering a building
 ## card sends `previewing` with its type (and "" on leaving), so the map can blink the plot it would take.
 
@@ -19,9 +21,18 @@ const ROW_SIZE := Vector2(176, 132)
 const ROW_BORDER := Color("#9ec27a")
 ## Height of the buyout button under each caravan card; the card shrinks to make room.
 const BUYOUT_HEIGHT := 28.0
+## Each section's colour: its heading, its edge and a faint tint behind its cards.
+const CORE_COLOR := Color("#c8ccd4")
+const BLUEPRINT_COLOR := Color("#ffd28a")
+const UPGRADE_COLOR := Color("#8fb8e8")
+const TRADE_COLOR := Color("#c0a060")
 
 var run: RunState
+## The window the blueprint offers go in; main.gd places it over the map.
+var draft: DraftPopup
 var _row: HBoxContainer
+## The round whose draft was last shown, so a hidden draft stays hidden until the next round's.
+var _draft_round := -1
 
 
 func _init() -> void:
@@ -33,10 +44,10 @@ func _init() -> void:
 	add_theme_stylebox_override("panel", style)
 	var scroll := ScrollContainer.new()
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size.y = CARD_SIZE.y + 14
+	scroll.custom_minimum_size.y = CARD_SIZE.y + 50
 	add_child(scroll)
 	_row = HBoxContainer.new()
-	_row.add_theme_constant_override("separation", 6)
+	_row.add_theme_constant_override("separation", 14)
 	scroll.add_child(_row)
 
 
@@ -45,39 +56,101 @@ func refresh() -> void:
 	for child in _row.get_children():
 		child.queue_free()
 	_draft_cards()
+	var core := _section("Core", "Always on offer", CORE_COLOR)
 	for type: String in run.hand.basics():
-		_row.add_child(_card(type, run.hand.need(type), "basic"))
-	_row.add_child(VSeparator.new())
+		core.add_child(_card(type, run.hand.need(type), "basic"))
+	var mine := _section("Your blueprints", "Drafted this run", BLUEPRINT_COLOR)
 	for type: String in run.hand.blueprints:
 		if run.world.count_buildings(type, false) < run.building_max(type):
-			_row.add_child(_card(type, run.hand.need(type), "blueprint"))
+			mine.add_child(_card(type, run.hand.need(type), "blueprint"))
 	for id: String in run.hand.row_blueprints:
-		_row.add_child(_row_card(id, run.hand.row_need(id), false))
+		mine.add_child(_row_card(id, run.hand.row_need(id), false))
+	if mine.get_child_count() == 0:
+		var empty := UiKit.note(mine, "None yet.\nDraft one from\nthe offers above.", 12)
+		empty.custom_minimum_size.x = 120
+		empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		empty.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var upgrades := _section("Upgrades", "Ageing up and tool sets", UPGRADE_COLOR)
 	if not run.hand.milestone.is_empty():
-		_row.add_child(_card(run.hand.milestone["building"], "", "age"))
-	_age_cards()
+		upgrades.add_child(_card(run.hand.milestone["building"], "", "age"))
+	_tool_cards(upgrades)
+	_drop_if_empty(upgrades)
+	var trading := _section("Trading", "The caravan's goods", TRADE_COLOR)
+	_caravan_cards(trading)
+	_drop_if_empty(trading)
 
 
-## The draft comes first, so the run's weightiest build choice is never scrolled out of sight.
+## A labelled block of cards with a coloured edge and tint, so where one kind of card ends and the
+## next begins is plain at a glance. Returns the row to put its cards in.
+func _section(title: String, hint: String, color: Color) -> HBoxContainer:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(color, 0.08)
+	style.border_color = color
+	style.border_width_left = 4
+	style.border_width_top = 2
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 10
+	style.content_margin_right = 8
+	style.content_margin_top = 4
+	style.content_margin_bottom = 6
+	panel.add_theme_stylebox_override("panel", style)
+	_row.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	panel.add_child(box)
+	var head := RichTextLabel.new()
+	head.bbcode_enabled = true
+	head.fit_content = true
+	head.scroll_active = false
+	head.autowrap_mode = TextServer.AUTOWRAP_OFF
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.add_theme_font_size_override("normal_font_size", 12)
+	head.add_theme_font_size_override("bold_font_size", 14)
+	head.text = "[b][color=#%s]%s[/color][/b]  [color=#%s]%s[/color]" % [color.to_html(false), title.to_upper(), UiKit.HINT_COLOR.to_html(false), hint]
+	box.add_child(head)
+	var cards := HBoxContainer.new()
+	cards.add_theme_constant_override("separation", 6)
+	box.add_child(cards)
+	return cards
+
+
+func _drop_if_empty(cards: HBoxContainer) -> void:
+	if cards.get_child_count() == 0:
+		var panel := cards.get_parent().get_parent()
+		_row.remove_child(panel)
+		panel.queue_free()
+
+
+## The draft goes in its own window over the map, so the run's weightiest build choice stands apart
+## from the cards the town orders from. A new round's draft opens unfolded; within a round the window
+## stays as the player left it.
 func _draft_cards() -> void:
-	if run.hand.picks <= 0 or (run.hand.cards.is_empty() and run.hand.rows.is_empty()):
+	if draft == null:
 		return
-	var head := UiKit.note(_row, "Draft %d\nKept for\nthe whole run" % run.hand.picks if run.hand.picks > 1 \
-		else "Draft one\nKept for\nthe whole run", 13)
-	head.custom_minimum_size.x = 92
-	head.add_theme_color_override("font_color", UiKit.HEADING_COLOR)
+	# Taken out at once, not at the end of the frame, so the window shrinks to the new offers.
+	for child in draft.cards.get_children():
+		draft.cards.remove_child(child)
+		child.queue_free()
+	if run.hand.picks <= 0 or (run.hand.cards.is_empty() and run.hand.rows.is_empty()):
+		draft.visible = false
+		return
+	draft.set_title("Draft %d blueprints" % run.hand.picks if run.hand.picks > 1 else "Draft a blueprint")
 	for card: Dictionary in run.hand.cards:
-		_row.add_child(_card(card["building"], card["need"], "draft"))
+		draft.cards.add_child(_card(card["building"], card["need"], "draft"))
 	for card: Dictionary in run.hand.rows:
-		_row.add_child(_row_card(card["row"], card["need"], true))
+		draft.cards.add_child(_row_card(card["row"], card["need"], true))
 	var redraw := UiKit.secondary(Button.new(), 13)
 	redraw.text = "Reroll\n%d shells" % run.hand.redraw_cost() if run.hand.redraws == 0 else "Rerolled\nthis round"
 	redraw.custom_minimum_size = Vector2(86, CARD_SIZE.y)
 	redraw.disabled = not run.hand.can_redraw()
 	redraw.tooltip_text = "Once a round: swap these offers for a fresh draw."
 	redraw.pressed.connect(_act.bind(run.hand.redraw))
-	_row.add_child(redraw)
-	_row.add_child(VSeparator.new())
+	draft.cards.add_child(redraw)
+	if _draft_round != run.round_number:
+		_draft_round = run.round_number
+		draft.set_collapsed(false)
+	draft.open()
 
 
 ## What a building adds to the dawn picks once it stands ("" if nothing): heroes it lodges or draws,
@@ -195,9 +268,9 @@ func _row_card(id: String, need: String, drafting: bool) -> Button:
 	return btn
 
 
-## Later-age cards beside the buildings: tool sets (a lasting upgrade for one townsfolk group, once
-## each) and whatever the southern caravan has left. They cost goods and shells, like any card.
-func _age_cards() -> void:
+## Tool sets, from the bronze age: a lasting upgrade for one townsfolk group, once each. They cost
+## goods and shells, like any card.
+func _tool_cards(parent: HBoxContainer) -> void:
 	var content := run.content
 	if not content.age_reached(run.age, "bronze"):
 		return
@@ -213,7 +286,14 @@ func _age_cards() -> void:
 		btn.disabled = not run.can_buy_tools(id)
 		UiKit.fade_if_disabled(btn, UiKit.shortfall(run.stock, def["cost"]))
 		btn.pressed.connect(_act.bind(run.buy_tools.bind(id)))
-		_row.add_child(btn)
+		parent.add_child(btn)
+
+
+## Whatever the southern caravan has left this round, from the bronze age.
+func _caravan_cards(parent: HBoxContainer) -> void:
+	var content := run.content
+	if not content.age_reached(run.age, "bronze"):
+		return
 	var trader: Dictionary = content.ages["trader"]
 	for good: String in run.trader_stock:
 		if int(run.trader_stock[good]) <= 0:
@@ -236,7 +316,7 @@ func _age_cards() -> void:
 		all.tooltip_text = "Buy as many %s as your shells pay for, up to all the caravan has left." % good
 		all.pressed.connect(_act.bind(run.buyout.bind(good)))
 		col.add_child(all)
-		_row.add_child(col)
+		parent.add_child(col)
 
 
 ## Why a building can't be ordered yet, beyond its cost ("" if nothing).
