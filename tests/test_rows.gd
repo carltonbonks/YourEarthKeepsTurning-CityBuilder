@@ -126,3 +126,24 @@ func test_bots_take_row_cards() -> void:
 			if a["kind"] == "row":
 				rows += 1
 	check(rows > 0, "the bot orders rows")
+
+
+func test_a_row_waits_for_one_of_its_buildings() -> void:
+	var run := _run()
+	run.build("market")
+	check(not run.hand._row_draftable("blade_row"), "no blade row before a knapper or an arms stall")
+	run.hand.blueprints = ["knapper"] as Array[String]
+	check(run.hand._row_draftable("blade_row"), "a drafted knapper opens it")
+	check_eq(run.hand.row_adds("blade_row"), ["arms_stall"] as Array[String], "it adds just the arms stall")
+	run.hand.rows = [{"row": "blade_row", "need": ""}] as Array[Dictionary]
+	run.hand.picks = 1
+	check(run.hand.draft_row("blade_row"), "drafted")
+	check_eq(run.hand.blueprints, ["knapper", "arms_stall"] as Array[String], "one new blueprint, like any draft")
+
+
+func test_offers_say_what_a_row_adds() -> void:
+	var run := _run()
+	run.build("market")
+	check_eq(BuildHandView.row_hint(run, "knapper"), "Opens a row: Blade row", "a knapper offer names the row it opens")
+	run.hand.blueprints = ["knapper"] as Array[String]
+	check_eq(BuildHandView.row_offer_line(run, "blade_row"), "You have Knapper. Adds Arms stall.", "the row card says what it adds")

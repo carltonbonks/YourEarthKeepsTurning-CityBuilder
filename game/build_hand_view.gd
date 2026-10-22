@@ -170,6 +170,25 @@ static func dawn_line(r: RunState, type: String) -> String:
 	return ""
 
 
+## What drafting a row gives, from what the town already has: "You have Knapper. Adds Arms stall."
+static func row_offer_line(r: RunState, id: String) -> String:
+	var names := func(types: Array) -> String:
+		return " and ".join(PackedStringArray(types.map(func(t: String) -> String: return r.content.buildings[t]["name"])))
+	var have := r.hand.row_have(id)
+	var adds := r.hand.row_adds(id)
+	if adds.is_empty():
+		return "You have both."
+	return "You have %s. Adds %s." % [names.call([have]), names.call(adds)]
+
+
+## The rows drafting this building would open ("" if none): "Opens a row: Blade row".
+static func row_hint(r: RunState, type: String) -> String:
+	var ids := r.hand.rows_opened_by(type)
+	if ids.is_empty():
+		return ""
+	return "Opens a row: " + ", ".join(PackedStringArray(ids.map(func(id: String) -> String: return r.content.combos[id]["name"])))
+
+
 ## Why the town wants this building, with the numbers ("" if nothing in particular).
 func recommendation(type: String, need: String) -> String:
 	var content := run.content
@@ -210,7 +229,8 @@ func _card(type: String, need: String, kind: String) -> Button:
 	var top: String = why if why != "" else {"basic": "Always on offer", "age": "Ageing up", "blueprint": "Your blueprint"}.get(kind, "New building")
 	var border := RECOMMEND_COLOR if why != "" else (UiKit.HEADING_COLOR if kind == "age" else UiKit.CARD_BORDER)
 	var dawn := dawn_line(run, type)
-	var footer := dawn if kind == "draft" else ("You have %d" % owned if owned > 0 else "")
+	var hint := row_hint(run, type) if kind == "draft" else ""
+	var footer := (dawn if dawn != "" else hint) if kind == "draft" else ("You have %d" % owned if owned > 0 else "")
 	var btn := UiKit.card(top, def["name"], UiKit.cost_text(run.stock, def["cost"]), def["text"],
 		footer, BASIC_SIZE if kind == "basic" else CARD_SIZE, border, why != "",
 		UiKit.HEADING_COLOR if kind == "age" else Color.WHITE)
@@ -219,6 +239,8 @@ func _card(type: String, need: String, kind: String) -> Button:
 		btn.tooltip_text += "\n" + dawn + "."
 	if kind == "draft":
 		btn.tooltip_text = "Draft it: you can order it, paying its cost, for the rest of the run.\n" + btn.tooltip_text
+		if hint != "":
+			btn.tooltip_text += "\n%s: a later draft can add its partner, side by side for a bonus." % hint
 		btn.disabled = not run.hand.can_draft(type)
 		btn.pressed.connect(_act.bind(run.hand.draft.bind(type)))
 		btn.mouse_entered.connect(func() -> void: previewing.emit(type))
@@ -249,13 +271,16 @@ func _row_card(id: String, need: String, drafting: bool) -> Button:
 	var b: String = content.buildings[row["partner"]]["name"]
 	var why := recommendation(row["building"] if run.hand.need(row["building"]) == need else row["partner"], need)
 	var cost := run.row_cost(id)
+	var body := "%s + %s, side by side. %s" % [a, b, row["text"]]
+	if drafting:
+		body = "%s %s" % [row_offer_line(run, id), row["text"]]
 	var btn := UiKit.card(why if why != "" else ("Draft a row" if drafting else "Your row"), row["name"], UiKit.cost_text(run.stock, cost),
-		"%s + %s, side by side. %s" % [a, b, row["text"]], "", ROW_SIZE, RECOMMEND_COLOR if why != "" else ROW_BORDER,
+		body, "", ROW_SIZE, RECOMMEND_COLOR if why != "" else ROW_BORDER,
 		why != "", ROW_BORDER)
 	btn.tooltip_text = "%s and %s go up together in one cluster, a fifth cheaper than ordering both.\n%s\nOnly buildings ordered as a row make this bonus." % [
 		a, b, row["text"]]
 	if drafting:
-		btn.tooltip_text = "Draft it: you can order this row, and each of its buildings on its own, for the rest of the run.\n" + btn.tooltip_text
+		btn.tooltip_text = "Draft it: you can order this row for the rest of the run. %s\n" % row_offer_line(run, id) + btn.tooltip_text
 		btn.disabled = not run.hand.can_draft_row(id)
 		btn.pressed.connect(_act.bind(run.hand.draft_row.bind(id)))
 		return btn

@@ -6,7 +6,8 @@ extends RefCounted
 ## it can be raised, and the building the next age-up needs is always among the offers until it is drafted.
 ## Ordering pays the building's cost (RunState.build) as often as its max allows.
 ## A row (data/combos.json) can be drafted too: it orders its two buildings side by side for less, and only
-## rows make a combo. Numbers are in data/balance.json (blueprint_*, build_need_weight, build_new_weight, build_redraw_cost).
+## rows make a combo. A row is a payoff you earn (Yusuf, 2026-10-22): it is offered only once the town has one of
+## its buildings (a basic, a blueprint or one standing), and drafting it adds just the other one and the bonus. Numbers are in data/balance.json (blueprint_*, build_need_weight, build_new_weight, build_redraw_cost).
 
 var run: RunState
 ## This round's draft offers, each {"building": type, "need": why the town wants it ("" if nothing in particular)}.
@@ -332,9 +333,12 @@ func _fill_rows(rng: SeededRng, avoid: Array) -> void:
 		rows.append({"row": id, "need": row_need(id)})
 
 
-## A row can be drafted once both its buildings are in reach of the age and whatever they require is drafted or standing.
+## A row can be drafted once the town has one of its buildings, both are in reach of the age and whatever they
+## require is drafted or standing.
 func _row_draftable(id: String) -> bool:
 	var row: Dictionary = run.content.combos[id]
+	if row_have(id) == "":
+		return false
 	for type: String in [row["building"], row["partner"]]:
 		var def: Dictionary = run.content.buildings[type]
 		var needs: String = def.get("requires", "")
@@ -342,6 +346,44 @@ func _row_draftable(id: String) -> bool:
 				and needs != row["partner"] and not blueprints.has(needs) and run.world.count_buildings(needs, false) == 0):
 			return false
 	return true
+
+
+## True if the town has this building to build a row on: a basic, a blueprint or one standing.
+func has_building(type: String) -> bool:
+	return run.content.buildings[type].get("basic", false) or blueprints.has(type) or run.world.count_buildings(type, false) > 0
+
+
+## The row's building the town already has ("" if neither): the row's own building first.
+func row_have(id: String) -> String:
+	var row: Dictionary = run.content.combos[id]
+	for type: String in [row["building"], row["partner"]]:
+		if has_building(type):
+			return type
+	return ""
+
+
+## The buildings drafting this row would add as blueprints (the ones the town doesn't have yet).
+func row_adds(id: String) -> Array[String]:
+	var row: Dictionary = run.content.combos[id]
+	var out: Array[String] = []
+	for type: String in [row["building"], row["partner"]]:
+		if not has_building(type):
+			out.append(type)
+	return out
+
+
+## Rows that drafting this building would open up for later drafts (none the town can draft already).
+func rows_opened_by(type: String) -> Array[String]:
+	var out: Array[String] = []
+	if has_building(type):
+		return out
+	var ids := run.content.combos.keys()
+	ids.sort()
+	for id: String in ids:
+		var row: Dictionary = run.content.combos[id]
+		if not row_blueprints.has(id) and row_have(id) == "" and (row["building"] == type or row["partner"] == type):
+			out.append(id)
+	return out
 
 
 ## Why the town wants a row: why it wants either of its buildings ("" if nothing in particular).
