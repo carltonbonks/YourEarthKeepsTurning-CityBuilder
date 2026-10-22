@@ -105,3 +105,24 @@ func test_the_screen_learns_who_never_came_home() -> void:
 	run.phase = RunState.Phase.PICK
 	run.choose_pick(0)
 	check(run.last_venture.is_empty(), "the next pick that isn't a venture clears it")
+
+
+func test_the_venture_card_shows_its_reward_unclipped() -> void:
+	# The reward used to be the card's clipped blurb, squeezed off the face when the name wrapped.
+	var screen: Control = load("res://game/main.tscn").instantiate()
+	screen.call("_ready")
+	screen.call("_new_run", 4821)
+	var run: RunState = screen.get("run")
+	var overlays: Overlays = screen.get("_overlays")
+	var btn: Button = overlays.call("_pick_card", {"kind": "venture", "role": "venture", "cost": 0, "venture": "herd_raid"})
+	var reward := ""
+	for child in btn.get_child(0).get_children():
+		if child is Label and (child as Label).text.begins_with("Brings home"):
+			reward = child.text
+			check(not (child as Label).clip_text, "the reward line never clips")
+	var terms := run.people.venture_terms("herd_raid")
+	for good: String in terms["goods"]:
+		check(reward.contains("%d %s" % [terms["goods"][good], good]), "the card face names %s (%s)" % [good, reward])
+	btn.free()
+	run.dispose()
+	screen.free()
