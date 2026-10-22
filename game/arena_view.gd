@@ -631,9 +631,10 @@ func _building_at(at: Vector2) -> int:
 ## A dark box beside the mouse: title, lines, tags, then warnings in orange. Kept inside the map.
 func _draw_tip(tip: Dictionary, at: Vector2, font: Font) -> void:
 	var rows: Array = [[tip["title"], 13, Color("#f0e6c8")]]
-	for line: String in tip["lines"]:
-		for part in _wrap(line):
-			rows.append([part, 11, Color("#c8ccc0")])
+	var colors: Dictionary = tip.get("line_colors", {})
+	for i in tip["lines"].size():
+		for part in _wrap(tip["lines"][i]):
+			rows.append([part, 11, colors.get(i, Color("#c8ccc0"))])
 	if not tip["tags"].is_empty():
 		rows.append(["Tags", 11, Color("#9fc4e0")])
 		for tag: String in tip["tags"]:

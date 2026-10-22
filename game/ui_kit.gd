@@ -95,6 +95,19 @@ static func card(top: String, title: String, cost: String, blurb: String, footer
 	return btn
 
 
+## Colours a card by its rarity (data/rarity.json): the border, and the rarity's name on the top line.
+## White (base) cards keep their usual look; a recommended (gold) top line keeps its gold.
+static func mark_rarity(btn: Button, content: Content, rarity_id: String) -> void:
+	if rarity_id == "white":
+		return
+	var color := content.rarity_color(rarity_id)
+	card_frame(btn, color, 2)
+	var head := btn.get_child(0).get_child(0) as Label
+	head.text = "%s · %s" % [head.text, content.rarity_tier(rarity_id)["name"]]
+	if not head.has_theme_stylebox_override("normal"):
+		head.add_theme_color_override("font_color", color)
+
+
 ## A card's border and face: lifts and lights up gold under the mouse so it reads as clickable,
 ## faded when it can't be taken.
 static func card_frame(btn: Button, border: Color, width := 1) -> void:

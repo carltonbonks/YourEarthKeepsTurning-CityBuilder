@@ -558,6 +558,9 @@ func choose_pick(index: int) -> void:
 		entry["offered_leanings"] = leanings
 	if took and pick_offer[index].has("leaning"):
 		entry["leaning"] = pick_offer[index]["leaning"]
+	entry["offered_rarities"] = pick_offer.map(people.card_rarity)
+	if took and pick_offer[index].get("legend", false):
+		entry["legend"] = true
 	if hunger_turned_away != "":
 		entry["hunger_turned_away"] = hunger_turned_away
 	if not venture.is_empty():
@@ -799,7 +802,7 @@ func choose_relic(relic_id: String) -> void:
 	elif relic_id != "" and relic_id in relic_offer:
 		_gain_relic(relic_id)
 		tell("Relic taken: %s." % content.relics[relic_id]["name"])
-		# Broken Crown: more relics at once, drawn from the ordinary ones.
+		# Broken Crown, Starfall Idol: more relics at once, drawn from the ordinary ones.
 		var gifts := int(content.relics[relic_id]["effects"].get("gain_relics", 0))
 		if gifts > 0:
 			var rng := SeededRng.stream(run_seed, "relic_gifts", round_number)
@@ -812,7 +815,7 @@ func choose_relic(relic_id: String) -> void:
 				pool.erase(gift)
 				_gain_relic(gift)
 				gifted.append(gift)
-				tell("The crown's shards become %s." % content.relics[gift]["name"])
+				tell("%s brings %s." % [content.relics[relic_id]["name"], content.relics[gift]["name"]])
 			record.note_value("relic_gifts", gifted)
 	record.note_value("relic_pick", relic_id)
 	if not spoils.is_empty():
@@ -934,20 +937,25 @@ func _relic_pool(pacts: bool) -> Array:
 	return pool
 
 
-## On pact rounds the offer is pacts, topped up from the rest if too few are left.
+## How likely a relic is to be drawn this round, by its rarity.
+func _relic_odds(id: String) -> float:
+	return content.rarity_odds(content.rarity_of("relic", id), round_number)
+
+
+## On pact rounds the offer is pacts, topped up from the rest if too few are left. Rarer relics are drawn less often.
 func _roll_relic_offer() -> Array[String]:
 	var rng := SeededRng.stream(run_seed, "relics", round_number)
 	var choices := maxi(1, content.int_num("relic_choices") + int(mod("relic_choices")))
 	var pool := _relic_pool(is_pact_round())
 	var offer: Array[String] = []
 	while offer.size() < choices and not pool.is_empty():
-		var pick: String = rng.pick(pool)
+		var pick: String = rng.pick_by(pool, _relic_odds)
 		pool.erase(pick)
 		offer.append(pick)
 	if offer.size() < choices and is_pact_round():
 		pool = _relic_pool(false)
 		while offer.size() < choices and not pool.is_empty():
-			var pick: String = rng.pick(pool)
+			var pick: String = rng.pick_by(pool, _relic_odds)
 			pool.erase(pick)
 			offer.append(pick)
 	spoils = _roll_spoils()

@@ -375,7 +375,7 @@ func spell_score(run: RunState, card: Dictionary) -> float:
 
 ## Relics it likes most first, ranked by how often bot runs that held them won (40 runs x 3 styles,
 ## blind picks, 2026-10-20). Anything not listed ranks after these; ties keep the offer's order.
-const RELIC_RANK := ["lone_wolf_pelt", "horde_drum", "broken_crown", "levy_horn", "ram_thorn_stakes", "tithe_bowl",
+const RELIC_RANK := ["sun_disc", "starfall_idol", "antler_crown", "ancestors_horn", "first_hearth_ember", "lone_wolf_pelt", "horde_drum", "broken_crown", "levy_horn", "ram_thorn_stakes", "tithe_bowl",
 	"grave_salt", "ancestor_mask", "owl_eyes", "sacred_spring", "witchs_thread", "chieftains_torc", "elders_tale",
 	"turncoats_torc", "fire_arrows", "bone_flute", "moneylenders_knot", "hollow_drum", "bear_tooth_charm",
 	"blood_brother_knot", "wanderers_fire", "ember_stone", "oxhide_sledges", "seed_cache", "ridgeheart",

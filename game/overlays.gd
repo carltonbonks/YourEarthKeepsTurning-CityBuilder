@@ -101,6 +101,7 @@ func show_pick() -> void:
 	spells.alignment = BoxContainer.ALIGNMENT_CENTER
 	for i in run.pick_offer.size():
 		var btn := _pick_card(run.pick_offer[i])
+		UiKit.mark_rarity(btn, run.content, run.people.card_rarity(run.pick_offer[i]))
 		btn.disabled = not run.can_take_pick(i)
 		UiKit.fade_if_disabled(btn, _why_not_pick(run.pick_offer[i]))
 		btn.pressed.connect(func() -> void: pick_taken.emit(i))
@@ -230,11 +231,19 @@ func _pick_card(card: Dictionary) -> Button:
 			var c: Dictionary = content.hero_classes[hero.type_id]
 			var likes: Array = content.traits[hero.trait_id].get("lodging", [])
 			var beds := " or ".join(likes.map(func(id: String) -> String: return content.buildings[id]["name"].to_lower()))
-			btn = UiKit.card("Hero", hero.display_name, UiKit.cost_text(run.stock, {"shells": card["cost"]}), "%s %s" % [content.traits[hero.trait_id]["name"], c["name"].to_lower()],
+			var who := "%s %s" % [content.traits[hero.trait_id]["name"], c["name"].to_lower()]
+			var legend := ""
+			if card.get("legend", false):
+				var gear := PackedStringArray()
+				for slot: String in hero.items:
+					gear.append(Loot.describe(content, hero.items[slot]))
+				legend = "A legend, level %d%s." % [hero.level, ", carrying " + " and ".join(gear) if not gear.is_empty() else ""]
+			btn = UiKit.card("Legend" if legend != "" else "Hero", hero.display_name, UiKit.cost_text(run.stock, {"shells": card["cost"]}),
+				who if legend == "" else "%s\n%s" % [who, legend],
 				"Sleeps in: %s" % beds, PICK_SIZE, Color(c["color"]), false, Color(c["color"]))
-			btn.tooltip_text = "%s, %s %s\nHealth %d, damage %d%s\nLikes to sleep in: %s\n%s\n%s." % [hero.display_name,
+			btn.tooltip_text = "%s, %s %s\nHealth %d, damage %d%s\n%sLikes to sleep in: %s\n%s\n%s." % [hero.display_name,
 				content.traits[hero.trait_id]["name"], c["name"].to_lower(), int(hero.max_hp), int(hero.attack),
-				", ranged" if hero.attack_range > 60 else "", beds, _trait_hint(hero.trait_id), eats]
+				", ranged" if hero.attack_range > 60 else "", legend + "\n" if legend != "" else "", beds, _trait_hint(hero.trait_id), eats]
 		"family":
 			var who := {}
 			for role: String in card["roles"]:
@@ -444,6 +453,7 @@ func show_relic_pick() -> void:
 		var btn := UiKit.card(kind, r["name"], "", text, footer, RELIC_SIZE, UiKit.HEADING_COLOR, false, UiKit.HEADING_COLOR)
 		# A relic's one line is the whole story, so it gets room instead of being cut short.
 		(btn.get_child(0).get_child(2) as Label).add_theme_font_size_override("font_size", 12)
+		UiKit.mark_rarity(btn, content, content.rarity_of("relic", id))
 		btn.tooltip_text = text + ("\n" + footer if footer != "" else "")
 		btn.pressed.connect(func() -> void: relic_picked.emit(id))
 		row.add_child(btn)

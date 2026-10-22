@@ -82,7 +82,10 @@ extends RefCounted
 ## 35: blueprints replace one-use building cards: "build_hands" now lists each round's draft offers (then one list per
 ##     reroll, and one after each draft while drafts are left); per round "blueprints" = [{building}] drafted that round
 ##     (a drafted row adds its non-basic buildings); a "blueprint" action ({"kind": "blueprint", "building"} or {"row"}).
-const RECORD_FORMAT := 35
+## 36: rarities (data/rarity.json): a dawn pick entry has "offered_rarities" (one rarity id per offered card) and
+##     "legend": true when the hero taken was a legend (a few levels up, carrying a mythic item). Items' and relics'
+##     rarities follow from their ids and affixes (Loot.rarity, Content.rarity_of).
+const RECORD_FORMAT := 36
 
 var run: RunState
 ## Finished rounds, oldest first.
