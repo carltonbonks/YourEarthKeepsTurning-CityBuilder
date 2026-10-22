@@ -26,6 +26,7 @@ The split that matters: **`sim/` is the game, `game/` only shows it.** Nothing i
 | `sim/run_state.gd` | `RunState`: one run. Phases (BUILD, PICK, SIM, RELIC, WON, LOST), stock, building orders, taking dawn cards, relics (`mod()`), ages, tool sets and the caravan, upkeep (food, fuel, fields). Its three parts below hold the rest. |
 | `sim/people.gd` | `People` (`run.people`): dealing the dawn cards (townsfolk, heroes, families, Promote cards), promotions and knighting, making and adding heroes, hero mood and heroes leaving, levelling, healing and selling finds between rounds. |
 | `data/combos.json` | Row cards: `BuildHand` deals them (`rows`, `order_row`), `RunState.build_row` pays both buildings less `row_discount`, `Town.choose_row` puts them side by side in one cluster and `World.add_row` links them (`row`, `row_mate`); the row's main building then crafts faster (`FolkAI`) or grows more food (`RunState.food_grown_daily`) via `Town.combos_of` / `combo_effect`. |
+| `data/rarity.json` | The four rarities (white, blue, yellow, orange) anything can carry as `"rarity"` in its data: `Content.rarity_of` / `rarity_tier` / `rarity_color` / `rarity_weight`. `BuildHand` weights blueprint offers by it; the cards colour the name. |
 | `data/traditions.json` | Founding traditions picked before round 1 (`RunState.choose_traditions`): their effects count in `RunState.mod()` like relics', `BuildHand` favours their buildings, `People.offer_picks` their leaning, `FolkAI.band_level` bands it sooner. |
 | `sim/pedlar_camp.gd`, `data/pedlars.json` | `PedlarCamp` (`world.pedlar`): on pedlar rounds the player invites one of a few pedlars (`RunState.choose_pedlar`, offer from `roll_offer`); it camps out past the town for the round's days (`open`, `pack_up` at dusk on the last day). `HeroAI` asks it who walks out to trade (`wants_visit`, `trade`) and who guards it (`is_guard`, `_guard_tick`); `EnemyAI` sends raiders that come near at it (`draws`, `raid`). |
 | `data/ventures.json` | Ventures: a dawn card now and then that sends tribespeople out for goods (`People._venture_card`, `venture_terms`, `go_venturing`); some never come back. Pathfinder's Cord (`venture_safety`, `venture_bonus`) makes them safer and richer. |
@@ -97,6 +98,8 @@ Descriptive tags no rule reads yet are fine: they show in tooltips by name and g
 | `siege` | `EnemyAI.enemy_tick`, `World._batter` | ignores people, goes for gates and the hearth (battering rams); Ram-thorn Stakes hurt it |
 | `pact` (relics) | `RunState._relic_pool` | a strong relic with a cost, offered only on `pact_rounds` |
 | `spoils` (relics) | `RunState._relic_pool`, `RunState._roll_spoils` | the spoils of a beaten attack: never in the ordinary pool, one added to the relic offer for the enemy tag (`spoils_of`) the attack was made of |
+| `bold` (traits) | the duelling ring's `duels` in `data/buildings.json`, used by `HeroAI.duels_dawn` | brave and greedy heroes spar each dawn: XP for both, the loser hurt |
+| `trophy` | the trophy hall's `prize` | the hall pays shells and extra XP per kill |
 | `proud` | `People.update_moods` | knights: sleeping rough hurts twice as much, wearing steel cheers them |
 
 When a rule reads a tag:
