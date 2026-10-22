@@ -247,7 +247,7 @@ func towers_tick() -> void:
 		var target := w.nearest_enemy(Vector2.ZERO, w.content.num("hearth_range"))
 		if target != null:
 			w.hearth_cooldown_left = w.content.num("hearth_cooldown")
-			w.shots.append({"from": Vector2.ZERO, "to": target.pos, "ranged": true, "time": w.time})
+			w.shots.append({"from": Vector2.ZERO, "to": target.pos, "ranged": true, "tower": true, "time": w.time})
 			w.damage(null, target, (w.content.num("hearth_attack") + w.run.mod("tower_attack")) * armour_left(target), "hearth")
 	for b in w.buildings:
 		var def: Dictionary = w.content.buildings[b["type"]]
@@ -261,7 +261,7 @@ func towers_tick() -> void:
 		var target := w.nearest_enemy(b["pos"], float(def["range"]))
 		if target != null:
 			b["cooldown_left"] = float(def["cooldown"])
-			w.shots.append({"from": b["pos"], "to": target.pos, "ranged": true, "time": w.time})
+			w.shots.append({"from": b["pos"], "to": target.pos, "ranged": true, "tower": true, "time": w.time})
 			w.damage(null, target, (float(def["attack"]) + w.run.mod("tower_attack")) * armour_left(target), b["type"])
 			# Sentient raiders turn on the tower that shot them (siege engines only want gates and the hearth).
 			if target.alive and def.has("tower_hp") and w.content.unit_has_tag(target, "sentient") \

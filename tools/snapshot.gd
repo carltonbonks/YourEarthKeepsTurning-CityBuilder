@@ -8,10 +8,11 @@ extends SceneTree
 ## as hovering its card does; relic=1 stops at that round's relic pick and shows it; impact=1 shows Who did what
 ## (with relic=1, that round's; otherwise the whole run's). steps= is how many steps mid=1 plays; goods carried in
 ## meanwhile show as one "+N" popup. venture=<id> (with pick=1) deals that venture as the first dawn card, and
-## venture_taken=1 takes it and shows who never came home.
+## venture_taken=1 takes it and shows who never came home. give=<relic id> hands the town that relic first;
+## wave=1 (with night=1) plays on into the round's attack night until the hearth or a watch post shoots.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -22,6 +23,9 @@ func _init() -> void:
 	await process_frame
 	main._new_run(int(args["seed"]))
 	var run: RunState = main.run
+	if args["give"] != "":
+		run.relics.append(args["give"])
+		run.relic_acquired_round[args["give"]] = run.round_number
 	var bot := AutoPlayer.new()
 	bot.style = args["style"]
 	if int(args["gates"]) >= 0:
@@ -56,6 +60,15 @@ func _init() -> void:
 			run.step()
 		for i in 60:
 			run.step()
+		if args["wave"] == "1":
+			var tower_shot := func() -> bool: return run.world.shots.any(func(x: Dictionary) -> bool: return x.get("tower", false))
+			while run.phase == RunState.Phase.PICK or run.phase == RunState.Phase.SIM:
+				if run.phase == RunState.Phase.PICK:
+					run.choose_pick(bot.pick(run))
+				run.step()
+				if run.world.is_wave_night() and tower_shot.call():
+					main._set_speed(0)  # Hold the shot in the air for the picture.
+					break
 	main._overlays.hide()
 	if args["pick"] == "1" and run.phase == RunState.Phase.BUILD:
 		bot.build(run)
