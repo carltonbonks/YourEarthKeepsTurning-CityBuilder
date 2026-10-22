@@ -7,10 +7,11 @@ extends SceneTree
 ## so the camera has closed in on the town (NightCamera); preview=<building id> blinks where that building would go,
 ## as hovering its card does; relic=1 stops at that round's relic pick and shows it; impact=1 shows Who did what
 ## (with relic=1, that round's; otherwise the whole run's). steps= is how many steps mid=1 plays; goods carried in
-## meanwhile show as one "+N" popup.
+## meanwhile show as one "+N" popup. venture=<id> (with pick=1) deals that venture as the first dawn card, and
+## venture_taken=1 takes it and shows who never came home.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -59,7 +60,11 @@ func _init() -> void:
 	if args["pick"] == "1" and run.phase == RunState.Phase.BUILD:
 		bot.build(run)
 		run.begin_round()
+		if args["venture"] != "":
+			run.pick_offer[0] = {"kind": "venture", "role": "venture", "cost": 0, "venture": args["venture"]}
 		main._overlays.show_for_phase()
+		if args["venture_taken"] == "1":
+			main._take_pick(0)
 	main._refresh()
 	if args["relic"] == "1" and run.phase == RunState.Phase.RELIC:
 		main._overlays.show_for_phase()

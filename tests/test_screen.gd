@@ -144,3 +144,35 @@ func test_night_closes_in_on_the_town_and_keeps_the_speed() -> void:
 	check_eq(arena.zoom, 3.0, "a camera the player moved at night stays put")
 	run.dispose()
 	screen.free()
+
+
+func test_a_venture_shows_its_dead_as_red_crosses() -> void:
+	var screen: Control = load("res://game/main.tscn").instantiate()
+	screen.call("_ready")
+	screen.call("_new_run", 4821)
+	var run: RunState = screen.get("run")
+	AutoPlayer.new().build(run)
+	run.begin_round()
+	while run.count_role("tribesperson") < 12:
+		run.world.folk_ai.add_folk("tribesperson")
+	run.pick_offer = [{"kind": "venture", "role": "venture", "cost": 0, "venture": "warthog_cull"}]
+	var terms := run.people.venture_terms("warthog_cull")
+	var overlays: Overlays = screen.get("_overlays")
+	overlays.show_pick()
+	var on_card: Array = overlays.find_children("*", "VentureFigures", true, false)
+	check_eq(on_card.size(), 1, "the venture card shows its people")
+	var row: VentureFigures = on_card[0]
+	check_eq(row.send, int(terms["send"]), "one figure per person sent")
+	check_eq(row.dead, int(terms["lose"][0]), "a bold cross for each sure death")
+	check_eq(row.maybe, int(terms["lose"][1]) - int(terms["lose"][0]), "a faint cross for each who may not come back")
+	screen.call("_take_pick", 0)
+	check(overlays.visible, "taking the venture shows how it went before the day goes on")
+	# The cards are freed at the end of the frame, so the outcome's row is the newest one.
+	var outcome: VentureFigures = overlays.find_children("*", "VentureFigures", true, false).back()
+	check_eq(outcome.send, int(terms["send"]), "the outcome shows the people sent")
+	check_eq(outcome.dead, int(run.last_venture["lost"]), "a red cross for each who never came home")
+	check_eq(outcome.maybe, 0, "no maybes once it's done")
+	overlays.closed.emit()
+	check(not overlays.visible, "carrying on lets the day begin")
+	run.dispose()
+	screen.free()

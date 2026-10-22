@@ -131,7 +131,7 @@ func venture_terms(id: String) -> Dictionary:
 
 
 ## Sends the tribespeople out: some never come back (chosen at random), the goods come home.
-## Returns {lost, goods} for the record.
+## Returns {venture, send, lost, goods}.
 func go_venturing(card: Dictionary) -> Dictionary:
 	var id: String = card["venture"]
 	var terms := venture_terms(id)
@@ -153,7 +153,7 @@ func go_venturing(card: Dictionary) -> Dictionary:
 		run.tell("%s: all %d tribespeople come home, with %s." % [name, terms["send"], brought])
 	else:
 		run.tell("%s: %d of %d tribespeople never come home. The rest bring %s." % [name, lost, terms["send"], brought])
-	return {"lost": lost, "goods": terms["goods"]}
+	return {"venture": id, "send": terms["send"], "lost": lost, "goods": terms["goods"]}
 
 
 # --- Promotions -------------------------------------------------------------

@@ -123,6 +123,9 @@ func _take_pick(index: int) -> void:
 	run.choose_pick(index)
 	_overlays.hide()
 	_refresh()
+	# A venture holds the day for a moment to show who never came home.
+	if not run.last_venture.is_empty():
+		_overlays.show_venture_result()
 
 
 func _pick_relic(relic_id: String) -> void:
