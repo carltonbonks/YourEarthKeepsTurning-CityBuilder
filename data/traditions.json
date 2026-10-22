@@ -8,8 +8,8 @@
 		"buildings": ["stone_yard", "gate", "watch_post", "knapper"], "leaning": "quarrier", "effects": {"tower_attack": 2}, "start": {"stone": 4}},
 	"firekeepers": {"name": "Firekeepers", "text": "Keepers of the flame. Charcoal pits, spirit shrines and smoke huts come up often, brushcutters band sooner, and the fire burns 1 less fuel a night.",
 		"buildings": ["charcoal_pit", "shrine", "smoke_hut"], "leaning": "brushcutter", "effects": {"fuel_saving": 1}, "start": {"fuel": 6}},
-	"traders": {"name": "Traders", "text": "Shell-counters and hagglers. The market, its stalls and the mead hall come up often, and traders leave 5 more shells every round.",
-		"buildings": ["market", "provisions_stall", "arms_stall", "hide_stall", "charm_stall", "tavern"], "effects": {"income": 5}, "start": {"shells": 15}},
+	"traders": {"name": "Traders", "text": "Shell-counters and hagglers. The market, its stalls and the mead hall come up often, traders leave 5 more shells every round, and the southern caravan lays out 1 more deal.",
+		"buildings": ["market", "provisions_stall", "arms_stall", "hide_stall", "charm_stall", "tavern"], "effects": {"income": 5, "trade_deals": 1}, "start": {"shells": 15}},
 	"smiths": {"name": "Smiths", "text": "Workers of flint and metal. Knappers, bone carvers, smelters and bronzesmiths come up often, prospectors band sooner, and heroes pay 20% less for gear.",
 		"buildings": ["knapper", "bone_carver", "smelter", "bronzesmith"], "leaning": "prospector", "effects": {"gear_discount": 0.2}, "start": {"stone": 3}}
 }

@@ -1,5 +1,5 @@
 extends TestCase
-## Slice 5: the bronze age, tool sets, the caravan, bronze reavers, promotions and hero mood.
+## Slice 5: the bronze age, tool sets, the caravan's arrival, bronze reavers, promotions and hero mood.
 
 
 func _run(seed_value := 4821) -> RunState:
@@ -168,9 +168,9 @@ func test_tool_sets_cost_bronze_and_upgrade_a_group() -> void:
 	check(run.world.folk_ai.work_rate(run.world.folk.back()) > plain, "chisels speed up craftspeople")
 
 
-func test_caravan_sells_tin_at_a_markup() -> void:
+func test_caravan_comes_with_the_bronze_age() -> void:
 	var run := _run()
-	check(run.trader_stock.is_empty(), "no caravan in the stone age")
+	check(run.caravan.offers.is_empty(), "no caravan in the stone age")
 	_age_up(run)
 	run.begin_round()
 	while not run.is_over() and run.phase != RunState.Phase.BUILD:
@@ -183,24 +183,7 @@ func test_caravan_sells_tin_at_a_markup() -> void:
 				run.choose_relic("")
 	if run.is_over():
 		return
-	check(run.trader_stock.has("tin") and run.trader_stock.has("cassiterite"), "the caravan brings tin and a little cassiterite")
-	check(int(run.trader_stock["cassiterite"]) < int(run.trader_stock["tin"]), "only a little raw ore: it is heavy")
-	run.stock["shells"] = 100
-	check(run.trade("tin"), "tin bought")
-	check_eq(int(run.stock["tin"]), 1, "tin arrives")
-	check_eq(int(run.stock["shells"]), 100 - run.trader_price("tin"), "at the caravan's price")
-	# The buyout takes as many as the shells pay for, never more than the caravan has.
-	var left := int(run.trader_stock["tin"])
-	run.stock["shells"] = run.trader_price("tin") + 1
-	check_eq(run.buyout_count("tin"), 1, "the buyout is limited by shells")
-	check_eq(run.buyout("tin"), 1, "one more tin bought")
-	check_eq(int(run.stock["shells"]), 1, "the buyout pays the caravan's price for each")
-	run.stock["shells"] = 1000
-	check_eq(run.buyout("tin"), left - 1, "with shells to spare the buyout takes all that is left")
-	check_eq(int(run.trader_stock["tin"]), 0, "the caravan has no tin left")
-	check_eq(run.buyout("tin"), 0, "nothing left to buy out")
-	var local := int(run.content.world["nodes"]["cassiterite"]["price"])
-	check(run.trader_price("cassiterite") > local * 2, "the caravan charges far more than heroes do")
+	check(not run.caravan.offers.is_empty(), "the caravan lays out deals once the moot stands (more in test_trades.gd)")
 
 
 func test_bronze_shields_turn_stone_but_not_metal() -> void:

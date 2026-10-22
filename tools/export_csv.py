@@ -68,7 +68,7 @@ def main(raw_folder, out_folder):
     records = load_records(raw_folder)
     tables = {name: [] for name in
               ["runs", "rounds", "picks", "builds", "wave_enemies", "deaths", "nights", "relic_offers", "relic_effects", "heroes",
-               "loot", "whims", "market_sales", "crafted", "promotions", "build_cards", "impact"]}
+               "loot", "whims", "market_sales", "crafted", "promotions", "build_cards", "impact", "trade_deals"]}
 
     for r in records:
         rid = r["_run_id"]
@@ -278,6 +278,12 @@ def main(raw_folder, out_folder):
                                              **{"goods_" + k: row.get("goods", {}).get(k, 0) for k in RESOURCES}})
             for effect, count in rd.get("relic_effects", {}).items():
                 tables["relic_effects"].append({"run_id": rid, "round": rn, "effect": effect, "count": count})
+            taken_deals = [d.get("deal", "") for d in rd.get("deals", [])]
+            for deal in rd.get("deals_offered", []):
+                taken = next((d for d in rd.get("deals", []) if d.get("deal") == deal), {})
+                tables["trade_deals"].append({"run_id": rid, "round": rn, "deal": deal, "rarity": taken.get("rarity", ""),
+                                              "taken": 1 if deal in taken_deals else 0, "relic": taken.get("relic", ""),
+                                              "reforged": taken.get("reforged", 0)})
             for relic in rd.get("relic_offer", []):
                 tables["relic_offers"].append({"run_id": rid, "round": rn, "relic": relic,
                                                "picked": 1 if rd.get("relic_pick") == relic else 0})
@@ -303,6 +309,7 @@ def main(raw_folder, out_folder):
         "crafted": ["run_id", "round", "recipe", "count"],
         "promotions": ["run_id", "round", "day", "role", "name", "became", "trait", "joined_round"],
         "build_cards": ["run_id", "round", "deal", "building", "ordered", "drafted"],
+        "trade_deals": ["run_id", "round", "deal", "rarity", "taken", "relic", "reforged"],
         "impact": ["run_id", "round", "group", "who", "hero_class", *IMPACT_STATS, "goods_total",
                    *["goods_" + k for k in RESOURCES]],
     }
