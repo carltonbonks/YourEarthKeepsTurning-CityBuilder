@@ -6,7 +6,7 @@ extends Control
 ##
 ## This file runs the flow (new run, ticking the sim, pausing for decisions, pause and speed, the Esc
 ## menu) and lays out the screen. The parts live in their own files: TopBar, BuildHandView (the
-## building cards), ThreatCard (the attack and Begin round), Alerts, HeroStrip, StoryLog, Overlays
+## building cards, with the blueprint draft in a DraftPopup), ThreatCard (the attack and Begin round), Alerts, HeroStrip, StoryLog, Overlays
 ## (picks, relics, end screen, menu, Run history, dev tuning) and ArenaView (the map).
 
 ## How often the live panels are rebuilt while the sim runs (the map redraws every frame).
@@ -27,6 +27,7 @@ var save_runs := true
 
 var _top: TopBar
 var _hand_view: BuildHandView
+var _draft: DraftPopup
 var _threat: ThreatCard
 var _alerts: Alerts
 var _arena: ArenaView
@@ -176,6 +177,7 @@ func _close_menu() -> void:
 
 func _refresh() -> void:
 	_hand_view.visible = run.phase == RunState.Phase.BUILD
+	_draft.visible = false
 	if _hand_view.visible:
 		_hand_view.refresh()
 	else:
@@ -278,6 +280,11 @@ func _build_ui() -> void:
 	_hand_view.changed.connect(_refresh)
 	_hand_view.previewing.connect(_preview_building)
 	map_box.add_child(_hand_view)
+	# The blueprint draft floats over the map in its own window, above the hand.
+	_draft = DraftPopup.new()
+	_draft.visible = false
+	map_box.add_child(_draft)
+	_hand_view.draft = _draft
 
 	# Underneath: the heroes as portraits, and the story's last lines.
 	var bottom := HBoxContainer.new()
