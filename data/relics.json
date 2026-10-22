@@ -9,7 +9,7 @@
 	"bear_tooth_charm": {"name": "Bear-tooth Charm", "text": "Heroes +10 max HP and retreat later.", "effects": {"hero_hp": 10, "retreat_shift": -0.1}},
 	"wanderers_fire": {"name": "Wanderer's Fire", "text": "A free hero joins now.", "effects": {"free_hero": 1}},
 	"flint_hoard": {"name": "Flint Hoard", "text": "Heroes pay 40% less for gear.", "effects": {"gear_discount": 0.4}},
-	"fire_arrows": {"name": "Fire Arrows", "text": "Hearth and watch posts deal +4 damage.", "effects": {"tower_attack": 4}},
+	"fire_arrows": {"name": "Fire Arrows", "text": "Hearth and watch posts deal +4 damage.", "tags": ["fire"], "effects": {"tower_attack": 4}},
 	"sacred_spring": {"name": "Sacred Spring", "text": "Heroes heal fully between rounds and 3x faster at the hearth.", "effects": {"full_heal": 1, "hearth_heal_mult": 2}},
 	"ember_stone": {"name": "Ember Stone", "text": "The hearth burns 1 less fuel each night.", "effects": {"fuel_saving": 1}},
 	"oxhide_sledges": {"name": "Oxhide Sledges", "text": "Gatherers carry twice as much.", "effects": {"carry_mult": 1.0}},

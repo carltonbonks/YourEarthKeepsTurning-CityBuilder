@@ -49,7 +49,7 @@ var wave_spawned := false
 var pause := Pause.NONE
 var cold_tonight := false
 
-## Recent attacks for drawing: {from: Vector2, to: Vector2, ranged: bool, time: float}.
+## Recent attacks for drawing: {from: Vector2, to: Vector2, ranged: bool, time: float}, and tower: true on the hearth's and watch posts' shots.
 var shots: Array[Dictionary] = []
 ## Facts for this round's record.
 var deaths: Array[Dictionary] = []

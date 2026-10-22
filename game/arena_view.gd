@@ -7,6 +7,7 @@ extends Control
 ## ones. V switches to the flat top-down view. The sim never knows: only the view's projection changes.
 ## Mouse wheel zooms, dragging pans, hovering shows a tooltip (see Tooltips). As each night falls the
 ## camera closes in on the town and afterwards goes back (NightCamera), unless the player moves it.
+## Light (Lighting) is drawn on a child layer that adds light, and the tooltip on a layer above that.
 
 const HERO_RADIUS := 9.0
 const FOLK_RADIUS := 5.5
@@ -50,6 +51,9 @@ var _slide_from_ms := -1.0
 var _pulse_from_ms := -1.0
 var night := NightCamera.new()
 var pickups := PickupPopups.new()
+var light := Lighting.new()
+var _light_layer: Control
+var _top_layer: Control
 ## The plot the hovered building card would go on, blinked on the map; -1 for none.
 var preview_plot := -1
 
@@ -75,11 +79,31 @@ func zoom_to_fit(radius: float, fill: float) -> float:
 	return clampf(fit / maxf(base, 0.0001), MIN_ZOOM, MAX_ZOOM)
 
 
+func _ready() -> void:
+	var add := CanvasItemMaterial.new()
+	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	_light_layer = _layer(_draw_lights)
+	_light_layer.material = add
+	_top_layer = _layer(_draw_top)
+
+
+## A see-through child layer covering the map, drawn by `draw_with`.
+func _layer(draw_with: Callable) -> Control:
+	var layer := Control.new()
+	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.draw.connect(draw_with)
+	add_child(layer)
+	return layer
+
+
 func _process(delta: float) -> void:
 	if run != null:
 		night.update(self, delta)
 		pickups.update(run.world, Time.get_ticks_msec())
 	queue_redraw()
+	_light_layer.queue_redraw()
+	_top_layer.queue_redraw()
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -236,23 +260,72 @@ func _draw() -> void:
 				_draw_pedlar(font)
 
 	# Shots fly at chest height.
-	var chest := Vector2(0.0, -FOLK_RADIUS * maxf(1.0, zoom * 0.7) if iso else 0.0)
+	var chest := _chest()
+	var fire_shots := Lighting.fire_shots(run)
 	for shot in w.shots:
 		var c := Color("#fff3b0") if shot["ranged"] else Color("#ffffff")
+		if fire_shots and shot.get("tower", false):
+			c = Color("#ffa040")
 		draw_line(_to_screen(shot["from"]) + chest, _to_screen(shot["to"]) + chest, Color(c, 0.6), 1.5 if shot["ranged"] else 2.5)
 
 	# Night falls over everything.
-	var dark := _darkness()
+	var dark := Lighting.darkness(run)
 	if dark > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.12, dark))
 	_draw_earth_pulses()
+
+
+## Shots fly at chest height.
+func _chest() -> Vector2:
+	return Vector2(0.0, -FOLK_RADIUS * maxf(1.0, zoom * 0.7) if iso else 0.0)
+
+
+## The light layer (blended by adding): sunlight over the map, the hearth's glow, and burning shots.
+func _draw_lights() -> void:
+	if run == null:
+		return
+	var w := run.world
+	var s := _scale()
+	var now := float(Time.get_ticks_msec())
+	_light_layer.draw_rect(Rect2(Vector2.ZERO, size), Lighting.sun(run))
+	var night_share := Lighting.darkness(run) / Lighting.NIGHT
+	if not w.cold_tonight:
+		var reach := World.HEARTH_RADIUS * s * lerpf(Lighting.HEARTH_REACH_DAY, Lighting.HEARTH_REACH_NIGHT, night_share)
+		var squash := ISO_SQUASH if iso else 1.0
+		var flick := Lighting.flicker(now)
+		var c := Lighting.dim(Lighting.FIRE, (0.1 + 0.26 * night_share) * flick)
+		light.draw_glow(_light_layer, _to_screen(Vector2.ZERO), reach * flick, reach * squash * flick, c)
+		# A brighter heart round the flames themselves.
+		var core := World.HEARTH_RADIUS * s * 1.2
+		var flame := Vector2(0.0, World.HEARTH_RADIUS * s * 0.3 if iso else 0.0)
+		light.draw_glow(_light_layer, _to_screen(Vector2.ZERO) - flame, core, core, Lighting.dim(Lighting.FIRE, (0.13 + 0.3 * night_share) * flick))
+	if Lighting.fire_shots(run):
+		var chest := _chest()
+		var r := maxf(10.0, Lighting.SHOT_GLOW * s)
+		for shot in w.shots:
+			if not shot.get("tower", false):
+				continue
+			var fade := 1.0 - clampf((w.time - float(shot["time"])) / Lighting.SHOT_SECONDS, 0.0, 1.0)
+			var c := Lighting.dim(Lighting.FIRE, (0.25 + 0.5 * night_share) * fade)
+			var from := _to_screen(shot["from"]) + chest
+			var to := _to_screen(shot["to"]) + chest
+			light.draw_glow(_light_layer, (from + to) / 2.0, r * 0.6, r * 0.6, Lighting.dim(c, 0.6))
+			light.draw_glow(_light_layer, to, r, r, c)
+
+
+## The top layer, over the light: goods carried in, the controls hint and the hover tooltip.
+func _draw_top() -> void:
+	if run == null:
+		return
+	var s := _scale()
+	var font := get_theme_default_font()
 	# Goods carried in rise over the hearth as "+2 stone", above the fire and its health bar.
 	var hearth_top := World.HEARTH_RADIUS * s * (ISO_SQUASH + 0.3 if iso else 1.0) + 16.0
-	pickups.draw(self, _to_screen(Vector2.ZERO) - Vector2(0.0, hearth_top), font, Time.get_ticks_msec(), main_color)
+	pickups.draw(_top_layer, _to_screen(Vector2.ZERO) - Vector2(0.0, hearth_top), font, Time.get_ticks_msec(), main_color)
 	# The controls hint is for a first run's opening rounds, and never under the building cards.
 	if run.round_number <= HELP_ROUNDS and run.phase != RunState.Phase.BUILD:
 		var help := "Mouse wheel to zoom, drag to look around, V for %s view, point at anything for details" % ("flat" if iso else "tilted")
-		draw_string(font, Vector2(8, size.y - 8), help, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#8a9088"))
+		_top_layer.draw_string(font, Vector2(8, size.y - 8), help, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#8a9088"))
 	if _mouse.x >= 0.0 and not _dragging:
 		var tip := hovered(_mouse)
 		if not tip.is_empty():
@@ -569,26 +642,11 @@ func _draw_tip(tip: Dictionary, at: Vector2, font: Font) -> void:
 	pos.x = clampf(pos.x, 0.0, maxf(0.0, size.x - box.x))
 	if pos.y + box.y > size.y:
 		pos.y = maxf(0.0, at.y - box.y - 8.0)
-	draw_rect(Rect2(pos, box), Color(0.05, 0.06, 0.05, 0.92))
-	draw_rect(Rect2(pos, box), Color("#6a7458"), false, 1.0)
+	_top_layer.draw_rect(Rect2(pos, box), Color(0.05, 0.06, 0.05, 0.92))
+	_top_layer.draw_rect(Rect2(pos, box), Color("#6a7458"), false, 1.0)
 	for i in rows.size():
 		var row: Array = rows[i]
-		draw_string(font, pos + Vector2(8, 18 + i * line_h), row[0], HORIZONTAL_ALIGNMENT_LEFT, width, row[1], row[2])
-
-
-## How dark it is: 0 by day, rising through dusk, 0.45 at night.
-func _darkness() -> float:
-	var w := run.world
-	if run.phase == RunState.Phase.BUILD:
-		return 0.0
-	var day := run.content.num("day_seconds")
-	var dusk := run.content.num("dusk_seconds")
-	var t := w.time_of_day()
-	if t >= day:
-		return 0.45
-	if t >= day - dusk:
-		return 0.45 * (t - (day - dusk)) / dusk
-	return 0.0
+		_top_layer.draw_string(font, pos + Vector2(8, 18 + i * line_h), row[0], HORIZONTAL_ALIGNMENT_LEFT, width, row[1], row[2])
 
 
 ## A good's colour: the main four have their own; anything else takes the colour of the node it comes from, lightened.
