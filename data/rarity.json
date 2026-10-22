@@ -1,0 +1,10 @@
+{
+	"_note": "Rarities shared by everything that can carry one (Yusuf, 2026-10-22): blueprints first, then items, relics and dawn cards. An entity says \"rarity\": \"<id>\" in its own data; no rarity means white. order = rarest last. name = what players read; color = the card or label colour (hex); weight = how much less often a rarer one is offered than a white one where offers are drawn at random (1.0 = as often). Read through Content.rarity_of / rarity_tier / rarity_color / rarity_weight.",
+	"order": ["white", "blue", "yellow", "orange"],
+	"tiers": {
+		"white": {"name": "Base", "color": "#d8d8d8", "weight": 1.0},
+		"blue": {"name": "Magic", "color": "#5a9cf0", "weight": 0.6},
+		"yellow": {"name": "Powerful", "color": "#f0d040", "weight": 0.3},
+		"orange": {"name": "Mythic", "color": "#f08a28", "weight": 0.12}
+	}
+}
