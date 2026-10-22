@@ -371,19 +371,23 @@ func _draw_den(den: Dictionary, font: Font) -> void:
 	draw_string(font, p + Vector2(-r, r + 12), def["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#d0a0a0"))
 
 
-## The pedlar's camp: a striped tent with its health under it.
+## The pedlar's camp: a striped tent with its health under it, and a slow gold beacon ring so it is
+## found out past the town (Yusuf never noticed one).
 func _draw_pedlar(font: Font) -> void:
 	var camp: Dictionary = run.world.pedlar.camp
 	var at := Vector2(camp["pos"])
-	var r := _den_radius()
-	_shadow(at, r)
+	var r := _den_radius() * 1.25
 	var base := _to_screen(at)
+	var beat := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.004)
+	var ring := _ground_ring(at, r * (1.6 + 0.5 * beat) / _scale(), 40)
+	draw_polyline(_closed(ring), Color(1.0, 0.85, 0.35, 0.75 - 0.5 * beat), 3.0)
+	_shadow(at, r)
 	var top := base + Vector2(0, -r * 1.8)
 	draw_colored_polygon(PackedVector2Array([base + Vector2(-r, 0), top, base + Vector2(r, 0)]), Color("#c89a4a"))
 	draw_colored_polygon(PackedVector2Array([base + Vector2(-r * 0.35, 0), top, base + Vector2(r * 0.35, 0)]), Color("#8a3a2a"))
 	_bar(base + Vector2(-r, 4), r * 2.0, float(camp["hp"]) / float(run.content.pedlars["hp"]), Color("#d8b860"))
 	var name: String = run.content.pedlars["pedlars"][camp["id"]]["name"]
-	draw_string(font, base + Vector2(-r, 20), "%s (%d wares)" % [name, camp["wares"].size()], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#e8d0a0"))
+	draw_string(font, base + Vector2(-r, 21), "Pedlar: %s (%d wares)" % [name, camp["wares"].size()], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffe0a0"))
 
 
 func _den_radius() -> float:

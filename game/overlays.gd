@@ -349,10 +349,11 @@ func _promote_card(card: Dictionary) -> Button:
 			var u: Unit = card["unit"]
 			var shop: String = content.buildings[card["workshop"]]["name"].to_lower()
 			var t: Dictionary = content.promotions["craftsperson"]["traits"][card["trait"]]
-			btn = UiKit.card("Promote a craftsperson", card["name"], cost, "master of the %s: %s" % [shop, t["name"].to_lower()],
-				"", PICK_SIZE, UiKit.RECOMMEND_COLOR, true)
-			btn.tooltip_text = "A craftsperson who made %d goods at the %s becomes %s, master of the %s.\n%s: %s" % [
-				int(u.made[card["workshop"]]), shop, card["name"], shop, t["name"], t["text"]]
+			var effects := Tooltips.master_effects(content, card["trait"], card["workshop"])
+			btn = UiKit.card("Promote a craftsperson", card["name"], cost, "%s master of the %s: %s." % [t["name"], shop,
+				", ".join(Tooltips.master_effects(content, card["trait"], card["workshop"], true))], "", PICK_SIZE, UiKit.RECOMMEND_COLOR, true)
+			btn.tooltip_text = "A craftsperson who made %d goods at the %s becomes %s, master of the %s.\n%s: %s\n%s.\nA master goes to their own bench before any other." % [
+				int(u.made[card["workshop"]]), shop, card["name"], shop, t["name"], t["text"], ".\n".join(effects)]
 	return btn
 
 

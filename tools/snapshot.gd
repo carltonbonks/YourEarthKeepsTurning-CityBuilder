@@ -11,9 +11,11 @@ extends SceneTree
 ## venture_taken=1 takes it and shows who never came home. give=<relic id> hands the town that relic first;
 ## wave=1 (with night=1) plays on into the round's attack night until the hearth or a watch post shoots.
 ## lodge=1 raises a Geomancer's lodge at the start, so dawn picks show the geomancy spell cards.
+## pedlars=1 shows the round's pedlar choice (round= a pedlar round, e.g. 3). master=<trait id> (with pick=1)
+## deals a Promote card for a craftsperson with that craft trait as the first dawn card.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0", "pedlars": "0", "master": ""}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -73,11 +75,19 @@ func _init() -> void:
 					main._set_speed(0)  # Hold the shot in the air for the picture.
 					break
 	main._overlays.hide()
+	if args["pedlars"] == "1" and run.awaiting_pedlar():
+		main._refresh()
+		main._overlays.show_for_phase()
 	if args["pick"] == "1" and run.phase == RunState.Phase.BUILD:
 		bot.build(run)
 		run.begin_round()
 		if args["venture"] != "":
 			run.pick_offer[0] = {"kind": "venture", "role": "venture", "cost": 0, "venture": args["venture"]}
+		if args["master"] != "":
+			var crafter: Unit = run.world.folk[0]
+			crafter.made["knapper"] = 9
+			run.pick_offer[0] = {"kind": "promote", "role": "craftsperson", "cost": 15, "unit": crafter, "workshop": "knapper",
+				"trait": args["master"], "name": run.people.unused_name()}
 		main._overlays.show_for_phase()
 		if args["venture_taken"] == "1":
 			main._take_pick(0)

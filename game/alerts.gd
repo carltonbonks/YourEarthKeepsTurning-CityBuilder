@@ -46,6 +46,10 @@ static func active(r: RunState) -> Array[Dictionary]:
 	if r.phase == RunState.Phase.BUILD and w.camp_index() >= 0:
 		out.append({"id": "camp:%d" % r.round_number, "text": "A war camp of %d raiders holds land in the wilds: heroes can clear it for plunder." % [
 			w.enemy_ai.camp_raiders().size()]})
+	if w.pedlar.is_open():
+		var pedlar: String = content.pedlars["pedlars"][w.pedlar.camp["id"]]["name"]
+		out.append({"id": "pedlar:%d" % r.round_number, "text": "The %s has camped %s of town (the gold tent): heroes walk out to trade." % [
+			pedlar.to_lower(), World.compass(Vector2(w.pedlar.camp["pos"]).angle())]})
 	if r.phase == RunState.Phase.BUILD and w.pathing.count_ground(Pathing.PATH) > 0 and not w.town.can_pave():
 		out.append({"id": "paving", "text": "Worn paths could be paved: build a %s." % w.town.paver_name()})
 	return out

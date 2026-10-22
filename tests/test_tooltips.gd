@@ -68,3 +68,17 @@ func test_tilted_and_flat_views_map_points_back() -> void:
 	view.iso = true
 	check(view._to_screen(Vector2(100, 100)).x == view._to_screen(Vector2.ZERO).x, "tilted: south-east of the hearth is straight down")
 	view.free()
+
+
+func test_a_master_shows_what_their_trait_does() -> void:
+	var c := Content.load_default()
+	var quick := Tooltips.master_effects(c, "quick_hands", "knapper")
+	check(quick.any(func(l: String) -> bool: return "2x as fast" in l), "quick hands: twice as fast")
+	check(quick.any(func(l: String) -> bool: return "never has a trait" in l), "quick hands: plain gear, against the usual chance")
+	var careful := Tooltips.master_effects(c, "meticulous", "knapper")
+	check(careful.any(func(l: String) -> bool: return "slower" in l), "meticulous: a little slower")
+	check(careful.any(func(l: String) -> bool: return "35% of their gear has a trait" in l), "meticulous: the trait chance in numbers")
+	check(Tooltips.master_effects(c, "gifted", "knapper").any(func(l: String) -> bool: return "1 tier better" in l), "gifted: a tier better")
+	var smelter := Tooltips.master_effects(c, "gifted", "smelter")
+	check(smelter.any(func(l: String) -> bool: return "makes no gear" in l), "a smelter master: only the speed counts")
+	check(not smelter.any(func(l: String) -> bool: return "tier" in l), "no gear bonus where no gear is made")

@@ -4,7 +4,7 @@
 	"champion": {"level": 5, "cost": 25, "becomes": "knight"},
 	"craftsperson": {"made": 8, "cost": 15,
 		"traits": {
-			"meticulous": {"name": "Meticulous", "text": "Slow and careful: more of their gear comes out with an affix.", "craft_rate": 0.9, "affix_chance": 0.35},
+			"meticulous": {"name": "Meticulous", "text": "Slow and careful: more of their gear comes out with a trait.", "craft_rate": 0.9, "affix_chance": 0.35},
 			"quick_hands": {"name": "Quick hands", "text": "Works twice as fast, but their gear is plain.", "craft_rate": 2.0, "affix_chance": 0.0},
 			"gifted": {"name": "Gifted", "text": "Their gear comes out one tier better.", "craft_rate": 1.2, "affix_chance": 0.1, "extra_tier": 1}
 		}

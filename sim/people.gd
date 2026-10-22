@@ -224,8 +224,8 @@ func promote(card: Dictionary) -> void:
 		u.master_of = card["workshop"]
 		u.craft_trait = card["trait"]
 		var t: Dictionary = run.content.promotions["craftsperson"]["traits"][u.craft_trait]
-		run.tell("%s, a craftsperson since %s, becomes master of the %s (%s)." % [u.display_name, since,
-			run.content.buildings[u.master_of]["name"].to_lower(), t["name"]])
+		run.tell("%s, a craftsperson since %s, becomes master of the %s. %s: %s" % [u.display_name, since,
+			run.content.buildings[u.master_of]["name"].to_lower(), t["name"], t["text"]])
 		entry.merge({"name": u.display_name, "became": "master_" + u.master_of, "trait": u.craft_trait, "made": int(u.made[u.master_of])})
 	run.record.note_list("promotions", entry)
 

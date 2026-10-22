@@ -176,3 +176,28 @@ func test_a_venture_shows_its_dead_as_red_crosses() -> void:
 	check(not overlays.visible, "carrying on lets the day begin")
 	run.dispose()
 	screen.free()
+
+
+func test_a_pedlar_round_opens_on_the_pedlar_choice_after_the_relic() -> void:
+	# Every round ends on a relic pick, so the pedlar choice must show once the relic is taken
+	# (it used to be hidden, and starting the round quietly invited nobody).
+	var screen: Control = load("res://game/main.tscn").instantiate()
+	screen.set("save_runs", false)
+	screen.call("_ready")
+	screen.call("_new_run", 4821)
+	var run: RunState = screen.get("run")
+	run.choose_traditions([])
+	run.round_number = int(run.content.pedlars["every"]) - 1
+	run.phase = RunState.Phase.RELIC
+	screen.call("_pick_relic", "")
+	var overlays: Overlays = screen.get("_overlays")
+	check(run.awaiting_pedlar(), "the new round is a pedlar round")
+	check(overlays.visible, "the pedlar choice shows after the relic pick")
+	var buttons := overlays.find_children("*", "Button", true, false)
+	check(buttons.any(func(b: Button) -> bool: return b.tooltip_text.contains("Would go")), "it shows the pedlar cards")
+	run.choose_pedlar(run.pedlar_offer[0]["id"])
+	run.begin_round()
+	check(Alerts.active(run).any(func(a: Dictionary) -> bool: return String(a["id"]).begins_with("pedlar")),
+		"an alert says where the pedlar camped")
+	run.dispose()
+	screen.free()
