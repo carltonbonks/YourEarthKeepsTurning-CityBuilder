@@ -30,6 +30,7 @@ var traditions: Dictionary  ## data/traditions.json: founding traditions picked 
 var combos: Dictionary  ## data/combos.json: row cards, two buildings ordered together that help each other.
 var ventures: Dictionary  ## data/ventures.json: dawn cards that spend tribespeople for goods.
 var pedlars: Dictionary  ## data/pedlars.json: the pedlars invited on pedlar rounds and their camp (see PedlarCamp).
+var rarity: Dictionary  ## data/rarity.json: the four rarities (white, blue, yellow, orange) anything can carry.
 
 
 static func load_default() -> Content:
@@ -56,6 +57,7 @@ static func load_default() -> Content:
 	c.combos = _strip(_read("combos.json"))
 	c.ventures = _strip(_read("ventures.json"))
 	c.pedlars = _strip(_read("pedlars.json"))
+	c.rarity = _strip(_read("rarity.json"))
 	return c
 
 
@@ -91,6 +93,25 @@ func unit_tags(unit: Unit) -> Array:
 
 func unit_has_tag(unit: Unit, tag: String) -> bool:
 	return tag in unit_tags(unit)
+
+
+## An entity's rarity id from its own data ("white" when it has none). kind is one of TAG_KINDS.
+func rarity_of(kind: String, id: String) -> String:
+	return tag_table(kind).get(id, {}).get("rarity", "white")
+
+
+## A rarity's entry in data/rarity.json ({name, color, weight}).
+func rarity_tier(rarity_id: String) -> Dictionary:
+	return rarity["tiers"].get(rarity_id, rarity["tiers"]["white"])
+
+
+func rarity_color(rarity_id: String) -> Color:
+	return Color(rarity_tier(rarity_id)["color"])
+
+
+## How often a rarity is offered next to a white one (1.0 = as often).
+func rarity_weight(rarity_id: String) -> float:
+	return float(rarity_tier(rarity_id)["weight"])
 
 
 ## The data table for a tag kind (see TAG_KINDS), keyed by id.
