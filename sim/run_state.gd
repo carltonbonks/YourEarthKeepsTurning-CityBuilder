@@ -421,6 +421,7 @@ func on_building_done(type: String) -> void:
 		age_up_round = round_number
 		age_rounds[next_age] = round_number
 		record.note_value("aged_up", next_age)
+		world.town.lay_hearth_ground(next_age)
 		tell("The %s is raised. The %s begins: %s." % [def["name"], content.age_name(age), content.ages["ages"][age].get("begins", "")])
 
 
