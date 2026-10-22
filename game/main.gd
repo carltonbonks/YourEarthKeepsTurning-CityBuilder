@@ -263,9 +263,6 @@ func _build_ui() -> void:
 	_threat.position = Vector2(-ThreatCard.WIDTH - 10, 8)
 	_threat.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	_threat.begin_pressed.connect(_begin_round)
-	_threat.omen_pressed.connect(func(id: String) -> void:
-		run.choose_omen(id)
-		_refresh())
 	map_box.add_child(_threat)
 	_hand_view = BuildHandView.new()
 	_hand_view.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)

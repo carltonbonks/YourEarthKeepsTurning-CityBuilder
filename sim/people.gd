@@ -57,6 +57,10 @@ func offer_picks() -> void:
 		run.pick_offer.append(promote)
 	if not venture.is_empty():
 		run.pick_offer.append(venture)
+	# A free geomancer offers its spells beside the newcomers; taking one is instead of a newcomer.
+	if run.can_cast():
+		for id: String in content.plates["spells"]:
+			run.pick_offer.append({"kind": "spell", "role": "spell", "cost": 0, "spell": id})
 	run.picks_left = 1 + int(run.mod("extra_picks"))
 	run.phase = RunState.Phase.PICK
 
@@ -77,10 +81,10 @@ func hero_card_cost(class_id: String) -> int:
 	return int(run.content.hero_classes[class_id].get("card_cost", run.content.int_num("hero_card_cost")))
 
 
-## How many people a dawn card brings into town (0 for a promotion or a venture).
+## How many people a dawn card brings into town (0 for a promotion, a venture or a spell).
 func card_people(card: Dictionary) -> int:
 	match card["kind"]:
-		"promote", "venture":
+		"promote", "venture", "spell":
 			return 0
 		"family":
 			return card["roles"].size()
@@ -92,6 +96,8 @@ func card_label(card: Dictionary) -> String:
 		return "promote:" + card["role"]
 	if card["kind"] == "venture":
 		return "venture:" + card["venture"]
+	if card["kind"] == "spell":
+		return "spell:" + card["spell"]
 	if card["kind"] == "family":
 		return "family"
 	return "hero:" + card["hero"].type_id if card["kind"] == "hero" else card["role"]

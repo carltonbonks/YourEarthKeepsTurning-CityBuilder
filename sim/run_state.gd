@@ -74,9 +74,9 @@ var departed: Array[Unit] = []
 var hunger_turned_away := ""
 ## The venture taken at the last dawn pick ({} if none): {venture, send, lost, goods}, so the screen can show who never came home.
 var last_venture := {}
-## The geomancer's omen for the next turn of the earth (an id from "omens" in data/plates.json, "" for none),
-## chosen while building once a building with "omens" stands; used up by that turn.
-var omen := ""
+## The geomancer's spell under way ({} for none): {id (from "spells" in data/plates.json), nights_left}. Chosen
+## from a dawn card once a building with "spells" stands; it happens at the dawn its nights run out.
+var spell := {}
 ## Pedlar rounds (data/pedlars.json): the pedlars offered while building, each {id, pos} (where it would camp),
 ## the one invited ("" for none), and whether the choice is made (an unmade one invites nobody when the round begins).
 var pedlar_offer: Array[Dictionary] = []
@@ -299,24 +299,42 @@ func build_row(id: String) -> bool:
 	return true
 
 
-# --- Market prices ----------------------------------------------------------
+# --- The geomancer -------------------------------------------------------------
 
-## Sets a stall kind's price level for the coming round ("cheap", "fair" or "dear").
-## True while building, once a building that reads the earth (a Geomancer's lodge) stands.
-func can_choose_omen() -> bool:
-	if phase != Phase.BUILD:
+## True once a building that works the earth (a Geomancer's lodge) stands and no spell is under way, so dawn
+## offers spell cards.
+func can_cast() -> bool:
+	if not spell.is_empty():
 		return false
 	for type: String in content.buildings:
-		if content.buildings[type].get("omens", false) and world.count_buildings(type) > 0:
+		if content.buildings[type].get("spells", false) and world.count_buildings(type) > 0:
 			return true
 	return false
 
 
-## Sets the omen for the next turn of the earth; choosing the one already set (or "") clears it.
-func choose_omen(id: String) -> void:
-	if not can_choose_omen() or (id != "" and not content.plates["omens"].has(id)):
+## Sets the geomancer to work on a spell (an id from "spells" in data/plates.json).
+func cast_spell(id: String) -> void:
+	if not can_cast() or not content.plates["spells"].has(id):
 		return
-	omen = "" if id == omen else id
+	var nights := int(content.plates["spells"][id]["nights"])
+	spell = {"id": id, "nights_left": nights}
+	tell("The geomancer begins to %s (%d night%s)." % [String(content.plates["spells"][id]["name"]).to_lower(), nights, "" if nights == 1 else "s"])
+	record.note_list("spells", {"day": world.day_index() + 1, "cast": id})
+
+
+## Each dawn the geomancer's spell comes one night nearer; when none are left it happens.
+func _work_spell() -> void:
+	if spell.is_empty():
+		return
+	spell["nights_left"] = int(spell["nights_left"]) - 1
+	if int(spell["nights_left"]) > 0:
+		return
+	var id: String = spell["id"]
+	spell = {}
+	var rng := SeededRng.stream(run_seed, "spell", round_number * 10 + world.day_index())
+	var line := world.earth.finish_spell(id, rng)
+	tell("The geomancer's spell is done: %s." % line)
+	record.note_list("spells", {"day": world.day_index() + 1, "finished": id, "did": world.earth.spell_done.duplicate(true)})
 
 
 ## True while building on a pedlar round until the player invites a pedlar or none (after the traditions).
@@ -344,6 +362,9 @@ func pedlar_choice() -> Dictionary:
 	return {}
 
 
+# --- Market prices ----------------------------------------------------------
+
+## Sets a stall kind's price level for the coming round ("cheap", "fair" or "dear").
 func set_price(kind: String, level: String) -> void:
 	if phase != Phase.BUILD or not prices.has(kind) or not content.market["price_levels"].has(level) or prices[kind] == level:
 		return
@@ -379,6 +400,7 @@ func begin_round() -> void:
 	world.start_round()
 	if pedlar != "":
 		world.pedlar.open(pedlar_choice())
+	_work_spell()
 	people.offer_picks()
 
 
@@ -485,7 +507,7 @@ func can_take_pick(index: int) -> bool:
 	if phase != Phase.PICK or index < 0 or index >= pick_offer.size():
 		return false
 	var card := pick_offer[index]
-	return (card["kind"] in ["promote", "venture"] or population() + people.card_people(card) <= housing()) and int(stock["shells"]) >= int(card["cost"])
+	return (card["kind"] in ["promote", "venture", "spell"] or population() + people.card_people(card) <= housing()) and int(stock["shells"]) >= int(card["cost"])
 
 
 ## Takes a dawn card (-1 skips), then lets the day begin.
@@ -505,6 +527,9 @@ func choose_pick(index: int) -> void:
 			tell("%s arrives and sleeps in %s." % [describe(hero), world.hero_ai.bed_name(hero.lodging)])
 		elif card["kind"] == "promote":
 			people.promote(card)
+			taken = people.card_label(card)
+		elif card["kind"] == "spell":
+			cast_spell(card["spell"])
 			taken = people.card_label(card)
 		elif card["kind"] == "venture":
 			venture = people.go_venturing(card)
@@ -542,8 +567,13 @@ func choose_pick(index: int) -> void:
 	# Twin Fires: another newcomer from the cards left, unless the player skipped.
 	if took and picks_left > 0 and pick_offer.size() > 1:
 		pick_offer.remove_at(index)
-		relic_fired("extra_picks")
-		return
+		# A spell taken leaves the geomancer busy, so its other spell cards go.
+		for i in range(pick_offer.size() - 1, -1, -1):
+			if not spell.is_empty() and pick_offer[i]["kind"] == "spell":
+				pick_offer.remove_at(i)
+		if not pick_offer.is_empty():
+			relic_fired("extra_picks")
+			return
 	pick_offer = []
 	hunger_turned_away = ""
 	phase = Phase.SIM
@@ -570,6 +600,7 @@ func step() -> void:
 			people.bury_heroes()
 			people.update_moods()
 			_close_night()
+			_work_spell()
 			people.offer_picks()
 		World.Pause.ROUND_OVER:
 			_finish_round()
@@ -804,7 +835,6 @@ func choose_relic(relic_id: String) -> void:
 	for i in int(mod("earth_turns")):
 		world.earth.shift()
 		relic_fired("earth_turns")
-	omen = ""
 	_enter_build()
 	if not world.earth.last.is_empty():
 		record.note_value("shift", world.earth.last.duplicate(true))

@@ -18,6 +18,7 @@ signal seed_run_requested(seed_value: int)
 signal closed
 
 const PICK_SIZE := Vector2(196, 176)
+const SPELL_SIZE := Vector2(236, 160)
 const RELIC_SIZE := Vector2(210, 150)
 const PEDLAR_SIZE := Vector2(230, 210)
 
@@ -94,12 +95,20 @@ func show_pick() -> void:
 	row.add_theme_constant_override("separation", 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_box.add_child(row)
+	# The geomancer's spells sit in their own row under the newcomers; taking one is instead of a newcomer.
+	var spells := HBoxContainer.new()
+	spells.add_theme_constant_override("separation", 10)
+	spells.alignment = BoxContainer.ALIGNMENT_CENTER
 	for i in run.pick_offer.size():
 		var btn := _pick_card(run.pick_offer[i])
 		btn.disabled = not run.can_take_pick(i)
 		UiKit.fade_if_disabled(btn, _why_not_pick(run.pick_offer[i]))
 		btn.pressed.connect(func() -> void: pick_taken.emit(i))
-		row.add_child(btn)
+		(spells if run.pick_offer[i]["kind"] == "spell" else row).add_child(btn)
+	if spells.get_child_count() > 0:
+		var head := UiKit.note(_box, "Or set the geomancer to work (instead of a newcomer):", 15, UiKit.HEADING_COLOR)
+		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_box.add_child(spells)
 	_skip_button("Nobody today", func() -> void: pick_taken.emit(-1))
 	show()
 
@@ -193,7 +202,7 @@ func show_pedlars() -> void:
 
 ## What stops the town taking a dawn card: no room, or not enough shells.
 func _why_not_pick(card: Dictionary) -> String:
-	if not card["kind"] in ["promote", "venture"] and run.population() + run.people.card_people(card) > run.housing():
+	if not card["kind"] in ["promote", "venture", "spell"] and run.population() + run.people.card_people(card) > run.housing():
 		return "No room: build homes"
 	return UiKit.shortfall(run.stock, {"shells": card["cost"]})
 
@@ -239,6 +248,8 @@ func _pick_card(card: Dictionary) -> Button:
 			btn = _promote_card(card)
 		"venture":
 			btn = _venture_card(card)
+		"spell":
+			btn = _spell_card(card)
 		_:
 			var def: Dictionary = content.townsfolk[card["role"]]
 			if card.has("leaning"):
@@ -274,6 +285,16 @@ func _venture_card(card: Dictionary) -> Button:
 	var figures := VentureFigures.make(terms["send"], lose[0], lose[1] - lose[0], 18.0)
 	box.add_child(figures)
 	box.move_child(figures, 3)
+	return btn
+
+
+## A geomancy spell: how many nights it takes and what it does when done.
+func _spell_card(card: Dictionary) -> Button:
+	var sd: Dictionary = run.content.plates["spells"][card["spell"]]
+	var nights := int(sd["nights"])
+	var btn := UiKit.card("Geomancy: %d night%s" % [nights, "" if nights == 1 else "s"], sd["name"], "", sd["text"],
+		"Instead of a newcomer", SPELL_SIZE, Color("#7a5a8a"))
+	btn.tooltip_text = "%s\nThe geomancer works on one spell at a time; when it is done, dawn offers spells again." % sd["text"]
 	return btn
 
 

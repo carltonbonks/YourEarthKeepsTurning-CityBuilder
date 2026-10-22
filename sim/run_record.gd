@@ -76,7 +76,10 @@ extends RefCounted
 ##     action records the choice ("" for none); hero_spending gains "pedlar".
 ## 33: row cards replace silent cluster combos: "combos_end" now counts only rows (combo ids from data/combos.json)
 ##     ordered on a row card; build hand labels list a row card as "row:<id>"; the "row" action records ordering one.
-const RECORD_FORMAT := 33
+## 34: geomancy spells replace omens (a shift's "omen" is always ""): per round "spells" = [{day, cast (spell id from
+##     data/plates.json spells)} or {day, finished, did: {grown, raised (node type -> count), dens_swallowed, finds}}];
+##     a dawn pick can take "spell:<id>".
+const RECORD_FORMAT := 34
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -151,7 +154,7 @@ func begin_round() -> void:
 		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
 		"camps_cleared": 0, "camp_spoils": 0, "hearty_meals": 0,
-		"build_hands": [{"cards": run.hand.labels()}], "impact": {}}
+		"build_hands": [{"cards": run.hand.labels()}], "impact": {}, "spells": []}
 
 
 func end_round() -> void:

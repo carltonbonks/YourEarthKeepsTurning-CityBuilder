@@ -175,6 +175,9 @@ def main(raw_folder, out_folder):
                 "earth_woke_ring": rd["shift"].get("woke_ring", "") if "shift" in rd else "",
                 "earth_omen": rd["shift"].get("omen", "") if "shift" in rd else "",
                 "earth_finds": sum(rd["shift"].get("finds", {}).values()) if "shift" in rd else "",
+                "spells_cast": "|".join(e["cast"] for e in rd.get("spells", []) if "cast" in e) if "spells" in rd else "",
+                "spells_finished": "|".join(e["finished"] for e in rd.get("spells", []) if "finished" in e)
+                if "spells" in rd else "",
                 "finds_dug": sum(rd.get("finds_dug", {}).values()) if "finds_dug" in rd else "",
                 **{"trips_cut_short_" + k: rd.get("trips_cut_short", {}).get(k, 0) if "trips_cut_short" in rd else ""
                    for k in ["dusk", "emptied", "unsafe"]},

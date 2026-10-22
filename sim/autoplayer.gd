@@ -17,7 +17,7 @@ extends RefCounted
 ## Every style can only order buildings on the round's cards (run.hand), and redraws once when shells are spare.
 ## Every style builds the stone-layers' yard from round 5 so craftspeople pave the busiest paths,
 ## invites the pedlar its heroes would gain most from (see _pedlar),
-## orders the forester and charcoal pit when they are needed (see _upkeep), the geomancer from round 3 (see _omen),
+## orders the forester and charcoal pit when they are needed (see _upkeep), the geomancer from round 3 (see spell_score),
 ## and orders up to `gates` gates from `gate_round` (see below), and a garden when food runs short.
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
 ## since the market is now the only place heroes can buy gear.
@@ -36,14 +36,13 @@ const TRADITIONS := {"balanced": ["hunters", "stoneworkers"], "workers": ["stone
 var garden_days := 3.0
 ## Orders the forester and charcoal pit when the cards recommend them. balance_run.gd: upkeep=0 turns it off.
 var upkeep := true
-## Orders the Geomancer's lodge from round 3 (not the workers style) and sets an omen each round (_omen). balance_run.gd: geomancer=0 turns it off.
+## Orders the Geomancer's lodge from round 3 (not the workers style) and takes a spell card at dawn (spell_score). balance_run.gd: geomancer=0 turns it off.
 var geomancer := true
 ## Invites a pedlar on pedlar rounds (_pedlar). balance_run.gd: pedlar=0 never invites one.
 var pedlar := true
 ## Takes a row card when it holds a building it was about to order (_order), except the workers style: its extra
 ## garden or drying rack ate the wood a town of gatherers needs (73% without rows, 62% with). balance_run.gd: rows=0 never does.
 var rows := true
-const OMEN_STILL_FROM := 9
 ## Redraws the building cards once a round when it has at least this many shells (after its first pass).
 var redraw_above := 40
 
@@ -72,7 +71,6 @@ func build(run: RunState) -> void:
 	if int(run.stock["shells"]) >= redraw_above and run.hand.can_redraw():
 		run.hand.redraw()
 		_build_pass(run)
-	_omen(run)
 
 
 ## The pedlar whose wares would most improve the heroes who would walk out to it: for each hero who would go
@@ -100,13 +98,6 @@ func _pedlar(run: RunState) -> String:
 			best_gain = gain
 			best = id
 	return best if best != "" else String(run.pedlar_offer[0]["id"])
-
-
-## Once the geomancer stands: feed the ridges early (stone and finds later), then still the near ring
-## so the town's own ground stays put for the late waves.
-func _omen(run: RunState) -> void:
-	if run.can_choose_omen() and run.omen == "":
-		run.choose_omen("raise" if run.round_number < OMEN_STILL_FROM else "still")
 
 
 ## Orders a building if a card for it is in hand; a row card with it on is taken first (both buildings, for less).
@@ -289,6 +280,8 @@ func pick(run: RunState) -> int:
 				score = 6.0
 			"venture":
 				score = venture_score(run, card)
+			"spell":
+				score = spell_score(run, card)
 			"family":
 				score = 8.0 if style == "medieval" else 3.5
 			"hero":
@@ -325,6 +318,19 @@ func venture_score(run: RunState, card: Dictionary) -> float:
 	if not helps or run.count_role("tribesperson") - int(terms["lose"][1]) < 8:
 		return -30.0
 	return 4.5
+
+
+## One spell a dawn is worth a newcomer: a ridge on the round's first dawn when the attack looks even or worse (it rises
+## before night 3), else sinking the den the attack comes by from round 4 (done by the next round's first dawn), else
+## quickening a far seam.
+func spell_score(run: RunState, card: Dictionary) -> float:
+	var ratio := Power.wave(run.content, run.next_wave) / maxf(1.0, float(Power.town(run.world)["total"]))
+	var want := "quicken"
+	if run.world.day_index() == 0 and ratio > 0.9:
+		want = "ridge"
+	elif run.round_number >= 4 and run.world.dens.any(func(d: Dictionary) -> bool: return not d.get("camp", false)):
+		want = "sink_den"
+	return 4.5 if card["spell"] == want else -10.0
 
 
 ## Relics it likes most first, ranked by how often bot runs that held them won (40 runs x 3 styles,

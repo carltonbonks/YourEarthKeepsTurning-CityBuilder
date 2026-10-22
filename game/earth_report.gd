@@ -31,10 +31,6 @@ static func lines(run: RunState) -> Array[String]:
 	var embers: String = c.plates["embers"]
 	var other_sank := 0
 	var grown := {}
-	var omen: String = earth.last.get("omen", "")
-	if omen != "":
-		var told: String = c.plates["omens"][omen]["told"]
-		out.append(told.left(1).to_upper() + told.substr(1) + ".")
 	for ev: Dictionary in earth.events:
 		if ev["kind"] == "den_sank":
 			out.append("The %s sank, and all in it." % _den_name(c, ev["type"]).to_lower())

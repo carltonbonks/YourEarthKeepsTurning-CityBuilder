@@ -46,7 +46,7 @@ var _ground_seen := [-1, null]
 ## Square index -> world time it was paved (or re-laid), for the glow.
 var _paved_at := {}
 ## The earth's last shift as seen here ([shift count, world]) and when the slide that shows it began.
-var _shift_seen := [-1, null]
+var _shift_seen := [-1, null, 0]
 var _slide_from_ms := -1.0
 var _pulse_from_ms := -1.0
 var night := NightCamera.new()
@@ -737,15 +737,18 @@ func _sector(r0: float, r1: float, a0: float, a1: float) -> PackedVector2Array:
 	return points
 
 
-## Starts the slide when the earth has just turned (not when a run is first shown).
+## Starts the slide when the earth has just turned (not when a run is first shown), and the pulses when a
+## geomancer's spell has just changed the land.
 func _watch_shift() -> void:
 	var w := run.world
-	var seen := [w.earth.shifts, w]
+	var seen := [w.earth.shifts, w, w.earth.changes]
 	if seen == _shift_seen:
 		return
 	if _shift_seen[1] == w and w.earth.shifts > int(_shift_seen[0]):
 		_slide_from_ms = Time.get_ticks_msec()
 		_pulse_from_ms = _slide_from_ms
+	elif _shift_seen[1] == w and w.earth.changes > int(_shift_seen[2]):
+		_pulse_from_ms = Time.get_ticks_msec()
 	_shift_seen = seen
 
 
