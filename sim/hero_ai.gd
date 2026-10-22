@@ -589,7 +589,7 @@ func sell_shards(hero: Unit) -> void:
 		if w.content.world["nodes"][id]["gives"] == hero.carrying:
 			price = int(w.content.world["nodes"][id].get("price", 0))
 	var pay := mini(n * price, int(w.run.stock["shells"]))
-	w.run.stock[hero.carrying] = int(w.run.stock[hero.carrying]) + n
+	w.bring_in(hero.carrying, n)
 	w.run.stock["shells"] = int(w.run.stock["shells"]) - pay
 	hero.gold += pay
 	hero.carry_amount = 0

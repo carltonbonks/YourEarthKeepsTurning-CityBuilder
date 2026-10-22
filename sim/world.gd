@@ -65,6 +65,9 @@ var _joining: Array[Dictionary] = []
 ## Enemies chasing a fleeing worker (seen last tick); warriors answer the call.
 var alarms: Array[Unit] = []
 var new_alarms: Array[Unit] = []
+## Goods carried back to the hearth so far this run, by good: townsfolk hauls and what heroes bring in from the
+## wilds (`bring_in`). Only grows. The view reads it for the "+2 stone" popups over the hearth.
+var brought_in := {}
 
 ## Where enemies and friends (townsfolk and heroes) stand, for fast nearest-unit lookups (see UnitGrid).
 ## Rebuilt each step when those units stop moving; a stale grid is never read (the lookups scan the lists instead).
@@ -402,6 +405,12 @@ func _add_node(id: String, at: Vector2) -> void:
 
 
 ## A node counts once the town has reached its age, until the shifting earth takes it away.
+## Goods carried back to the hearth go into stock and the `brought_in` tally.
+func bring_in(good: String, n: int) -> void:
+	run.stock[good] = int(run.stock[good]) + n
+	brought_in[good] = int(brought_in.get(good, 0)) + n
+
+
 func node_active(node: Dictionary) -> bool:
 	return not node.get("gone", false) and content.age_reached(run.age, node.get("age", ""))
 
