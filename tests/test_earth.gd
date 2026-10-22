@@ -406,69 +406,109 @@ func test_the_earth_report_says_what_the_turn_did() -> void:
 	run.dispose()
 
 
-func test_the_geomancer_offers_omens_once_it_stands() -> void:
-	var run := _run()
-	check(not run.can_choose_omen(), "no omens without a geomancer")
-	run.choose_omen("still")
-	check_eq(run.omen, "", "so choosing does nothing")
+func _with_lodge(run: RunState) -> void:
 	run.world.add_building("geomancer")
 	run.world.buildings[-1]["work_left"] = 0.0
-	check(run.can_choose_omen(), "omens once the lodge stands, while building")
-	run.choose_omen("still")
-	check_eq(run.omen, "still", "an omen is set")
-	run.choose_omen("still")
-	check_eq(run.omen, "", "choosing it again clears it")
-	run.choose_omen("nonsense")
-	check_eq(run.omen, "", "an unknown omen is ignored")
+
+
+func _spell_cards(run: RunState) -> Array:
+	return run.pick_offer.filter(func(c: Dictionary) -> bool: return c["kind"] == "spell")
+
+
+func test_a_free_geomancer_offers_spells_at_dawn() -> void:
+	var run := _run()
+	run.people.offer_picks()
+	check(_spell_cards(run).is_empty(), "no spell cards without a geomancer")
+	_with_lodge(run)
+	run.people.offer_picks()
+	var cards := _spell_cards(run)
+	check_eq(cards.size(), run.content.plates["spells"].size(), "one card per spell once the lodge stands")
+	check(run.pick_offer.size() > cards.size(), "beside the newcomers")
+	var at := run.pick_offer.find(cards.filter(func(c: Dictionary) -> bool: return c["spell"] == "ridge")[0])
+	check(run.can_take_pick(at), "a spell card can be taken even with no room")
+	run.choose_pick(at)
+	check_eq(run.spell, {"id": "ridge", "nights_left": 2}, "the geomancer works on the ridge")
+	check_eq(run.record.entry["picks"][-1]["taken"], "spell:ridge", "the pick is recorded")
+	run.people.offer_picks()
+	check(_spell_cards(run).is_empty(), "no spell cards while one is under way")
+	run.cast_spell("quicken")
+	check_eq(run.spell["id"], "ridge", "and no second spell")
 	run.dispose()
 
 
-func test_stilling_omen_holds_the_near_ring() -> void:
+func test_a_spell_happens_when_its_nights_run_out() -> void:
 	var run := _run()
-	var earth := run.world.earth
-	run.omen = "still"
-	var near: Array = run.world.nodes.filter(func(n: Dictionary) -> bool: return earth.ring_at(n["pos"]) == 0)
-	var at: Array = near.map(func(n: Dictionary) -> Vector2: return n["pos"])
-	earth.shift()
-	check(not near.is_empty(), "nodes in the near ring")
-	for i in near.size():
-		check(Vector2(near[i]["pos"]).distance_to(at[i]) < 0.01, "a near node stayed put")
-	check_eq(earth.last["omen"], "still", "the shift reports the omen it followed")
-	check(earth.woke.is_empty() or int(earth.woke["ring"]) != 0, "and no near seam woke")
+	_with_lodge(run)
+	run.cast_spell("sink_den")
+	var dens := run.world.dens.size()
+	run._work_spell()
+	run._work_spell()
+	check_eq(run.world.dens.size(), dens, "not yet after two nights")
+	check_eq(int(run.spell["nights_left"]), 1, "one night left")
+	run._work_spell()
+	check(run.spell.is_empty(), "the geomancer is free again")
+	check_eq(run.world.dens.size(), dens - 1, "a den sank on the third dawn")
+	check_eq(run.world.earth.changes, 1, "the map is told the land changed")
+	var spells: Array = run.record.entry["spells"]
+	check_eq(spells[0]["cast"], "sink_den", "the cast is recorded")
+	check_eq(spells[-1]["finished"], "sink_den", "and so is the finish")
+	check_eq(int(spells[-1]["did"]["dens_swallowed"]), 1, "with what it did")
 	run.dispose()
 
 
-func test_stirring_omen_wakes_a_near_seam() -> void:
+func test_sinking_a_den_takes_the_attacks_den_and_leaves_its_hoard() -> void:
 	var run := _run()
-	var earth := run.world.earth
-	var near := 0
-	for n in 13:
-		run.omen = "stir"
+	var w := run.world
+	var earth := w.earth
+	var shift_report := earth.last.duplicate(true)
+	var type: String = w.wave_side_dens[0] if not w.wave_side_dens.is_empty() and w.wave_side_dens[0] != "" else ""
+	earth.finish_spell("sink_den", SeededRng.new(1))
+	if type != "":
+		check(not w.dens.any(func(d: Dictionary) -> bool: return d["type"] == type and not d.get("camp", false)), "the attack's den is gone")
+	check(w.nodes.any(func(n: Dictionary) -> bool: return n["type"] == "sunk_hoard"), "its hoard waits for a hero")
+	check_eq(earth.last, shift_report, "the last turn's report is left alone")
+	run.dispose()
+
+
+func test_a_raised_ridge_blocks_the_way_sprouts_and_wears_away() -> void:
+	var run := _run()
+	var w := run.world
+	var earth := w.earth
+	w.wave_sides = [0.0]
+	var nodes := w.nodes.size()
+	var sd: Dictionary = run.content.plates["spells"]["ridge"]
+	var mid := w.pathing.index_of(Vector2(float(sd["r"]), 0.0))
+	check(not w.pathing.is_solid(mid), "open ground before")
+	earth.finish_spell("ridge", SeededRng.new(1))
+	check(w.pathing.is_solid(mid), "the ridge stands across the attack's way")
+	check(earth.is_ridge(mid), "and the map draws it as a ridge")
+	check_eq(w.nodes.size(), nodes + sd["sprouts"].size(), "stone and timber sprout by it")
+	for n in w.nodes.slice(nodes):
+		check(Vector2(n["pos"]).length() < float(sd["r"]), "on the town's side")
+	for i in int(sd["lasts"]) - 1:
 		earth.shift()
-		if not earth.woke.is_empty() and int(earth.woke["ring"]) == 0:
-			near += 1
-	check(near >= 10, "nearly every stirred turn wakes a near seam (%d of 13)" % near)
+		check_eq(earth.raised_ridges.size(), 1, "it lasts a few turns")
+		var a := float(earth.raised_ridges[0]["a"])
+		check(w.pathing.is_solid(w.pathing.index_of(Vector2.from_angle(a) * float(sd["r"]))), "riding the near ring")
+	earth.shift()
+	check(earth.raised_ridges.is_empty(), "then wears away")
 	run.dispose()
 
 
-func test_raising_omen_feeds_the_ridges() -> void:
-	var fed := _run()
-	var plain := _run()
-	var fed_steps := 0
-	var plain_steps := 0
-	for n in 6:
-		fed.omen = "raise"
-		fed.world.earth.shift()
-		plain.world.earth.shift()
-	for ring in fed.world.earth.rings:
-		for h: int in ring["ridges"]:
-			fed_steps += h
-	for ring in plain.world.earth.rings:
-		for h: int in ring["ridges"]:
-			plain_steps += h
-	check(fed_steps > plain_steps, "fed ridges stand taller (%d against %d)" % [fed_steps, plain_steps])
-	fed.dispose()
-	plain.dispose()
+func test_quickening_grows_or_raises_far_out() -> void:
+	var grew := 0
+	var raised := 0
+	for seed_value in 8:
+		var run := _run(seed_value + 1)
+		run.world.earth.finish_spell("quicken", SeededRng.new(seed_value))
+		var done := run.world.earth.spell_done
+		grew += int(done["grown"].values().reduce(func(a: int, b: int) -> int: return a + b, 0))
+		raised += int(done["raised"].values().reduce(func(a: int, b: int) -> int: return a + b, 0))
+		for ev: Dictionary in run.world.earth.events:
+			check(run.world.earth.ring_at(ev["pos"]) >= 1 or Vector2(ev["pos"]).length() > 420.0, "out past the near ring")
+		run.dispose()
+	check(grew > 0, "some quickenings grow a valley (%d)" % grew)
+	check(raised > 0, "some break open a rich vein (%d)" % raised)
 
 
 func test_a_sunk_den_leaves_a_hoard_and_a_bold_hero_digs_it_out() -> void:

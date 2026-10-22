@@ -10,9 +10,10 @@ extends SceneTree
 ## meanwhile show as one "+N" popup. venture=<id> (with pick=1) deals that venture as the first dawn card, and
 ## venture_taken=1 takes it and shows who never came home. give=<relic id> hands the town that relic first;
 ## wave=1 (with night=1) plays on into the round's attack night until the hearth or a watch post shoots.
+## lodge=1 raises a Geomancer's lodge at the start, so dawn picks show the geomancy spell cards.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -26,6 +27,8 @@ func _init() -> void:
 	if args["give"] != "":
 		run.relics.append(args["give"])
 		run.relic_acquired_round[args["give"]] = run.round_number
+	if args["lodge"] == "1" and run.world.add_building("geomancer"):
+		run.world.buildings[-1]["work_left"] = 0.0
 	var bot := AutoPlayer.new()
 	bot.style = args["style"]
 	if int(args["gates"]) >= 0:
