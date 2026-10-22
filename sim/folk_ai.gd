@@ -22,6 +22,21 @@ var _wants := {}
 var fighters := 0
 ## Living townsfolk per role and leaning ("role/leaning" -> count), counted each step: a band's size (band_tier).
 var leaning_counts := {}
+## Node index -> [[unit, amount], ...]: gatherers walking there for a good they don't lean to. A gatherer that leans
+## to the node's good may bump them (first dibs), and they plan another trip.
+var _bumpable := {}
+## Building index -> how many townsfolk are lending a hand there.
+var _helpers := {}
+## Building index -> how many craftspeople are working its bench.
+var _crafters := {}
+## How much the town needs the good of the trip plan_trip last chose (gather_need_floor = it has enough).
+var _trip_need := 0.0
+## Where gatherers out past the houses are this step, farthest first: by day warriors shadow them (_warrior_tick).
+var _shadow_spots: Array[Vector2] = []
+## Living warriors this step.
+var _warriors := 0
+## Role -> daytime seconds spent idle not yet written to the record (it counts whole seconds).
+var _idle_time := {}
 
 
 func _init(world: World) -> void:
@@ -34,6 +49,11 @@ func begin_step() -> void:
 	_claimed.clear()
 	_inbound.clear()
 	_wants = {}
+	_bumpable.clear()
+	_helpers.clear()
+	_crafters.clear()
+	_shadow_spots.clear()
+	_warriors = 0
 	fighters = 0
 	leaning_counts = count_leanings()
 	for unit in w.folk:
@@ -41,17 +61,63 @@ func begin_step() -> void:
 			fighters += 1
 		if unit.type_id == "warrior":
 			_warrior_slot[unit] = _warrior_slot.size()
+			if unit.alive:
+				_warriors += 1
 		elif unit.alive:
+			if (unit.task == "gather" or unit.task == "return") and unit.pos.length() > World.HOME_RADIUS:
+				_shadow_spots.append(unit.pos)
 			if unit.task == "gather":
-				_claim(unit.task_index, carry_of(unit, w.nodes[unit.task_index]["gives"]))
+				var good: String = w.nodes[unit.task_index]["gives"]
+				_claim(unit.task_index, carry_of(unit, good))
+				_note_bumpable(unit, unit.task_index, good)
+			elif unit.task == "assist":
+				_helpers[unit.task_index] = int(_helpers.get(unit.task_index, 0)) + 1
+			elif unit.task == "craft":
+				_crafters[unit.task_index] = int(_crafters.get(unit.task_index, 0)) + 1
 			if unit.carry_amount > 0:
 				_inbound[unit.carrying] = int(_inbound.get(unit.carrying, 0)) + unit.carry_amount
+	_shadow_spots.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.length_squared() > b.length_squared())
 
 
 func _claim(node_index: int, amount: int) -> void:
 	_claimed[node_index] = int(_claimed.get(node_index, 0)) + amount
 	var good: String = w.nodes[node_index]["gives"]
 	_inbound[good] = int(_inbound.get(good, 0)) + amount
+
+
+## Lists a gatherer still walking out for a good it doesn't lean to, so a leaned gatherer can bump it.
+func _note_bumpable(unit: Unit, node_index: int, good: String) -> void:
+	if unit.carry_amount == 0 and not leans_to(unit, good):
+		if not _bumpable.has(node_index):
+			_bumpable[node_index] = []
+		_bumpable[node_index].append([unit, carry_of(unit, good)])
+
+
+## How much a leaned gatherer could free at a node by bumping the gatherers there who don't lean to its good.
+func _bumpable_amount(node_index: int) -> int:
+	var total := 0
+	for pair: Array in _bumpable.get(node_index, []):
+		total += int(pair[1])
+	return total
+
+
+## First dibs: bumps gatherers who don't lean to the node's good until want is free there for the one who does.
+## The bumped plan another trip on their next tick.
+func _bump(node_index: int, want: int) -> void:
+	var node := w.nodes[node_index]
+	var good: String = node["gives"]
+	var short := want - (int(node["amount"]) - int(_claimed.get(node_index, 0)))
+	var list: Array = _bumpable.get(node_index, [])
+	while short > 0 and not list.is_empty():
+		var pair: Array = list.pop_back()
+		var other: Unit = pair[0]
+		if other.task != "gather" or other.task_index != node_index or other.carry_amount > 0:
+			continue
+		other.task = ""
+		_claimed[node_index] = int(_claimed[node_index]) - int(pair[1])
+		_inbound[good] = int(_inbound.get(good, 0)) - int(pair[1])
+		short -= int(pair[1])
+		w.run.record.note_count("trips_bumped", 1, good)
 
 
 func add_folk(role: String, leaning := "") -> Unit:
@@ -113,8 +179,20 @@ func relic_damage(unit: Unit, amount: float) -> float:
 	return amount
 
 
+## Warriors: fall back to heal when hurt, fight what comes near, answer calls for help. Otherwise, by day, the first
+## shadow_share of them each shadow a gatherer out past the houses (farthest first), standing between it and the
+## wilds no farther out than shadow_reach; the rest, and everyone at dusk and night, walk the patrol circle.
 func _warrior_tick(unit: Unit) -> void:
-	var patrol := float(w.content.townsfolk["warrior"]["patrol_radius"])
+	var def: Dictionary = w.content.townsfolk["warrior"]
+	var patrol := float(def["patrol_radius"])
+	var index: int = _warrior_slot.get(unit, -1)
+	if index < 0:  # joined since the step began (or ticked outside World.step)
+		index = w.folk.filter(func(u: Unit) -> bool: return u.type_id == "warrior").find(unit)
+	var shadow := Vector2.INF
+	if not w.is_dusk() and not levied(unit) and index < int(_warriors * float(def.get("shadow_share", 0.0))) \
+			and index < _shadow_spots.size():
+		shadow = _shadow_spots[index].limit_length(float(def["shadow_reach"]))
+		patrol = shadow.length()
 	if unit.hp_fraction() < 0.3:
 		unit.retreating = true
 	if unit.retreating:
@@ -132,9 +210,10 @@ func _warrior_tick(unit: Unit) -> void:
 		unit.intent = "answering a call for help"
 		w.fight(unit, call)
 		return
-	var index: int = _warrior_slot.get(unit, -1)
-	if index < 0:  # joined since the step began (or ticked outside World.step)
-		index = w.folk.filter(func(u: Unit) -> bool: return u.type_id == "warrior").find(unit)
+	if shadow != Vector2.INF:
+		unit.intent = "keeping watch over the gatherers"
+		w.walk_toward(unit, shadow - shadow.normalized() * 20.0, 6.0)
+		return
 	var angle := w.time * 0.05 + index * 2.4
 	unit.intent = "patrolling"
 	w.walk_toward(unit, Vector2.from_angle(angle) * patrol)
@@ -235,6 +314,25 @@ func _worker_tick(unit: Unit) -> void:
 					var mended := minf(w.run.hearth_max_hp() - w.hearth_hp, float(def.get("repair_per_wood", 4)))
 					w.hearth_hp += mended
 					w.run.record.note_impact("folk", unit.type_id, "patched", mended)
+		"assist":
+			if not can_assist(unit, unit.task_index):
+				unit.task = ""
+				return
+			var b: Dictionary = w.buildings[unit.task_index]
+			unit.intent = "lending a hand at the %s" % w.content.buildings[b["type"]]["name"].to_lower()
+			if w.walk_toward(unit, b["pos"], 14.0):
+				unit.task_timer -= w.dt
+				w.run.record.note_impact("folk", unit.type_id, "helped", w.dt)
+				if w.content.buildings[b["type"]].has("workshop"):
+					if b["craft"] != "":
+						b["craft_left"] = float(b["craft_left"]) - work_rate(unit) * w.content.num("assist_rate") * w.dt
+						if float(b["craft_left"]) <= 0.0:
+							w.market.finish_craft(unit.task_index, unit)
+				else:
+					b["assisted"] = float(b.get("assisted", 0.0)) + w.dt
+				if unit.task_timer <= 0.0:
+					# Look again: a trip may be worth taking now.
+					unit.task = ""
 		"gather":
 			var node: Dictionary = w.nodes[unit.task_index]
 			unit.intent = "gathering %s" % node["gives"]
@@ -260,10 +358,20 @@ func _worker_tick(unit: Unit) -> void:
 					unit.task = "return"
 		_:
 			unit.intent = "idle"
+			_note_idle(unit)
 			w.walk_toward(unit, unit.home)
 			unit.task_timer -= w.dt
 			if unit.task_timer <= 0.0:
 				unit.task = ""
+
+
+## Counts a daytime second spent idle toward the round's "idle_seconds" for the unit's role.
+func _note_idle(unit: Unit) -> void:
+	var t := float(_idle_time.get(unit.type_id, 0.0)) + w.dt
+	if t >= 1.0:
+		w.run.record.note_count("idle_seconds", int(t), unit.type_id)
+		t -= int(t)
+	_idle_time[unit.type_id] = t
 
 
 func _choose_work(unit: Unit) -> void:
@@ -292,6 +400,9 @@ func _choose_work(unit: Unit) -> void:
 		unit.task_timer = 2.0
 		return
 	var best := plan_trip(unit)
+	# With nothing the town is short of in reach, lend a hand in town rather than fetch more of what it has.
+	if (best < 0 or _trip_need <= w.content.num("gather_need_floor")) and _lend_a_hand(unit):
+		return
 	if best < 0:
 		# Nothing worth fetching: wait a moment before looking again.
 		unit.task = "idle"
@@ -301,15 +412,81 @@ func _choose_work(unit: Unit) -> void:
 	unit.task_index = best
 	var gives: String = w.nodes[best]["gives"]
 	unit.task_timer = gather_time(unit, gives)
+	if leans_to(unit, gives):
+		_bump(best, carry_of(unit, gives))
 	_claim(best, carry_of(unit, gives))
+	_note_bumpable(unit, best, gives)
+
+
+## Finds work in town for someone with no trip worth taking: lending a hand at a building that takes help
+## ("assist" in buildings.json; a tribesperson only where its leaning fits), else helping raise a building
+## (tribespeople; craftspeople already raise them first). Returns false when there is nothing.
+func _lend_a_hand(unit: Unit) -> bool:
+	var best := -1
+	var best_d := INF
+	for i in w.buildings.size():
+		if can_assist(unit, i, true):
+			var d := unit.pos.distance_to(w.buildings[i]["pos"])
+			if d < best_d:
+				best_d = d
+				best = i
+	if best >= 0:
+		unit.task = "assist"
+		unit.task_index = best
+		unit.task_timer = w.content.num("assist_recheck")
+		_helpers[best] = int(_helpers.get(best, 0)) + 1
+		return true
+	if unit.type_id != "tribesperson":
+		return false
+	for i in w.buildings.size():
+		if float(w.buildings[i]["work_left"]) > 0.0:
+			unit.task = "build"
+			unit.task_index = i
+			return true
+	return false
+
+
+## Whether a townsperson can lend a hand at building i now. A workshop takes help while something is being made
+## there or a craftsperson is at its bench (craftspeople help at any workshop, tribespeople where their leaning fits
+## or they have none); a food building takes help until today's helping has earned its most extra food.
+## With new_hand, the building must also have room for one more helper (its "hands").
+func can_assist(unit: Unit, i: int, new_hand := false) -> bool:
+	if i >= w.buildings.size():
+		return false
+	var b := w.buildings[i]
+	var def: Dictionary = w.content.buildings[b["type"]]
+	var assist: Dictionary = def.get("assist", {})
+	if assist.is_empty() or float(b["work_left"]) > 0.0:
+		return false
+	if new_hand and int(_helpers.get(i, 0)) >= int(assist.get("hands", 1)):
+		return false
+	if unit.type_id == "craftsperson":
+		if not def.has("workshop"):
+			return false
+	elif unit.leaning != "" and not assist.get("leanings", []).has(unit.leaning):
+		return false
+	if def.has("workshop"):
+		return b["craft"] != "" or int(_crafters.get(i, 0)) > 0
+	return assist.has("food") and assisted_food(b) < int(assist.get("food_max", 0))
+
+
+## Extra food a building's helpers have earned today (paid at the next dawn, World._dawn resets it).
+func assisted_food(b: Dictionary) -> int:
+	var assist: Dictionary = w.content.buildings[b["type"]].get("assist", {})
+	if not assist.has("food"):
+		return 0
+	var earned := floori(float(b.get("assisted", 0.0)) / float(assist["seconds"])) * int(assist["food"])
+	return mini(earned, int(assist.get("food_max", 0)))
 
 
 ## Picks the gathering trip worth the most to the town, or -1. Each trip is scored by how badly the town
 ## needs the good (after what is already on its way in) times what this gatherer can carry back from what
 ## the node will have left once the others heading there have taken theirs, over the time the round trip takes.
 ## A trip that can't reach the node and finish gathering before dusk isn't started.
-## Craftspeople only fetch wood. A gatherer's leaning makes trips for its goods worth leaning_weight times more.
+## Craftspeople only fetch wood. A gatherer's leaning makes trips for its goods worth leaning_weight times more, and
+## gives it first dibs on them: it counts what gatherers there who don't lean to the good claimed as free (_choose_work bumps them).
 func plan_trip(unit: Unit) -> int:
+	_trip_need = 0.0
 	var time_left := w.content.num("day_seconds") - w.content.num("dusk_seconds") - w.time_of_day()
 	if time_left <= gather_time(unit):
 		return -1
@@ -329,7 +506,11 @@ func plan_trip(unit: Unit) -> int:
 		var good: String = node["gives"]
 		if not need.has(good) or (unit.type_id == "craftsperson" and good != "wood") or not _can_gather(node):
 			continue
-		var take := mini(carry_of(unit, good), int(node["amount"]) - int(_claimed.get(i, 0)))
+		var free := int(node["amount"]) - int(_claimed.get(i, 0))
+		# First dibs: a gatherer leaning to the good counts what the others there who don't could leave it.
+		if leans_to(unit, good):
+			free += _bumpable_amount(i)
+		var take := mini(carry_of(unit, good), free)
 		if take <= 0:
 			continue
 		var d := unit.pos.distance_to(node["pos"])
@@ -346,6 +527,7 @@ func plan_trip(unit: Unit) -> int:
 		if score > best_score:
 			best_score = score
 			best = i
+			_trip_need = float(need[good])
 	return best
 
 

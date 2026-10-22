@@ -159,12 +159,35 @@ static func building(run: RunState, index: int) -> Dictionary:
 		t["lines"].append("Making: %s" % c.recipe_name(b["craft"]))
 	elif def.has("workshop") and work_left <= 0.0:
 		t["lines"].append("Idle right now")
+	t["lines"].append_array(helper_lines(run, b))
 	if def.has("gate_hp") and work_left <= 0.0:
 		var whole := run.world.town.gate_health(index)
 		t["lines"].append("Health %d%%. Mended to full each dawn." % roundi(100.0 * whole) if whole > 0.0 else "Broken through! Mended at dawn.")
 	t["lines"].append_array(combo_lines(run, b["type"], index))
 	t["warnings"] = warnings(run, b["type"])
 	return t
+
+
+## Who lends a hand at a building when they have nothing worth fetching ("assist" in buildings.json), and the
+## extra food today's helpers have earned it.
+static func helper_lines(run: RunState, b: Dictionary) -> Array[String]:
+	var c := run.content
+	var def: Dictionary = c.buildings[b["type"]]
+	var assist: Dictionary = def.get("assist", {})
+	var out: Array[String] = []
+	if assist.is_empty():
+		return out
+	var who := PackedStringArray()
+	var leanings: Dictionary = c.townsfolk["tribesperson"]["leanings"]
+	for l: String in assist.get("leanings", []):
+		who.append(String(leanings[l]["name"]).to_lower() + "s")
+	who.append("tribespeople with no leaning")
+	if def.has("workshop"):
+		who.append("craftspeople")
+	out.append("Helpers with nothing to fetch: %s (%d at a time)" % [", ".join(who), int(assist.get("hands", 1))])
+	if assist.has("food") and float(b["work_left"]) <= 0.0:
+		out.append("Helped today: +%d food at dawn (most %d)" % [run.world.folk_ai.assisted_food(b), int(assist["food_max"])])
+	return out
 
 
 ## The rows (data/combos.json) a building type can be part of, marking the one building `index` is part of now.

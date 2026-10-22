@@ -181,6 +181,13 @@ def main(raw_folder, out_folder):
                 "finds_dug": sum(rd.get("finds_dug", {}).values()) if "finds_dug" in rd else "",
                 **{"trips_cut_short_" + k: rd.get("trips_cut_short", {}).get(k, 0) if "trips_cut_short" in rd else ""
                    for k in ["dusk", "emptied", "unsafe"]},
+                **{"idle_seconds_" + k: rd.get("idle_seconds", {}).get(k, 0) if "idle_seconds" in rd else ""
+                   for k in ["tribesperson", "craftsperson"]},
+                "trips_bumped": sum(rd.get("trips_bumped", {}).values()) if "trips_bumped" in rd else "",
+                "folk_helped_seconds": round(sum(r.get("helped", 0) for r in rd.get("impact", {}).get("folk", {}).values()))
+                if "idle_seconds" in rd else "",
+                "heroes_drilled_xp": round(sum(r.get("drilled", 0) for r in rd.get("impact", {}).get("heroes", {}).values()), 1)
+                if "idle_seconds" in rd else "",
                 "families": sum(1 for p in rd.get("picks", []) if p.get("taken") == "family"),
                 "wave_to_town_power": round(rd["power"]["wave"] / rd["power"]["town"]["total"], 2)
                 if rd.get("power", {}).get("town", {}).get("total") else "",

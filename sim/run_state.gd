@@ -625,6 +625,7 @@ func food_needed_today() -> int:
 
 ## Food that standing buildings (gardens, fields) bring in each dawn, before anyone eats. A building
 ## with worked_by only yields while enough of that role are in town to work it, plus their tools' field_mult.
+## Townsfolk who lent a hand there the day before add their extra food (FolkAI.assisted_food).
 func food_grown_daily() -> int:
 	var total := 0
 	for type: String in content.buildings:
@@ -638,9 +639,10 @@ func food_grown_daily() -> int:
 			count = mini(count, count_role(worked["role"]) / int(worked["per"]))
 			each = roundi(each * (1.0 + tool_bonus(worked["role"], "field_mult")))
 		total += count * each
-	# Rows (data/combos.json) that bring extra food.
+	# Rows (data/combos.json) that bring extra food, and what helpers earned at food buildings today.
 	for i in world.buildings.size():
 		total += int(world.town.combo_effect(i, "daily_food"))
+		total += world.folk_ai.assisted_food(world.buildings[i])
 	return total
 
 

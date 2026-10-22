@@ -82,7 +82,10 @@ extends RefCounted
 ## 35: blueprints replace one-use building cards: "build_hands" now lists each round's draft offers (then one list per
 ##     reroll, and one after each draft while drafts are left); per round "blueprints" = [{building}] drafted that round
 ##     (a drafted row adds its non-basic buildings); a "blueprint" action ({"kind": "blueprint", "building"} or {"row"}).
-const RECORD_FORMAT := 35
+## 36: idle hands: per round "idle_seconds" (role -> daytime seconds townsfolk stood idle), "trips_bumped" (good ->
+##     gathering trips a gatherer leaning to the good took over from one who didn't); impact rows gain "helped" (seconds
+##     townsfolk lent a hand at buildings) and, for heroes, "drilled" (XP from drilling on quiet days).
+const RECORD_FORMAT := 36
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -154,7 +157,7 @@ func begin_round() -> void:
 		"prices": run.prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
 		"age": run.age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
 		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0, "towers_broken": 0,
-		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {},
+		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {}, "idle_seconds": {}, "trips_bumped": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
 		"camps_cleared": 0, "camp_spoils": 0, "hearty_meals": 0,
 		"build_hands": [{"cards": run.hand.labels()}], "blueprints": [], "impact": {}, "spells": []}
