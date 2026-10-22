@@ -69,7 +69,14 @@ extends RefCounted
 ##     "goods" (good -> amount brought home), "made" (things crafted), "raised" (buildings finished), "paved"
 ##     (squares), "patched" (hearth health mended); a hero row also has "class". Defences are "hearth", a tower's
 ##     building type, or "relic" (damage relics did on their own). Risen bones count as the role "risen".
-const RECORD_FORMAT := 31
+## 32: the pedlar's camp replaces the carousel (no more "carousel"): on pedlar rounds "pedlar_offer" (the pedlar ids
+##     offered) and, when one was invited, "pedlar" = {id, distance, wares, visits, sold (items heroes sold it),
+##     sold_value, bought: [{hero, base, tier, affixes, price}], guards (names hired), paid: [{hero, base, tier,
+##     affixes}] (wares guards took as pay), fell (raiders overran it), left (wares it took away)}; the "pedlar"
+##     action records the choice ("" for none); hero_spending gains "pedlar".
+## 33: row cards replace silent cluster combos: "combos_end" now counts only rows (combo ids from data/combos.json)
+##     ordered on a row card; build hand labels list a row card as "row:<id>"; the "row" action records ordering one.
+const RECORD_FORMAT := 33
 
 var run: RunState
 ## Finished rounds, oldest first.

@@ -81,6 +81,7 @@ var folk_ai: FolkAI
 var hero_ai: HeroAI
 var market: Market
 var enemy_ai: EnemyAI
+var pedlar: PedlarCamp
 
 
 func _init(run_state: RunState) -> void:
@@ -90,6 +91,7 @@ func _init(run_state: RunState) -> void:
 	hero_ai = HeroAI.new(self)
 	market = Market.new(self)
 	enemy_ai = EnemyAI.new(self)
+	pedlar = PedlarCamp.new(self)
 	rng = SeededRng.stream(run.run_seed, "world")
 	dt = 1.0 / content.num("ticks_per_second")
 	hearth_hp = run.hearth_max_hp()
@@ -212,6 +214,7 @@ func step() -> void:
 	alarms = new_alarms
 	new_alarms = []
 	market.refresh_prizes()
+	pedlar.tick()
 	enemy_ai.dens_tick()
 	for enemy in enemies:
 		if not enemy.spawned and time >= enemy.spawn_time:
@@ -301,6 +304,7 @@ func _dawn() -> void:
 	pathing.wear_trails()
 	town.patch_walls()
 	enemy_ai.mend_towers()
+	pedlar.hire_guards()
 	run.daily_upkeep()
 	pause = Pause.DAWN
 
@@ -463,6 +467,24 @@ func add_building(type: String) -> bool:
 		"hp": float(content.buildings[type].get("tower_hp", 0.0)),
 		"goods": [], "craft": "", "craft_left": 0.0, "craft_tier": 1, "made": 0})
 	town.occupy(plot, buildings.size() - 1)
+	return true
+
+
+## Places a row card's two buildings side by side (data/combos.json) and links them. False if no cluster has room.
+func add_row(id: String) -> bool:
+	var row: Dictionary = content.combos[id]
+	var at := town.choose_row(row["building"], row["partner"])
+	if at.is_empty():
+		return false
+	var first := buildings.size()
+	for n in 2:
+		var type: String = row["building"] if n == 0 else row["partner"]
+		buildings.append({"type": type, "plot": at[n], "pos": town.plots[at[n]]["pos"],
+			"work_left": float(content.buildings[type]["work"]), "cooldown_left": 0.0,
+			"hp": float(content.buildings[type].get("tower_hp", 0.0)),
+			"goods": [], "craft": "", "craft_left": 0.0, "craft_tier": 1, "made": 0,
+			"row": id, "row_mate": first + 1 - n})
+		town.occupy(at[n], buildings.size() - 1)
 	return true
 
 
@@ -750,4 +772,5 @@ func dispose() -> void:
 	hero_ai = null
 	market = null
 	enemy_ai = null
+	pedlar = null
 	town = null

@@ -14,6 +14,8 @@ signal previewing(type: String)
 const RECOMMEND_COLOR := UiKit.RECOMMEND_COLOR
 const CARD_SIZE := Vector2(150, 132)
 const BASIC_SIZE := Vector2(118, 132)
+const ROW_SIZE := Vector2(176, 132)
+const ROW_BORDER := Color("#9ec27a")
 ## Height of the buyout button under each caravan card; the card shrinks to make room.
 const BUYOUT_HEIGHT := 28.0
 
@@ -46,6 +48,8 @@ func refresh() -> void:
 	_row.add_child(VSeparator.new())
 	for card: Dictionary in run.hand.cards:
 		_row.add_child(_card(card["building"], card["need"], "card"))
+	for card: Dictionary in run.hand.rows:
+		_row.add_child(_row_card(card["row"], card["need"]))
 	if not run.hand.milestone.is_empty():
 		_row.add_child(_card(run.hand.milestone["building"], "", "age"))
 	_age_cards()
@@ -94,8 +98,6 @@ func _card(type: String, need: String, kind: String) -> Button:
 	var def: Dictionary = run.content.buildings[type]
 	var owned := run.world.count_buildings(type, false)
 	var why := recommendation(type, need)
-	if why == "" and kind != "basic":
-		why = Tooltips.combo_hint(run, type)
 	var top := why if why != "" else ("Always on offer" if kind == "basic" else ("Ageing up" if kind == "age" else "New building"))
 	var border := RECOMMEND_COLOR if why != "" else (UiKit.HEADING_COLOR if kind == "age" else UiKit.CARD_BORDER)
 	var btn := UiKit.card(top, def["name"], UiKit.cost_text(run.stock, def["cost"]), def["text"],
@@ -115,6 +117,28 @@ func _card(type: String, need: String, kind: String) -> Button:
 	UiKit.fade_if_disabled(btn, _why_not(blocked, def["cost"]))
 	btn.pressed.connect(_act.bind(run.hand.order.bind(type)))
 	btn.mouse_entered.connect(func() -> void: previewing.emit(type))
+	btn.mouse_exited.connect(func() -> void: previewing.emit(""))
+	return btn
+
+
+## A row card: two buildings ordered together, side by side, for less, and the bonus they make together.
+func _row_card(id: String, need: String) -> Button:
+	var content := run.content
+	var row: Dictionary = content.combos[id]
+	var a: String = content.buildings[row["building"]]["name"]
+	var b: String = content.buildings[row["partner"]]["name"]
+	var why := recommendation(row["building"] if run.hand.need(row["building"]) == need else row["partner"], need)
+	var cost := run.row_cost(id)
+	var btn := UiKit.card(why if why != "" else "Row: two buildings", row["name"], UiKit.cost_text(run.stock, cost),
+		"%s + %s, side by side. %s" % [a, b, row["text"]], "", ROW_SIZE, RECOMMEND_COLOR if why != "" else ROW_BORDER,
+		why != "", ROW_BORDER)
+	btn.tooltip_text = "%s and %s go up together in one cluster, a fifth cheaper than ordering both.\n%s\nOnly buildings ordered on a row card make this bonus." % [
+		a, b, row["text"]]
+	btn.disabled = not run.hand.can_order_row(id)
+	var short := UiKit.shortfall(run.stock, cost)
+	UiKit.fade_if_disabled(btn, short if short != "" else "No room for both")
+	btn.pressed.connect(_act.bind(run.hand.order_row.bind(id)))
+	btn.mouse_entered.connect(func() -> void: previewing.emit(row["building"]))
 	btn.mouse_exited.connect(func() -> void: previewing.emit(""))
 	return btn
 

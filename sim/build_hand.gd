@@ -4,6 +4,7 @@ extends RefCounted
 ## weighted toward what the town needs, plus a card for ageing up whenever it can be raised.
 ## Basic buildings (homes and food) are always on offer and never dealt, like Against the Storm's basics.
 ## Ordering a card pays the building's cost (RunState.build) and uses the card up.
+## A row card (data/combos.json) orders two buildings side by side for less, and only they make a combo.
 ## Numbers are in data/balance.json (build_hand_size, build_need_weight, build_new_weight, build_redraw_cost).
 
 var run: RunState
@@ -11,6 +12,8 @@ var run: RunState
 var cards: Array[Dictionary] = []
 ## The ageing-up card ({} when no age-up building can be ordered).
 var milestone := {}
+## Row cards in hand, each {"row": id from data/combos.json, "need": why the town wants either building}.
+var rows: Array[Dictionary] = []
 ## Redraws used this round.
 var redraws := 0
 
@@ -36,7 +39,7 @@ func redraw() -> bool:
 		return false
 	run.stock["shells"] = int(run.stock["shells"]) - redraw_cost()
 	redraws += 1
-	var before := cards.map(func(c: Dictionary) -> String: return c["building"])
+	var before := labels()
 	_fill(SeededRng.stream(run.run_seed, "build_cards", run.round_number * 10 + redraws), before)
 	run.record.note_action({"kind": "redraw", "cost": redraw_cost()})
 	run.record.note_list("build_hands", {"cards": labels()})
@@ -64,6 +67,35 @@ func offers(type: String) -> bool:
 	return run.content.buildings[type].get("basic", false) or milestone.get("building", "") == type or cards.any(func(c: Dictionary) -> bool: return c["building"] == type)
 
 
+## True if a row card for this row is in hand.
+func offers_row(id: String) -> bool:
+	return rows.any(func(c: Dictionary) -> bool: return c["row"] == id)
+
+
+func can_order_row(id: String) -> bool:
+	return offers_row(id) and run.can_build_row(id)
+
+
+## Orders both buildings on a row card in hand and uses the card up.
+func order_row(id: String) -> bool:
+	if not can_order_row(id) or not run.build_row(id):
+		return false
+	for i in rows.size():
+		if rows[i]["row"] == id:
+			rows.remove_at(i)
+			break
+	return true
+
+
+## The row card in hand that has this building on it ("" if none).
+func row_with(type: String) -> String:
+	for c in rows:
+		var row: Dictionary = run.content.combos[c["row"]]
+		if row["building"] == type or row["partner"] == type:
+			return c["row"]
+	return ""
+
+
 ## Orders the building on a card in hand and uses the card up.
 func can_order(type: String) -> bool:
 	return offers(type) and run.can_build(type)
@@ -87,6 +119,8 @@ func order(type: String) -> bool:
 ## The building types listed in hand, for the run record.
 func labels() -> Array:
 	var out := cards.map(func(c: Dictionary) -> String: return c["building"])
+	for c in rows:
+		out.append("row:" + c["row"])
 	if not milestone.is_empty():
 		out.append(milestone["building"])
 	return out
@@ -184,6 +218,35 @@ func _fill(rng: SeededRng, avoid: Array = []) -> void:
 		var type := rng.weighted(weights)
 		weights.erase(type)
 		cards.append({"building": type, "need": need(type)})
+	_fill_rows(rng, avoid)
+
+
+## Deals up to row_cards row cards from the rows whose buildings could both go up now, favouring rows the town needs.
+func _fill_rows(rng: SeededRng, avoid: Array) -> void:
+	rows = []
+	var weights := {}
+	var ids := run.content.combos.keys()
+	ids.sort()
+	for id: String in ids:
+		if not run.row_allowed(id):
+			continue
+		var weight := 1.0
+		if row_need(id) != "":
+			weight *= run.content.num("build_need_weight")
+		if avoid.has("row:" + id):
+			weight *= 0.25
+		weights[id] = weight
+	while rows.size() < run.content.int_num("row_cards") and not weights.is_empty():
+		var id := rng.weighted(weights)
+		weights.erase(id)
+		rows.append({"row": id, "need": row_need(id)})
+
+
+## Why the town wants a row: why it wants either of its buildings ("" if nothing in particular).
+func row_need(id: String) -> String:
+	var row: Dictionary = run.content.combos[id]
+	var why := need(row["building"])
+	return why if why != "" else need(row["partner"])
 
 
 func free_beds() -> int:

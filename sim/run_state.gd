@@ -77,6 +77,11 @@ var last_venture := {}
 ## The geomancer's omen for the next turn of the earth (an id from "omens" in data/plates.json, "" for none),
 ## chosen while building once a building with "omens" stands; used up by that turn.
 var omen := ""
+## Pedlar rounds (data/pedlars.json): the pedlars offered while building, each {id, pos} (where it would camp),
+## the one invited ("" for none), and whether the choice is made (an unmade one invites nobody when the round begins).
+var pedlar_offer: Array[Dictionary] = []
+var pedlar := ""
+var pedlar_settled := true
 
 var _next_id := 1
 var _effects_between_rounds := {}
@@ -253,6 +258,47 @@ func build(type: String) -> bool:
 	return true
 
 
+## A row card's price: both buildings' costs, less row_discount (rounded down).
+func row_cost(id: String) -> Dictionary:
+	var row: Dictionary = content.combos[id]
+	var cost := {}
+	for type: String in [row["building"], row["partner"]]:
+		var c: Dictionary = content.buildings[type]["cost"]
+		for r: String in c:
+			cost[r] = int(cost.get(r, 0)) + int(c[r])
+	for r: String in cost:
+		cost[r] = int(float(cost[r]) * (1.0 - content.num("row_discount")))
+	return cost
+
+
+## Whether both of a row's buildings could go up now (each allowed, ignoring each one's own cost), side by side.
+func row_allowed(id: String) -> bool:
+	var row: Dictionary = content.combos[id]
+	for type: String in [row["building"], row["partner"]]:
+		var def: Dictionary = content.buildings[type]
+		var needs: String = def.get("requires", "")
+		if world.count_buildings(type, false) >= building_max(type) or not content.age_reached(age, def.get("age", "")) \
+				or population() < int(def.get("min_people", 0)) \
+				or (needs != "" and needs != row["building"] and needs != row["partner"] and world.count_buildings(needs, false) == 0):
+			return false
+	return not world.town.choose_row(row["building"], row["partner"]).is_empty()
+
+
+func can_build_row(id: String) -> bool:
+	return phase == Phase.BUILD and can_afford(row_cost(id)) and row_allowed(id)
+
+
+## Orders a row: both buildings, side by side, for the row's price.
+func build_row(id: String) -> bool:
+	if not can_build_row(id) or not world.add_row(id):
+		return false
+	var cost := row_cost(id)
+	for r: String in cost:
+		stock[r] = int(stock[r]) - int(cost[r])
+	record.note_action({"kind": "row", "row": id})
+	return true
+
+
 # --- Market prices ----------------------------------------------------------
 
 ## Sets a stall kind's price level for the coming round ("cheap", "fair" or "dear").
@@ -271,6 +317,31 @@ func choose_omen(id: String) -> void:
 	if not can_choose_omen() or (id != "" and not content.plates["omens"].has(id)):
 		return
 	omen = "" if id == omen else id
+
+
+## True while building on a pedlar round until the player invites a pedlar or none (after the traditions).
+func awaiting_pedlar() -> bool:
+	return phase == Phase.BUILD and not pedlar_settled and not awaiting_traditions()
+
+
+## Invites one of the offered pedlars to camp this round ("" for none).
+func choose_pedlar(id: String) -> void:
+	if not awaiting_pedlar():
+		return
+	pedlar_settled = true
+	pedlar = id if pedlar_offer.any(func(o: Dictionary) -> bool: return o["id"] == id) else ""
+	record.note_value("pedlar_offer", pedlar_offer.map(func(o: Dictionary) -> String: return o["id"]))
+	record.note_action({"kind": "pedlar", "pedlar": pedlar})
+	if pedlar != "":
+		tell("You send word to the %s." % content.pedlars["pedlars"][pedlar]["name"].to_lower())
+
+
+## The offered pedlar the player invited ({id, pos}), or {}.
+func pedlar_choice() -> Dictionary:
+	for o in pedlar_offer:
+		if o["id"] == pedlar:
+			return o
+	return {}
 
 
 func set_price(kind: String, level: String) -> void:
@@ -303,7 +374,11 @@ func begin_round() -> void:
 	assert(phase == Phase.BUILD)
 	# Starting round 1 without choosing founds the town on no traditions.
 	traditions_settled = true
+	if not pedlar_settled:
+		choose_pedlar("")
 	world.start_round()
+	if pedlar != "":
+		world.pedlar.open(pedlar_choice())
 	people.offer_picks()
 
 
@@ -532,7 +607,7 @@ func food_grown_daily() -> int:
 			count = mini(count, count_role(worked["role"]) / int(worked["per"]))
 			each = roundi(each * (1.0 + tool_bonus(worked["role"], "field_mult")))
 		total += count * each
-	# Cluster combos (data/combos.json) that bring extra food.
+	# Rows (data/combos.json) that bring extra food.
 	for i in world.buildings.size():
 		total += int(world.town.combo_effect(i, "daily_food"))
 	return total
@@ -627,6 +702,7 @@ func _close_night() -> void:
 
 
 func _finish_round() -> void:
+	world.pedlar.close()
 	people.bury_heroes()
 	people.update_moods()
 	_close_night()
@@ -658,7 +734,6 @@ func _finish_round() -> void:
 		record.end_round()
 		return
 	people.heal_between_rounds()
-	people.pedlar_carousel()
 	people.heroes_sell_finds()
 	relic_offer = _roll_relic_offer()
 	record.note_value("relic_offer", relic_offer.duplicate())
@@ -673,6 +748,7 @@ func _lose() -> void:
 	if world.pause == World.Pause.HEARTH_LOST:
 		_close_night()
 	phase = Phase.LOST
+	world.pedlar.close()
 	people.bury_heroes()
 	world.release()
 	if world.hearth_hp <= 0.0:
@@ -743,6 +819,9 @@ func _enter_build() -> void:
 	if camp_joined > 0:
 		tell("%d of them make a war camp out in the wilds. Gatherers can't work near it until heroes clear it." % camp_joined)
 	world.roll_wave_sides()
+	pedlar = ""
+	pedlar_offer = world.pedlar.roll_offer() if world.pedlar.is_pedlar_round(round_number) else ([] as Array[Dictionary])
+	pedlar_settled = pedlar_offer.is_empty()
 	trader_stock = {}
 	var trader: Dictionary = content.ages["trader"]
 	if world.count_buildings(trader["needs"]) > 0:

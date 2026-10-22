@@ -232,25 +232,21 @@ func cluster_mates(i: int) -> Array[int]:
 	return out
 
 
-## The combos (data/combos.json) building i is part of now: it is finished and a partner stands in its cluster.
+## The row (data/combos.json) building i is part of now, as a one-item list: it was ordered on a row card as the
+## row's main building, and it and its partner both stand finished.
 func combos_of(i: int) -> Array[String]:
 	var out: Array[String] = []
-	var type: String = w.buildings[i]["type"]
-	if float(w.buildings[i]["work_left"]) > 0.0:
+	var b := w.buildings[i]
+	var id: String = b.get("row", "")
+	if id == "" or w.content.combos[id]["building"] != b["type"] or float(b["work_left"]) > 0.0:
 		return out
-	var mates: Array = []
-	for id: String in w.content.combos:
-		var combo: Dictionary = w.content.combos[id]
-		if combo["building"] != type:
-			continue
-		if mates.is_empty():
-			mates = cluster_mates(i).map(func(b: int) -> String: return w.buildings[b]["type"])
-		if mates.any(func(t: String) -> bool: return combo["with"].has(t)):
-			out.append(id)
+	var mate := int(b.get("row_mate", -1))
+	if mate >= 0 and float(w.buildings[mate]["work_left"]) <= 0.0:
+		out.append(id)
 	return out
 
 
-## The sum of one effect key over the combos building i is part of.
+## The sum of one effect key over the rows building i is part of.
 func combo_effect(i: int, key: String) -> float:
 	var total := 0.0
 	for id in combos_of(i):
@@ -258,23 +254,34 @@ func combo_effect(i: int, key: String) -> float:
 	return total
 
 
-## Whether a building of this type on plot k would join a combo with a building already in that cluster,
-## either way round (ordered buildings count, so pairs ordered together find each other).
-func _completes_combo(type: String, k: int) -> bool:
-	var near: Array[String] = []
-	for p in cluster_plots(k):
-		var b := int(plots[p]["building"])
-		if b >= 0:
-			near.append(w.buildings[b]["type"])
-	if near.is_empty():
-		return false
-	for id: String in w.content.combos:
-		var combo: Dictionary = w.content.combos[id]
-		if combo["building"] == type and near.any(func(t: String) -> bool: return combo["with"].has(t)):
-			return true
-		if combo["with"].has(type) and near.has(combo["building"]):
-			return true
-	return false
+## Where a row card's two buildings go: [plot for a, plot for b] in one cluster, or [] if no cluster has room.
+## Building a takes the best plot (by its own wants) whose cluster has another free plot, and b the free plot
+## there that suits it best; neither may wall off the hearth.
+func choose_row(a: String, b: String) -> Array[int]:
+	var order: Array = []
+	for k in plots.size():
+		if plot_free(k) and not plots[k]["lane"]:
+			order.append([_plot_score(a, k) + (1000.0 if _paved_in(k) > 0 else 0.0), k])
+	order.sort()
+	for pair: Array in order:
+		var k: int = pair[1]
+		var best := -1
+		var best_score := INF
+		for p in cluster_plots(k):
+			if p == k or not plot_free(p) or plots[p]["lane"]:
+				continue
+			var score := _plot_score(b, p)
+			if score < best_score:
+				best_score = score
+				best = p
+		if best < 0 or not _keeps_town_open(k):
+			continue
+		_set_plot_solid(k, true)
+		var open := _keeps_town_open(best)
+		_set_plot_solid(k, false)
+		if open:
+			return [k, best]
+	return []
 
 
 ## How many sides of plot k (0 to 2) have something standing on them.
@@ -333,9 +340,6 @@ func _plot_score(type: String, k: int) -> float:
 	for other in [k - 1, k + 1]:
 		if other >= 0 and other < plots.size() and plots[other]["ring"] == ring and int(plots[other]["building"]) >= 0:
 			score -= 12.0
-	# Buildings lean toward a cluster where they would complete a combo (data/combos.json).
-	if _completes_combo(type, k):
-		score -= float(w.content.town.get("combo_pull", 0.0))
 	# A little seeded jitter so towns grow a bit differently each run.
 	score += float(hash([w.run.run_seed, k, w.buildings.size()]) % 1000) / 1000.0 * 20.0
 	return score

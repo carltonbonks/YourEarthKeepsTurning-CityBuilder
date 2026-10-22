@@ -8,8 +8,6 @@ extends RefCounted
 var run: RunState
 ## True once someone has gone hungry since the last dawn's mood update.
 var hungry_today := false
-## The last pedlar's carousel, in pick order: {hero, item (described), equipped}; [] when none came this round.
-var last_carousel: Array = []
 var _hero_rng: SeededRng
 
 
@@ -401,59 +399,6 @@ func heroes_sell_finds() -> void:
 		run.tell("%s sells %d found item%s %s for %d shells; the settlement keeps %d." % [hero.display_name,
 			hero.spares.size(), "" if hero.spares.size() == 1 else "s", where, total, tax])
 		hero.spares.clear()
-
-
-## The pedlar's carousel (TFT): every carousel_every-th round a pedlar lays out one item per living hero and a few more.
-## Heroes pick one each, the weakest first (lowest level, then fewest shells): the item that most improves on what
-## they wear by their personality, or the most valuable one to sell when none does. Picks are kept on last_carousel.
-func pedlar_carousel() -> void:
-	var content := run.content
-	last_carousel = []
-	var every := content.int_num("carousel_every")
-	var heroes := run.living_heroes()
-	if every <= 0 or run.round_number % every != 0 or heroes.is_empty():
-		return
-	var rng := SeededRng.stream(run.run_seed, "carousel", run.round_number)
-	var wares: Array[Dictionary] = []
-	for i in heroes.size() + content.int_num("carousel_extra"):
-		wares.append(Loot.roll(content, rng, run.round_number + content.int_num("carousel_rounds_ahead"), run.age))
-	heroes.sort_custom(func(a: Unit, b: Unit) -> bool:
-		return a.level < b.level or (a.level == b.level and (a.gold < b.gold or (a.gold == b.gold and a.id < b.id))))
-	run.tell("A pedlar spreads out %d wares, and the heroes take their pick, %s first." % [wares.size(), heroes[0].display_name])
-	var picks: Array = []
-	for hero in heroes:
-		var best := _carousel_choice(hero, wares)
-		var item: Dictionary = wares[best]
-		wares.remove_at(best)
-		var slot := Loot.slot(content, item)
-		run.world.hero_ai.give_item(hero, item)
-		var equipped: bool = hero.items.get(slot, {}) == item
-		picks.append({"hero": hero.display_name, "level": hero.level, "base": item["base"], "tier": item["tier"],
-			"affixes": item["affixes"].duplicate(), "equipped": equipped})
-		last_carousel.append({"hero": hero.display_name, "item": Loot.describe(content, item), "equipped": equipped})
-	run.record.note_value("carousel", picks)
-	run.record.note_value("carousel_left", wares.size())
-
-
-## Which ware a hero takes: the biggest gain over the item in that slot, by their likes; else the most valuable.
-func _carousel_choice(hero: Unit, wares: Array[Dictionary]) -> int:
-	var content := run.content
-	var likes: Dictionary = content.traits[hero.trait_id].get("likes", {})
-	var best := -1
-	var best_gain := 0.0
-	for i in wares.size():
-		var current: Dictionary = hero.items.get(Loot.slot(content, wares[i]), {})
-		var gain := Loot.score(content, wares[i], likes) - (Loot.score(content, current, likes) if not current.is_empty() else 0.0)
-		if gain > best_gain:
-			best_gain = gain
-			best = i
-	if best >= 0:
-		return best
-	best = 0
-	for i in wares.size():
-		if Loot.value(content, wares[i]) > Loot.value(content, wares[best]):
-			best = i
-	return best
 
 
 ## Hearty meals at dawn, once everyone has eaten the town's daily need: each hero in turn eats hearty_food more

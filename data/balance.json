@@ -44,6 +44,9 @@
 	"build_tend_below": 0.5,
 	"build_new_weight": 2,
 	"build_redraw_cost": 10,
+	"_rows_note": "Row cards (data/combos.json): a hand deals at most row_cards row cards, each ordering two buildings side by side for both costs less row_discount (0.2 = a fifth off, rounded down).",
+	"row_cards": 1,
+	"row_discount": 0.2,
 
 	"wave_budget_base": 6,
 	"wave_budget_per_round": 8,
@@ -96,10 +99,6 @@
 	"traditions_to_pick": 2,
 	"tradition_card_weight": 3,
 	"tradition_band_ease": 1,
-	"_carousel_note": "The pedlar's carousel (TFT): at the end of every carousel_every-th round a pedlar lays out one item per living hero plus carousel_extra, rolled carousel_rounds_ahead rounds ahead of the round. Heroes pick one each, the weakest first (lowest level, then fewest shells): the item their personality likes most over what they wear, or the most valuable to sell. sim/people.gd pedlar_carousel.",
-	"carousel_every": 3,
-	"carousel_extra": 1,
-	"carousel_rounds_ahead": 2,
 	"_spoils_note": "After each round the relic offer gains one card of spoils (relics tagged spoils, data/relics.json) from the kind of enemy the attack was made of; spoils_kinds names each kind on the card (enemy tag -> what the band of them is called).",
 	"spoils_kinds": {"human": "warband", "beast": "pack", "undead": "barrow-dead", "siege": "siege train"},
 
