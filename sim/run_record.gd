@@ -82,7 +82,10 @@ extends RefCounted
 ## 35: blueprints replace one-use building cards: "build_hands" now lists each round's draft offers (then one list per
 ##     reroll, and one after each draft while drafts are left); per round "blueprints" = [{building}] drafted that round
 ##     (a drafted row adds its non-basic buildings); a "blueprint" action ({"kind": "blueprint", "building"} or {"row"}).
-const RECORD_FORMAT := 35
+## 36: hero-shaping buildings: per round "drill_seconds" (hero-seconds drilled at the training yard), "hounds_given"
+##     (hounds the kennel handed out) and "duels" (bouts in the duelling ring), each only when it happened. Rows are
+##     offered only once the town has one of their buildings, so a drafted row adds at most one blueprint.
+const RECORD_FORMAT := 36
 
 var run: RunState
 ## Finished rounds, oldest first.

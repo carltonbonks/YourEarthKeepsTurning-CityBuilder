@@ -165,6 +165,12 @@ static func dawn_line(r: RunState, type: String) -> String:
 		return "Dawn: heroes can arrive" if r.world.hero_ai.count_lodgings() == 0 else "Dawn: beds for %d more heroes" % int(def["lodging"]["beds"])
 	if def.get("spells", false):
 		return "Dawn: spell cards"
+	if int(def.get("effects", {}).get("pick_bonus", 0)) > 0:
+		return "Dawn: %d more card to pick from" % int(def["effects"]["pick_bonus"])
+	if def.has("hounds"):
+		return "Dawn: hounds for %d heroes" % int(def["hounds"]["heroes"])
+	if def.has("duels"):
+		return "Dawn: bold heroes spar"
 	if def.has("workshop") and not content.recipes_for(type).is_empty():
 		return "Dawn: its crafters can become masters"
 	return ""
@@ -231,10 +237,13 @@ func _card(type: String, need: String, kind: String) -> Button:
 	var dawn := dawn_line(run, type)
 	var hint := row_hint(run, type) if kind == "draft" else ""
 	var footer := (dawn if dawn != "" else hint) if kind == "draft" else ("You have %d" % owned if owned > 0 else "")
+	var rarity := run.content.rarity_of("building", type)
 	var btn := UiKit.card(top, def["name"], UiKit.cost_text(run.stock, def["cost"]), def["text"],
 		footer, BASIC_SIZE if kind == "basic" else CARD_SIZE, border, why != "",
-		UiKit.HEADING_COLOR if kind == "age" else Color.WHITE)
+		UiKit.HEADING_COLOR if kind == "age" else (Color.WHITE if rarity == "white" else run.content.rarity_color(rarity)))
 	btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], def["work"]]
+	if rarity != "white":
+		btn.tooltip_text = "%s blueprint (rarer ones come up less often).\n" % run.content.rarity_tier(rarity)["name"] + btn.tooltip_text
 	if dawn != "":
 		btn.tooltip_text += "\n" + dawn + "."
 	if kind == "draft":

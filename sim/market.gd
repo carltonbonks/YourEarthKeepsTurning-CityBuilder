@@ -11,6 +11,8 @@ extends RefCounted
 var w: World
 ## Prize shells per creature tag posted by finished buildings (see "prize" in data/buildings.json), refreshed each tick.
 var _prizes := {}
+## Extra XP share per prize tag (a prize's "xp"), rebuilt with the prizes.
+var _prize_xp := {}
 
 
 func _init(world: World) -> void:
@@ -153,6 +155,27 @@ func finish_craft(index: int, crafter: Unit = null) -> void:
 ## Rebuilds the posted prizes from the finished buildings; World.step() calls this every tick.
 func refresh_prizes() -> void:
 	_prizes = _posted_prizes()
+	_prize_xp = {}
+	var effects := {}
+	for b in w.buildings:
+		var def: Dictionary = w.content.buildings[b["type"]]
+		if float(b["work_left"]) > 0.0:
+			continue
+		var prize: Dictionary = def.get("prize", {})
+		if prize.has("xp"):
+			_prize_xp[prize["tag"]] = float(_prize_xp.get(prize["tag"], 0.0)) + float(prize["xp"])
+		for key: String in def.get("effects", {}):
+			effects[key] = float(effects.get(key, 0.0)) + float(def["effects"][key])
+	w.building_effects = effects
+
+
+## Extra XP share a hero earns for killing this creature type, from buildings whose prize carries "xp".
+func prize_xp(type_id: String) -> float:
+	var total := 0.0
+	for tag: String in _prize_xp:
+		if w.content.has_tag("enemy", type_id, tag):
+			total += float(_prize_xp[tag])
+	return total
 
 
 func _posted_prizes() -> Dictionary:

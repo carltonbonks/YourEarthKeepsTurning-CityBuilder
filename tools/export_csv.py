@@ -151,6 +151,7 @@ def main(raw_folder, out_folder):
                 "gathered_total": sum(rd.get("gathered", {}).values()) if "gathered" in rd else "",
                 "gathered_leaned_total": sum(rd.get("gathered_leaned", {}).values()) if "gathered_leaned" in rd else "",
                 "hearty_meals": rd.get("hearty_meals", ""),
+                **{k: rd.get(k, "") for k in ["drill_seconds", "hounds_given", "duels"]},
                 "combos_end": sum(rd["combos_end"].values()) if "combos_end" in rd else "",
                 "carousel_picks": len(rd["carousel"]) if "carousel" in rd else "",
                 "pedlar": rd.get("pedlar", {}).get("id", "") if "pedlar_offer" in rd else "",

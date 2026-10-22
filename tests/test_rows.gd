@@ -119,12 +119,13 @@ func test_hover_names_the_row() -> void:
 
 
 func test_bots_take_row_cards() -> void:
-	var rec := bot_record(4821, "balanced")
+	# Rows wait for one of their buildings, so not every run gets one: look over a few.
 	var rows := 0
-	for rd: Dictionary in rec["rounds"]:
-		for a: Dictionary in rd["actions"]:
-			if a["kind"] == "row":
-				rows += 1
+	for seed_value in [4821, 1001, 61823]:
+		for rd: Dictionary in bot_record(seed_value, "balanced")["rounds"]:
+			for a: Dictionary in rd["actions"]:
+				if a["kind"] == "row":
+					rows += 1
 	check(rows > 0, "the bot orders rows")
 
 

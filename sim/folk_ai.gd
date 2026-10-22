@@ -390,7 +390,7 @@ func tier_for(role: String, leaning: String, size: int) -> Dictionary:
 
 ## How many band tiers a role's townsfolk sharing a leaning reach at this size (0 for none).
 func band_level(role: String, leaning: String, size: int) -> int:
-	var ease := w.content.int_num("tradition_band_ease") if w.run.tradition_leanings().has(leaning) else 0
+	var ease := band_ease(leaning)
 	var level := 0
 	for tier: Dictionary in w.content.townsfolk[role].get("band_tiers", []):
 		if size >= int(tier["size"]) - ease:
@@ -400,7 +400,13 @@ func band_level(role: String, leaning: String, size: int) -> int:
 
 ## The size a band tier needs for this leaning (traditions included).
 func band_size_needed(role: String, leaning: String, tier: Dictionary) -> int:
-	return int(tier["size"]) - (w.content.int_num("tradition_band_ease") if w.run.tradition_leanings().has(leaning) else 0)
+	return int(tier["size"]) - band_ease(leaning)
+
+
+## How many fewer townsfolk this leaning's bands need: tradition_band_ease for a tradition's leaning, plus
+## band_ease from buildings (the brewhouse).
+func band_ease(leaning: String) -> int:
+	return (w.content.int_num("tradition_band_ease") if w.run.tradition_leanings().has(leaning) else 0) + int(w.run.mod("band_ease"))
 
 
 ## The band tier a townsperson's leaning reaches this step, or {} when it has no leaning or too few share it.

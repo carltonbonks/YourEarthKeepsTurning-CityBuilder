@@ -288,7 +288,8 @@ func _fill(rng: SeededRng, avoid: Array = []) -> void:
 	for type: String in types:
 		if not draftable(type):
 			continue
-		var weight := 1.0
+		# Rarer blueprints (data/rarity.json) come up less often.
+		var weight := content.rarity_weight(content.rarity_of("building", type))
 		if need(type) != "":
 			weight *= content.num("build_need_weight")
 		if run.world.count_buildings(type, false) == 0:

@@ -81,6 +81,8 @@ var master_of := ""
 var craft_trait := ""
 ## Heroes: ate a hearty meal this dawn (earns more XP until the next dawn).
 var well_fed := false
+## A hero with a hound from the kennel hits harder; the hound runs off when the hero falls back badly hurt.
+var hound := false
 ## Townsfolk: the leaning their dawn card came with (a key of their role's "leanings"), or "".
 var leaning := ""
 
