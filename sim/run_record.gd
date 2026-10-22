@@ -79,7 +79,10 @@ extends RefCounted
 ## 34: geomancy spells replace omens (a shift's "omen" is always ""): per round "spells" = [{day, cast (spell id from
 ##     data/plates.json spells)} or {day, finished, did: {grown, raised (node type -> count), dens_swallowed, finds}}];
 ##     a dawn pick can take "spell:<id>".
-const RECORD_FORMAT := 34
+## 35: blueprints replace one-use building cards: "build_hands" now lists each round's draft offers (then one list per
+##     reroll, and one after each draft while drafts are left); per round "blueprints" = [{building}] drafted that round
+##     (a drafted row adds its non-basic buildings); a "blueprint" action ({"kind": "blueprint", "building"} or {"row"}).
+const RECORD_FORMAT := 35
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -154,7 +157,7 @@ func begin_round() -> void:
 		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
 		"camps_cleared": 0, "camp_spoils": 0, "hearty_meals": 0,
-		"build_hands": [{"cards": run.hand.labels()}], "impact": {}, "spells": []}
+		"build_hands": [{"cards": run.hand.labels()}], "blueprints": [], "impact": {}, "spells": []}
 
 
 func end_round() -> void:

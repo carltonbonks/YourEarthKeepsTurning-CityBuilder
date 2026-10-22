@@ -1,5 +1,5 @@
 extends TestCase
-## Row cards: two buildings ordered together, side by side, for less; only they make a combo (data/combos.json).
+## Rows: drafted like blueprints, they order two buildings together, side by side, for less; only they make a combo (data/combos.json).
 
 
 func _run() -> RunState:
@@ -11,9 +11,9 @@ func _run() -> RunState:
 	return run
 
 
-## Puts a row card for this row in hand.
+## Gives the town this row as if drafted.
 func _deal(run: RunState, id: String) -> void:
-	run.hand.rows = [{"row": id, "need": ""}]
+	run.hand.row_blueprints = [id] as Array[String]
 
 
 func _finish(run: RunState) -> void:
@@ -34,7 +34,7 @@ func test_a_row_card_builds_both_side_by_side() -> void:
 	check(run.world.town.cluster_plots(garden["plot"]).has(hut["plot"]), "in one cluster")
 	var full := int(run.content.buildings["garden"]["cost"]["wood"]) + int(run.content.buildings["hut"]["cost"]["wood"])
 	check_eq(wood - int(run.stock["wood"]), int(full * (1.0 - run.content.num("row_discount"))), "a fifth cheaper")
-	check(run.hand.rows.is_empty(), "the card is used up")
+	check(run.hand.can_order_row("kitchen_garden"), "the row stays on offer")
 
 
 func test_the_row_bonus_comes_once_both_stand() -> void:
@@ -76,16 +76,25 @@ func test_a_row_needs_its_buildings_allowed() -> void:
 	check(run.row_allowed("kitchen_garden"), "a garden and a hut can go up")
 
 
-func test_hands_deal_row_cards() -> void:
+func test_drafts_offer_rows() -> void:
 	var run := _run()
 	var dealt := 0
 	for r in 6:
 		run.hand._fill(SeededRng.stream(r, "t"))
 		dealt += run.hand.rows.size()
 		for c in run.hand.rows:
-			check(run.row_allowed(c["row"]), "only rows that can go up")
-	check(dealt > 0, "row cards come up")
-	check(dealt <= 6 * run.content.int_num("row_cards"), "at most row_cards a hand")
+			check(run.hand._row_draftable(c["row"]), "only rows in reach of the age")
+	check(dealt > 0, "rows come up in the draft")
+	check(dealt <= 6 * run.content.int_num("row_cards"), "at most row_cards a draft")
+
+
+func test_drafting_a_row_drafts_its_buildings() -> void:
+	var run := _run()
+	run.hand.rows = [{"row": "drying_greens", "need": ""}] as Array[Dictionary]
+	check(run.hand.draft_row("drying_greens"), "drafted")
+	check(run.hand.offers_row("drying_greens"), "the row is on offer for good")
+	check(run.hand.blueprints.has("drying_rack"), "its drying rack is a blueprint")
+	check(not run.hand.blueprints.has("garden"), "its garden is a basic, not a blueprint")
 
 
 func test_rows_are_recorded() -> void:

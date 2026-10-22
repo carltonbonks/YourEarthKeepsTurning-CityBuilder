@@ -1,36 +1,53 @@
 class_name BuildHand
 extends RefCounted
-## Building cards (`run.hand`): each round's build phase deals a hand of buildings to order from,
-## weighted toward what the town needs, plus a card for ageing up whenever it can be raised.
-## Basic buildings (homes and food) are always on offer and never dealt, like Against the Storm's basics.
-## Ordering a card pays the building's cost (RunState.build) and uses the card up.
-## A row card (data/combos.json) orders two buildings side by side for less, and only they make a combo.
-## Numbers are in data/balance.json (build_hand_size, build_need_weight, build_new_weight, build_redraw_cost).
+## Blueprints (`run.hand`), like Against the Storm's: each round's build phase offers a few buildings to draft,
+## weighted toward what the town needs, and a drafted building stays on offer for the rest of the run.
+## Basic buildings (homes and food) are always on offer and never drafted. Ageing up is its own card whenever
+## it can be raised, and the building the next age-up needs is always among the offers until it is drafted.
+## Ordering pays the building's cost (RunState.build) as often as its max allows.
+## A row (data/combos.json) can be drafted too: it orders its two buildings side by side for less, and only
+## rows make a combo. Numbers are in data/balance.json (blueprint_*, build_need_weight, build_new_weight, build_redraw_cost).
 
 var run: RunState
-## This round's cards, each {"building": type, "need": why the town wants it ("" if nothing in particular)}.
+## This round's draft offers, each {"building": type, "need": why the town wants it ("" if nothing in particular)}.
 var cards: Array[Dictionary] = []
 ## The ageing-up card ({} when no age-up building can be ordered).
 var milestone := {}
-## Row cards in hand, each {"row": id from data/combos.json, "need": why the town wants either building}.
+## Row offers in the draft, each {"row": id from data/combos.json, "need": why the town wants either building}.
 var rows: Array[Dictionary] = []
-## Redraws used this round.
+## Buildings drafted this run, in the order they were taken: on offer for good.
+var blueprints: Array[String] = []
+## Rows drafted this run.
+var row_blueprints: Array[String] = []
+## Drafts left to take (unspent picks carry over to the next round).
+var picks := 0
+## Rerolls of the offers used this round.
 var redraws := 0
+var _dealt_round := -1
+var _dealt_age := ""
 
 
 func _init(run_state: RunState) -> void:
 	run = run_state
 
 
-## Deals a fresh hand for the round (called as the build phase begins).
+## Deals fresh offers for the round (called as the build phase begins). The first round brings
+## blueprint_first_picks drafts and every later one blueprint_picks; reaching a new age adds blueprint_age_picks.
 func deal() -> void:
 	redraws = 0
+	if _dealt_round != run.round_number:
+		var content := run.content
+		picks += content.int_num("blueprint_first_picks") if _dealt_round < 0 else content.int_num("blueprint_picks")
+		if _dealt_age != "" and _dealt_age != run.age:
+			picks += content.int_num("blueprint_age_picks")
+		_dealt_round = run.round_number
+		_dealt_age = run.age
 	_fill(SeededRng.stream(run.run_seed, "build_cards", run.round_number * 10))
 
 
-## Deals new cards in place of the unused ones, once a round, for shells.
+## Rerolls the offers, once a round while a draft is left, for shells.
 func can_redraw() -> bool:
-	return run.phase == RunState.Phase.BUILD and redraws == 0 and int(run.stock["shells"]) >= redraw_cost() \
+	return run.phase == RunState.Phase.BUILD and picks > 0 and redraws == 0 and int(run.stock["shells"]) >= redraw_cost() \
 		and not run.has_effect("no_redraw")
 
 
@@ -51,7 +68,7 @@ func redraw_cost() -> int:
 
 
 ## Basic buildings (homes and food, `basic` in data/buildings.json) that can go up now: always on offer,
-## as many as the town can pay for, never dealt as cards.
+## as many as the town can pay for, never drafted.
 func basics() -> Array[String]:
 	var out: Array[String] = []
 	var types := run.content.buildings.keys()
@@ -62,41 +79,34 @@ func basics() -> Array[String]:
 	return out
 
 
-## True if this building type is on a card in hand (the ageing-up card and basic buildings count).
+## True if this building type can be ordered from the hand: a basic, a blueprint or the ageing-up card.
 func offers(type: String) -> bool:
-	return run.content.buildings[type].get("basic", false) or milestone.get("building", "") == type or cards.any(func(c: Dictionary) -> bool: return c["building"] == type)
+	return run.content.buildings[type].get("basic", false) or milestone.get("building", "") == type or blueprints.has(type)
 
 
-## True if a row card for this row is in hand.
+## True if this row has been drafted.
 func offers_row(id: String) -> bool:
-	return rows.any(func(c: Dictionary) -> bool: return c["row"] == id)
+	return row_blueprints.has(id)
 
 
 func can_order_row(id: String) -> bool:
 	return offers_row(id) and run.can_build_row(id)
 
 
-## Orders both buildings on a row card in hand and uses the card up.
+## Orders both buildings of a drafted row, side by side.
 func order_row(id: String) -> bool:
-	if not can_order_row(id) or not run.build_row(id):
-		return false
-	for i in rows.size():
-		if rows[i]["row"] == id:
-			rows.remove_at(i)
-			break
-	return true
+	return can_order_row(id) and run.build_row(id)
 
 
-## The row card in hand that has this building on it ("" if none).
+## The drafted row that has this building in it ("" if none).
 func row_with(type: String) -> String:
-	for c in rows:
-		var row: Dictionary = run.content.combos[c["row"]]
+	for id in row_blueprints:
+		var row: Dictionary = run.content.combos[id]
 		if row["building"] == type or row["partner"] == type:
-			return c["row"]
+			return id
 	return ""
 
 
-## Orders the building on a card in hand and uses the card up.
 func can_order(type: String) -> bool:
 	return offers(type) and run.can_build(type)
 
@@ -104,30 +114,97 @@ func can_order(type: String) -> bool:
 func order(type: String) -> bool:
 	if not can_order(type) or not run.build(type):
 		return false
-	if run.content.buildings[type].get("basic", false):
-		return true
 	if milestone.get("building", "") == type:
 		milestone = {}
-	else:
-		for i in cards.size():
-			if cards[i]["building"] == type:
-				cards.remove_at(i)
-				break
 	return true
 
 
-## The building types listed in hand, for the run record.
+## True if this building is among the offers and a draft is left.
+func can_draft(type: String) -> bool:
+	return run.phase == RunState.Phase.BUILD and picks > 0 and cards.any(func(c: Dictionary) -> bool: return c["building"] == type)
+
+
+## Drafts an offered building for the rest of the run; fresh offers follow while drafts are left.
+func draft(type: String) -> bool:
+	if not can_draft(type):
+		return false
+	_take(type)
+	run.record.note_action({"kind": "blueprint", "building": type})
+	_after_draft()
+	return true
+
+
+func can_draft_row(id: String) -> bool:
+	return run.phase == RunState.Phase.BUILD and picks > 0 and rows.any(func(c: Dictionary) -> bool: return c["row"] == id)
+
+
+## Drafts an offered row: the row for good, and both its buildings (unless basic) as blueprints.
+func draft_row(id: String) -> bool:
+	if not can_draft_row(id):
+		return false
+	row_blueprints.append(id)
+	var row: Dictionary = run.content.combos[id]
+	for type: String in [row["building"], row["partner"]]:
+		if not run.content.buildings[type].get("basic", false) and not blueprints.has(type):
+			_take(type)
+	run.record.note_action({"kind": "blueprint", "row": id})
+	_after_draft()
+	return true
+
+
+func _take(type: String) -> void:
+	blueprints.append(type)
+	run.record.note_list("blueprints", {"building": type})
+
+
+func _after_draft() -> void:
+	picks -= 1
+	if picks > 0:
+		_fill(SeededRng.stream(run.run_seed, "build_cards", run.round_number * 10 + 5 + blueprints.size()))
+		run.record.note_list("build_hands", {"cards": labels()})
+	else:
+		cards = []
+		rows = []
+
+
+## Buildings that could be drafted now: not basic or ageing up, not drafted yet, in reach of the age, below their max,
+## and whatever they require already drafted or standing.
+func draftable(type: String) -> bool:
+	var content := run.content
+	var def: Dictionary = content.buildings[type]
+	var needs: String = def.get("requires", "")
+	return not def.get("basic", false) and not def.has("ages_up") and not blueprints.has(type) \
+		and content.age_reached(run.age, def.get("age", "")) \
+		and run.world.count_buildings(type, false) < run.building_max(type) \
+		and (needs == "" or blueprints.has(needs) or run.world.count_buildings(needs, false) > 0)
+
+
+## The building the next age-up requires, if it is neither drafted nor standing ("" if none).
+func ageing_need() -> String:
+	var order: Array = run.content.ages["order"]
+	var next := order.find(run.age) + 1
+	if next >= order.size():
+		return ""
+	for type: String in run.content.buildings:
+		var def: Dictionary = run.content.buildings[type]
+		if def.get("ages_up", "") != order[next]:
+			continue
+		var needs: String = def.get("requires", "")
+		if needs != "" and not blueprints.has(needs) and run.world.count_buildings(needs, false) == 0:
+			return needs
+	return ""
+
+
+## The draft offers, for the run record.
 func labels() -> Array:
 	var out := cards.map(func(c: Dictionary) -> String: return c["building"])
 	for c in rows:
 		out.append("row:" + c["row"])
-	if not milestone.is_empty():
-		out.append(milestone["building"])
 	return out
 
 
-## Buildings that could go on a card now: in reach of the age, requirements met, below their max,
-## enough people, and a free plot. Cost is not checked: a card you can't pay for yet still shows.
+## Buildings that could go up now: in reach of the age, requirements met, below their max,
+## enough people, and a free plot. Cost is not checked.
 func eligible(type: String) -> bool:
 	var content := run.content
 	var def: Dictionary = content.buildings[type]
@@ -142,7 +219,8 @@ func eligible(type: String) -> bool:
 
 ## Why the town wants a building now: "housing", "food", "beds", "regrow" (the nodes it tends are picked over),
 ## "fuel" (it makes fuel and there is less than two nights' worth), "supply" (a stall has nobody making
-## its goods), "stall" (a workshop has nowhere to sell), "age" (new in the town's current age),
+## its goods), "stall" (a workshop has nowhere to sell), "heroes" (no hero lodging drafted or standing),
+## "ageing" (the next age-up needs it), "age" (new in the town's current age),
 ## or "" for nothing in particular.
 func need(type: String) -> String:
 	var content := run.content
@@ -154,6 +232,10 @@ func need(type: String) -> String:
 		return "food"
 	if def.has("lodging") and run.world.hero_ai.count_lodgings() > 0 and free_beds() <= 0:
 		return "beds"
+	if def.has("lodging") and not _any_lodging():
+		return "heroes"
+	if type == ageing_need():
+		return "ageing"
 	if def.has("tends") and run.world.nodes_fullness(def["tends"]["tag"]) < content.num("build_tend_below"):
 		return "regrow"
 	if def.has("workshop") and _makes_fuel(type) and float(run.stock["fuel"]) < run.fuel_needed_tonight() * 2.0:
@@ -184,24 +266,26 @@ func _makes_fuel(type: String) -> bool:
 		return run.content.market["recipes"][id].get("makes", {}).has("fuel"))
 
 
-## How many cards a hand holds: build_hand_size, plus build_hand_per_age for every age past the first.
+## How many buildings each draft offers: blueprint_offers (rows count among them), plus relics' hand_bonus.
 func size() -> int:
-	return run.content.int_num("build_hand_size") + run.content.int_num("build_hand_per_age") * run.content.ages["order"].find(run.age) \
-		+ int(run.mod("hand_bonus"))
+	return run.content.int_num("blueprint_offers") + int(run.mod("hand_bonus"))
 
 
 func _fill(rng: SeededRng, avoid: Array = []) -> void:
 	var content := run.content
 	cards = []
+	rows = []
 	milestone = {}
-	var weights := {}
 	var types := content.buildings.keys()
 	types.sort()
 	for type: String in types:
-		if not eligible(type) or content.buildings[type].get("basic", false):
-			continue
-		if content.buildings[type].has("ages_up"):
+		if content.buildings[type].has("ages_up") and eligible(type):
 			milestone = {"building": type, "need": ""}
+	if picks <= 0:
+		return
+	var weights := {}
+	for type: String in types:
+		if not draftable(type):
 			continue
 		var weight := 1.0
 		if need(type) != "":
@@ -210,25 +294,31 @@ func _fill(rng: SeededRng, avoid: Array = []) -> void:
 			weight *= content.num("build_new_weight")
 		if run.tradition_favours(type):
 			weight *= content.num("tradition_card_weight")
-		# A redraw leans away from what was just in hand, so it feels like a fresh deal.
+		# A reroll leans away from what was just offered, so it feels like a fresh deal.
 		if avoid.has(type):
 			weight *= 0.25
 		weights[type] = weight
-	while cards.size() < size() and not weights.is_empty():
+	var room := size()
+	_fill_rows(rng, avoid)
+	room -= rows.size()
+	# The building the next age-up needs is always offered, so ageing up never waits on luck.
+	var must := ageing_need()
+	if must != "" and weights.has(must) and room > 0:
+		weights.erase(must)
+		cards.append({"building": must, "need": need(must)})
+	while cards.size() < room and not weights.is_empty():
 		var type := rng.weighted(weights)
 		weights.erase(type)
 		cards.append({"building": type, "need": need(type)})
-	_fill_rows(rng, avoid)
 
 
-## Deals up to row_cards row cards from the rows whose buildings could both go up now, favouring rows the town needs.
+## Offers up to row_cards rows not drafted yet whose buildings are in reach of the age, favouring rows the town needs.
 func _fill_rows(rng: SeededRng, avoid: Array) -> void:
-	rows = []
 	var weights := {}
 	var ids := run.content.combos.keys()
 	ids.sort()
 	for id: String in ids:
-		if not run.row_allowed(id):
+		if row_blueprints.has(id) or not _row_draftable(id):
 			continue
 		var weight := 1.0
 		if row_need(id) != "":
@@ -242,11 +332,30 @@ func _fill_rows(rng: SeededRng, avoid: Array) -> void:
 		rows.append({"row": id, "need": row_need(id)})
 
 
+## A row can be drafted once both its buildings are in reach of the age and whatever they require is drafted or standing.
+func _row_draftable(id: String) -> bool:
+	var row: Dictionary = run.content.combos[id]
+	for type: String in [row["building"], row["partner"]]:
+		var def: Dictionary = run.content.buildings[type]
+		var needs: String = def.get("requires", "")
+		if not run.content.age_reached(run.age, def.get("age", "")) or (needs != "" and needs != row["building"] \
+				and needs != row["partner"] and not blueprints.has(needs) and run.world.count_buildings(needs, false) == 0):
+			return false
+	return true
+
+
 ## Why the town wants a row: why it wants either of its buildings ("" if nothing in particular).
 func row_need(id: String) -> String:
 	var row: Dictionary = run.content.combos[id]
 	var why := need(row["building"])
 	return why if why != "" else need(row["partner"])
+
+
+func _any_lodging() -> bool:
+	for type: String in run.content.buildings:
+		if run.content.buildings[type].has("lodging") and (blueprints.has(type) or run.world.count_buildings(type, false) > 0):
+			return true
+	return false
 
 
 func free_beds() -> int:
