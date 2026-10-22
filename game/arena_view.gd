@@ -293,12 +293,12 @@ func _draw_lights() -> void:
 		var reach := World.HEARTH_RADIUS * s * lerpf(Lighting.HEARTH_REACH_DAY, Lighting.HEARTH_REACH_NIGHT, night_share)
 		var squash := ISO_SQUASH if iso else 1.0
 		var flick := Lighting.flicker(now)
-		var c := Lighting.dim(Lighting.FIRE, (0.12 + 0.3 * night_share) * flick)
+		var c := Lighting.dim(Lighting.FIRE, (0.1 + 0.26 * night_share) * flick)
 		light.draw_glow(_light_layer, _to_screen(Vector2.ZERO), reach * flick, reach * squash * flick, c)
 		# A brighter heart round the flames themselves.
 		var core := World.HEARTH_RADIUS * s * 1.2
 		var flame := Vector2(0.0, World.HEARTH_RADIUS * s * 0.3 if iso else 0.0)
-		light.draw_glow(_light_layer, _to_screen(Vector2.ZERO) - flame, core, core, Lighting.dim(Lighting.FIRE, (0.15 + 0.35 * night_share) * flick))
+		light.draw_glow(_light_layer, _to_screen(Vector2.ZERO) - flame, core, core, Lighting.dim(Lighting.FIRE, (0.13 + 0.3 * night_share) * flick))
 	if Lighting.fire_shots(run):
 		var chest := _chest()
 		var r := maxf(10.0, Lighting.SHOT_GLOW * s)
