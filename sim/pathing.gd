@@ -365,7 +365,8 @@ func wear_trails() -> int:
 		elif g == TRAIL and t < need * 0.25 and floor_kind[i] < TRAIL:
 			set_ground(i, PLAIN)
 			changed += 1
-		if ground[i] >= PATH:
+		# Ground an age laid round the hearth isn't a desire path: stone-layers leave it be.
+		if ground[i] >= PATH and floor_kind[i] == 0:
 			busy.append([t, i])
 		traffic[i] = t * decay
 	busy.sort_custom(func(x: Array, y: Array) -> bool: return x[0] > y[0])

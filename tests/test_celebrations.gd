@@ -128,3 +128,20 @@ func test_hero_level_ups_get_a_halo() -> void:
 	c.update(run, 50.0 + Celebrations.HALO_MS)
 	check_eq(c.halo_share(hero, 50.0 + Celebrations.HALO_MS), 0.0, "the halo fades")
 	run.dispose()
+
+
+func test_stone_layers_leave_the_laid_ground_be() -> void:
+	var run := _run()
+	_age_up(run)
+	var p := run.world.pathing
+	var laid := PackedInt32Array()
+	for i in p.cells_in_circle(Vector2.ZERO, float(run.content.ages["hearth_ground_radius"])):
+		if not p.is_solid(i):
+			laid.append(i)
+			p.traffic[i] = 999.0
+	p.wear_trails()
+	for i in laid:
+		check(not p.busy_paths.has(i), "the laid ground round the hearth is not re-paved, however busy")
+		if p.busy_paths.has(i):
+			break
+	run.dispose()
