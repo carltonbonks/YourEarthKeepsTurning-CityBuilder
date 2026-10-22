@@ -117,6 +117,9 @@ func finish_craft(index: int, crafter: Unit = null) -> void:
 	var master := {}
 	if crafter != null:
 		crafter.made[b["type"]] = int(crafter.made.get(b["type"], 0)) + 1
+		var key := w.run.record.impact_key(crafter)
+		if not key.is_empty():
+			w.run.record.note_impact(key[0], key[1], "made", 1.0)
 		if crafter.master_of == b["type"]:
 			master = w.run.craft_trait(crafter)
 	if r.has("makes"):

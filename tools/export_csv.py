@@ -20,6 +20,7 @@ RESOURCES = ["food", "fuel", "wood", "stone", "shells", "flint", "hides", "bone"
              "copper", "cassiterite", "tin", "bronze", "bog_iron", "charcoal", "iron", "steel"]
 ROLES = ["tribesperson", "warrior", "craftsperson"]
 LEANINGS = ["forager", "woodcutter", "quarrier", "brushcutter", "prospector"]
+IMPACT_STATS = ["dealt", "taken", "kills", "lost", "made", "raised", "paved", "patched"]
 
 
 def load_records(folder):
@@ -67,7 +68,7 @@ def main(raw_folder, out_folder):
     records = load_records(raw_folder)
     tables = {name: [] for name in
               ["runs", "rounds", "picks", "builds", "wave_enemies", "deaths", "nights", "relic_offers", "relic_effects", "heroes",
-               "loot", "whims", "market_sales", "crafted", "promotions", "build_cards"]}
+               "loot", "whims", "market_sales", "crafted", "promotions", "build_cards", "impact"]}
 
     for r in records:
         rid = r["_run_id"]
@@ -263,6 +264,13 @@ def main(raw_folder, out_folder):
             for w in rd.get("whims", []):
                 tables["whims"].append({"run_id": rid, "round": rn, "day": w.get("day", ""),
                                         "hero": w.get("hero", ""), "whim": w.get("whim", "")})
+            for group, rows in rd.get("impact", {}).items():
+                for who, row in rows.items():
+                    tables["impact"].append({"run_id": rid, "round": rn, "group": group, "who": who,
+                                             "hero_class": row.get("class", ""),
+                                             "goods_total": sum(row.get("goods", {}).values()),
+                                             **{k: row.get(k, 0) for k in IMPACT_STATS},
+                                             **{"goods_" + k: row.get("goods", {}).get(k, 0) for k in RESOURCES}})
             for effect, count in rd.get("relic_effects", {}).items():
                 tables["relic_effects"].append({"run_id": rid, "round": rn, "effect": effect, "count": count})
             for relic in rd.get("relic_offer", []):
@@ -290,6 +298,8 @@ def main(raw_folder, out_folder):
         "crafted": ["run_id", "round", "recipe", "count"],
         "promotions": ["run_id", "round", "day", "role", "name", "became", "trait", "joined_round"],
         "build_cards": ["run_id", "round", "deal", "building", "ordered"],
+        "impact": ["run_id", "round", "group", "who", "hero_class", *IMPACT_STATS, "goods_total",
+                   *["goods_" + k for k in RESOURCES]],
     }
     for table, rows in tables.items():
         count = write(out_folder, table, columns[table], rows)

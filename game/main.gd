@@ -129,6 +129,9 @@ func _take_pick(index: int) -> void:
 	run.choose_pick(index)
 	_overlays.hide()
 	_refresh()
+	# A venture holds the day for a moment to show who never came home.
+	if not run.last_venture.is_empty():
+		_overlays.show_venture_result()
 
 
 func _pick_relic(relic_id: String) -> void:
@@ -285,6 +288,9 @@ func _build_ui() -> void:
 	_story.open_pressed.connect(func() -> void:
 		_menu_open = true
 		_overlays.show_log())
+	_story.impact_pressed.connect(func() -> void:
+		_menu_open = true
+		_overlays.show_impact())
 	bottom.add_child(_story)
 
 	# Overlay for picks, relics, the end screen and the menu: dims the screen, panel in the middle.

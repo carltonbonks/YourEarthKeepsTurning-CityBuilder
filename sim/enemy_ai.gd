@@ -74,6 +74,7 @@ func enemy_tick(enemy: Unit) -> void:
 		if w.content.unit_has_tag(enemy, "siege"):
 			w.run.record.note_count("siege_damage", roundi(dmg))
 			thorns(enemy)
+		w.run.record.note_impact("defences", "hearth", "taken", minf(dmg, maxf(0.0, w.hearth_hp)))
 		w.hearth_hp -= dmg
 		w.wave_stats["keep_damage"] = float(w.wave_stats["keep_damage"]) + dmg
 		w.night_report["hearth_damage"] = float(w.night_report["hearth_damage"]) + dmg
@@ -201,7 +202,7 @@ func spawn_probe() -> void:
 func thorns(enemy: Unit) -> void:
 	var hurt := w.run.mod("siege_thorns")
 	if hurt > 0.0 and enemy.alive:
-		w.damage(null, enemy, hurt)
+		w.damage(null, enemy, hurt, "relic")
 		w.run.relic_fired("siege_thorns")
 
 
@@ -247,7 +248,7 @@ func towers_tick() -> void:
 		if target != null:
 			w.hearth_cooldown_left = w.content.num("hearth_cooldown")
 			w.shots.append({"from": Vector2.ZERO, "to": target.pos, "ranged": true, "time": w.time})
-			w.damage(null, target, (w.content.num("hearth_attack") + w.run.mod("tower_attack")) * armour_left(target))
+			w.damage(null, target, (w.content.num("hearth_attack") + w.run.mod("tower_attack")) * armour_left(target), "hearth")
 	for b in w.buildings:
 		var def: Dictionary = w.content.buildings[b["type"]]
 		if not def.has("attack") or float(b["work_left"]) > 0.0:
@@ -261,7 +262,7 @@ func towers_tick() -> void:
 		if target != null:
 			b["cooldown_left"] = float(def["cooldown"])
 			w.shots.append({"from": b["pos"], "to": target.pos, "ranged": true, "time": w.time})
-			w.damage(null, target, (float(def["attack"]) + w.run.mod("tower_attack")) * armour_left(target))
+			w.damage(null, target, (float(def["attack"]) + w.run.mod("tower_attack")) * armour_left(target), b["type"])
 			# Sentient raiders turn on the tower that shot them (siege engines only want gates and the hearth).
 			if target.alive and def.has("tower_hp") and w.content.unit_has_tag(target, "sentient") \
 					and not w.content.unit_has_tag(target, "siege"):
@@ -289,6 +290,7 @@ func _attack_tower(enemy: Unit, b: int) -> void:
 	enemy.cooldown_left = enemy.cooldown
 	var dmg := enemy.attack * war_chant()
 	w.shots.append({"from": enemy.pos, "to": building["pos"], "ranged": enemy.attack_range > 60, "time": w.time})
+	w.run.record.note_impact("defences", building["type"], "taken", minf(dmg, float(building["hp"])))
 	building["hp"] = maxf(0.0, float(building["hp"]) - dmg)
 	if float(building["hp"]) <= 0.0:
 		enemy.target_tower = -1

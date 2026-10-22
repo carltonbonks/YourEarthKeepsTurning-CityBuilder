@@ -267,9 +267,42 @@ func _venture_card(card: Dictionary) -> Button:
 	var brings := ", ".join(terms["goods"].keys().map(func(g: String) -> String: return "%d %s" % [terms["goods"][g], g.replace("_", " ")]))
 	var btn := UiKit.card("Venture: send %d tribespeople" % terms["send"], v["name"], "[color=#ff7a6a]%s won't come back[/color]" % losing,
 		"Brings home %s" % brings, "Instead of a newcomer", PICK_SIZE, UiKit.CARD_BORDER)
-	btn.tooltip_text = "%s\nSend %d tribespeople (you have %d). %s of them never come home; the rest bring %s.\nInstead of a newcomer today." % [
+	btn.tooltip_text = "%s\nSend %d tribespeople (you have %d). %s of them never come home; the rest bring %s.\nInstead of a newcomer today.\nA bold red X is a sure death, a faint one may or may not come home." % [
 		v["text"], terms["send"], run.count_role("tribesperson"), losing, brings]
+	# One figure per person sent, crossed out red for those who won't come back, under the cost line.
+	var box: Control = btn.get_child(0)
+	var figures := VentureFigures.make(terms["send"], lose[0], lose[1] - lose[0], 18.0)
+	box.add_child(figures)
+	box.move_child(figures, 3)
 	return btn
+
+
+## Just after a venture: who never came home (a red X each) and what the rest brought.
+func show_venture_result() -> void:
+	var result := run.last_venture
+	_clear()
+	_title(run.content.ventures[result["venture"]]["name"])
+	var row := CenterContainer.new()
+	row.add_child(VentureFigures.make(result["send"], result["lost"], 0, 28.0))
+	_box.add_child(row)
+	var lost := int(result["lost"])
+	var line := Label.new()
+	line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	line.add_theme_font_size_override("font_size", 18)
+	if lost == 0:
+		line.text = "All %d tribespeople came home." % result["send"]
+		line.add_theme_color_override("font_color", VentureFigures.HOME_COLOR)
+	else:
+		line.text = "%d of %d tribespeople never came home." % [lost, result["send"]]
+		line.add_theme_color_override("font_color", VentureFigures.X_COLOR)
+	_box.add_child(line)
+	var goods: Dictionary = result["goods"]
+	var brought := ", ".join(goods.keys().map(func(g: String) -> String: return "%d %s" % [goods[g], g.replace("_", " ")]))
+	UiKit.note(_box, "They bring home %s." % brought, 15, Color("#e8e8e8")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var center := CenterContainer.new()
+	_box.add_child(center)
+	UiKit.primary(UiKit.button(center, "Carry on", func() -> void: closed.emit())).custom_minimum_size = Vector2(220, 36)
+	show()
 
 
 func _promote_card(card: Dictionary) -> Button:
@@ -334,11 +367,30 @@ func _night_summary() -> void:
 	_box.add_child(label)
 
 
+## Who hit hardest this round and what the hearth took, with a button for the whole table.
+func _impact_line() -> void:
+	var shown := ImpactView.shown_round(run)
+	if shown.is_empty() or (shown["impact"] as Dictionary).is_empty():
+		return
+	var line := HBoxContainer.new()
+	line.alignment = BoxContainer.ALIGNMENT_CENTER
+	line.add_theme_constant_override("separation", 10)
+	_box.add_child(line)
+	var label := UiKit.note(line, ImpactView.headline(run, shown["impact"]), 13, UiKit.HEADING_COLOR)
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	var open := Button.new()
+	open.text = "Who did what"
+	UiKit.secondary(open, 12)
+	open.pressed.connect(func() -> void: show_impact())
+	line.add_child(open)
+
+
 func show_relic_pick() -> void:
 	var content := run.content
 	_clear()
 	_title(("Round %d survived! Choose a pact" if run.is_pact_round() else "Round %d survived! Choose a relic") % run.round_number)
 	_night_summary()
+	_impact_line()
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -383,6 +435,7 @@ func show_end() -> void:
 	_box.add_child(summary)
 	UiKit.primary(UiKit.button(_box, "New run", func() -> void: new_run_requested.emit(false)))
 	UiKit.button(_box, "Replay seed %d" % run.run_seed, func() -> void: new_run_requested.emit(true))
+	UiKit.button(_box, "Who did what", func() -> void: show_impact(true))
 	UiKit.button(_box, "Run history", show_history)
 	show()
 
@@ -560,6 +613,37 @@ func show_log() -> void:
 		lines.append(StoryLog.as_bbcode(line))
 	text.text = "\n".join(lines)
 	_box.add_child(text)
+	UiKit.button(_box, "Back", func() -> void: closed.emit())
+	show()
+
+
+## Who did what (ImpactView): this round's table, or the whole run's. Back returns to what the run waits on.
+func show_impact(whole_run := false) -> void:
+	_clear()
+	var shown := ImpactView.shown_round(run)
+	if whole_run:
+		_title("Who did what this run")
+	else:
+		_title("Who did what in round %d" % int(shown.get("round", run.round_number)))
+	var tabs := HBoxContainer.new()
+	tabs.alignment = BoxContainer.ALIGNMENT_CENTER
+	tabs.add_theme_constant_override("separation", 8)
+	_box.add_child(tabs)
+	var this_round := Button.new()
+	this_round.text = "This round"
+	this_round.disabled = not whole_run
+	this_round.pressed.connect(func() -> void: show_impact(false))
+	tabs.add_child(this_round)
+	var all := Button.new()
+	all.text = "Whole run"
+	all.disabled = whole_run
+	all.pressed.connect(func() -> void: show_impact(true))
+	tabs.add_child(all)
+	for btn: Button in [this_round, all]:
+		UiKit.secondary(btn, 13)
+	UiKit.note(_box, "Damage counts only the health a blow took. Percent is each one's share of all damage the town dealt. "
+		+ "Lost is townsfolk who died. Raised counts the buildings each kind finished.", 11)
+	ImpactView.build(_box, run, ImpactView.whole_run(run) if whole_run else shown.get("impact", {}))
 	UiKit.button(_box, "Back", func() -> void: closed.emit())
 	show()
 

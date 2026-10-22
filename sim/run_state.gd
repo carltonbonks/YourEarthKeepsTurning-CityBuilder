@@ -72,6 +72,8 @@ var trader_stock := {}
 var departed: Array[Unit] = []
 ## The role of whoever left hungry this dawn ("" if nobody): none of that role come to the dawn pick.
 var hunger_turned_away := ""
+## The venture taken at the last dawn pick ({} if none): {venture, send, lost, goods}, so the screen can show who never came home.
+var last_venture := {}
 ## The geomancer's omen for the next turn of the earth (an id from "omens" in data/plates.json, "" for none),
 ## chosen while building once a building with "omens" stands; used up by that turn.
 var omen := ""
@@ -491,6 +493,7 @@ func choose_pick(index: int) -> void:
 	assert(phase == Phase.PICK)
 	var taken := ""
 	var venture := {}
+	last_venture = {}
 	var took := can_take_pick(index)
 	if took:
 		var card := pick_offer[index]
@@ -505,6 +508,7 @@ func choose_pick(index: int) -> void:
 			taken = people.card_label(card)
 		elif card["kind"] == "venture":
 			venture = people.go_venturing(card)
+			last_venture = venture
 			taken = people.card_label(card)
 		elif card["kind"] == "family":
 			for role: String in card["roles"]:

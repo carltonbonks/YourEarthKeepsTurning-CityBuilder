@@ -65,6 +65,9 @@ var _joining: Array[Dictionary] = []
 ## Enemies chasing a fleeing worker (seen last tick); warriors answer the call.
 var alarms: Array[Unit] = []
 var new_alarms: Array[Unit] = []
+## Goods carried back to the hearth so far this run, by good: townsfolk hauls and what heroes bring in from the
+## wilds (`bring_in`). Only grows. The view reads it for the "+2 stone" popups over the hearth.
+var brought_in := {}
 
 ## Where enemies and friends (townsfolk and heroes) stand, for fast nearest-unit lookups (see UnitGrid).
 ## Rebuilt each step when those units stop moving; a stale grid is never read (the lookups scan the lists instead).
@@ -246,6 +249,7 @@ func step() -> void:
 		var wave_left := enemies.filter(func(e: Unit) -> bool: return e.alive and e.den_index < 0)
 		if wave_left.is_empty() or time >= night_end + content.num("night_seconds") * 2.0:
 			for e in wave_left:
+				run.record.note_impact("defences", "hearth", "taken", minf(e.attack * 3.0, maxf(0.0, hearth_hp)))
 				hearth_hp -= e.attack * 3.0
 				e.alive = false
 			if not wave_left.is_empty():
@@ -405,6 +409,12 @@ func _add_node(id: String, at: Vector2) -> void:
 
 
 ## A node counts once the town has reached its age, until the shifting earth takes it away.
+## Goods carried back to the hearth go into stock and the `brought_in` tally.
+func bring_in(good: String, n: int) -> void:
+	run.stock[good] = int(run.stock[good]) + n
+	brought_in[good] = int(brought_in.get(good, 0)) + n
+
+
 func node_active(node: Dictionary) -> bool:
 	return not node.get("gone", false) and content.age_reached(run.age, node.get("age", ""))
 
@@ -583,8 +593,11 @@ func _blow_is(attacker: Unit, kind: String) -> bool:
 	return attacker.is_folk() and run.has_tools_with(attacker.type_id, kind)
 
 
-func damage(attacker: Unit, victim: Unit, amount: float) -> void:
+## `source` names the defence that struck when there is no attacker ("hearth", a tower's type, "relic"), for the impact tally.
+func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
+	var before := maxf(0.0, victim.hp)
 	victim.hp -= amount
+	run.record.note_blow(attacker, victim, clampf(amount, 0.0, before), source, victim.hp <= 0.0 and before > 0.0)
 	if victim.hp > 0.0:
 		# Sentient creatures turn on whoever hurt them.
 		if victim.is_enemy() and attacker != null and content.unit_has_tag(victim, "sentient"):

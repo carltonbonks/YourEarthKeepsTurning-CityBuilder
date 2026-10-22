@@ -64,14 +64,19 @@ extends RefCounted
 ## 30: the geomancer and earth finds: a round's "shift" also has "omen" (the geomancer's omen it followed, "" for none)
 ##     and "finds" (node type -> earth finds it left: starstone, sunk hoards); per round "finds_dug" (node type ->
 ##     finds heroes dug out, each an earthborn item, also in "loot").
-## 31: the pedlar's camp replaces the carousel (no more "carousel"): on pedlar rounds "pedlar_offer" (the pedlar ids
+## 31: who did what: per round "impact" = {"folk": {role: row}, "heroes": {name: row}, "defences": {who: row}}, a row
+##     being any of "dealt", "taken" (damage, never more than the victim had left), "kills", "lost" (townsfolk who died),
+##     "goods" (good -> amount brought home), "made" (things crafted), "raised" (buildings finished), "paved"
+##     (squares), "patched" (hearth health mended); a hero row also has "class". Defences are "hearth", a tower's
+##     building type, or "relic" (damage relics did on their own). Risen bones count as the role "risen".
+## 32: the pedlar's camp replaces the carousel (no more "carousel"): on pedlar rounds "pedlar_offer" (the pedlar ids
 ##     offered) and, when one was invited, "pedlar" = {id, distance, wares, visits, sold (items heroes sold it),
 ##     sold_value, bought: [{hero, base, tier, affixes, price}], guards (names hired), paid: [{hero, base, tier,
 ##     affixes}] (wares guards took as pay), fell (raiders overran it), left (wares it took away)}; the "pedlar"
 ##     action records the choice ("" for none); hero_spending gains "pedlar".
-## 32: row cards replace silent cluster combos: "combos_end" now counts only rows (combo ids from data/combos.json)
+## 33: row cards replace silent cluster combos: "combos_end" now counts only rows (combo ids from data/combos.json)
 ##     ordered on a row card; build hand labels list a row card as "row:<id>"; the "row" action records ordering one.
-const RECORD_FORMAT := 32
+const RECORD_FORMAT := 33
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -95,7 +100,9 @@ func to_record() -> Dictionary:
 		result = "lost"
 	var all_rounds: Array = rounds.duplicate(true)
 	if not run.is_over():
-		all_rounds.append(entry.duplicate(true))
+		var current := entry.duplicate(true)
+		current["impact"] = rounded_impact(current.get("impact", {}))
+		all_rounds.append(current)
 	return {
 		"format": RECORD_FORMAT,
 		"seed": run.run_seed,
@@ -144,7 +151,7 @@ func begin_round() -> void:
 		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
 		"camps_cleared": 0, "camp_spoils": 0, "hearty_meals": 0,
-		"build_hands": [{"cards": run.hand.labels()}]}
+		"build_hands": [{"cards": run.hand.labels()}], "impact": {}}
 
 
 func end_round() -> void:
@@ -169,6 +176,7 @@ func end_round() -> void:
 		for id in run.world.town.combos_of(i):
 			combos[id] = int(combos.get(id, 0)) + 1
 	entry["combos_end"] = combos
+	entry["impact"] = rounded_impact(entry.get("impact", {}))
 	rounds.append(entry)
 	entry = {}
 
@@ -224,6 +232,74 @@ func note_count(key: String, amount: int, what := "") -> void:
 		entry[key][what] = int(entry[key].get(what, 0)) + amount
 	else:
 		entry[key] = int(entry.get(key, 0)) + amount
+
+
+## Adds to one row of the round's "impact" (who did what): group "folk", "heroes" or "defences", then who
+## (a role, a hero's name, "hearth" or a tower's type). `good` puts the amount under "goods".
+func note_impact(group: String, who: String, stat: String, amount: float, good := "") -> void:
+	if entry.is_empty() or amount <= 0.0:
+		return
+	var row: Dictionary = entry.get_or_add("impact", {}).get_or_add(group, {}).get_or_add(who, {})
+	if good != "":
+		var goods: Dictionary = row.get_or_add("goods", {})
+		goods[good] = float(goods.get(good, 0.0)) + amount
+	else:
+		row[stat] = float(row.get(stat, 0.0)) + amount
+
+
+## The impact row a unit's deeds go in: its group and who, or [] for enemies.
+func impact_key(unit: Unit) -> Array:
+	if unit == null or unit.is_enemy():
+		return []
+	if unit.is_hero():
+		if entry.is_empty():
+			return []
+		var row: Dictionary = entry.get_or_add("impact", {}).get_or_add("heroes", {}).get_or_add(unit.display_name, {})
+		row["class"] = unit.type_id
+		return ["heroes", unit.display_name]
+	return ["folk", "risen" if unit.risen else unit.type_id]
+
+
+## One blow landed (World.damage): `dealt` is the health it took, `source` names the defence when nobody struck it.
+func note_blow(attacker: Unit, victim: Unit, dealt: float, source: String, killed: bool) -> void:
+	if entry.is_empty():
+		return
+	if victim.is_enemy():
+		var key := impact_key(attacker) if attacker != null else (["defences", source] if source != "" else [])
+		if key.is_empty():
+			return
+		note_impact(key[0], key[1], "dealt", dealt)
+		if killed:
+			note_impact(key[0], key[1], "kills", 1.0)
+		return
+	var key := impact_key(victim)
+	if key.is_empty():
+		return
+	note_impact(key[0], key[1], "taken", dealt)
+	if killed and victim.is_folk() and not victim.risen:
+		note_impact(key[0], key[1], "lost", 1.0)
+
+
+## The round's impact with every number rounded (amounts pile up as fractions while the round plays).
+static func rounded_impact(impact: Dictionary) -> Dictionary:
+	var out := {}
+	for group: String in impact:
+		out[group] = {}
+		for who: String in impact[group]:
+			var row := {}
+			for stat: String in impact[group][who]:
+				var value: Variant = impact[group][who][stat]
+				if value is Dictionary:
+					var goods := {}
+					for good: String in value:
+						goods[good] = roundi(float(value[good]))
+					row[stat] = goods
+				elif value is String:
+					row[stat] = value
+				else:
+					row[stat] = roundi(float(value))
+			out[group][who] = row
+	return out
 
 
 ## Sets a plain value on the round ("aged_up", "relic_offer", "battle", ...).
