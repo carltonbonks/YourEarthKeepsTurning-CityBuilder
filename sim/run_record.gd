@@ -69,7 +69,9 @@ extends RefCounted
 ##     sold_value, bought: [{hero, base, tier, affixes, price}], guards (names hired), paid: [{hero, base, tier,
 ##     affixes}] (wares guards took as pay), fell (raiders overran it), left (wares it took away)}; the "pedlar"
 ##     action records the choice ("" for none); hero_spending gains "pedlar".
-const RECORD_FORMAT := 31
+## 32: row cards replace silent cluster combos: "combos_end" now counts only rows (combo ids from data/combos.json)
+##     ordered on a row card; build hand labels list a row card as "row:<id>"; the "row" action records ordering one.
+const RECORD_FORMAT := 32
 
 var run: RunState
 ## Finished rounds, oldest first.

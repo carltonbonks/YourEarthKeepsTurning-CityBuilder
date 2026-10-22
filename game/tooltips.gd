@@ -166,33 +166,19 @@ static func building(run: RunState, index: int) -> Dictionary:
 	return t
 
 
-## A building card's gold strip when ordering it would make a combo with something the town has: "Combo: Blade row".
-static func combo_hint(run: RunState, type: String) -> String:
-	var c := run.content
-	for id: String in c.combos:
-		var combo: Dictionary = c.combos[id]
-		if combo["building"] == type and combo["with"].any(func(o: String) -> bool: return run.world.count_buildings(o, false) > 0):
-			return "Combo: %s" % combo["name"]
-		if combo["with"].has(type) and run.world.count_buildings(combo["building"], false) > 0:
-			return "Combo: %s" % combo["name"]
-	return ""
-
-
-## The cluster combos a building type can be part of (data/combos.json), marking the ones building
-## `index` is part of now. index -1: a building card, so nothing is active yet.
+## The rows (data/combos.json) a building type can be part of, marking the one building `index` is part of now.
+## index -1: a building card, so nothing is active yet.
 static func combo_lines(run: RunState, type: String, index := -1) -> Array[String]:
 	var c := run.content
 	var active: Array[String] = run.world.town.combos_of(index) if index >= 0 else ([] as Array[String])
 	var out: Array[String] = []
 	for id: String in c.combos:
-		var combo: Dictionary = c.combos[id]
-		var partners := PackedStringArray()
-		for other: String in combo["with"]:
-			partners.append(c.buildings[other]["name"].to_lower())
-		if combo["building"] == type:
-			out.append("%s %s: %s" % ["Combo:" if active.has(id) else "Combo with a %s nearby," % " or ".join(partners), combo["name"], combo["text"]])
-		elif combo["with"].has(type):
-			out.append("Helps a nearby %s (%s)" % [c.buildings[combo["building"]]["name"].to_lower(), combo["name"]])
+		var row: Dictionary = c.combos[id]
+		if active.has(id):
+			out.append("Row: %s: %s" % [row["name"], row["text"]])
+		elif row["building"] == type or row["partner"] == type:
+			out.append("Ordered with a %s on a %s row card, it would make a bonus: %s" % [
+				c.buildings[row["partner"] if row["building"] == type else row["building"]]["name"].to_lower(), row["name"], row["text"]])
 	return out
 
 

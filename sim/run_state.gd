@@ -256,6 +256,47 @@ func build(type: String) -> bool:
 	return true
 
 
+## A row card's price: both buildings' costs, less row_discount (rounded down).
+func row_cost(id: String) -> Dictionary:
+	var row: Dictionary = content.combos[id]
+	var cost := {}
+	for type: String in [row["building"], row["partner"]]:
+		var c: Dictionary = content.buildings[type]["cost"]
+		for r: String in c:
+			cost[r] = int(cost.get(r, 0)) + int(c[r])
+	for r: String in cost:
+		cost[r] = int(float(cost[r]) * (1.0 - content.num("row_discount")))
+	return cost
+
+
+## Whether both of a row's buildings could go up now (each allowed, ignoring each one's own cost), side by side.
+func row_allowed(id: String) -> bool:
+	var row: Dictionary = content.combos[id]
+	for type: String in [row["building"], row["partner"]]:
+		var def: Dictionary = content.buildings[type]
+		var needs: String = def.get("requires", "")
+		if world.count_buildings(type, false) >= building_max(type) or not content.age_reached(age, def.get("age", "")) \
+				or population() < int(def.get("min_people", 0)) \
+				or (needs != "" and needs != row["building"] and needs != row["partner"] and world.count_buildings(needs, false) == 0):
+			return false
+	return not world.town.choose_row(row["building"], row["partner"]).is_empty()
+
+
+func can_build_row(id: String) -> bool:
+	return phase == Phase.BUILD and can_afford(row_cost(id)) and row_allowed(id)
+
+
+## Orders a row: both buildings, side by side, for the row's price.
+func build_row(id: String) -> bool:
+	if not can_build_row(id) or not world.add_row(id):
+		return false
+	var cost := row_cost(id)
+	for r: String in cost:
+		stock[r] = int(stock[r]) - int(cost[r])
+	record.note_action({"kind": "row", "row": id})
+	return true
+
+
 # --- Market prices ----------------------------------------------------------
 
 ## Sets a stall kind's price level for the coming round ("cheap", "fair" or "dear").
@@ -562,7 +603,7 @@ func food_grown_daily() -> int:
 			count = mini(count, count_role(worked["role"]) / int(worked["per"]))
 			each = roundi(each * (1.0 + tool_bonus(worked["role"], "field_mult")))
 		total += count * each
-	# Cluster combos (data/combos.json) that bring extra food.
+	# Rows (data/combos.json) that bring extra food.
 	for i in world.buildings.size():
 		total += int(world.town.combo_effect(i, "daily_food"))
 	return total

@@ -40,6 +40,9 @@ var upkeep := true
 var geomancer := true
 ## Invites a pedlar on pedlar rounds (_pedlar). balance_run.gd: pedlar=0 never invites one.
 var pedlar := true
+## Takes a row card when it holds a building it was about to order (_order), except the workers style: its extra
+## garden or drying rack ate the wood a town of gatherers needs (73% without rows, 62% with). balance_run.gd: rows=0 never does.
+var rows := true
 const OMEN_STILL_FROM := 9
 ## Redraws the building cards once a round when it has at least this many shells (after its first pass).
 var redraw_above := 40
@@ -106,8 +109,12 @@ func _omen(run: RunState) -> void:
 		run.choose_omen("raise" if run.round_number < OMEN_STILL_FROM else "still")
 
 
-## Orders a building if a card for it is in hand.
+## Orders a building if a card for it is in hand; a row card with it on is taken first (both buildings, for less).
 func _order(run: RunState, type: String) -> bool:
+	if rows and style != "workers":
+		var row := run.hand.row_with(type)
+		if row != "" and run.hand.order_row(row):
+			return true
 	return run.hand.order(type)
 
 

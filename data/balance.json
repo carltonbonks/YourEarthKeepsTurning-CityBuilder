@@ -44,6 +44,9 @@
 	"build_tend_below": 0.5,
 	"build_new_weight": 2,
 	"build_redraw_cost": 10,
+	"_rows_note": "Row cards (data/combos.json): a hand deals at most row_cards row cards, each ordering two buildings side by side for both costs less row_discount (0.2 = a fifth off, rounded down).",
+	"row_cards": 1,
+	"row_discount": 0.2,
 
 	"wave_budget_base": 6,
 	"wave_budget_per_round": 8,

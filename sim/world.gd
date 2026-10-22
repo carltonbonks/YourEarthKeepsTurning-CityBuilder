@@ -460,6 +460,24 @@ func add_building(type: String) -> bool:
 	return true
 
 
+## Places a row card's two buildings side by side (data/combos.json) and links them. False if no cluster has room.
+func add_row(id: String) -> bool:
+	var row: Dictionary = content.combos[id]
+	var at := town.choose_row(row["building"], row["partner"])
+	if at.is_empty():
+		return false
+	var first := buildings.size()
+	for n in 2:
+		var type: String = row["building"] if n == 0 else row["partner"]
+		buildings.append({"type": type, "plot": at[n], "pos": town.plots[at[n]]["pos"],
+			"work_left": float(content.buildings[type]["work"]), "cooldown_left": 0.0,
+			"hp": float(content.buildings[type].get("tower_hp", 0.0)),
+			"goods": [], "craft": "", "craft_left": 0.0, "craft_tier": 1, "made": 0,
+			"row": id, "row_mate": first + 1 - n})
+		town.occupy(at[n], buildings.size() - 1)
+	return true
+
+
 func count_buildings(type: String, built_only := true) -> int:
 	return buildings.filter(func(b: Dictionary) -> bool:
 		return b["type"] == type and (not built_only or float(b["work_left"]) <= 0.0)).size()

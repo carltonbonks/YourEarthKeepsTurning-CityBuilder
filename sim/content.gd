@@ -27,7 +27,7 @@ var town: Dictionary  ## data/town.json: town rings and plots, obstacles, ground
 var tags: Dictionary  ## data/tags.json: what each tag that a rule reads means, for tooltips.
 var plates: Dictionary  ## data/plates.json: the shifting earth past the town (see Earth).
 var traditions: Dictionary  ## data/traditions.json: founding traditions picked before round 1.
-var combos: Dictionary  ## data/combos.json: buildings in the same cluster that help each other.
+var combos: Dictionary  ## data/combos.json: row cards, two buildings ordered together that help each other.
 var ventures: Dictionary  ## data/ventures.json: dawn cards that spend tribespeople for goods.
 var pedlars: Dictionary  ## data/pedlars.json: the pedlars invited on pedlar rounds and their camp (see PedlarCamp).
 
