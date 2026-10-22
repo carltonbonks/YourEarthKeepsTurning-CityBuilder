@@ -37,6 +37,8 @@ var wall_hp := PackedFloat32Array()  ## Health of the gate on each square; 0 = n
 var wall_detour := 0.0  ## Extra squares a raider walks to avoid one point of gate health.
 var ground := PackedByteArray()
 var traffic := PackedFloat32Array()
+## The lowest ground kind each square can fade back to (the ground an age lays round the hearth stays).
+var floor_kind := PackedByteArray()
 var speeds := PackedFloat32Array()  ## Walking speed multiplier per ground kind.
 var kind_ids: Array[String] = ["plain", "thicket", "trail", "path"]  ## Ground kind index -> id (road ids after path).
 ## Worn paths, busiest first, as of the last dawn (stone-layers pave these).
@@ -68,6 +70,7 @@ func _init(content: Content) -> void:
 		grid.update()
 	ground.resize(cells * cells)
 	traffic.resize(cells * cells)
+	floor_kind.resize(cells * cells)
 	solid.resize(cells * cells)
 	wall_hp.resize(cells * cells)
 	wall_detour = float(town["gate"]["raider_detour"])
@@ -127,6 +130,13 @@ func set_ground(i: int, kind: int) -> void:
 	ground[i] = kind
 	_sync_weights(i)
 	ground_version += 1
+
+
+## Lays ground of this kind (or better, if it is already better) on square i for good: it never fades below it.
+func lay(i: int, kind: int) -> void:
+	floor_kind[i] = maxi(floor_kind[i], kind)
+	if ground[i] < kind:
+		set_ground(i, kind)
 
 
 ## Puts up (hp > 0) or takes down (hp 0) a gate on square i.
@@ -349,13 +359,14 @@ func wear_trails() -> int:
 		elif g == TRAIL and t >= path_need:
 			set_ground(i, PATH)
 			changed += 1
-		elif g == PATH and t < path_need * 0.25:
+		elif g == PATH and t < path_need * 0.25 and floor_kind[i] < PATH:
 			set_ground(i, TRAIL)
 			changed += 1
-		elif g == TRAIL and t < need * 0.25:
+		elif g == TRAIL and t < need * 0.25 and floor_kind[i] < TRAIL:
 			set_ground(i, PLAIN)
 			changed += 1
-		if ground[i] >= PATH:
+		# Ground an age laid round the hearth isn't a desire path: stone-layers leave it be.
+		if ground[i] >= PATH and floor_kind[i] == 0:
 			busy.append([t, i])
 		traffic[i] = t * decay
 	busy.sort_custom(func(x: Array, y: Array) -> bool: return x[0] > y[0])
