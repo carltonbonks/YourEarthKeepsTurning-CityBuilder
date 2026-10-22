@@ -1,10 +1,11 @@
 {
-	"_note": "Tech ages in order. The run starts in the first; raising a building with ages_up (the Bronze moot, then the Stone keep) moves the town into the next; begins = what the story says the new age brings. Buildings, map nodes, item bases and tool sets with an age only appear once the town has reached it. tools = group upgrades bought with goods while building (one each per run): gather_mult speeds gathering, carry adds to what a gatherer brings back, build_rate adds to craftsperson work speed, attack/hp add to each member's stats, field_mult adds to the food worked fields bring in, metal means their hits pierce bronze shields, steel means they also cut through mail. trader = a caravan that visits during the build phase once its building stands; each good has a price in shells and how many it brings each round.",
+	"_note": "Tech ages in order. The run starts in the first; raising a building with ages_up (the Bronze moot, then the Stone keep) moves the town into the next; begins = what the story says the new age brings. Buildings, map nodes, item bases and tool sets with an age only appear once the town has reached it. tools = group upgrades bought with goods while building (one each per run): gather_mult speeds gathering, carry adds to what a gatherer brings back, build_rate adds to craftsperson work speed, attack/hp add to each member's stats, field_mult adds to the food worked fields bring in, metal means their hits pierce bronze shields, steel means they also cut through mail. trader = a caravan that visits during the build phase once its building stands; each good has a price in shells and how many it brings each round. hearth_ground = the ground the age lays for good on every open square round the hearth out to hearth_ground_radius as it begins (\"path\" for a dirt path, or a road id from data/town.json), never lowering better ground already there.",
+	"hearth_ground_radius": 60,
 	"order": ["neolithic", "bronze", "medieval"],
 	"ages": {
 		"neolithic": {"name": "Stone age"},
-		"bronze": {"name": "Bronze age", "begins": "copper in the hills, tin by the dens, and traders from the south"},
-		"medieval": {"name": "Medieval age", "begins": "bog iron in the marshes, charcoal and steel, and room for a real town"}
+		"bronze": {"name": "Bronze age", "begins": "copper in the hills, tin by the dens, and traders from the south", "hearth_ground": "path"},
+		"medieval": {"name": "Medieval age", "begins": "bog iron in the marshes, charcoal and steel, and room for a real town", "hearth_ground": "stone_path"}
 	},
 	"tools": {
 		"bronze_picks": {"name": "Bronze picks and sickles", "text": "Tribespeople gather 50% faster and carry 1 more.", "role": "tribesperson", "age": "bronze", "cost": {"bronze": 3}, "gather_mult": 0.5, "carry": 1},

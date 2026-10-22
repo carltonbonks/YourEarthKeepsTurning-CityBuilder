@@ -13,9 +13,11 @@ extends SceneTree
 ## lodge=1 raises a Geomancer's lodge at the start, so dawn picks show the geomancy spell cards.
 ## pedlars=1 shows the round's pedlar choice (round= a pedlar round, e.g. 3). master=<trait id> (with pick=1)
 ## deals a Promote card for a craftsperson with that craft trait as the first dawn card.
+## ageup=1 plays on from that round until the town reaches a new age and shows the celebration (style=bronze or
+## medieval gets there); levelup=1 levels up the first hero so the halo shows.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0", "pedlars": "0", "master": ""}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -92,6 +94,28 @@ func _init() -> void:
 		if args["venture_taken"] == "1":
 			main._take_pick(0)
 	main._refresh()
+	main._arena.celebrations.update(run, Time.get_ticks_msec())
+	if args["ageup"] == "1":
+		var start_age := run.age
+		while not run.is_over() and run.age == start_age:
+			match run.phase:
+				RunState.Phase.BUILD:
+					bot.build(run)
+					run.begin_round()
+				RunState.Phase.PICK:
+					run.choose_pick(bot.pick(run))
+				RunState.Phase.SIM:
+					run.step()
+				RunState.Phase.RELIC:
+					run.choose_relic(run.relic_offer[0] if not run.relic_offer.is_empty() else "")
+		# A few steps on, so the new ground has been drawn once and glows.
+		for i in 10:
+			run.step()
+	if args["levelup"] == "1" and not run.living_heroes().is_empty():
+		var hero: Unit = run.living_heroes()[0]
+		hero.xp = run.content.num("xp_per_level") * hero.level
+		run.people.level_up(hero)
+	main._arena.celebrations.update(run, Time.get_ticks_msec())
 	if args["relic"] == "1" and run.phase == RunState.Phase.RELIC:
 		main._overlays.show_for_phase()
 	if args["impact"] == "1":

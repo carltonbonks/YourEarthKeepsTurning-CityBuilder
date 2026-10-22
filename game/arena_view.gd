@@ -51,6 +51,7 @@ var _slide_from_ms := -1.0
 var _pulse_from_ms := -1.0
 var night := NightCamera.new()
 var pickups := PickupPopups.new()
+var celebrations := Celebrations.new()
 var light := Lighting.new()
 var _light_layer: Control
 var _top_layer: Control
@@ -101,6 +102,7 @@ func _process(delta: float) -> void:
 	if run != null:
 		night.update(self, delta)
 		pickups.update(run.world, Time.get_ticks_msec())
+		celebrations.update(run, Time.get_ticks_msec())
 	queue_redraw()
 	_light_layer.queue_redraw()
 	_top_layer.queue_redraw()
@@ -273,6 +275,7 @@ func _draw() -> void:
 	if dark > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.12, dark))
 	_draw_earth_pulses()
+	celebrations.draw_highlights(self, size, Time.get_ticks_msec(), _to_screen, main_color)
 
 
 ## Shots fly at chest height.
@@ -311,6 +314,7 @@ func _draw_lights() -> void:
 			var to := _to_screen(shot["to"]) + chest
 			light.draw_glow(_light_layer, (from + to) / 2.0, r * 0.6, r * 0.6, Lighting.dim(c, 0.6))
 			light.draw_glow(_light_layer, to, r, r, c)
+	celebrations.draw_lights(_light_layer, light, now, _to_screen, run.heroes, HERO_RADIUS * maxf(1.0, zoom * 0.7))
 
 
 ## The top layer, over the light: goods carried in, the controls hint and the hover tooltip.
@@ -326,6 +330,7 @@ func _draw_top() -> void:
 	if run.round_number <= HELP_ROUNDS and run.phase != RunState.Phase.BUILD:
 		var help := "Mouse wheel to zoom, drag to look around, V for %s view, point at anything for details" % ("flat" if iso else "tilted")
 		_top_layer.draw_string(font, Vector2(8, size.y - 8), help, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#8a9088"))
+	celebrations.draw_top(_top_layer, size, font, Time.get_ticks_msec(), _to_screen, run.heroes, HERO_RADIUS * maxf(1.0, zoom * 0.7))
 	if _mouse.x >= 0.0 and not _dragging:
 		var tip := hovered(_mouse)
 		if not tip.is_empty():
@@ -802,7 +807,9 @@ func _draw_ground() -> void:
 			var g: int = w.pathing.ground[i]
 			if g >= Pathing.TRAIL:
 				_ground_cache.append([i, g])
-				if same_world and g >= Pathing.FIRST_ROAD and int(was.get(i, 0)) != g:
+				# New roads glow, and so does the ground a new age lays round the hearth.
+				var laid: bool = g >= Pathing.FIRST_ROAD or w.pathing.floor_kind[i] >= g
+				if same_world and laid and int(was.get(i, 0)) != g:
 					_paved_at[i] = w.time
 	var cell := w.pathing.cell
 	var trail := Color(run.content.town["trail"]["color"])
