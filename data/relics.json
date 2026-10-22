@@ -15,7 +15,7 @@
 	"oxhide_sledges": {"name": "Oxhide Sledges", "text": "Gatherers carry twice as much.", "effects": {"carry_mult": 1.0}},
 	"bone_dice": {"name": "Bone Dice", "text": "Every kill drops +2 shells for the hero.", "effects": {"loot_shells": 2}},
 	"ancestor_mask": {"name": "Ancestor Mask", "text": "Warriors +15 max HP and +2 damage.", "effects": {"warrior_hp": 15, "warrior_attack": 2}},
-	"chieftains_torc": {"name": "Chieftain's Torc", "text": "Building cards deal 2 more each round and you can never redraw them. Dawn picks show one card fewer.", "tags": ["pact"], "effects": {"hand_bonus": 2, "no_redraw": 1, "pick_bonus": -1}},
+	"chieftains_torc": {"name": "Chieftain's Torc", "text": "Every blueprint draft offers 1 more building and you can never reroll it. Dawn picks show one card fewer.", "tags": ["pact"], "effects": {"hand_bonus": 1, "no_redraw": 1, "pick_bonus": -1}},
 	"twin_fires": {"name": "Twin Fires", "text": "Take two newcomers at every dawn, but the hearth burns twice the fuel.", "tags": ["pact"], "effects": {"extra_picks": 1, "fuel_mult": 1.0}},
 	"broken_crown": {"name": "Broken Crown", "text": "Gain 2 random relics now. Later relic offers show one card fewer.", "tags": ["pact"], "effects": {"gain_relics": 2, "relic_choices": -1}},
 	"tithe_bowl": {"name": "Tithe Bowl", "text": "Traders stop leaving shells. Instead the town takes a third of every shell heroes earn from kills.", "tags": ["pact"], "effects": {"income_mult": -1.0, "hero_tithe": 0.34}},

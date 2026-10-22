@@ -1,8 +1,9 @@
 class_name BuildHandView
 extends PanelContainer
 ## The round's building cards (run.hand) as a heads-up hand along the bottom of the map, like the
-## dawn pick: basics (homes and food, always on offer), the dealt cards, the ageing-up card, tool sets
-## and the caravan in later ages, and the redraw. A card the town needs says why on a gold strip at
+## dawn pick: basics (homes and food, always on offer), the town's blueprints and drafted rows, the ageing-up
+## card, tool sets and the caravan in later ages, then, while a draft is left, the blueprint offers
+## (each says what it adds to the dawn picks) and the reroll. A card the town needs says why on a gold strip at
 ## the top ("Food runs out in 2 days"); a card the town can't take says why on a red strip at the
 ## bottom ("Need 3 more wood"). Costs show red where the town is short. Shown only while building.
 ## Every choice goes through run.hand; `changed` asks the screen to refresh. Hovering a building
@@ -43,26 +44,57 @@ func refresh() -> void:
 	previewing.emit("")
 	for child in _row.get_children():
 		child.queue_free()
+	_draft_cards()
 	for type: String in run.hand.basics():
 		_row.add_child(_card(type, run.hand.need(type), "basic"))
 	_row.add_child(VSeparator.new())
-	for card: Dictionary in run.hand.cards:
-		_row.add_child(_card(card["building"], card["need"], "card"))
-	for card: Dictionary in run.hand.rows:
-		_row.add_child(_row_card(card["row"], card["need"]))
+	for type: String in run.hand.blueprints:
+		if run.world.count_buildings(type, false) < run.building_max(type):
+			_row.add_child(_card(type, run.hand.need(type), "blueprint"))
+	for id: String in run.hand.row_blueprints:
+		_row.add_child(_row_card(id, run.hand.row_need(id), false))
 	if not run.hand.milestone.is_empty():
 		_row.add_child(_card(run.hand.milestone["building"], "", "age"))
 	_age_cards()
-	if run.hand.cards.is_empty() and run.hand.milestone.is_empty():
-		var none := UiKit.note(_row, "No cards left this round.", 12)
-		none.custom_minimum_size.x = 120
+
+
+## The draft comes first, so the run's weightiest build choice is never scrolled out of sight.
+func _draft_cards() -> void:
+	if run.hand.picks <= 0 or (run.hand.cards.is_empty() and run.hand.rows.is_empty()):
+		return
+	var head := UiKit.note(_row, "Draft %d\nKept for\nthe whole run" % run.hand.picks if run.hand.picks > 1 \
+		else "Draft one\nKept for\nthe whole run", 13)
+	head.custom_minimum_size.x = 92
+	head.add_theme_color_override("font_color", UiKit.HEADING_COLOR)
+	for card: Dictionary in run.hand.cards:
+		_row.add_child(_card(card["building"], card["need"], "draft"))
+	for card: Dictionary in run.hand.rows:
+		_row.add_child(_row_card(card["row"], card["need"], true))
 	var redraw := UiKit.secondary(Button.new(), 13)
-	redraw.text = "Redraw\n%d shells" % run.hand.redraw_cost() if run.hand.redraws == 0 else "Redrawn\nthis round"
+	redraw.text = "Reroll\n%d shells" % run.hand.redraw_cost() if run.hand.redraws == 0 else "Rerolled\nthis round"
 	redraw.custom_minimum_size = Vector2(86, CARD_SIZE.y)
 	redraw.disabled = not run.hand.can_redraw()
-	redraw.tooltip_text = "Once a round: the cards you haven't used are swapped for a fresh deal."
+	redraw.tooltip_text = "Once a round: swap these offers for a fresh draw."
 	redraw.pressed.connect(_act.bind(run.hand.redraw))
 	_row.add_child(redraw)
+	_row.add_child(VSeparator.new())
+
+
+## What a building adds to the dawn picks once it stands ("" if nothing): heroes it lodges or draws,
+## craftspeople it can make masters, the geomancer's spells.
+static func dawn_line(r: RunState, type: String) -> String:
+	var content := r.content
+	var def: Dictionary = content.buildings[type]
+	for id: String in content.hero_classes:
+		if content.hero_classes[id].get("needs", "") == type:
+			return "Dawn: %ss can arrive" % content.hero_classes[id]["name"].to_lower()
+	if def.has("lodging"):
+		return "Dawn: heroes can arrive" if r.world.hero_ai.count_lodgings() == 0 else "Dawn: beds for %d more heroes" % int(def["lodging"]["beds"])
+	if def.get("spells", false):
+		return "Dawn: spell cards"
+	if def.has("workshop") and not content.recipes_for(type).is_empty():
+		return "Dawn: its crafters can become masters"
+	return ""
 
 
 ## Why the town wants this building, with the numbers ("" if nothing in particular).
@@ -89,6 +121,10 @@ func recommendation(type: String, need: String) -> String:
 			return "Fuel for %d night%s" % [nights, "" if nights == 1 else "s"] if nights > 0 else "Fuel runs out tonight"
 		"stall":
 			return "Your workshop needs a stall"
+		"heroes":
+			return "No hero lodging yet"
+		"ageing":
+			return "Needed to age up"
 		"age":
 			return "New in the %s" % content.age_name(content.buildings[type].get("age", run.age)).to_lower()
 	return ""
@@ -98,12 +134,23 @@ func _card(type: String, need: String, kind: String) -> Button:
 	var def: Dictionary = run.content.buildings[type]
 	var owned := run.world.count_buildings(type, false)
 	var why := recommendation(type, need)
-	var top := why if why != "" else ("Always on offer" if kind == "basic" else ("Ageing up" if kind == "age" else "New building"))
+	var top: String = why if why != "" else {"basic": "Always on offer", "age": "Ageing up", "blueprint": "Your blueprint"}.get(kind, "New building")
 	var border := RECOMMEND_COLOR if why != "" else (UiKit.HEADING_COLOR if kind == "age" else UiKit.CARD_BORDER)
+	var dawn := dawn_line(run, type)
+	var footer := dawn if kind == "draft" else ("You have %d" % owned if owned > 0 else "")
 	var btn := UiKit.card(top, def["name"], UiKit.cost_text(run.stock, def["cost"]), def["text"],
-		"You have %d" % owned if owned > 0 else "", BASIC_SIZE if kind == "basic" else CARD_SIZE, border, why != "",
+		footer, BASIC_SIZE if kind == "basic" else CARD_SIZE, border, why != "",
 		UiKit.HEADING_COLOR if kind == "age" else Color.WHITE)
 	btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], def["work"]]
+	if dawn != "":
+		btn.tooltip_text += "\n" + dawn + "."
+	if kind == "draft":
+		btn.tooltip_text = "Draft it: you can order it, paying its cost, for the rest of the run.\n" + btn.tooltip_text
+		btn.disabled = not run.hand.can_draft(type)
+		btn.pressed.connect(_act.bind(run.hand.draft.bind(type)))
+		btn.mouse_entered.connect(func() -> void: previewing.emit(type))
+		btn.mouse_exited.connect(func() -> void: previewing.emit(""))
+		return btn
 	var combos := Tooltips.combo_lines(run, type)
 	if not combos.is_empty():
 		btn.tooltip_text += "\n" + "\n".join(PackedStringArray(combos))
@@ -122,18 +169,23 @@ func _card(type: String, need: String, kind: String) -> Button:
 
 
 ## A row card: two buildings ordered together, side by side, for less, and the bonus they make together.
-func _row_card(id: String, need: String) -> Button:
+func _row_card(id: String, need: String, drafting: bool) -> Button:
 	var content := run.content
 	var row: Dictionary = content.combos[id]
 	var a: String = content.buildings[row["building"]]["name"]
 	var b: String = content.buildings[row["partner"]]["name"]
 	var why := recommendation(row["building"] if run.hand.need(row["building"]) == need else row["partner"], need)
 	var cost := run.row_cost(id)
-	var btn := UiKit.card(why if why != "" else "Row: two buildings", row["name"], UiKit.cost_text(run.stock, cost),
+	var btn := UiKit.card(why if why != "" else ("Draft a row" if drafting else "Your row"), row["name"], UiKit.cost_text(run.stock, cost),
 		"%s + %s, side by side. %s" % [a, b, row["text"]], "", ROW_SIZE, RECOMMEND_COLOR if why != "" else ROW_BORDER,
 		why != "", ROW_BORDER)
-	btn.tooltip_text = "%s and %s go up together in one cluster, a fifth cheaper than ordering both.\n%s\nOnly buildings ordered on a row card make this bonus." % [
+	btn.tooltip_text = "%s and %s go up together in one cluster, a fifth cheaper than ordering both.\n%s\nOnly buildings ordered as a row make this bonus." % [
 		a, b, row["text"]]
+	if drafting:
+		btn.tooltip_text = "Draft it: you can order this row, and each of its buildings on its own, for the rest of the run.\n" + btn.tooltip_text
+		btn.disabled = not run.hand.can_draft_row(id)
+		btn.pressed.connect(_act.bind(run.hand.draft_row.bind(id)))
+		return btn
 	btn.disabled = not run.hand.can_order_row(id)
 	var short := UiKit.shortfall(run.stock, cost)
 	UiKit.fade_if_disabled(btn, short if short != "" else "No room for both")

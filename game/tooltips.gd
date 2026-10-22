@@ -177,7 +177,7 @@ static func combo_lines(run: RunState, type: String, index := -1) -> Array[Strin
 		if active.has(id):
 			out.append("Row: %s: %s" % [row["name"], row["text"]])
 		elif row["building"] == type or row["partner"] == type:
-			out.append("Ordered with a %s on a %s row card, it would make a bonus: %s" % [
+			out.append("Ordered with a %s as a drafted %s row, it would make a bonus: %s" % [
 				c.buildings[row["partner"] if row["building"] == type else row["building"]]["name"].to_lower(), row["name"], row["text"]])
 	return out
 

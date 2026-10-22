@@ -14,7 +14,8 @@ extends RefCounted
 ## it takes family cards whenever the houses have room.
 ## Every style takes a Promote card when one is offered and affordable.
 ## Every style takes the offered relic it ranks highest (RELIC_RANK).
-## Every style can only order buildings on the round's cards (run.hand), and redraws once when shells are spare.
+## Every style can only order basics, the age-up card and buildings it has drafted (run.hand). It drafts what it
+## wanted to order and couldn't (see build), and rerolls the offers once when shells are spare and none of them is wanted.
 ## Every style builds the stone-layers' yard from round 5 so craftspeople pave the busiest paths,
 ## invites the pedlar its heroes would gain most from (see _pedlar),
 ## orders the forester and charcoal pit when they are needed (see _upkeep), the geomancer from round 3 (see spell_score),
@@ -43,8 +44,10 @@ var pedlar := true
 ## Takes a row card when it holds a building it was about to order (_order), except the workers style: its extra
 ## garden or drying rack ate the wood a town of gatherers needs (73% without rows, 62% with). balance_run.gd: rows=0 never does.
 var rows := true
-## Redraws the building cards once a round when it has at least this many shells (after its first pass).
+## Rerolls the blueprint offers once a round when it has at least this many shells and no offer is wanted.
 var redraw_above := 40
+## Buildings it tried to order this build phase without a blueprint for them, most wanted first.
+var _wishes: Array[String] = []
 
 
 func play_run(run: RunState) -> void:
@@ -61,16 +64,48 @@ func play_run(run: RunState) -> void:
 				run.choose_relic(pick_relic(run))
 
 
-## Orders from the round's building cards, then redraws once when shells are spare and orders again.
+## Orders what it can, drafts blueprints for what it wanted and couldn't, then orders again.
 func build(run: RunState) -> void:
 	if run.awaiting_traditions():
 		run.choose_traditions(TRADITIONS.get(style, []) if traditions else [])
 	if run.awaiting_pedlar():
 		run.choose_pedlar(_pedlar(run) if pedlar else "")
+	_wishes = []
 	_build_pass(run)
-	if int(run.stock["shells"]) >= redraw_above and run.hand.can_redraw():
-		run.hand.redraw()
+	while run.hand.picks > 0 and not run.hand.cards.is_empty():
+		if _wanted_offer(run) == "" and int(run.stock["shells"]) >= redraw_above and run.hand.can_redraw():
+			run.hand.redraw()
+		_draft(run)
 		_build_pass(run)
+
+
+## The first building it wished for that is on offer ("" if none).
+func _wanted_offer(run: RunState) -> String:
+	for type in _wishes:
+		if run.hand.can_draft(type):
+			return type
+	return ""
+
+
+## Drafts a row holding a wished-for building (not the workers style, see `rows`), else the most wished-for
+## offer, else one the town needs, else the first offered.
+func _draft(run: RunState) -> void:
+	if rows and style != "workers":
+		for c in run.hand.rows:
+			var row: Dictionary = run.content.combos[c["row"]]
+			if _wishes.has(row["building"]) or _wishes.has(row["partner"]):
+				run.hand.draft_row(c["row"])
+				return
+	var pick := _wanted_offer(run)
+	if pick == "":
+		for c in run.hand.cards:
+			if c["need"] != "":
+				pick = c["building"]
+				break
+	if pick == "" and not run.hand.cards.is_empty():
+		pick = run.hand.cards[0]["building"]
+	if pick != "":
+		run.hand.draft(pick)
 
 
 ## The pedlar whose wares would most improve the heroes who would walk out to it: for each hero who would go
@@ -100,8 +135,13 @@ func _pedlar(run: RunState) -> String:
 	return best if best != "" else String(run.pedlar_offer[0]["id"])
 
 
-## Orders a building if a card for it is in hand; a row card with it on is taken first (both buildings, for less).
+## Orders a building it has a blueprint for; a drafted row with it in is taken first (both buildings, for less).
+## A building it has no blueprint for goes on its wish list for the draft.
 func _order(run: RunState, type: String) -> bool:
+	if not run.hand.offers(type):
+		if not _wishes.has(type) and run.hand.draftable(type):
+			_wishes.append(type)
+		return false
 	if rows and style != "workers":
 		var row := run.hand.row_with(type)
 		if row != "" and run.hand.order_row(row):

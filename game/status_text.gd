@@ -203,7 +203,8 @@ static func clock(run: RunState) -> String:
 	var content := run.content
 	var w := run.world
 	if run.phase == RunState.Phase.BUILD:
-		return "[b]Build[/b]: order from the cards, then begin the round"
+		return "[b]Build[/b]: draft a blueprint, order from the cards, then begin the round" if run.hand.picks > 0 \
+			else "[b]Build[/b]: order from the cards, then begin the round"
 	var night := w.is_night()
 	var wave_night := w.day_index() == content.int_num("days_per_round") - 1
 	var text := "[b]Day %d / %d[/b]  %s%s" % [w.day_index() + 1, content.int_num("days_per_round"),

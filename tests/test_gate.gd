@@ -184,7 +184,7 @@ func test_bot_orders_a_gate() -> void:
 	var bot := AutoPlayer.new()
 	bot.gates = 1
 	bot.gate_round = 3
-	run.hand.cards = [{"building": "gate", "need": ""}]
+	run.hand.blueprints = ["gate"] as Array[String]
 	bot.build(run)
 	check_eq(run.world.count_buildings("gate", false), 1, "the bot ordered a gate")
 

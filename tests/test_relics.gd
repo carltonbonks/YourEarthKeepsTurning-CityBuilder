@@ -86,12 +86,12 @@ func test_broken_crown_gives_two_relics_and_shrinks_offers() -> void:
 	run.dispose()
 
 
-func test_chieftains_torc_more_building_cards_fewer_dawn_cards() -> void:
+func test_chieftains_torc_more_blueprint_offers_fewer_dawn_cards() -> void:
 	var run := _run()
 	var hand := run.hand.size()
 	_give(run, "chieftains_torc")
-	check(not run.hand.can_redraw(), "no redraw")
-	check_eq(run.hand.size(), hand + 2, "two more building cards")
+	check(not run.hand.can_redraw(), "no reroll")
+	check_eq(run.hand.size(), hand + 1, "one more blueprint offer")
 	run.begin_round()
 	run.run_until_pause()
 	check_eq(run.phase, RunState.Phase.PICK, "a dawn pick")
