@@ -56,6 +56,10 @@ func enemy_tick(enemy: Unit) -> void:
 	if enemy.target != null:
 		w.fight(enemy, enemy.target)
 		return
+	# A pedlar's camp close by is easy pickings.
+	if w.pedlar.draws(enemy):
+		w.pedlar.raid(enemy)
+		return
 	if enemy.den_index >= 0:
 		_wander(enemy)
 		return

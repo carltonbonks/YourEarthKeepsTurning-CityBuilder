@@ -8,6 +8,8 @@ signal pick_taken(index: int)
 signal relic_picked(relic_id: String)
 ## The founding traditions chosen before round 1 ([] for none).
 signal traditions_chosen(ids: Array)
+## The pedlar invited on a pedlar round ("" for none).
+signal pedlar_chosen(id: String)
 ## replay = true restarts on the same seed, false on a new one.
 signal new_run_requested(replay: bool)
 ## Start a new run on this seed (from the menu).
@@ -17,6 +19,7 @@ signal closed
 
 const PICK_SIZE := Vector2(196, 176)
 const RELIC_SIZE := Vector2(210, 150)
+const PEDLAR_SIZE := Vector2(230, 210)
 
 var run: RunState
 var _box: VBoxContainer
@@ -51,6 +54,9 @@ func _init() -> void:
 func show_for_phase() -> void:
 	if run.awaiting_traditions():
 		show_traditions()
+		return
+	if run.awaiting_pedlar():
+		show_pedlars()
 		return
 	match run.phase:
 		RunState.Phase.PICK:
@@ -143,6 +149,45 @@ func show_traditions(chosen: Array = []) -> void:
 	var found := UiKit.primary(UiKit.button(row, "Found the town", func() -> void: traditions_chosen.emit(chosen)))
 	found.disabled = chosen.size() < to_pick
 	UiKit.button(row, "No traditions", func() -> void: traditions_chosen.emit([]))
+	show()
+
+
+## On a pedlar round: invite one pedlar (or none). Each card says what it sells, how far out it camps and
+## which heroes would walk that far to trade.
+func show_pedlars() -> void:
+	var content := run.content
+	_clear()
+	_title("A pedlar's caravan is passing. Who do you invite?")
+	var note := Label.new()
+	note.text = "The pedlar camps out past the town for this round's days and leaves before the attack. Heroes walk out on their own to sell loot and buy wares; the bold and greedy go furthest. The pedlar hires a hero or two to guard the camp, and they sleep out there."
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD
+	note.custom_minimum_size.x = 660
+	_box.add_child(note)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_box.add_child(row)
+	var slots := {"weapon": "weapons", "armor": "armour", "charm": "charms", "": "a bit of everything"}
+	for offer: Dictionary in run.pedlar_offer:
+		var id: String = offer["id"]
+		var d: Dictionary = content.pedlars["pedlars"][id]
+		var pos := Vector2(offer["pos"])
+		var who := run.world.pedlar.who_would_go(pos)
+		var goers: String = ", ".join(who["go"]) if not who["go"].is_empty() else "nobody"
+		var footer := "Would go: " + goers
+		if not who["guarded"].is_empty():
+			footer += "\nOnce guarded: " + ", ".join(who["guarded"])
+		var where := "Camps %d out, %s" % [roundi(pos.length()), World.compass(pos.angle())]
+		var blurb := "%s\nSells %s, about tier %d.\n%s." % [d["text"], slots.get(d["slot"], d["slot"]),
+			run.world.pedlar.ware_tier(id), where]
+		var btn := UiKit.card("Pedlar, %s" % d["camp"], d["name"], "", blurb, footer, PEDLAR_SIZE, UiKit.HEADING_COLOR,
+			false, UiKit.HEADING_COLOR)
+		(btn.get_child(0).get_child(2) as Label).add_theme_font_size_override("font_size", 12)
+		btn.tooltip_text = blurb + "\n" + footer
+		btn.pressed.connect(func() -> void: pedlar_chosen.emit(id))
+		row.add_child(btn)
+	_skip_button("No pedlar", func() -> void: pedlar_chosen.emit(""))
 	show()
 
 
@@ -289,28 +334,11 @@ func _night_summary() -> void:
 	_box.add_child(label)
 
 
-## What the heroes took from the pedlar's carousel this round, in pick order.
-func _carousel_summary() -> void:
-	if run.people.last_carousel.is_empty():
-		return
-	var parts := PackedStringArray()
-	for p: Dictionary in run.people.last_carousel:
-		parts.append("%s took a %s%s" % [p["hero"], p["item"], "" if p["equipped"] else " to sell"])
-	var label := Label.new()
-	label.text = "A pedlar came by. " + ", then ".join(parts) + "."
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	label.custom_minimum_size.x = 600
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_color_override("font_color", UiKit.HEADING_COLOR)
-	_box.add_child(label)
-
-
 func show_relic_pick() -> void:
 	var content := run.content
 	_clear()
 	_title(("Round %d survived! Choose a pact" if run.is_pact_round() else "Round %d survived! Choose a relic") % run.round_number)
 	_night_summary()
-	_carousel_summary()
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER

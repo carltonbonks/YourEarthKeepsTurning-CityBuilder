@@ -97,6 +97,12 @@ func _found(ids: Array) -> void:
 	_refresh()
 
 
+func _invite_pedlar(id: String) -> void:
+	run.choose_pedlar(id)
+	_overlays.hide()
+	_refresh()
+
+
 func _begin_round() -> void:
 	if run.phase != RunState.Phase.BUILD:
 		return
@@ -286,6 +292,7 @@ func _build_ui() -> void:
 	_overlays.pick_taken.connect(_take_pick)
 	_overlays.relic_picked.connect(_pick_relic)
 	_overlays.traditions_chosen.connect(_found)
+	_overlays.pedlar_chosen.connect(_invite_pedlar)
 	_overlays.new_run_requested.connect(_restart)
 	_overlays.seed_run_requested.connect(_new_run)
 	_overlays.closed.connect(_close_menu)

@@ -78,6 +78,7 @@ var folk_ai: FolkAI
 var hero_ai: HeroAI
 var market: Market
 var enemy_ai: EnemyAI
+var pedlar: PedlarCamp
 
 
 func _init(run_state: RunState) -> void:
@@ -87,6 +88,7 @@ func _init(run_state: RunState) -> void:
 	hero_ai = HeroAI.new(self)
 	market = Market.new(self)
 	enemy_ai = EnemyAI.new(self)
+	pedlar = PedlarCamp.new(self)
 	rng = SeededRng.stream(run.run_seed, "world")
 	dt = 1.0 / content.num("ticks_per_second")
 	hearth_hp = run.hearth_max_hp()
@@ -209,6 +211,7 @@ func step() -> void:
 	alarms = new_alarms
 	new_alarms = []
 	market.refresh_prizes()
+	pedlar.tick()
 	enemy_ai.dens_tick()
 	for enemy in enemies:
 		if not enemy.spawned and time >= enemy.spawn_time:
@@ -297,6 +300,7 @@ func _dawn() -> void:
 	pathing.wear_trails()
 	town.patch_walls()
 	enemy_ai.mend_towers()
+	pedlar.hire_guards()
 	run.daily_upkeep()
 	pause = Pause.DAWN
 
@@ -737,4 +741,5 @@ func dispose() -> void:
 	hero_ai = null
 	market = null
 	enemy_ai = null
+	pedlar = null
 	town = null

@@ -16,6 +16,7 @@ extends RefCounted
 ## Every style takes the offered relic it ranks highest (RELIC_RANK).
 ## Every style can only order buildings on the round's cards (run.hand), and redraws once when shells are spare.
 ## Every style builds the stone-layers' yard from round 5 so craftspeople pave the busiest paths,
+## invites the pedlar its heroes would gain most from (see _pedlar),
 ## orders the forester and charcoal pit when they are needed (see _upkeep), the geomancer from round 3 (see _omen),
 ## and orders up to `gates` gates from `gate_round` (see below), and a garden when food runs short.
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
@@ -37,6 +38,8 @@ var garden_days := 3.0
 var upkeep := true
 ## Orders the Geomancer's lodge from round 3 (not the workers style) and sets an omen each round (_omen). balance_run.gd: geomancer=0 turns it off.
 var geomancer := true
+## Invites a pedlar on pedlar rounds (_pedlar). balance_run.gd: pedlar=0 never invites one.
+var pedlar := true
 const OMEN_STILL_FROM := 9
 ## Redraws the building cards once a round when it has at least this many shells (after its first pass).
 var redraw_above := 40
@@ -60,11 +63,40 @@ func play_run(run: RunState) -> void:
 func build(run: RunState) -> void:
 	if run.awaiting_traditions():
 		run.choose_traditions(TRADITIONS.get(style, []) if traditions else [])
+	if run.awaiting_pedlar():
+		run.choose_pedlar(_pedlar(run) if pedlar else "")
 	_build_pass(run)
 	if int(run.stock["shells"]) >= redraw_above and run.hand.can_redraw():
 		run.hand.redraw()
 		_build_pass(run)
 	_omen(run)
+
+
+## The pedlar whose wares would most improve the heroes who would walk out to it: for each hero who would go
+## (or would once guarded), the tiers its ware tier stands above what they wear in that slot (the weakest slot
+## for a pedlar of everything). A tie goes to the nearer camp; with no gain at all, the nearest (to sell loot).
+func _pedlar(run: RunState) -> String:
+	if run.living_heroes().is_empty():
+		return ""
+	var camp := run.world.pedlar
+	var best := ""
+	var best_gain := 0
+	for offer: Dictionary in run.pedlar_offer:
+		var id: String = offer["id"]
+		var slot: String = camp.def(id)["slot"]
+		var who := camp.who_would_go(offer["pos"])
+		var gain := 0
+		for h in run.living_heroes():
+			if not (h.display_name in who["go"] or h.display_name in who["guarded"]):
+				continue
+			var worn := 99
+			for s: String in (Loot.SLOTS if slot == "" else [slot]):
+				worn = mini(worn, int(h.items.get(s, {}).get("tier", 0)))
+			gain += maxi(0, camp.ware_tier(id) - worn)
+		if gain > best_gain:
+			best_gain = gain
+			best = id
+	return best if best != "" else String(run.pedlar_offer[0]["id"])
 
 
 ## Once the geomancer stands: feed the ridges early (stone and finds later), then still the near ring

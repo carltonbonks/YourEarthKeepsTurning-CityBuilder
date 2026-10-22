@@ -317,6 +317,27 @@ static func war_camp(run: RunState, d: Dictionary) -> Dictionary:
 	return t
 
 
+## The pedlar's camp: what is left to buy, who guards it, who would walk out to it.
+static func pedlar_camp(run: RunState) -> Dictionary:
+	var c := run.content
+	var camp: Dictionary = run.world.pedlar.camp
+	var d: Dictionary = c.pedlars["pedlars"][camp["id"]]
+	var t := new_tip("%s's camp" % d["name"])
+	var wares: Array[String] = []
+	for item: Dictionary in camp["wares"]:
+		wares.append("%s, %d shells" % [Loot.describe(c, item), run.world.pedlar.price(item)])
+	t["lines"].append("Wares: %s." % ("; ".join(wares) if not wares.is_empty() else "sold out"))
+	var guards: Array[String] = []
+	for h in run.heroes:
+		if h.alive and h.id in camp["guards"]:
+			guards.append(h.display_name)
+	t["lines"].append("Guarded by %s." % " and ".join(guards) if not guards.is_empty() else "Nobody guards it.")
+	t["lines"].append("Health %d / %d. Raiders that come near go for it; if it falls the pedlar flees with the wares." % [
+		roundi(float(camp["hp"])), int(c.pedlars["hp"])])
+	t["lines"].append("Heroes come out by day to sell loot (the pedlar takes no cut) and buy. It leaves at dusk on the last day.")
+	return t
+
+
 static func obstacle(run: RunState, id: String) -> Dictionary:
 	var def: Dictionary = run.content.town["obstacles"][id]
 	var t := new_tip(def["name"])

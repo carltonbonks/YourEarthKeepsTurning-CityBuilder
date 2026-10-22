@@ -29,7 +29,7 @@ const PULSE_COLORS := {"sank": Color("#e06048"), "den_sank": Color("#e06048"), "
 ## The controls hint shows for this many rounds.
 const HELP_ROUNDS := 2
 ## What each kind of standing thing is, for the back-to-front pass.
-enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO }
+enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO, PEDLAR }
 
 var run: RunState
 var iso := true  ## Tilted (isometric) view; false is the flat top-down view.
@@ -200,6 +200,8 @@ func _draw() -> void:
 		_queue(things, keys, Kind.DEN, den, den["pos"])
 	for bi in w.buildings.size():
 		_queue(things, keys, Kind.BUILDING, bi, w.buildings[bi]["pos"])
+	if w.pedlar.is_open():
+		_queue(things, keys, Kind.PEDLAR, null, w.pedlar.camp["pos"])
 	_queue(things, keys, Kind.HEARTH, null, Vector2.ZERO)
 	for u in w.folk:
 		if u.alive:
@@ -228,6 +230,8 @@ func _draw() -> void:
 				_draw_enemy(thing[1])
 			Kind.HERO:
 				_draw_hero(thing[1], font)
+			Kind.PEDLAR:
+				_draw_pedlar(font)
 
 	# Shots fly at chest height.
 	var chest := Vector2(0.0, -FOLK_RADIUS * maxf(1.0, zoom * 0.7) if iso else 0.0)
@@ -287,6 +291,21 @@ func _draw_den(den: Dictionary, font: Font) -> void:
 	draw_circle(p, r, Color(def["color"]))
 	draw_arc(p, r, 0, TAU, 24, Color("#a05050"), 2.0)
 	draw_string(font, p + Vector2(-r, r + 12), def["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#d0a0a0"))
+
+
+## The pedlar's camp: a striped tent with its health under it.
+func _draw_pedlar(font: Font) -> void:
+	var camp: Dictionary = run.world.pedlar.camp
+	var at := Vector2(camp["pos"])
+	var r := _den_radius()
+	_shadow(at, r)
+	var base := _to_screen(at)
+	var top := base + Vector2(0, -r * 1.8)
+	draw_colored_polygon(PackedVector2Array([base + Vector2(-r, 0), top, base + Vector2(r, 0)]), Color("#c89a4a"))
+	draw_colored_polygon(PackedVector2Array([base + Vector2(-r * 0.35, 0), top, base + Vector2(r * 0.35, 0)]), Color("#8a3a2a"))
+	_bar(base + Vector2(-r, 4), r * 2.0, float(camp["hp"]) / float(run.content.pedlars["hp"]), Color("#d8b860"))
+	var name: String = run.content.pedlars["pedlars"][camp["id"]]["name"]
+	draw_string(font, base + Vector2(-r, 20), "%s (%d wares)" % [name, camp["wares"].size()], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#e8d0a0"))
 
 
 func _den_radius() -> float:
@@ -478,6 +497,8 @@ func hovered(at: Vector2) -> Dictionary:
 		return Tooltips.obstacle(run, w.town.plots[plot]["obstacle"])
 	if _to_world(at).length() <= World.HEARTH_RADIUS + 3.0 / _scale():
 		return Tooltips.hearth(run)
+	if w.pedlar.is_open() and _near(w.pedlar.camp["pos"], at, _den_radius()):
+		return Tooltips.pedlar_camp(run)
 	for den in w.dens:
 		if _near(den["pos"], at, _den_radius()):
 			return Tooltips.den(run, den)

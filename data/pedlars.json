@@ -1,0 +1,26 @@
+{
+	"_note": "The pedlar's camp (sim/pedlar_camp.gd, Yusuf's pick 2026-10-21, replacing the pedlar's carousel). Every `every`-th round (3, 6, 9, 12) the build phase offers `offer` pedlars from `pedlars`, each with where it would camp; the player invites one or none (RunState.choose_pedlar). The pedlar camps at that spot for the round's days and packs up at dusk on the last day, before the attack. camp: near/middle/far, a distance from the hearth in `camps`; the spot is rolled away from the dens. slot: the kind of ware it sells (weapon, armor, charm; \"\" any). wares: how many it lays out, rolled as loot `ahead` rounds past this one, at least `affixes` affixes each. Heroes walk out on their own, by day, once a day: a hero goes when the camp is within camp_reach_base + (greed + wilds) x camp_reach_per of the hearth, plus guarded_reach while a guard stands at the camp. There they sell every spare item for its value x buys (the market keeps 20%, the pedlar nothing) and buy the ware that most improves their gear (by their likes), at its value x price, if they have that many shells x their hoard. The pedlar hires up to `guards` heroes whose duty or greed is at least guard_appetite (most keen first), again each dawn if one fell; guards stay by the camp day and night (sleeping rough there), fight anything within guard_radius of it, and when it packs up each takes a ware as pay, the most wanted first. Raiders and wanderers within aggro of the camp go for it; it has hp health, and if it falls the pedlar flees with the wares and the guards get nothing.",
+	"every": 3,
+	"offer": 3,
+	"camps": {"near": 290, "middle": 430, "far": 580},
+	"camp_reach_base": 150,
+	"camp_reach_per": 200,
+	"guarded_reach": 150,
+	"guards": 2,
+	"guard_appetite": 1.0,
+	"guard_radius": 130,
+	"aggro": 90,
+	"hp": 100,
+	"price": 1.2,
+	"buys": 1.0,
+	"pedlars": {
+		"tinker": {"name": "Tinker", "text": "Camps just past the town. A bit of everything, plain and fairly priced.",
+			"camp": "near", "slot": "", "wares": 5, "ahead": 0, "affixes": 0},
+		"armourer": {"name": "Armourer", "text": "Camps a fair walk out. Armour a step better than the town makes.",
+			"camp": "middle", "slot": "armor", "wares": 4, "ahead": 3, "affixes": 0},
+		"charm_seller": {"name": "Charm-seller", "text": "Camps a fair walk out. Charms, every one with a trait.",
+			"camp": "middle", "slot": "charm", "wares": 4, "ahead": 2, "affixes": 1},
+		"blade_trader": {"name": "Blade-trader", "text": "Camps far out between the dens. The best blades, for heroes bold enough to fetch them.",
+			"camp": "far", "slot": "weapon", "wares": 4, "ahead": 6, "affixes": 1}
+	}
+}

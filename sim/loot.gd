@@ -77,15 +77,17 @@ static func earth_find(content: Content, rng: SeededRng, round_number: int, age 
 
 
 ## A random dropped item. Tier grows with the round; some get one or two affixes.
-## Bases from a later age only drop once the town has reached it.
-static func roll(content: Content, rng: SeededRng, round_number: int, age := "") -> Dictionary:
+## Bases from a later age only drop once the town has reached it. slot ("" for any) limits the bases;
+## min_affixes tops the affixes up (a pedlar's wares).
+static func roll(content: Content, rng: SeededRng, round_number: int, age := "", slot := "", min_affixes := 0) -> Dictionary:
 	var drops: Dictionary = content.items["drops"]
 	var tier := clampi(1 + (round_number - 1) / int(drops["tier_every_rounds"]) + (1 if rng.randf() < 0.25 else 0),
 		1, int(drops["max_tier"]))
 	var bases: Array = content.items["bases"].keys().filter(func(id: String) -> bool:
 		return int(content.items["bases"][id].get("min_tier", 1)) <= tier \
 			and (age == "" or content.age_reached(age, content.items["bases"][id].get("age", ""))) \
-			and (age != "" or not content.items["bases"][id].has("age")))
+			and (age != "" or not content.items["bases"][id].has("age")) \
+			and (slot == "" or content.items["bases"][id]["slot"] == slot))
 	bases.sort()
 	var affix_ids: Array = content.items["affixes"].keys().filter(func(a: String) -> bool:
 		return not content.items["affixes"][a].get("earth_only", false))
@@ -97,4 +99,8 @@ static func roll(content: Content, rng: SeededRng, round_number: int, age := "")
 			var second: String = rng.pick(affix_ids)
 			if not affixes.has(second):
 				affixes.append(second)
+	while affixes.size() < mini(min_affixes, affix_ids.size()):
+		var extra: String = rng.pick(affix_ids)
+		if not affixes.has(extra):
+			affixes.append(extra)
 	return make(rng.pick(bases), tier, affixes)

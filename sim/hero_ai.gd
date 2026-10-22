@@ -55,6 +55,9 @@ func hero_tick(hero: Unit) -> void:
 	var whim: Dictionary = w.content.whims.get(hero.whim, {})
 	var wilds := float(whim.get("wilds", t["wilds"]))
 	# By day the keen ones hunt far out; at dusk and night everyone stays near home.
+	if w.pedlar.is_guard(hero):
+		_guard_tick(hero, t)
+		return
 	var reach := w.content.num("settlement_radius") + 160.0
 	if not w.is_dusk():
 		reach = maxf(reach, wilds * (w.content.num("den_max_distance") + 120.0))
@@ -79,6 +82,11 @@ func hero_tick(hero: Unit) -> void:
 	if hero.target != null:
 		w.fight(hero, hero.target)
 		return
+	if not w.is_dusk() and w.pedlar.wants_visit(hero, wilds):
+		hero.intent = "off to trade with the %s" % w.pedlar.def(w.pedlar.camp["id"])["name"].to_lower()
+		if w.walk_toward(hero, w.pedlar.camp["pos"], PedlarCamp.CAMP_RADIUS + 6.0):
+			w.pedlar.trade(hero)
+		return
 	if not w.is_dusk() and float(t["greed"]) + wilds >= w.content.num("find_appetite"):
 		var find := find_for(hero, wilds)
 		if find >= 0:
@@ -100,6 +108,28 @@ func hero_tick(hero: Unit) -> void:
 	hero.intent = "guarding the camp"
 	var index := w.run.heroes.find(hero)
 	w.walk_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * (w.content.num("settlement_radius") * 0.6), 4.0)
+
+
+## A hero guarding the pedlar's camp: fights anything near it, sleeps beside it, trades there once a day,
+## and otherwise stands watch.
+func _guard_tick(hero: Unit, t: Dictionary) -> void:
+	var camp_pos: Vector2 = w.pedlar.camp["pos"]
+	var foe := w.nearest_enemy(camp_pos, float(w.content.pedlars["guard_radius"]))
+	if foe != null:
+		hero.target = foe
+		hero.intent = "defending the pedlar's camp"
+		w.fight(hero, foe)
+		return
+	hero.target = null
+	var why_bed := _wants_bed(hero, t)
+	if why_bed != "":
+		hero.intent = "%s, bedding down at the pedlar's camp" % why_bed
+		if w.walk_toward(hero, bed_pos(hero), 8.0):
+			hero.resting = true
+		return
+	hero.intent = "guarding the pedlar's camp"
+	if w.walk_toward(hero, w.pedlar.guard_spot(hero), 6.0) and hero.pedlar_visit != w.night_key():
+		w.pedlar.trade(hero)
 
 
 ## Why a hero wants to be in bed right now ("" if they don't).
@@ -137,6 +167,8 @@ func rest_tick(hero: Unit) -> void:
 	hero.hp = minf(hero.max_hp, hero.hp + (float(def.get("heal", 0.0)) + Loot.total(w.content, hero, "rest_heal")) * w.dt)
 	if _carousing(hero):
 		hero.intent = "drinking in %s" % bed_name(bed)
+	elif w.pedlar.is_guard(hero):
+		hero.intent = "asleep at the pedlar's camp" if w.is_night() else "resting at the pedlar's camp"
 	else:
 		hero.intent = "asleep in %s" % bed_name(bed) if w.is_night() else "resting in %s" % bed_name(bed)
 	if w.is_night():
@@ -171,7 +203,7 @@ func _pay_town(hero: Unit, amount: int, reason: String) -> int:
 
 
 func _carousing(hero: Unit) -> bool:
-	if hero.whim != "carouse" or w.first_built("tavern") < 0:
+	if hero.whim != "carouse" or w.first_built("tavern") < 0 or w.pedlar.is_guard(hero):
 		return false
 	return w.is_night() or w.time_of_day() >= w.content.num("day_seconds") * float(w.content.whims["carouse"].get("from", 0.5))
 
@@ -212,12 +244,16 @@ func count_lodgings() -> int:
 
 ## Where a hero sleeps tonight: a building index, or -1 for the hearth.
 func bed_index(hero: Unit) -> int:
+	if w.pedlar.is_guard(hero):
+		return -1
 	if _carousing(hero):
 		return w.first_built("tavern")
 	return hero.lodging
 
 
 func bed_pos(hero: Unit) -> Vector2:
+	if w.pedlar.is_guard(hero):
+		return w.pedlar.guard_spot(hero)
 	var bed := bed_index(hero)
 	if bed >= 0:
 		return w.buildings[bed]["pos"]

@@ -64,7 +64,12 @@ extends RefCounted
 ## 30: the geomancer and earth finds: a round's "shift" also has "omen" (the geomancer's omen it followed, "" for none)
 ##     and "finds" (node type -> earth finds it left: starstone, sunk hoards); per round "finds_dug" (node type ->
 ##     finds heroes dug out, each an earthborn item, also in "loot").
-const RECORD_FORMAT := 30
+## 31: the pedlar's camp replaces the carousel (no more "carousel"): on pedlar rounds "pedlar_offer" (the pedlar ids
+##     offered) and, when one was invited, "pedlar" = {id, distance, wares, visits, sold (items heroes sold it),
+##     sold_value, bought: [{hero, base, tier, affixes, price}], guards (names hired), paid: [{hero, base, tier,
+##     affixes}] (wares guards took as pay), fell (raiders overran it), left (wares it took away)}; the "pedlar"
+##     action records the choice ("" for none); hero_spending gains "pedlar".
+const RECORD_FORMAT := 31
 
 var run: RunState
 ## Finished rounds, oldest first.

@@ -75,6 +75,11 @@ var hunger_turned_away := ""
 ## The geomancer's omen for the next turn of the earth (an id from "omens" in data/plates.json, "" for none),
 ## chosen while building once a building with "omens" stands; used up by that turn.
 var omen := ""
+## Pedlar rounds (data/pedlars.json): the pedlars offered while building, each {id, pos} (where it would camp),
+## the one invited ("" for none), and whether the choice is made (an unmade one invites nobody when the round begins).
+var pedlar_offer: Array[Dictionary] = []
+var pedlar := ""
+var pedlar_settled := true
 
 var _next_id := 1
 var _effects_between_rounds := {}
@@ -271,6 +276,31 @@ func choose_omen(id: String) -> void:
 	omen = "" if id == omen else id
 
 
+## True while building on a pedlar round until the player invites a pedlar or none (after the traditions).
+func awaiting_pedlar() -> bool:
+	return phase == Phase.BUILD and not pedlar_settled and not awaiting_traditions()
+
+
+## Invites one of the offered pedlars to camp this round ("" for none).
+func choose_pedlar(id: String) -> void:
+	if not awaiting_pedlar():
+		return
+	pedlar_settled = true
+	pedlar = id if pedlar_offer.any(func(o: Dictionary) -> bool: return o["id"] == id) else ""
+	record.note_value("pedlar_offer", pedlar_offer.map(func(o: Dictionary) -> String: return o["id"]))
+	record.note_action({"kind": "pedlar", "pedlar": pedlar})
+	if pedlar != "":
+		tell("You send word to the %s." % content.pedlars["pedlars"][pedlar]["name"].to_lower())
+
+
+## The offered pedlar the player invited ({id, pos}), or {}.
+func pedlar_choice() -> Dictionary:
+	for o in pedlar_offer:
+		if o["id"] == pedlar:
+			return o
+	return {}
+
+
 func set_price(kind: String, level: String) -> void:
 	if phase != Phase.BUILD or not prices.has(kind) or not content.market["price_levels"].has(level) or prices[kind] == level:
 		return
@@ -301,7 +331,11 @@ func begin_round() -> void:
 	assert(phase == Phase.BUILD)
 	# Starting round 1 without choosing founds the town on no traditions.
 	traditions_settled = true
+	if not pedlar_settled:
+		choose_pedlar("")
 	world.start_round()
+	if pedlar != "":
+		world.pedlar.open(pedlar_choice())
 	people.offer_picks()
 
 
@@ -623,6 +657,7 @@ func _close_night() -> void:
 
 
 func _finish_round() -> void:
+	world.pedlar.close()
 	people.bury_heroes()
 	people.update_moods()
 	_close_night()
@@ -654,7 +689,6 @@ func _finish_round() -> void:
 		record.end_round()
 		return
 	people.heal_between_rounds()
-	people.pedlar_carousel()
 	people.heroes_sell_finds()
 	relic_offer = _roll_relic_offer()
 	record.note_value("relic_offer", relic_offer.duplicate())
@@ -669,6 +703,7 @@ func _lose() -> void:
 	if world.pause == World.Pause.HEARTH_LOST:
 		_close_night()
 	phase = Phase.LOST
+	world.pedlar.close()
 	people.bury_heroes()
 	world.release()
 	if world.hearth_hp <= 0.0:
@@ -739,6 +774,9 @@ func _enter_build() -> void:
 	if camp_joined > 0:
 		tell("%d of them make a war camp out in the wilds. Gatherers can't work near it until heroes clear it." % camp_joined)
 	world.roll_wave_sides()
+	pedlar = ""
+	pedlar_offer = world.pedlar.roll_offer() if world.pedlar.is_pedlar_round(round_number) else ([] as Array[Dictionary])
+	pedlar_settled = pedlar_offer.is_empty()
 	trader_stock = {}
 	var trader: Dictionary = content.ages["trader"]
 	if world.count_buildings(trader["needs"]) > 0:
