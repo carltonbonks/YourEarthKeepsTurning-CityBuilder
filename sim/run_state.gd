@@ -128,6 +128,8 @@ func mod(key: String) -> float:
 		total += float(v) if v is float or v is int else 0.0
 	for id in traditions:
 		total += float(content.traditions[id].get("effects", {}).get(key, 0.0))
+	if world != null:
+		total += float(world.building_effects.get(key, 0.0))
 	return total
 
 
@@ -665,7 +667,11 @@ func food_needed_today() -> int:
 	var growth := 0.0
 	for id in relics:
 		growth += float(content.relics[id]["effects"].get("food_growth", 0.0)) * (round_number - int(relic_acquired_round[id]))
-	return maxi(0, int(ceil(population() * content.num("food_per_person_per_day") * (1.0 - 0.25 * racks) - growth)))
+	var eaten := 0
+	for type: String in content.buildings:
+		eaten += world.count_buildings(type) * int(content.buildings[type].get("eats", {}).get("food", 0))
+	eaten += world.hero_ai.hounds() * int(world.hero_ai.kennel_def().get("food", 0))
+	return maxi(0, int(ceil(population() * content.num("food_per_person_per_day") * (1.0 - 0.25 * racks) - growth))) + eaten
 
 
 ## Food that standing buildings (gardens, fields) bring in each dawn, before anyone eats. A building

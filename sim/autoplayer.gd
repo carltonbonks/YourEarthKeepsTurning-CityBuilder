@@ -105,10 +105,19 @@ func _draft(run: RunState) -> void:
 	if rows and style != "workers":
 		for c in run.hand.rows:
 			var row: Dictionary = run.content.combos[c["row"]]
-			if _wishes.has(row["building"]) or _wishes.has(row["partner"]):
+			# A row adds the building it lacks: worth a draft when that is wished for, or for its bonus alone once
+			# a workshop row's two buildings both stand.
+			var both_stand: bool = not run.content.buildings[row["building"]].get("basic", false) \
+				and run.world.count_buildings(row["building"], false) > 0 and run.world.count_buildings(row["partner"], false) > 0
+			if both_stand or _wishes.has(row["building"]) or _wishes.has(row["partner"]):
 				run.hand.draft_row(c["row"])
 				return
 	var pick := _wanted_offer(run)
+	if pick == "":
+		for type: String in _shaping_list():
+			if run.hand.can_draft(type):
+				pick = type
+				break
 	if pick == "":
 		for c in run.hand.cards:
 			if c["need"] != "":
@@ -161,6 +170,14 @@ func _order(run: RunState, type: String) -> bool:
 	return run.hand.order(type)
 
 
+## Incentive and hero-shaping buildings the bot drafts when offered (after what it wished for) and raises
+## once drafted, best first. The workers style has no heroes to shape, so only the brewhouse.
+func _shaping_list() -> Array[String]:
+	if style == "workers":
+		return ["brewhouse"] as Array[String]
+	return ["training_yard", "trophy_hall", "kennel", "seer_tent", "gibbet_post", "duel_ring", "warden_hut", "brewhouse"] as Array[String]
+
+
 func _build_pass(run: RunState) -> void:
 	if _ages(style):
 		_buy_goods(run)
@@ -210,6 +227,11 @@ func _build_pass(run: RunState) -> void:
 	# A town with no heroes gets little from it: the lodge's wood cost the workers style about 8 points.
 	if geomancer and style != "workers" and run.round_number >= 3:
 		_order(run, "geomancer")
+	# Incentive and hero-shaping buildings it drafted, from round 3.
+	if run.round_number >= 3:
+		for type: String in _shaping_list():
+			if run.hand.offers(type):
+				_order(run, type)
 	# Gates last, with whatever is left over.
 	_gates(run)
 

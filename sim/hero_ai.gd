@@ -28,6 +28,10 @@ func hero_tick(hero: Unit) -> void:
 		_use_provision(hero, "heal")
 	if not hero.retreating and hero.hp_fraction() < retreat_at:
 		hero.retreating = true
+		if hero.hound:
+			hero.hound = false
+			apply_hero_stats(hero)
+			w.run.tell("%s's hound bolts for home." % hero.display_name)
 		hero.resting = false
 		hero.target = null
 		if w.wave_spawned:
@@ -117,6 +121,11 @@ func hero_tick(hero: Unit) -> void:
 	if w.is_dusk():
 		hero.intent = "guarding the camp"
 		w.walk_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * (w.content.num("settlement_radius") * 0.6), 4.0)
+		return
+	# A training yard drills idle heroes harder than the hearth does.
+	var yard := building_with("drills")
+	if yard >= 0 and not w.is_night():
+		_drill_tick(hero, yard)
 		return
 	# A quiet day for a hero who doesn't roam: drill by the hearth for a trickle of XP.
 	hero.intent = "drilling by the hearth"
@@ -305,6 +314,8 @@ func roll_whims() -> void:
 			var needs: String = w.content.whims[id].get("needs", "")
 			if needs != "" and w.count_buildings(needs) == 0:
 				weights[id] = 0.0
+		if weights.has("trophy"):
+			weights["trophy"] = float(weights["trophy"]) * (1.0 + w.run.mod("trophy_whims"))
 		hero.whim = rng.weighted(weights)
 		if hero.whim == "":
 			hero.whim = "none"
@@ -364,6 +375,8 @@ func apply_hero_stats(hero: Unit) -> void:
 		for s: String in hero.items:
 			if hero.items[s]["affixes"].has("cursed"):
 				hero.max_hp -= float(w.content.items["affixes"]["cursed"].get("hp", 0.0))
+	if hero.hound:
+		hero.attack += float(kennel_def().get("attack", 0.0))
 	hero.attack_range = float(c["range"])
 	hero.cooldown = float(c["cooldown"])
 	hero.speed = float(c["speed"]) + Loot.total(w.content, hero, "speed", w.run.gear_bonus())
@@ -702,3 +715,83 @@ func sell_shards(hero: Unit) -> void:
 	w.run.record.impact_key(hero)
 	w.run.record.note_impact("heroes", hero.display_name, "goods", n, hero.carrying)
 	w.run.tell("%s brings back %d %s and sells it for %d shells." % [hero.display_name, n, hero.carrying, pay])
+
+
+# --- Hero-shaping buildings (data/buildings.json: drills, hounds, duels) ------------------------------
+
+## The first finished building whose data carries this key (-1 if none).
+func building_with(key: String) -> int:
+	for i in w.buildings.size():
+		var b: Dictionary = w.buildings[i]
+		if float(b["work_left"]) <= 0.0 and w.content.buildings[b["type"]].has(key):
+			return i
+	return -1
+
+
+## A hero with nothing else to do by day drills at the training yard: XP as they go, but they tire faster.
+func _drill_tick(hero: Unit, yard: int) -> void:
+	var b: Dictionary = w.buildings[yard]
+	var drills: Dictionary = w.content.buildings[b["type"]]["drills"]
+	hero.intent = "drilling at the %s" % w.content.buildings[b["type"]]["name"].to_lower()
+	if w.walk_toward(hero, b["pos"], 24.0):
+		var xp := float(drills["xp_per_second"]) * w.dt
+		hero.xp += xp
+		var key := w.run.record.impact_key(hero)
+		if not key.is_empty():
+			w.run.record.note_impact(key[0], key[1], "drilled", xp)
+		hero.energy = maxf(0.0, hero.energy - w.content.num("energy_drain") * (float(drills["energy_mult"]) - 1.0) * w.dt)
+		if fmod(w.time, 1.0) < w.dt:
+			w.run.record.note_count("drill_seconds", 1)
+
+
+## The kennel's numbers ({} when no kennel stands).
+func kennel_def() -> Dictionary:
+	var k := building_with("hounds")
+	return {} if k < 0 else w.content.buildings[w.buildings[k]["type"]]["hounds"]
+
+
+## Heroes running with a hound now.
+func hounds() -> int:
+	return w.run.living_heroes().filter(func(h: Unit) -> bool: return h.hound).size()
+
+
+## At dawn the kennel gives a hound to heroes without one, the highest level first, up to its number.
+func kennel_dawn() -> void:
+	var k := kennel_def()
+	if k.is_empty():
+		return
+	var heroes := w.run.living_heroes().filter(func(h: Unit) -> bool: return not h.hound)
+	heroes.sort_custom(func(a: Unit, b: Unit) -> bool: return a.level > b.level or (a.level == b.level and a.id < b.id))
+	for hero: Unit in heroes:
+		if hounds() >= int(k["heroes"]):
+			break
+		hero.hound = true
+		apply_hero_stats(hero)
+		w.run.record.note_count("hounds_given", 1)
+		w.run.tell("%s takes a hound from the kennel." % hero.display_name)
+
+
+## At dawn heroes carrying the duelling ring's tag spar in pairs: both learn from it, the loser is hurt.
+func duels_dawn() -> void:
+	var ring := building_with("duels")
+	if ring < 0:
+		return
+	var duels: Dictionary = w.content.buildings[w.buildings[ring]["type"]]["duels"]
+	var fighters := w.run.living_heroes().filter(func(h: Unit) -> bool:
+		return w.content.unit_has_tag(h, duels["tag"]) and not h.retreating)
+	fighters.sort_custom(func(a: Unit, b: Unit) -> bool: return a.id < b.id)
+	var rng := SeededRng.stream(w.run.run_seed, "duels", w.night_key())
+	var i := 0
+	while i + 1 < fighters.size():
+		var a: Unit = fighters[i]
+		var b: Unit = fighters[i + 1]
+		i += 2
+		# The stronger fighter usually wins, but not always.
+		var a_odds := (a.attack * a.hp) / maxf(1.0, a.attack * a.hp + b.attack * b.hp)
+		var loser := b if rng.randf() < a_odds else a
+		var winner := a if loser == b else b
+		a.xp += float(duels["xp"])
+		b.xp += float(duels["xp"])
+		loser.hp = maxf(1.0, loser.hp - loser.max_hp * float(duels["hurt"]))
+		w.run.record.note_count("duels", 1)
+		w.run.tell("%s beats %s in the duelling ring; both learn from it." % [winner.display_name, loser.display_name])

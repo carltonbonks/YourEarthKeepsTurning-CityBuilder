@@ -87,6 +87,8 @@ var hero_ai: HeroAI
 var market: Market
 var enemy_ai: EnemyAI
 var pedlar: PedlarCamp
+## Effects of the finished buildings that carry "effects" (data/buildings.json), summed; RunState.mod() adds them in.
+var building_effects := {}
 
 
 func _init(run_state: RunState) -> void:
@@ -310,6 +312,8 @@ func _dawn() -> void:
 	town.patch_walls()
 	enemy_ai.mend_towers()
 	pedlar.hire_guards()
+	hero_ai.kennel_dawn()
+	hero_ai.duels_dawn()
 	run.daily_upkeep()
 	for b in buildings:
 		b["assisted"] = 0.0
@@ -652,7 +656,7 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 	var e: Dictionary = content.enemies[victim.type_id]
 	attacker.kills += 1
 	attacker.xp += float(e["xp"]) * (1.0 + run.mod("xp_mult") + hero_ai.chosen_xp(attacker)
-		+ (content.num("hearty_xp") if attacker.well_fed else 0.0))
+		+ (content.num("hearty_xp") if attacker.well_fed else 0.0) + market.prize_xp(victim.type_id))
 	var earned := int(e["loot"]) + int(run.mod("loot_shells")) + int(Loot.total(content, attacker, "loot", run.gear_bonus()))
 	var tithe := int(earned * run.mod("hero_tithe"))
 	if tithe > 0:

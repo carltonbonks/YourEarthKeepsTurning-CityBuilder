@@ -99,7 +99,10 @@ extends RefCounted
 ##     runner delivered to a hero in the wilds) and "runners_lost" (hero -> runners killed on the way); hero_spending
 ##     gains "runners" (the fees); impact rows gain "supplied" (deliveries made, for townsfolk; taken, for heroes); a
 ##     runner's delivery is also a "market" sale; trips_cut_short gains "runner" (a gatherer called away to run).
-const RECORD_FORMAT := 40
+## 41: hero-shaping buildings: per round "drill_seconds" (hero-seconds drilled at the training yard), "hounds_given"
+##     (hounds the kennel handed out) and "duels" (bouts in the duelling ring), each only when it happened. Rows are
+##     offered only once the town has one of their buildings, so a drafted row adds at most one blueprint.
+const RECORD_FORMAT := 41
 
 var run: RunState
 ## Finished rounds, oldest first.

@@ -47,6 +47,7 @@
 	},
 	"traits": {
 		"brave": {
+			"tags": ["bold"],
 			"name": "Brave",
 			"retreat_at": 0.3,
 			"greed": 0.6,
@@ -115,6 +116,7 @@
 			}
 		},
 		"greedy": {
+			"tags": ["bold"],
 			"name": "Greedy",
 			"retreat_at": 0.3,
 			"greed": 2.2,

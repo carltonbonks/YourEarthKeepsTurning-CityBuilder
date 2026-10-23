@@ -119,13 +119,32 @@ func test_hover_names_the_row() -> void:
 
 
 func test_bots_take_row_cards() -> void:
-	# Whether a row is drafted at all depends on the draws, so look at a second run if the first had none.
+	# Rows wait for one of their buildings, so not every run gets one: look over a few.
 	var rows := 0
-	for s in [4821, 61823]:
-		for rd: Dictionary in bot_record(s, "balanced")["rounds"]:
+	for seed_value in [1004, 1005]:
+		for rd: Dictionary in bot_record(seed_value, "balanced")["rounds"]:
 			for a: Dictionary in rd["actions"]:
 				if a["kind"] == "row":
 					rows += 1
-		if rows > 0:
-			break
 	check(rows > 0, "the bot orders rows")
+
+
+func test_a_row_waits_for_one_of_its_buildings() -> void:
+	var run := _run()
+	run.build("market")
+	check(not run.hand._row_draftable("blade_row"), "no blade row before a knapper or an arms stall")
+	run.hand.blueprints = ["knapper"] as Array[String]
+	check(run.hand._row_draftable("blade_row"), "a drafted knapper opens it")
+	check_eq(run.hand.row_adds("blade_row"), ["arms_stall"] as Array[String], "it adds just the arms stall")
+	run.hand.rows = [{"row": "blade_row", "need": ""}] as Array[Dictionary]
+	run.hand.picks = 1
+	check(run.hand.draft_row("blade_row"), "drafted")
+	check_eq(run.hand.blueprints, ["knapper", "arms_stall"] as Array[String], "one new blueprint, like any draft")
+
+
+func test_offers_say_what_a_row_adds() -> void:
+	var run := _run()
+	run.build("market")
+	check_eq(BuildHandView.row_hint(run, "knapper"), "Opens a row: Blade row", "a knapper offer names the row it opens")
+	run.hand.blueprints = ["knapper"] as Array[String]
+	check_eq(BuildHandView.row_offer_line(run, "blade_row"), "You have Knapper. Adds Arms stall.", "the row card says what it adds")
