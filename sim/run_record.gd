@@ -102,7 +102,11 @@ extends RefCounted
 ## 41: hero-shaping buildings: per round "drill_seconds" (hero-seconds drilled at the training yard), "hounds_given"
 ##     (hounds the kennel handed out) and "duels" (bouts in the duelling ring), each only when it happened. Rows are
 ##     offered only once the town has one of their buildings, so a drafted row adds at most one blueprint.
-const RECORD_FORMAT := 41
+## 42: upgrades, rule-breakers and outposts: top-level "upgrades" (ids from data/upgrades.json, in the order taken)
+##     and an "upgrade" action ({"kind": "upgrade", "upgrade"}); build_hands may list "upgrade:<id>" offers; per round
+##     "outpost_goods" (good -> amount outposts brought in), "outposts_wrecked" and "outposts_moved" (building -> count),
+##     only when it happened; a final plot of an outpost has ring 0 and sector -1.
+const RECORD_FORMAT := 42
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -139,11 +143,14 @@ func to_record() -> Dictionary:
 		"keep_hp": roundi(world.hearth_hp),
 		"buildings": world.buildings.map(func(b: Dictionary) -> String: return b["type"]),
 		"plots": world.buildings.map(func(b: Dictionary) -> Dictionary:
+			if int(b["plot"]) < 0:
+				return {"building": b["type"], "ring": 0, "sector": -1}
 			var plot: Dictionary = world.town.plots[b["plot"]]
 			return {"building": b["type"], "ring": int(plot["ring"]) + 1, "sector": int(plot["sector"])}),
 		"townsfolk": folk_counts(),
 		"townsfolk_lost": run.fallen_folk,
 		"relics": run.relics.duplicate(),
+		"upgrades": run.upgrades.duplicate(),
 		"traditions": run.traditions.duplicate(),
 		"prices": run.prices.duplicate(),
 		"age": run.age,

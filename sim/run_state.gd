@@ -36,6 +36,8 @@ var relic_acquired_round := {}
 var relic_offer: Array[String] = []
 ## Founding traditions chosen before round 1 (data/traditions.json), and whether that choice is made (or skipped).
 var traditions: Array[String] = []
+## Upgrades taken this run (data/upgrades.json), in order.
+var upgrades: Array[String] = []
 var traditions_settled := false
 ## The spoils in this round's relic offer: {id, kind (enemy tag), foes (how many of that kind came)}, or {}.
 var spoils := {}
@@ -89,7 +91,7 @@ var _effects_between_rounds := {}
 
 
 func _init(game_content: Content, seed_value: int) -> void:
-	content = game_content
+	content = game_content.for_run()
 	run_seed = seed_value
 	people = People.new(self)
 	hand = BuildHand.new(self)
@@ -292,7 +294,7 @@ func can_build(type: String) -> bool:
 		and world.count_buildings(type, false) < building_max(type) \
 		and (needs == "" or world.count_buildings(needs, false) > 0) \
 		and content.age_reached(age, def.get("age", "")) and population() >= int(def.get("min_people", 0)) \
-		and world.town.choose_plot(type) >= 0
+		and world.has_spot(type)
 
 
 ## How many of a building the town may have: its max, raised by max_by_age once the town reaches that age.
@@ -314,6 +316,24 @@ func build(type: String) -> bool:
 		stock[r] = int(stock[r]) - int(cost[r])
 	record.note_action({"kind": "build", "building": type})
 	return true
+
+
+## Takes an upgrade (data/upgrades.json): its numbers are added to its building's data for the rest of the run.
+func take_upgrade(id: String) -> void:
+	var up: Dictionary = content.upgrades[id]
+	var def: Dictionary = content.buildings[up["building"]]
+	for key: String in up["add"]:
+		var parts := key.split(".")
+		var at: Dictionary = def
+		for i in parts.size() - 1:
+			if not at.has(parts[i]):
+				at[parts[i]] = {}
+			at = at[parts[i]]
+		var last := parts[parts.size() - 1]
+		at[last] = float(at.get(last, 0.0)) + float(up["add"][key])
+	upgrades.append(id)
+	record.note_action({"kind": "upgrade", "upgrade": id})
+	tell("%s: %s" % [up["name"], up["text"]])
 
 
 ## A row card's price: both buildings' costs, less row_discount (rounded down).
@@ -468,6 +488,11 @@ func on_building_done(type: String) -> void:
 		world.hero_ai.assign_lodgings()
 	if def.has("hearth_hp"):
 		world.hearth_hp = minf(hearth_max_hp(), world.hearth_hp + float(def["hearth_hp"]))
+	# A building with effects (an oath stone's hero_attack) changes heroes' stats the moment it stands.
+	if def.has("effects"):
+		world.market.refresh_prizes()
+		for hero in living_heroes():
+			world.hero_ai.apply_hero_stats(hero)
 	# Goods a building brings with it when it stands (the age-up buildings' founding gifts).
 	for good: String in def.get("gift", {}):
 		stock[good] = int(stock.get(good, 0)) + int(def["gift"][good])

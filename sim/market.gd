@@ -13,6 +13,8 @@ var w: World
 var _prizes := {}
 ## Extra XP share per prize tag (a prize's "xp"), rebuilt with the prizes.
 var _prize_xp := {}
+## How far an outpost stands from its node, on the town's side.
+const OUTPOST_OFFSET := 26.0
 
 
 func _init(world: World) -> void:
@@ -237,3 +239,91 @@ func pay_prizes(hero: Unit, victim: Unit) -> void:
 	hero.gold += paid
 	hero.mood_events["prize"] = int(hero.mood_events.get("prize", 0)) + 1
 	w.run.record.note_economy("prizes", paid)
+
+
+# --- Outposts (data/buildings.json "outpost") -----------------------------------------------------
+
+## The node an outpost of this type would stand by: the farthest stocked node of its goods from the hearth
+## that no other outpost works (-1 if none).
+func outpost_node(type: String) -> int:
+	var post: Dictionary = w.content.buildings[type]["outpost"]
+	var taken := {}
+	for b in w.buildings:
+		if b.has("node"):
+			taken[int(b["node"])] = true
+	var best := -1
+	for i in w.nodes.size():
+		var node: Dictionary = w.nodes[i]
+		if node["gives"] != post["gives"] or not w.node_active(node) or int(node["amount"]) <= 0 or taken.has(i):
+			continue
+		if best < 0 or node["pos"].length() > w.nodes[best]["pos"].length():
+			best = i
+	return best
+
+
+## Places an outpost by its node, a little on the town's side of it. False if no node is free.
+func add_outpost(type: String) -> bool:
+	var node := outpost_node(type)
+	if node < 0:
+		return false
+	w.buildings.append({"type": type, "plot": -1, "node": node, "pos": _outpost_pos(node),
+		"work_left": float(w.content.buildings[type]["work"]), "cooldown_left": 0.0, "hp": 0.0,
+		"goods": [], "craft": "", "craft_left": 0.0, "craft_tier": 1, "made": 0})
+	return true
+
+
+func _outpost_pos(node: int) -> Vector2:
+	var at: Vector2 = w.nodes[node]["pos"]
+	return at - at.normalized() * OUTPOST_OFFSET
+
+
+## Each step: an outpost rides its node across the shifting earth, and a standing outpost with an enemy close
+## by is wrecked: it brings nothing until craftspeople raise it again.
+func outposts_tick() -> void:
+	for i in w.buildings.size():
+		var b: Dictionary = w.buildings[i]
+		if not b.has("node"):
+			continue
+		b["pos"] = _outpost_pos(int(b["node"]))
+		if float(b["work_left"]) > 0.0:
+			continue
+		var post: Dictionary = w.content.buildings[b["type"]]["outpost"]
+		var foe := w.nearest_enemy(b["pos"], float(post["raid_radius"]))
+		if foe != null:
+			b["work_left"] = float(w.content.buildings[b["type"]]["work"]) * float(post["rebuild_share"])
+			w.run.record.note_count("outposts_wrecked", 1, b["type"])
+			w.run.tell("A %s wrecks the %s out by the %s." % [foe.display_name.to_lower(),
+				w.content.buildings[b["type"]]["name"].to_lower(), w.content.world["nodes"][w.nodes[int(b["node"])]["type"]]["name"].to_lower()])
+
+
+## At dawn each standing outpost brings in goods from its node. One whose node the earth took (or that was
+## worked out) moves to the next free node of its kind and must be raised again.
+func outposts_dawn() -> void:
+	for i in w.buildings.size():
+		var b: Dictionary = w.buildings[i]
+		if not b.has("node"):
+			continue
+		var node: Dictionary = w.nodes[int(b["node"])]
+		if not w.node_active(node) or int(node["amount"]) <= 0:
+			var name: String = w.content.buildings[b["type"]]["name"]
+			b["node"] = -1
+			var next := outpost_node(b["type"])
+			if next < 0:
+				b["node"] = int(w.nodes.find(node))
+				continue
+			b["node"] = next
+			b["pos"] = _outpost_pos(next)
+			b["work_left"] = float(w.content.buildings[b["type"]]["work"])
+			w.run.record.note_count("outposts_moved", 1, b["type"])
+			w.run.tell("The %s's %s is gone; it must be raised again by another." % [name.to_lower(),
+				w.content.world["nodes"][node["type"]]["name"].to_lower()])
+			continue
+		if float(b["work_left"]) > 0.0:
+			continue
+		var post: Dictionary = w.content.buildings[b["type"]]["outpost"]
+		var got := mini(int(post["take"]), int(node["amount"]))
+		node["amount"] = int(node["amount"]) - got
+		var good: String = post["gives"]
+		w.run.stock[good] = int(w.run.stock.get(good, 0)) + got
+		w.run.record.note_count("outpost_goods", got, good)
+

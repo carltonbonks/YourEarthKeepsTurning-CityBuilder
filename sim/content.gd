@@ -31,6 +31,7 @@ var combos: Dictionary  ## data/combos.json: row cards, two buildings ordered to
 var ventures: Dictionary  ## data/ventures.json: dawn cards that spend tribespeople for goods.
 var pedlars: Dictionary  ## data/pedlars.json: the pedlars invited on pedlar rounds and their camp (see PedlarCamp).
 var trades: Dictionary  ## data/trades.json: the caravan's trade cards (see Caravan).
+var upgrades: Dictionary  ## data/upgrades.json: draft offers that change a building the town has, for the run.
 var rarity: Dictionary  ## data/rarity.json: the four rarities (white, blue, yellow, orange) anything can carry.
 
 
@@ -60,6 +61,18 @@ static func load_default() -> Content:
 	c.pedlars = _strip(_read("pedlars.json"))
 	c.rarity = _strip(_read("rarity.json"))
 	c.trades = _strip(_read("trades.json"))
+	c.upgrades = _strip(_read("upgrades.json"))
+	return c
+
+
+## A copy for one run: the same data, but buildings of its own, so upgrades taken in this run
+## (RunState.take_upgrade) change only this run.
+func for_run() -> Content:
+	var c := Content.new()
+	for p in get_property_list():
+		if p["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE:
+			c.set(p["name"], get(p["name"]))
+	c.buildings = buildings.duplicate(true)
 	return c
 
 

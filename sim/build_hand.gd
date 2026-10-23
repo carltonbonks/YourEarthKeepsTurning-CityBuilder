@@ -18,6 +18,8 @@ var cards: Array[Dictionary] = []
 var milestone := {}
 ## Row offers in the draft, each {"row": id from data/combos.json, "need": why the town wants either building}.
 var rows: Array[Dictionary] = []
+## Upgrade offers in the draft, each {"upgrade": id from data/upgrades.json}.
+var upgrade_offers: Array[Dictionary] = []
 ## Buildings drafted this run, in the order they were taken: on offer for good.
 var blueprints: Array[String] = []
 ## Rows drafted this run.
@@ -193,6 +195,7 @@ func _after_draft() -> void:
 	else:
 		cards = []
 		rows = []
+		upgrade_offers = []
 
 
 ## Buildings that could be drafted now: not basic or ageing up, not drafted yet, in reach of the age, below their max,
@@ -230,6 +233,8 @@ func labels() -> Array:
 		out.append("row:" + c["row"])
 	if ring_offer():
 		out.append("ring")
+	for c in upgrade_offers:
+		out.append("upgrade:" + c["upgrade"])
 	return out
 
 
@@ -244,7 +249,7 @@ func eligible(type: String) -> bool:
 		and (needs == "" or run.world.count_buildings(needs, false) > 0) \
 		and run.population() >= int(def.get("min_people", 0)) \
 		and not (def.has("ages_up") and content.age_reached(run.age, def["ages_up"])) \
-		and run.world.town.choose_plot(type) >= 0
+		and run.world.has_spot(type)
 
 
 ## Why the town wants a building now: "housing", "food", "beds", "regrow" (the nodes it tends are picked over),
@@ -307,6 +312,7 @@ func _fill(rng: SeededRng, avoid: Array = []) -> void:
 	var content := run.content
 	cards = []
 	rows = []
+	upgrade_offers = []
 	milestone = {}
 	var types := content.buildings.keys()
 	types.sort()
@@ -334,6 +340,8 @@ func _fill(rng: SeededRng, avoid: Array = []) -> void:
 	var room := size()
 	_fill_rows(rng, avoid)
 	room -= rows.size()
+	# An upgrade comes on top of the building offers, so it never crowds out a new building.
+	_fill_upgrades(rng, avoid)
 	# The building the next age-up needs is always offered, so ageing up never waits on luck.
 	var must := ageing_need()
 	if must != "" and weights.has(must) and room > 0:
@@ -343,6 +351,42 @@ func _fill(rng: SeededRng, avoid: Array = []) -> void:
 		var type := rng.weighted(weights)
 		weights.erase(type)
 		cards.append({"building": type, "need": need(type)})
+
+
+## Offers up to upgrade_cards upgrades not taken yet for buildings the town has standing, weighted by rarity.
+func _fill_upgrades(rng: SeededRng, avoid: Array) -> void:
+	var weights := {}
+	var ids := run.content.upgrades.keys()
+	ids.sort()
+	for id: String in ids:
+		if not upgradable(id):
+			continue
+		var weight := run.content.rarity_odds(run.content.upgrades[id].get("rarity", "white"), run.round_number)
+		if avoid.has("upgrade:" + id):
+			weight *= 0.25
+		weights[id] = weight
+	while upgrade_offers.size() < run.content.int_num("upgrade_cards") and not weights.is_empty():
+		var id := rng.weighted(weights)
+		weights.erase(id)
+		upgrade_offers.append({"upgrade": id})
+
+
+## An upgrade can be offered once its building stands, until it is taken.
+func upgradable(id: String) -> bool:
+	return not run.upgrades.has(id) and run.world.count_buildings(run.content.upgrades[id]["building"]) > 0
+
+
+func can_draft_upgrade(id: String) -> bool:
+	return run.phase == RunState.Phase.BUILD and picks > 0 and upgrade_offers.any(func(c: Dictionary) -> bool: return c["upgrade"] == id)
+
+
+## Takes an offered upgrade for the rest of the run, spending the draft.
+func draft_upgrade(id: String) -> bool:
+	if not can_draft_upgrade(id):
+		return false
+	run.take_upgrade(id)
+	_after_draft()
+	return true
 
 
 ## Offers up to row_cards rows not drafted yet whose buildings are in reach of the age, favouring rows the town needs.
