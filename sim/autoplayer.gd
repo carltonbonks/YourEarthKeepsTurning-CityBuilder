@@ -8,7 +8,7 @@ extends RefCounted
 ## "heroes": rushes the longhouse and takes every hero card it can afford.
 ## "market": like balanced, but builds every workshop and stall early and the hunting lodge.
 ## "bronze": like market, then raises the Bronze moot as soon as it can, the smelter and bronzesmith,
-## buys tool sets (picks, chisels, then spears) and some tin from the caravan.
+## buys tool sets (picks, chisels, then spears) and takes caravan deals (see _buy_goods).
 ## "medieval": like bronze, then saves for the Stone keep once the bronzesmith stands, and after it
 ## the charcoal burner, bloomery, blacksmith, townhouses, fields, guildhall, chapel and iron tool sets;
 ## it takes family cards whenever the houses have room.
@@ -23,6 +23,8 @@ extends RefCounted
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
 ## since the market is now the only place heroes can buy gear.
 var style := "balanced"
+## Shells it keeps after taking a caravan deal.
+var trade_reserve := 30
 ## Gates: how many it orders at most (after everything else, when a plot fits) and from which round.
 ## Free gates were worth about 11 points; ordered last it rarely has 6 wood spare, so it builds few.
 ## balance_run.gd sets these with gates= and gate_round=.
@@ -271,8 +273,6 @@ func _bronze(run: RunState) -> void:
 	if not _order(run, "smelter") and run.world.count_buildings("smelter", false) == 0:
 		return
 	_order(run, "bronzesmith")
-	while int(run.stock["shells"]) > 45 and int(run.stock["tin"]) < 4 and run.trade("tin"):
-		pass
 	# The medieval bot keeps its ingots for the Stone keep until it is ordered.
 	if style == "medieval" and run.world.count_buildings("stone_keep", false) == 0:
 		return
@@ -283,11 +283,16 @@ func _bronze(run: RunState) -> void:
 		break
 
 
-## Spare shells buy timber and stone from the caravan before anything is ordered.
+## Takes the caravan's deals before anything is ordered: ones the town needs, people and smiths, and the relic
+## dealer, while it keeps trade_reserve shells after paying.
 func _buy_goods(run: RunState) -> void:
-	for good: String in ["stone", "wood"]:
-		while int(run.stock["shells"]) > 60 and int(run.stock[good]) < 30 and run.trade(good):
-			pass
+	for i in run.caravan.offers.size():
+		var id: String = run.caravan.offers[i]["deal"]
+		var def := run.caravan.deal(id)
+		var give: Dictionary = def["give"]
+		var wanted: bool = run.caravan.offers[i]["need"] != "" or def.has("folk") or def.has("smith") or def.has("relic")
+		if wanted and int(run.stock["shells"]) - int(give.get("shells", 0)) >= trade_reserve:
+			run.caravan.take(i)
 
 
 func _ages(s: String) -> bool:

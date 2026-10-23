@@ -310,6 +310,8 @@ func _dawn() -> void:
 	hero_ai.kennel_dawn()
 	hero_ai.duels_dawn()
 	run.daily_upkeep()
+	for b in buildings:
+		b["assisted"] = 0.0
 	pause = Pause.DAWN
 
 

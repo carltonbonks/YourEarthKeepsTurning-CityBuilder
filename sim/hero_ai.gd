@@ -109,13 +109,24 @@ func hero_tick(hero: Unit) -> void:
 		hero.intent = "stalking the %s" % w.content.world["dens"][den["type"]]["name"].to_lower()
 		w.walk_toward(hero, den["pos"] * 0.85, 10.0)
 		return
+	var index := w.run.heroes.find(hero)
+	if w.is_dusk():
+		hero.intent = "guarding the camp"
+		w.walk_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * (w.content.num("settlement_radius") * 0.6), 4.0)
+		return
+	# A training yard drills idle heroes harder than the hearth does.
 	var yard := building_with("drills")
-	if yard >= 0 and not w.is_dusk() and not w.is_night():
+	if yard >= 0 and not w.is_night():
 		_drill_tick(hero, yard)
 		return
-	hero.intent = "guarding the camp"
-	var index := w.run.heroes.find(hero)
-	w.walk_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * (w.content.num("settlement_radius") * 0.6), 4.0)
+	# A quiet day for a hero who doesn't roam: drill by the hearth for a trickle of XP.
+	hero.intent = "drilling by the hearth"
+	if w.walk_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * w.content.num("drill_radius"), 4.0):
+		var xp := w.content.num("drill_xp_per_second") * w.dt
+		hero.xp += xp
+		var key := w.run.record.impact_key(hero)
+		if not key.is_empty():
+			w.run.record.note_impact(key[0], key[1], "drilled", xp)
 
 
 ## A hero guarding the pedlar's camp: fights anything near it, sleeps beside it, trades there once a day,
@@ -664,7 +675,11 @@ func _drill_tick(hero: Unit, yard: int) -> void:
 	var drills: Dictionary = w.content.buildings[b["type"]]["drills"]
 	hero.intent = "drilling at the %s" % w.content.buildings[b["type"]]["name"].to_lower()
 	if w.walk_toward(hero, b["pos"], 24.0):
-		hero.xp += float(drills["xp_per_second"]) * w.dt
+		var xp := float(drills["xp_per_second"]) * w.dt
+		hero.xp += xp
+		var key := w.run.record.impact_key(hero)
+		if not key.is_empty():
+			w.run.record.note_impact(key[0], key[1], "drilled", xp)
 		hero.energy = maxf(0.0, hero.energy - w.content.num("energy_drain") * (float(drills["energy_mult"]) - 1.0) * w.dt)
 		if fmod(w.time, 1.0) < w.dt:
 			w.run.record.note_count("drill_seconds", 1)

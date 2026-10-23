@@ -54,21 +54,21 @@ func test_screen_shows_every_phase_of_a_run() -> void:
 
 func test_every_kind_of_card_shows() -> void:
 	# The medieval cards a seeded bot may never be dealt: family, knighting, a master craftsperson,
-	# and every tool set and caravan good in the building hand.
+	# and every tool set and some caravan deals in the building hand.
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	run.age = "medieval"
-	for good: String in run.content.ages["trader"]["goods"]:
-		run.trader_stock[good] = 1
+	for id: String in ["tin_bundle", "sellswords", "relic_dealer"]:
+		run.caravan.offers.append({"deal": id, "need": "", "taken": false})
 	screen.call("_refresh")
 	var hand: BuildHandView = screen.get("_hand_view")
 	var labels := []
 	for card in hand.find_children("*", "Label", true, false):
 		labels.append((card as Label).text)
 	check(labels.has("Iron ploughs and axes"), "a medieval tool set is a card in the hand")
-	check(labels.has("1 tin"), "the caravan's goods are cards in the hand")
+	check(labels.has("Bundle of tin") and labels.has("Relic dealer"), "the caravan's deals are cards in the hand")
 	run.begin_round()
 	check_eq(run.phase, RunState.Phase.PICK, "the round opens on a dawn pick")
 	var champion := run.people.make_hero()
