@@ -3,7 +3,7 @@ extends PanelContainer
 ## The round's building cards (run.hand) as a heads-up hand along the bottom of the map, split into
 ## sections with plain dividers so it's clear where each card comes from: Core (homes and food, always
 ## on offer), Your blueprints (buildings and rows drafted this run), Upgrades (the ageing-up card and
-## tool sets, once there are any) and Trading (the caravan's goods, once it comes). While a draft is
+## tool sets, once there are any) and Trading (the caravan's trade cards, once it comes). While a draft is
 ## left, the blueprint offers (each says what it adds to the dawn picks) and the reroll sit apart in
 ## the DraftPopup window over the map. A card the town needs says why on a gold strip at the top
 ## ("Food runs out in 2 days"); a card the town can't take says why on a red strip at the bottom
@@ -19,8 +19,6 @@ const CARD_SIZE := Vector2(150, 132)
 const BASIC_SIZE := Vector2(118, 132)
 const ROW_SIZE := Vector2(176, 132)
 const ROW_BORDER := Color("#9ec27a")
-## Height of the buyout button under each caravan card; the card shrinks to make room.
-const BUYOUT_HEIGHT := 28.0
 ## Each section's colour: its heading, its edge and a faint tint behind its cards.
 const CORE_COLOR := Color("#c8ccd4")
 const BLUEPRINT_COLOR := Color("#ffd28a")
@@ -75,7 +73,7 @@ func refresh() -> void:
 		upgrades.add_child(_card(run.hand.milestone["building"], "", "age"))
 	_tool_cards(upgrades)
 	_drop_if_empty(upgrades)
-	var trading := _section("Trading", "The caravan's goods", TRADE_COLOR)
+	var trading := _section("Trading", "The caravan's deals, once each this round", TRADE_COLOR)
 	_caravan_cards(trading)
 	_drop_if_empty(trading)
 
@@ -289,34 +287,51 @@ func _tool_cards(parent: HBoxContainer) -> void:
 		parent.add_child(btn)
 
 
-## Whatever the southern caravan has left this round, from the bronze age.
+## The southern caravan's trade cards (run.caravan): each deal once a round, its border and name in its rarity's
+## colour, a gold strip when the town wants it, a red one when it can't be taken.
 func _caravan_cards(parent: HBoxContainer) -> void:
+	for i in run.caravan.offers.size():
+		parent.add_child(_deal_card(i))
+
+
+func _deal_card(index: int) -> Button:
 	var content := run.content
-	if not content.age_reached(run.age, "bronze"):
-		return
-	var trader: Dictionary = content.ages["trader"]
-	for good: String in run.trader_stock:
-		if int(run.trader_stock[good]) <= 0:
-			continue
-		# One card buys one; the buyout under it takes as many as the shells pay for.
-		var col := VBoxContainer.new()
-		col.add_theme_constant_override("separation", 4)
-		var btn := UiKit.card("Caravan · %d left" % run.trader_stock[good], "1 %s" % good,
-			UiKit.cost_text(run.stock, {"shells": run.trader_price(good)}), "", "", Vector2(BASIC_SIZE.x, BASIC_SIZE.y - BUYOUT_HEIGHT - 4), Color("#c0a060"))
-		btn.tooltip_text = "%s\n%s\n%d left this round." % [trader["name"], trader["text"], run.trader_stock[good]]
-		btn.disabled = not run.can_trade(good)
-		UiKit.fade_if_disabled(btn, UiKit.shortfall(run.stock, {"shells": run.trader_price(good)}))
-		btn.pressed.connect(_act.bind(run.trade.bind(good)))
-		col.add_child(btn)
-		var n := run.buyout_count(good)
-		var all := UiKit.secondary(Button.new(), 12)
-		all.text = "Buy %d · %d shells" % [n, n * run.trader_price(good)] if n > 0 else "Buyout"
-		all.custom_minimum_size = Vector2(BASIC_SIZE.x, BUYOUT_HEIGHT)
-		all.disabled = n == 0
-		all.tooltip_text = "Buy as many %s as your shells pay for, up to all the caravan has left." % good
-		all.pressed.connect(_act.bind(run.buyout.bind(good)))
-		col.add_child(all)
-		parent.add_child(col)
+	var offer: Dictionary = run.caravan.offers[index]
+	var id: String = offer["deal"]
+	var def := run.caravan.deal(id)
+	var rarity := content.rarity_of("deal", id)
+	var colour := content.rarity_color(rarity)
+	var top: String = offer["need"] if offer["need"] != "" else "Caravan · %s" % content.rarity_tier(rarity)["name"]
+	# Spelled out as a trade: what you hand over, then what you get back.
+	var terms := "[color=#9da2ab]You pay[/color] %s\n[color=#9da2ab]You get[/color] [color=#a8d890]%s[/color]" % [
+		UiKit.cost_text(run.stock, def["give"]), deal_brings(run, id)]
+	var btn := UiKit.card(top, def["name"], terms, def["text"],
+		"", CARD_SIZE, colour, offer["need"] != "", Color.WHITE if rarity == "white" else colour)
+	var pays := ", ".join(PackedStringArray(def["give"].keys().map(func(g: String) -> String: return "%d %s" % [def["give"][g], g])))
+	btn.tooltip_text = "%s deal from the %s (rarer deals come up less often).\n%s\nYou pay: %s.\nYou get: %s.\nOnce this round." % [
+		content.rarity_tier(rarity)["name"], content.trades["name"].to_lower(), def["text"], pays, deal_brings(run, id)]
+	btn.disabled = not run.caravan.can_take(index)
+	var blocked := run.caravan.blocker(index)
+	UiKit.fade_if_disabled(btn, blocked if blocked != "" else UiKit.shortfall(run.stock, def["give"]))
+	btn.pressed.connect(_act.bind(run.caravan.take.bind(index)))
+	return btn
+
+
+## What a deal brings, in words: "+4 tin", "2 warriors join", "every hero's weapon +1 tier", "a relic".
+static func deal_brings(r: RunState, id: String) -> String:
+	var def := r.caravan.deal(id)
+	var parts: PackedStringArray = []
+	var got := r.caravan.gets(id)
+	for good: String in got:
+		parts.append("+%d %s" % [got[good], good])
+	for role: String in def.get("folk", {}):
+		var n := int(def["folk"][role])
+		parts.append("%d %s%s join" % [n, r.content.townsfolk[role]["name"].to_lower(), "s" if n > 1 else ""])
+	if int(def.get("smith", 0)) > 0:
+		parts.append("hero weapons +%d tier%s" % [def["smith"], "s" if int(def["smith"]) > 1 else ""])
+	if int(def.get("relic", 0)) > 0:
+		parts.append("a relic")
+	return ", ".join(parts)
 
 
 ## Why a building can't be ordered yet, beyond its cost ("" if nothing).

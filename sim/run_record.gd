@@ -82,10 +82,14 @@ extends RefCounted
 ## 35: blueprints replace one-use building cards: "build_hands" now lists each round's draft offers (then one list per
 ##     reroll, and one after each draft while drafts are left); per round "blueprints" = [{building}] drafted that round
 ##     (a drafted row adds its non-basic buildings); a "blueprint" action ({"kind": "blueprint", "building"} or {"row"}).
-## 36: idle hands: per round "idle_seconds" (role -> daytime seconds townsfolk stood idle), "trips_bumped" (good ->
+## 36: trade cards replace the caravan's per-good shop: per round "deals_offered" (deal ids from data/trades.json the
+##     caravan laid out, [] before it comes) and "deals" = [{deal, rarity, got (good -> amount), reforged (heroes whose
+##     weapon a smith raised), relic (one a relic dealer sold)}]; "trades" still counts goods bought, by good; a
+##     "deal" action ({"kind": "deal", "deal"}).
+## 37: idle hands: per round "idle_seconds" (role -> daytime seconds townsfolk stood idle), "trips_bumped" (good ->
 ##     gathering trips a gatherer leaning to the good took over from one who didn't); impact rows gain "helped" (seconds
 ##     townsfolk lent a hand at buildings) and, for heroes, "drilled" (XP from drilling on quiet days).
-const RECORD_FORMAT := 36
+const RECORD_FORMAT := 37
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -160,7 +164,8 @@ func begin_round() -> void:
 		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {}, "idle_seconds": {}, "trips_bumped": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
 		"camps_cleared": 0, "camp_spoils": 0, "hearty_meals": 0,
-		"build_hands": [{"cards": run.hand.labels()}], "blueprints": [], "impact": {}, "spells": []}
+		"build_hands": [{"cards": run.hand.labels()}], "blueprints": [], "impact": {}, "spells": [],
+		"deals_offered": run.caravan.labels(), "deals": []}
 
 
 func end_round() -> void:
