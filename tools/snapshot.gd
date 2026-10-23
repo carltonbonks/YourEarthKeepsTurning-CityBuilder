@@ -16,14 +16,16 @@ extends SceneTree
 ## ageup=1 plays on from that round until the town reaches a new age and shows the celebration (style=bronze or
 ## medieval gets there); levelup=1 levels up the first hero so the halo shows.
 ## deals=<id,id,...> lays out those caravan trade cards (data/trades.json) in the build hand.
+## size=<W>x<H> sets the window size (default 1600x1000), to check the screen layout at other sizes.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": ""}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "size": "1600x1000"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
 			args[kv[0]] = kv[1]
-	DisplayServer.window_set_size(Vector2i(1600, 1000))
+	var wh: PackedStringArray = args["size"].split("x")
+	DisplayServer.window_set_size(Vector2i(int(wh[0]), int(wh[1])))
 	var main: Control = load("res://game/main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame

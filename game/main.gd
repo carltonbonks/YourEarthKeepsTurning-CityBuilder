@@ -6,8 +6,9 @@ extends Control
 ##
 ## This file runs the flow (new run, ticking the sim, pausing for decisions, pause and speed, the Esc
 ## menu) and lays out the screen. The parts live in their own files: TopBar, BuildHandView (the
-## building cards, with the blueprint draft in a DraftPopup), ThreatCard (the attack and Begin round), Alerts, HeroStrip, StoryLog, Overlays
-## (picks, relics, end screen, menu, Run history, dev tuning) and ArenaView (the map).
+## building cards, with the blueprint draft in a DraftPopup), ThreatCard (the attack), Alerts, HeroStrip, StoryLog, Overlays
+## (picks, relics, end screen, menu, Run history, dev tuning) and ArenaView (the map). HudLayout keeps
+## the panels over the map out of each other's way.
 
 ## How often the live panels are rebuilt while the sim runs (the map redraws every frame).
 const LIVE_REFRESH_SECONDS := 0.1
@@ -31,6 +32,9 @@ var _draft: DraftPopup
 var _threat: ThreatCard
 var _alerts: Alerts
 var _arena: ArenaView
+var _map_box: Control
+## The clock and alerts in the map's top-left corner.
+var _corner: VBoxContainer
 var _clock_label: RichTextLabel
 var _heroes: HeroStrip
 var _story: StoryLog
@@ -198,6 +202,36 @@ func _refresh_live() -> void:
 	_alerts.refresh()
 	_heroes.refresh()
 	_story.refresh()
+	_layout_hud()
+
+
+## Gives each panel over the map its own room (HudLayout): the draft window keeps its place, the hand
+## its strip along the bottom, and the corner columns take the tallest free stretch of their edge and
+## fold what doesn't fit there.
+func _layout_hud() -> void:
+	if _draft == null:
+		return  # Still building the screen.
+	var area := _map_box.size
+	if area.x <= 0.0 or area.y <= 0.0:
+		return
+	var m := HudLayout.MARGIN
+	var bottom := area.y - m
+	if _hand_view.visible:
+		bottom -= maxf(_hand_view.size.y, _hand_view.get_combined_minimum_size().y)
+	var blocks: Array[Rect2] = []
+	if _draft.visible:
+		blocks.append(_draft.shown_rect())
+	var left_x := m + 2.0
+	var left := HudLayout.free_span(left_x, left_x + Alerts.WIDTH, m, bottom, blocks)
+	_corner.position = Vector2(left_x, left.x)
+	var sep := float(_corner.get_theme_constant("separation"))
+	_alerts.fit(left.y - left.x - _clock_label.get_combined_minimum_size().y - sep)
+	_corner.reset_size()
+	var right_x := area.x - ThreatCard.WIDTH - m - 2.0
+	var right := HudLayout.free_span(right_x, area.x, m, bottom, blocks)
+	_threat.fit(right.y - right.x)
+	_threat.position = Vector2(right_x, right.x)
+	_threat.reset_size()
 
 
 # --- Seeds -----------------------------------------------------------------
@@ -247,42 +281,47 @@ func _build_ui() -> void:
 	# building cards as a heads-up hand along its bottom edge while building.
 	var map_box := Control.new()
 	map_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	map_box.resized.connect(_layout_hud)
 	root.add_child(map_box)
+	_map_box = map_box
 	_arena = ArenaView.new()
 	_arena.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_arena.clip_contents = true
 	map_box.add_child(_arena)
-	var corner := VBoxContainer.new()
-	corner.position = Vector2(10, 8)
-	corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	corner.add_theme_constant_override("separation", 6)
-	map_box.add_child(corner)
+	_corner = VBoxContainer.new()
+	_corner.position = Vector2(10, 8)
+	_corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_corner.add_theme_constant_override("separation", 6)
+	map_box.add_child(_corner)
 	_clock_label = RichTextLabel.new()
 	_clock_label.bbcode_enabled = true
 	_clock_label.fit_content = true
-	_clock_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	# Wraps at the alerts' width, so the corner column stays clear of the draft window.
+	_clock_label.custom_minimum_size.x = Alerts.WIDTH
+	_clock_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_clock_label.scroll_active = false
 	_clock_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_clock_label.add_theme_font_size_override("normal_font_size", 15)
 	_clock_label.add_theme_font_size_override("bold_font_size", 15)
-	corner.add_child(_clock_label)
+	_corner.add_child(_clock_label)
 	_alerts = Alerts.new()
-	corner.add_child(_alerts)
+	_corner.add_child(_alerts)
+	# Placed by _layout_hud.
 	_threat = ThreatCard.new()
-	_threat.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	_threat.position = Vector2(-ThreatCard.WIDTH - 10, 8)
-	_threat.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_threat.begin_pressed.connect(_begin_round)
 	map_box.add_child(_threat)
 	_hand_view = BuildHandView.new()
 	_hand_view.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	_hand_view.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_hand_view.changed.connect(_refresh)
 	_hand_view.previewing.connect(_preview_building)
+	_hand_view.resized.connect(_layout_hud)
+	_hand_view.begin_pressed.connect(_begin_round)
 	map_box.add_child(_hand_view)
 	# The blueprint draft floats over the map in its own window, above the hand.
 	_draft = DraftPopup.new()
 	_draft.visible = false
+	_draft.moved.connect(_layout_hud)
+	_draft.visibility_changed.connect(_layout_hud)
 	map_box.add_child(_draft)
 	_hand_view.draft = _draft
 

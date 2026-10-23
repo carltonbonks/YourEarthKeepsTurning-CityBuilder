@@ -11,9 +11,12 @@ extends PanelContainer
 ## ("Need 3 more wood"). Costs show red where the town is short. Shown only while building.
 ## Every choice goes through run.hand; `changed` asks the screen to refresh. Hovering a building
 ## card sends `previewing` with its type (and "" on leaving), so the map can blink the plot it would take.
+## The Begin round button sits at the hand's right end, outside the scrolling cards, so it is always in
+## the same place and never covered.
 
 signal changed
 signal previewing(type: String)
+signal begin_pressed
 
 const RECOMMEND_COLOR := UiKit.RECOMMEND_COLOR
 const CARD_SIZE := Vector2(150, 132)
@@ -31,6 +34,7 @@ var run: RunState
 ## The window the blueprint offers go in; main.gd places it over the map.
 var draft: DraftPopup
 var _row: HBoxContainer
+var _begin: Button
 ## The round whose draft was last shown, so a hidden draft stays hidden until the next round's.
 var _draft_round := -1
 
@@ -42,17 +46,26 @@ func _init() -> void:
 	style.border_width_top = 1
 	style.set_content_margin_all(6)
 	add_theme_stylebox_override("panel", style)
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override("separation", 10)
+	add_child(line)
 	var scroll := ScrollContainer.new()
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.custom_minimum_size.y = CARD_SIZE.y + 50
-	add_child(scroll)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.add_child(scroll)
 	_row = HBoxContainer.new()
 	_row.add_theme_constant_override("separation", 14)
 	scroll.add_child(_row)
+	_begin = UiKit.primary(UiKit.button(line, "", func() -> void: begin_pressed.emit()), 18)
+	_begin.custom_minimum_size = Vector2(150, 72)
+	_begin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_begin.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 
 func refresh() -> void:
 	previewing.emit("")
+	_begin.text = "Begin round %d" % run.round_number
 	for child in _row.get_children():
 		child.queue_free()
 	_draft_cards()
