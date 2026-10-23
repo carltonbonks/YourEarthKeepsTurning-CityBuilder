@@ -131,7 +131,10 @@ func test_bots_take_row_cards() -> void:
 
 
 func test_a_row_waits_for_one_of_its_buildings() -> void:
-	var run := _run()
+	# Traders keep the arms stall in this run's blueprint pool.
+	var run := RunState.new(Content.load_default(), 4821)
+	run.choose_traditions(["traders"] as Array[String])
+	run.stock["shells"] = 999
 	run.build("market")
 	check(not run.hand._row_draftable("blade_row"), "no blade row before a knapper or an arms stall")
 	run.hand.blueprints = ["knapper"] as Array[String]

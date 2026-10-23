@@ -9,6 +9,9 @@ extends RefCounted
 ## rows make a combo. A row is a payoff you earn (Yusuf, 2026-10-22): it is offered only once the town has one of
 ## its buildings (a basic, a blueprint or one standing), and drafting it adds just the other one and the bonus. Once the open rings are nearly full (clear_when_full in
 ## data/town.json), the draft also offers to clear the next ring of plots for its clear_cost, in place of a building (`ring_offer`, `clear_ring`).
+## Each run drafts from its own pool of blueprints (Yusuf, 2026-10-23): buildings tagged staple, the founding
+## traditions' buildings and what the age-ups require are always in it, and blueprint_pool_share of the rest, per age,
+## is dealt from the run's seed, so runs differ in which buildings they can have at all (`in_pool`).
 ## Numbers are in data/balance.json (blueprint_*, build_need_weight, build_new_weight, build_redraw_cost).
 
 var run: RunState
@@ -29,6 +32,8 @@ var picks := 0
 ## Rerolls of the offers used this round.
 var redraws := 0
 var _dealt_round := -1
+## This run's blueprint pool (see `in_pool`), dealt once the founding traditions are chosen.
+var _pool: Array[String] = []
 var _dealt_age := ""
 
 
@@ -204,10 +209,65 @@ func draftable(type: String) -> bool:
 	var content := run.content
 	var def: Dictionary = content.buildings[type]
 	var needs: String = def.get("requires", "")
-	return not def.get("basic", false) and not def.has("ages_up") and not blueprints.has(type) \
+	return not def.get("basic", false) and not def.has("ages_up") and not blueprints.has(type) and in_pool(type) \
 		and content.age_reached(run.age, def.get("age", "")) \
 		and run.world.count_buildings(type, false) < run.building_max(type) \
 		and (needs == "" or blueprints.has(needs) or run.world.count_buildings(needs, false) > 0)
+
+
+## True if this building can come up in this run's draft. Basics and age-up buildings are never drafted, so they
+## are not in the pool but always on offer.
+func in_pool(type: String) -> bool:
+	return pool().has(type)
+
+
+## This run's blueprint pool, sorted: staples, the traditions' buildings, what the age-ups require (and what those
+## require), and blueprint_pool_share of the rest of each age's blueprints, at least one per age, from the run's seed.
+func pool() -> Array[String]:
+	if not _pool.is_empty():
+		return _pool
+	var content := run.content
+	var keep := {}
+	var rest := {}
+	var types := content.buildings.keys()
+	types.sort()
+	for type: String in types:
+		var def: Dictionary = content.buildings[type]
+		if def.has("ages_up"):
+			keep[def.get("requires", "")] = true
+		if def.get("basic", false) or def.has("ages_up"):
+			continue
+		if content.has_tag("building", type, "staple") or run.tradition_favours(type):
+			keep[type] = true
+		else:
+			var age: String = def.get("age", content.ages["order"][0])
+			if not rest.has(age):
+				rest[age] = []
+			rest[age].append(type)
+	var rng := SeededRng.stream(run.run_seed, "blueprint_pool")
+	for age: String in content.ages["order"]:
+		var left: Array = rest.get(age, [])
+		var take := maxi(1, roundi(left.size() * content.num("blueprint_pool_share"))) if not left.is_empty() else 0
+		for i in take:
+			var type: String = left.pop_at(rng.randi_range(0, left.size() - 1))
+			keep[type] = true
+	# A pooled building brings what it requires.
+	var grew := true
+	while grew:
+		grew = false
+		for type: String in keep.keys():
+			var needs: String = content.buildings.get(type, {}).get("requires", "")
+			if needs != "" and not keep.has(needs):
+				keep[needs] = true
+				grew = true
+	keep.erase("")
+	var out: Array[String] = []
+	out.assign(keep.keys())
+	out.sort()
+	# Before the traditions are chosen the pool is only a preview, so it is dealt again after.
+	if not run.awaiting_traditions():
+		_pool = out
+	return out
 
 
 ## The building the next age-up requires, if it is neither drafted nor standing ("" if none).
@@ -415,6 +475,10 @@ func _row_draftable(id: String) -> bool:
 	var row: Dictionary = run.content.combos[id]
 	if row_have(id) == "":
 		return false
+	# The building a row adds must be one this run can have.
+	for type: String in row_adds(id):
+		if not in_pool(type):
+			return false
 	for type: String in [row["building"], row["partner"]]:
 		var def: Dictionary = run.content.buildings[type]
 		var needs: String = def.get("requires", "")
