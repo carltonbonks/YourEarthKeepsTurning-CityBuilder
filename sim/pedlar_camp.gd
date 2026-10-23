@@ -195,7 +195,7 @@ func best_ware(hero: Unit) -> int:
 func gain_of(hero: Unit, item: Dictionary) -> float:
 	var likes: Dictionary = w.content.traits[hero.trait_id].get("likes", {})
 	var current: Dictionary = hero.items.get(Loot.slot(w.content, item), {})
-	return Loot.score(w.content, item, likes) - (Loot.score(w.content, current, likes) if not current.is_empty() else 0.0)
+	return Loot.score(w.content, item, likes, w.run.gear_bonus()) - (Loot.score(w.content, current, likes, w.run.gear_bonus()) if not current.is_empty() else 0.0)
 
 
 ## A hero at the camp sells all their spare loot (the pedlar takes no cut) and buys the ware they want most.

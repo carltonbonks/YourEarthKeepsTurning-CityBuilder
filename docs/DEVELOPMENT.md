@@ -100,15 +100,18 @@ Descriptive tags no rule reads yet are fine: they show in tooltips by name and g
 | `pact` (relics) | `RunState._relic_pool` | a strong relic with a cost, offered only on `pact_rounds` |
 | `spoils` (relics) | `RunState._relic_pool`, `RunState._roll_spoils` | the spoils of a beaten attack: never in the ordinary pool, one added to the relic offer for the enemy tag (`spoils_of`) the attack was made of |
 | `proud` | `People.update_moods` | knights: sleeping rough hurts twice as much, wearing steel cheers them |
+| any tag, via relic data | `RunState.tag_mod` / `tag_sums` / `gear_bonus`, read by `World.hit`, `World._relic_kill`, `Loot.stat`, `FolkAI.carry_of` | tag-keyed relic effects (`RunState.TAG_EFFECTS`): `foe_damage` (enemies with the tag take more), `foe_spoils` (goods when one falls), `gear_bonus` (gear with the tag gains stats and heroes rate it higher), `node_yield` (gatherers bring more from nodes with the tag). Today: `beast`, `human`, `undead`, `mystic`, `spirit` (enemies), `stone`, `bone`, `hide`, `bronze`, `iron` (item bases), `stone`, `ore`, `plant` (nodes) |
+
+**Prefer tag-keyed relic effects to new one-off keys.** A relic that says "+40% against beasts" is `{"foe_damage": {"beast": 0.4}}`, not a `beast_damage` key: it then reaches every enemy that ever carries `beast`, and a new shape (another `TAG_EFFECTS` entry) serves every tag at once.
 
 When a rule reads a tag:
 1. Read it through `Content.has_tag(kind, id, tag)` or `Content.unit_has_tag(unit, tag)` (a unit carries its type's tags; a hero also carries its trait's), with the tag written in quotes. Never check ids or names instead.
 2. Explain it for players in `data/tags.json`. The hover tooltip then shows `tag: what it does`. Prize tags are explained from `buildings.json` automatically.
 3. Make sure the entities it should apply to carry it in data, and add a test that the rule fires.
-4. `tests/test_tags.gd` scans `sim/` and `game/` for `has_tag(...)` calls and fails if a read tag has no `tags.json` line, if nothing carries it, or if `tags.json` explains a tag no rule reads any more.
+4. `tests/test_tags.gd` scans `sim/` and `game/` for `has_tag(...)` calls, and relic data for tag-keyed effects, and fails if a read tag has no `tags.json` line, if nothing carries it, or if `tags.json` explains a tag no rule reads any more.
 5. A behaviour only one entity will ever have can be a specific data key instead (like `shield` or `war_chant`); if a second entity might want it, make it a tag.
 
-Tooltips show tags for creatures only (`Tooltips.tag_notes(run, kind, id)` works for any kind). Knights' `proud` is the first hero tag a rule reads and the hero tooltip doesn't show it yet; when heroes, buildings or items get tags players need to see, show them in those tooltips too.
+Tooltips show tags for creatures and resource nodes, naming any owned relic keyed on the tag, and hero gear lines end with their base's tags ("[bone]") (`Tooltips.tag_notes(run, kind, id)` works for any kind). Knights' `proud` is the first hero tag a rule reads and the hero tooltip doesn't show it yet; when heroes, buildings or items get tags players need to see, show them in those tooltips too.
 
 ### 3. Determinism
 All randomness goes through the run's `SeededRng` (never `randi()`/`randf()`), and the sim steps in fixed ticks. The same seed and the same choices must give the same run, so "seed 4821, round 6" is reproducible.

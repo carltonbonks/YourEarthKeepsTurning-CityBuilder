@@ -387,9 +387,11 @@ func spell_score(run: RunState, card: Dictionary) -> float:
 ## Relics it likes most first, ranked by how often bot runs that held them won (40 runs x 3 styles,
 ## blind picks, 2026-10-20). Anything not listed ranks after these; ties keep the offer's order.
 const RELIC_RANK := ["sun_disc", "starfall_idol", "antler_crown", "ancestors_horn", "first_hearth_ember", "lone_wolf_pelt", "horde_drum", "broken_crown", "levy_horn", "ram_thorn_stakes", "tithe_bowl",
-	"grave_salt", "ancestor_mask", "owl_eyes", "sacred_spring", "witchs_thread", "chieftains_torc", "elders_tale",
+	"grave_salt", "smith_gods_hammer", "blood_mark", "kinslayers_brand", "ancestor_mask", "owl_eyes", "sacred_spring", "witchs_thread", "chieftains_torc", "elders_tale",
 	"turncoats_torc", "fire_arrows", "bone_flute", "moneylenders_knot", "hollow_drum", "bear_tooth_charm",
 	"blood_brother_knot", "wanderers_fire", "ember_stone", "oxhide_sledges", "seed_cache", "ridgeheart",
+	"green_mothers_bough", "quarry_spirit", "ore_singer", "tanners_blessing", "knappers_spirit", "bone_readers_rite",
+	"spirit_knot", "skinning_knife", "ossuary_pit",
 	# Spoils last: taking a pack-train's goods over a relic cost the bots 8-20 win-rate points (40 seeds).
 	"raiders_spears", "wolfskin_cloaks", "bone_ward", "splintered_ram", "pack_train", "ram_timbers", "smoked_haunches", "grave_goods"]
 

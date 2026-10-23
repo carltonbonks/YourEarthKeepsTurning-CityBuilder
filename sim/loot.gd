@@ -16,19 +16,23 @@ static func slot(content: Content, item: Dictionary) -> String:
 	return content.items["bases"][item["base"]]["slot"]
 
 
-## One stat of an item: the base's stat times its tier, plus every affix.
-static func stat(content: Content, item: Dictionary, key: String) -> float:
+## One stat of an item: the base's stat times its tier, plus every affix. bonus is the owned relics' gear_bonus
+## (RunState.gear_bonus(), {tag: {stat: per tier}}): gear whose base carries one of those tags gains it per tier.
+static func stat(content: Content, item: Dictionary, key: String, bonus := {}) -> float:
 	var total := float(content.items["bases"][item["base"]].get(key, 0.0)) * int(item["tier"])
 	for a: String in item["affixes"]:
 		total += float(content.items["affixes"][a].get(key, 0.0))
+	for tag: String in bonus:
+		if content.has_tag("item", item["base"], tag):
+			total += float(bonus[tag].get(key, 0.0)) * int(item["tier"])
 	return total
 
 
 ## Sum of one stat across everything a hero has equipped.
-static func total(content: Content, hero: Unit, key: String) -> float:
+static func total(content: Content, hero: Unit, key: String, bonus := {}) -> float:
 	var sum := 0.0
 	for s: String in hero.items:
-		sum += stat(content, hero.items[s], key)
+		sum += stat(content, hero.items[s], key, bonus)
 	return sum
 
 
@@ -73,11 +77,12 @@ static func describe(content: Content, item: Dictionary) -> String:
 	return "%s (t%d)" % [" ".join(words), int(item["tier"])]
 
 
-## How much a hero with these tastes wants an item (see "likes" in data/heroes.json).
-static func score(content: Content, item: Dictionary, likes: Dictionary) -> float:
+## How much a hero with these tastes wants an item (see "likes" in data/heroes.json). bonus as in stat(), so
+## heroes come to favour gear the town's relics strengthen.
+static func score(content: Content, item: Dictionary, likes: Dictionary, bonus := {}) -> float:
 	var s := 0.0
 	for key: String in STATS:
-		s += stat(content, item, key) * float(likes.get(key, 0.0))
+		s += stat(content, item, key, bonus) * float(likes.get(key, 0.0))
 	return s
 
 
