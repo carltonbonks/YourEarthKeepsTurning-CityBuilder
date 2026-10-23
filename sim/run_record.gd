@@ -92,7 +92,10 @@ extends RefCounted
 ## 38: rarities (data/rarity.json): a dawn pick entry has "offered_rarities" (one rarity id per offered card) and
 ##     "legend": true when the hero taken was a legend (a few levels up, carrying a mythic item). Items' and relics'
 ##     rarities follow from their ids and affixes (Loot.rarity, Content.rarity_of).
-const RECORD_FORMAT := 38
+## 39: opening rings: "rings_open" (rings of plots open at the end, and per round at its start); a "clear_ring"
+##     action ({"kind": "clear_ring", "ring": rings now open}) when the player paid to clear the next ring; a
+##     round's "build_hands" lists "ring" while the draft offered it.
+const RECORD_FORMAT := 39
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -139,6 +142,7 @@ func to_record() -> Dictionary:
 		"age": run.age,
 		"age_up_round": run.age_up_round,
 		"age_rounds": run.age_rounds.duplicate(),
+		"rings_open": run.rings_open,
 		"tools": run.tools.duplicate(),
 		"heroes": run.heroes.map(hero_snapshot),
 		"fallen": run.fallen.map(hero_snapshot),
@@ -162,7 +166,7 @@ func begin_round() -> void:
 		"heroes_start": run.living_heroes().size(), "actions": [], "picks": [],
 		"whims": [], "loot": [], "sales": [], "hero_spending": {},
 		"prices": run.prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
-		"age": run.age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
+		"age": run.age, "rings_open": run.rings_open, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
 		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0, "towers_broken": 0,
 		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {}, "idle_seconds": {}, "trips_bumped": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),

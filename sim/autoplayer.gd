@@ -16,6 +16,7 @@ extends RefCounted
 ## Every style takes the offered relic it ranks highest (RELIC_RANK).
 ## Every style can only order basics, the age-up card and buildings it has drafted (run.hand). It drafts what it
 ## wanted to order and couldn't (see build), and rerolls the offers once when shells are spare and none of them is wanted.
+## Every style clears the next ring as soon as the draft offers it and it can pay, before drafting anything new.
 ## Every style builds the stone-layers' yard from round 5 so craftspeople pave the busiest paths,
 ## invites the pedlar its heroes would gain most from (see _pedlar),
 ## orders the forester and charcoal pit when they are needed (see _upkeep), the geomancer from round 3 (see spell_score),
@@ -75,6 +76,11 @@ func build(run: RunState) -> void:
 	_wishes = []
 	_build_pass(run)
 	while run.hand.picks > 0 and not run.hand.cards.is_empty():
+		# A town nearly out of room clears the next ring before drafting anything new.
+		if run.hand.can_clear_ring():
+			run.hand.clear_ring()
+			_build_pass(run)
+			continue
 		if _wanted_offer(run) == "" and int(run.stock["shells"]) >= redraw_above and run.hand.can_redraw():
 			run.hand.redraw()
 		_draft(run)

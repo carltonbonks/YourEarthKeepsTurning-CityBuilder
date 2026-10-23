@@ -212,8 +212,8 @@ func test_townsfolk_never_gather_obsidian() -> void:
 
 
 func test_market_bot_run_records_the_economy() -> void:
-	# A market run that lasts: seed 1001 now loses in round 5, before its workshops get going.
-	var record := bot_record(1002, "market")
+	# A market run that lasts: seeds 1001 and 1002 now lose early (rounds 5 and 7), before their workshops get going.
+	var record := bot_record(1003, "market")
 	check_eq(int(record["format"]), RunRecord.RECORD_FORMAT, "current record format")
 	check(record.has("prices"), "prices in the record")
 	var crafted := 0
