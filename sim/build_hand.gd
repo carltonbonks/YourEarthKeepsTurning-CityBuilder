@@ -6,7 +6,9 @@ extends RefCounted
 ## it can be raised, and the building the next age-up needs is always among the offers until it is drafted.
 ## Ordering pays the building's cost (RunState.build) as often as its max allows.
 ## A row (data/combos.json) can be drafted too: it orders its two buildings side by side for less, and only
-## rows make a combo. Numbers are in data/balance.json (blueprint_*, build_need_weight, build_new_weight, build_redraw_cost).
+## rows make a combo. Once the open rings are nearly full (clear_when_full in data/town.json), the draft also offers
+## to clear the next ring of plots for its clear_cost, in place of a building (`ring_offer`, `clear_ring`).
+## Numbers are in data/balance.json (blueprint_*, build_need_weight, build_new_weight, build_redraw_cost).
 
 var run: RunState
 ## This round's draft offers, each {"building": type, "need": why the town wants it ("" if nothing in particular)}.
@@ -138,6 +140,31 @@ func can_draft_row(id: String) -> bool:
 	return run.phase == RunState.Phase.BUILD and picks > 0 and rows.any(func(c: Dictionary) -> bool: return c["row"] == id)
 
 
+func can_clear_ring() -> bool:
+	return ring_offer() and run.can_afford(run.ring_cost())
+
+
+## Takes the draft's ring offer: pays to clear the next ring of plots, which opens for good.
+func clear_ring() -> bool:
+	if not can_clear_ring():
+		return false
+	var cost := run.ring_cost()
+	for r: String in cost:
+		run.stock[r] = int(run.stock[r]) - int(cost[r])
+	run.open_ring()
+	run.record.note_action({"kind": "clear_ring", "ring": run.rings_open})
+	run.tell("Townsfolk clear the ground for a new ring of plots round the town.")
+	_after_draft()
+	return true
+
+
+## True while the draft offers to clear the next ring: a draft is left, a ring is still closed and the open rings
+## are nearly full. It is checked live, so it turns up as soon as building fills the town.
+func ring_offer() -> bool:
+	return run.phase == RunState.Phase.BUILD and picks > 0 and run.ring_closed() \
+		and run.world.town.fullness() >= float(run.content.town["clear_when_full"])
+
+
 ## Drafts an offered row: the row for good, and both its buildings (unless basic) as blueprints.
 func draft_row(id: String) -> bool:
 	if not can_draft_row(id):
@@ -200,6 +227,8 @@ func labels() -> Array:
 	var out := cards.map(func(c: Dictionary) -> String: return c["building"])
 	for c in rows:
 		out.append("row:" + c["row"])
+	if ring_offer():
+		out.append("ring")
 	return out
 
 

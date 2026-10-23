@@ -6,6 +6,8 @@ func _run(seed_value := 4821) -> RunState:
 	var run := RunState.new(Content.load_default(), seed_value)
 	for r: String in ["wood", "stone", "shells"]:
 		run.stock[r] = 999
+	# These tests work in the third ring, so open it as if it had been cleared.
+	run.rings_open = 3
 	return run
 
 

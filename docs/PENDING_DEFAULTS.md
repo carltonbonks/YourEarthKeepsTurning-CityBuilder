@@ -149,3 +149,6 @@ Yusuf's idea: four rarities across the game, white (base), blue (magic), yellow 
 - **Odds climb:** by the last round each rarity closes `rarity_climb` (0.35) of its gap to white (orange 0.12 → 0.43), all in data/balance.json.
 
 Bots (40 seeds, against main at d8501b6): balanced 78 → 80%, workers 70 → 60%, medieval 70 → 83%. Every draw is reshuffled, so part of each swing is seed luck; the workers drop is worth watching. Pending Yusuf's playtest.
+
+## Opening rings (2026-10-23)
+**Yusuf decided: start with 2 rings and clear more as a pick in the blueprint draft.** Before this, rings opened only by age (3 in the stone age) and space never ran short (seed 51705 used 26 of ~55 stone-age plots). Claude's defaults, in data/town.json: `start_rings` 2; each age-up opens the next ring free; the draft offers to clear the next ring once the open rings' building plots (not lanes or obstacles) are `clear_when_full` (0.8) taken, checked live as the town builds; clearing takes that draft and costs the ring's `clear_cost` (3rd ring 10 wood 4 stone, 4th 14 wood 8 stone, 5th 18 wood 12 stone; flat, never scaled to the town's wealth). Obstacles still sit on the inner 3 rings (`obstacle_rings`). The bot clears a ring as soon as it is offered and it can pay.

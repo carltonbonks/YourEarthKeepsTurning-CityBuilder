@@ -4,7 +4,8 @@ extends PanelContainer
 ## sections with plain dividers so it's clear where each card comes from: Core (homes and food, always
 ## on offer), Your blueprints (buildings and rows drafted this run), Upgrades (the ageing-up card and
 ## tool sets, once there are any) and Trading (the caravan's trade cards, once it comes). While a draft is
-## left, the blueprint offers (each says what it adds to the dawn picks) and the reroll sit apart in
+## left, the blueprint offers (each says what it adds to the dawn picks), the offer to clear the next ring
+## once the town is nearly full, and the reroll sit apart in
 ## the DraftPopup window over the map. A card the town needs says why on a gold strip at the top
 ## ("Food runs out in 2 days"); a card the town can't take says why on a red strip at the bottom
 ## ("Need 3 more wood"). Costs show red where the town is short. Shown only while building.
@@ -19,6 +20,7 @@ const CARD_SIZE := Vector2(150, 132)
 const BASIC_SIZE := Vector2(118, 132)
 const ROW_SIZE := Vector2(176, 132)
 const ROW_BORDER := Color("#9ec27a")
+const RING_BORDER := Color("#c9a27a")
 ## Each section's colour: its heading, its edge and a faint tint behind its cards.
 const CORE_COLOR := Color("#c8ccd4")
 const BLUEPRINT_COLOR := Color("#ffd28a")
@@ -130,7 +132,7 @@ func _draft_cards() -> void:
 	for child in draft.cards.get_children():
 		draft.cards.remove_child(child)
 		child.queue_free()
-	if run.hand.picks <= 0 or (run.hand.cards.is_empty() and run.hand.rows.is_empty()):
+	if run.hand.picks <= 0 or (run.hand.cards.is_empty() and run.hand.rows.is_empty() and not run.hand.ring_offer()):
 		draft.visible = false
 		return
 	draft.set_title("Draft %d blueprints" % run.hand.picks if run.hand.picks > 1 else "Draft a blueprint")
@@ -138,6 +140,8 @@ func _draft_cards() -> void:
 		draft.cards.add_child(_card(card["building"], card["need"], "draft"))
 	for card: Dictionary in run.hand.rows:
 		draft.cards.add_child(_row_card(card["row"], card["need"], true))
+	if run.hand.ring_offer():
+		draft.cards.add_child(_ring_card())
 	var redraw := UiKit.secondary(Button.new(), 13)
 	redraw.text = "Reroll\n%d shells" % run.hand.redraw_cost() if run.hand.redraws == 0 else "Rerolled\nthis round"
 	redraw.custom_minimum_size = Vector2(86, CARD_SIZE.y)
@@ -263,6 +267,20 @@ func _row_card(id: String, need: String, drafting: bool) -> Button:
 	btn.pressed.connect(_act.bind(run.hand.order_row.bind(id)))
 	btn.mouse_entered.connect(func() -> void: previewing.emit(row["building"]))
 	btn.mouse_exited.connect(func() -> void: previewing.emit(""))
+	return btn
+
+
+## The offer to clear the next ring of plots, in place of a building, once the open rings are nearly full.
+func _ring_card() -> Button:
+	var cost := run.ring_cost()
+	var full := roundi(run.world.town.fullness() * 100.0)
+	var btn := UiKit.card("Room to grow: %d%% full" % full, "Clear a new ring", UiKit.cost_text(run.stock, cost),
+		"Opens the next ring of plots round the town for good. A bigger town has a longer edge to hold.",
+		"Ring %d of %d" % [run.rings_open + 1, run.content.town["rings"].size()], CARD_SIZE, RECOMMEND_COLOR, true, RING_BORDER)
+	btn.tooltip_text = "Takes this draft instead of a new building: pay to clear the next ring, and buildings can stand there from now on.\nAgeing up also opens a ring, for free."
+	btn.disabled = not run.hand.can_clear_ring()
+	UiKit.fade_if_disabled(btn, UiKit.shortfall(run.stock, cost))
+	btn.pressed.connect(_act.bind(run.hand.clear_ring))
 	return btn
 
 

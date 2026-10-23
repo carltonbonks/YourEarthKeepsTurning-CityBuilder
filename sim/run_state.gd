@@ -65,6 +65,8 @@ var age := ""
 var age_up_round := 0
 ## The round each age after the first was reached: age id -> round.
 var age_rounds := {}
+## How many rings of plots are open (see Town.ring_open): start_rings in data/town.json, one more per age-up or cleared ring.
+var rings_open := 0
 ## Tool sets bought for townsfolk groups (ids from "tools" in data/ages.json).
 var tools: Array[String] = []
 ## Heroes who left town unhappy.
@@ -101,6 +103,7 @@ func _init(game_content: Content, seed_value: int) -> void:
 	kinds.sort()
 	for kind: String in kinds:
 		prices[kind] = "fair"
+	rings_open = int(content.town["start_rings"])
 	world = World.new(self)
 	var start_people: Dictionary = content.balance["start_people"]
 	var roles := start_people.keys()
@@ -420,7 +423,26 @@ func on_building_done(type: String) -> void:
 		age_rounds[next_age] = round_number
 		record.note_value("aged_up", next_age)
 		world.town.lay_hearth_ground(next_age)
+		open_ring()
 		tell("The %s is raised. The %s begins: %s." % [def["name"], content.age_name(age), content.ages["ages"][age].get("begins", "")])
+
+
+# --- Rings ---------------------------------------------------
+
+## True if a ring of plots is still closed.
+func ring_closed() -> bool:
+	return rings_open < content.town["rings"].size()
+
+
+## What clearing the next closed ring costs ({} if none is closed).
+func ring_cost() -> Dictionary:
+	return content.town["rings"][rings_open].get("clear_cost", {}) if ring_closed() else {}
+
+
+## Opens the next closed ring (an age-up does it for free; BuildHand.clear_ring when the player pays).
+func open_ring() -> void:
+	if ring_closed():
+		rings_open += 1
 
 
 # --- Ages: tool sets -----------------------------------------
