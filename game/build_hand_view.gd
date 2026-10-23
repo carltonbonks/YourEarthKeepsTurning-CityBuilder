@@ -135,7 +135,7 @@ func _draft_cards() -> void:
 	if run.hand.picks <= 0 or (run.hand.cards.is_empty() and run.hand.rows.is_empty() and not run.hand.ring_offer() and run.hand.upgrade_offers.is_empty()):
 		draft.visible = false
 		return
-	draft.set_title("Draft %d blueprints" % run.hand.picks if run.hand.picks > 1 else "Draft a blueprint")
+	draft.set_title("Draft %d blueprints" % run.hand.picks if run.hand.picks > 1 else "Draft a blueprint", pool_line(run))
 	for card: Dictionary in run.hand.cards:
 		draft.cards.add_child(_card(card["building"], card["need"], "draft"))
 	for card: Dictionary in run.hand.rows:
@@ -181,6 +181,21 @@ static func dawn_line(r: RunState, type: String) -> String:
 
 
 ## What drafting a row gives, from what the town already has: "You have Knapper. Adds Arms stall."
+## The draft title's hover: which blueprints this run can offer at all.
+static func pool_line(r: RunState) -> String:
+	var all := 0
+	for type: String in r.content.buildings:
+		var def: Dictionary = r.content.buildings[type]
+		if not def.get("basic", false) and not def.has("ages_up"):
+			all += 1
+	var pool := r.hand.pool()
+	var names: Array[String] = []
+	for type in pool:
+		names.append(r.content.buildings[type]["name"])
+	return "This run's blueprints: %d of %d buildings can come up in the draft. Another run deals a different set.\n%s" \
+		% [pool.size(), all, ", ".join(names)]
+
+
 static func row_offer_line(r: RunState, id: String) -> String:
 	var names := func(types: Array) -> String:
 		return " and ".join(PackedStringArray(types.map(func(t: String) -> String: return r.content.buildings[t]["name"])))

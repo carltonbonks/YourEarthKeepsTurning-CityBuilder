@@ -105,6 +105,7 @@ Descriptive tags no rule reads yet are fine: they show in tooltips by name and g
 | `bold` (traits) | the duelling ring's `duels` in `data/buildings.json`, used by `HeroAI.duels_dawn` | brave and greedy heroes spar each dawn: XP for both, the loser hurt |
 | `trophy` | the trophy hall's `prize` | the hall pays shells and extra XP per kill |
 | `courier` (buildings) | `FolkAI.courier_hut` | the runners' hut: its tribespeople carry provisions from the stall to heroes in the wilds who sent for them (`runners` in buildings.json; `HeroAI._call_for_supplies`, `FolkAI._dispatch_runners`, `_run_errand`) |
+| `staple` (buildings) | `BuildHand.pool` | always in a run's blueprint pool (longhouse, watch post, gate); the rest of the pool is `blueprint_pool_share` of each age's blueprints plus the traditions' buildings and age-up needs |
 | `proud` | `People.update_moods` | knights: sleeping rough hurts twice as much, wearing steel cheers them |
 | any tag, via relic data | `RunState.tag_mod` / `tag_sums` / `gear_bonus`, read by `World.hit`, `World._relic_kill`, `Loot.stat`, `FolkAI.carry_of` | tag-keyed relic effects (`RunState.TAG_EFFECTS`): `foe_damage` (enemies with the tag take more), `foe_spoils` (goods when one falls), `gear_bonus` (gear with the tag gains stats and heroes rate it higher), `node_yield` (gatherers bring more from nodes with the tag). Today: `beast`, `human`, `undead`, `mystic`, `spirit` (enemies), `stone`, `bone`, `hide`, `bronze`, `iron` (item bases), `stone`, `ore`, `plant` (nodes) |
 

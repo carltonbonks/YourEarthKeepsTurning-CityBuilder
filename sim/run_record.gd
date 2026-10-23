@@ -106,7 +106,8 @@ extends RefCounted
 ##     and an "upgrade" action ({"kind": "upgrade", "upgrade"}); build_hands may list "upgrade:<id>" offers; per round
 ##     "outpost_goods" (good -> amount outposts brought in), "outposts_wrecked" and "outposts_moved" (building -> count),
 ##     only when it happened; a final plot of an outpost has ring 0 and sector -1.
-const RECORD_FORMAT := 42
+## 43: a run's own blueprint pool: top-level "pool" (building ids the run's draft could offer, sorted).
+const RECORD_FORMAT := 43
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -151,6 +152,7 @@ func to_record() -> Dictionary:
 		"townsfolk_lost": run.fallen_folk,
 		"relics": run.relics.duplicate(),
 		"upgrades": run.upgrades.duplicate(),
+		"pool": run.hand.pool().duplicate(),
 		"traditions": run.traditions.duplicate(),
 		"prices": run.prices.duplicate(),
 		"age": run.age,

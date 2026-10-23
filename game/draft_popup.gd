@@ -58,8 +58,10 @@ func _init() -> void:
 	set_collapsed(false)
 
 
-func set_title(text: String) -> void:
+func set_title(text: String, tip := "") -> void:
 	_title.text = text
+	_title.tooltip_text = tip
+	_title.mouse_filter = Control.MOUSE_FILTER_PASS if tip != "" else Control.MOUSE_FILTER_IGNORE
 
 
 ## Folded down to its title bar (true) or open.
