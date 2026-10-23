@@ -550,6 +550,25 @@ func pave(i: int) -> bool:
 	return true
 
 
+## A new age lays its ground (data/ages.json "hearth_ground": "path" or a road id) on every open
+## square round the hearth out to "hearth_ground_radius", keeping better ground where it is already
+## laid. Returns how many squares changed.
+func lay_hearth_ground(age_id: String) -> int:
+	var ages := w.content.ages
+	var id: String = ages["ages"][age_id].get("hearth_ground", "")
+	var kind := pathing.kind_ids.find(id)
+	if kind < 0:
+		return 0
+	var n := 0
+	for i in pathing.cells_in_circle(Vector2.ZERO, float(ages["hearth_ground_radius"])):
+		if pathing.is_solid(i):
+			continue
+		if pathing.ground[i] < kind:
+			n += 1
+		pathing.lay(i, kind)
+	return n
+
+
 ## Squares of each road kind laid so far, by id.
 func paved_counts() -> Dictionary:
 	var out := {}

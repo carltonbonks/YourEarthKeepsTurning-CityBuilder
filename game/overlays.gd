@@ -277,7 +277,7 @@ func _venture_card(card: Dictionary) -> Button:
 	var losing := "%d" % lose[0] if lose[0] == lose[1] else "%d-%d" % [lose[0], lose[1]]
 	var brings := ", ".join(terms["goods"].keys().map(func(g: String) -> String: return "%d %s" % [terms["goods"][g], g.replace("_", " ")]))
 	var btn := UiKit.card("Venture: send %d tribespeople" % terms["send"], v["name"], "[color=#ff7a6a]%s won't come back[/color]" % losing,
-		"Brings home %s" % brings, "Instead of a newcomer", PICK_SIZE, UiKit.CARD_BORDER)
+		"Brings home %s" % brings, "", PICK_SIZE, UiKit.CARD_BORDER)
 	btn.tooltip_text = "%s\nSend %d tribespeople (you have %d). %s of them never come home; the rest bring %s.\nInstead of a newcomer today.\nA bold red X is a sure death, a faint one may or may not come home." % [
 		v["text"], terms["send"], run.count_role("tribesperson"), losing, brings]
 	# One figure per person sent, crossed out red for those who won't come back, under the cost line.
@@ -285,6 +285,14 @@ func _venture_card(card: Dictionary) -> Button:
 	var figures := VentureFigures.make(terms["send"], lose[0], lose[1] - lose[0], 18.0)
 	box.add_child(figures)
 	box.move_child(figures, 3)
+	# The reward must never clip away (a two-line name used to squeeze it off the card), so it
+	# shows whole in green on a slightly taller card, and "instead of a newcomer" lives in the tooltip.
+	btn.custom_minimum_size.y += 22
+	var reward: Label = box.get_child(4)
+	reward.clip_text = false
+	reward.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	reward.add_theme_font_size_override("font_size", 12)
+	reward.add_theme_color_override("font_color", Color("#9be08a"))
 	return btn
 
 
