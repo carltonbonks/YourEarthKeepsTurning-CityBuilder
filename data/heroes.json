@@ -1,9 +1,10 @@
 {
-	"_note": "Hero classes, personality traits, names and whims. wilds = how keen a hero is to hunt at the dens by day (0 = stays home). Traits also drive retreat, target choice, where heroes like to sleep (lodging, first match wins), when they feel tired (tired_at, energy 0-100), how they rate items (likes: weight per item stat) and how likely each whim is (whims: weights). max_markup = the dearest stall price a hero will pay (1.5 = Dear). A class with needs only turns up once that building stands, and card_cost replaces the usual hero card cost. rarity (data/rarity.json): the colour of the class's dawn card.",
+	"_note": "Hero classes, personality traits, names and whims. teaches (classes) = the mark (data/marks.json) warriors earn drilling beside a hero of the class on quiet days; teach_mult (traits) = how much faster such a hero teaches (2.0 = twice as fast, sim/folk_ai.gd). wilds = how keen a hero is to hunt at the dens by day (0 = stays home). Traits also drive retreat, target choice, where heroes like to sleep (lodging, first match wins), when they feel tired (tired_at, energy 0-100), how they rate items (likes: weight per item stat) and how likely each whim is (whims: weights). max_markup = the dearest stall price a hero will pay (1.5 = Dear). A class with needs only turns up once that building stands, and card_cost replaces the usual hero card cost. rarity (data/rarity.json): the colour of the class's dawn card.",
 	"classes": {
 		"hunter": {
 			"rarity": "yellow",
 			"name": "Hunter",
+			"teaches": "sharp",
 			"hp": 40,
 			"attack": 6,
 			"range": 170,
@@ -14,6 +15,7 @@
 		"champion": {
 			"rarity": "yellow",
 			"name": "Champion",
+			"teaches": "hardy",
 			"hp": 62,
 			"attack": 7,
 			"range": 28,
@@ -24,6 +26,7 @@
 		"stalker": {
 			"rarity": "yellow",
 			"name": "Stalker",
+			"teaches": "swift",
 			"hp": 44,
 			"attack": 9,
 			"range": 28,
@@ -34,6 +37,7 @@
 		"knight": {
 			"rarity": "orange",
 			"name": "Knight",
+			"teaches": "hardy",
 			"tags": ["proud"],
 			"needs": "guildhall",
 			"card_cost": 45,
@@ -150,6 +154,7 @@
 		},
 		"dutiful": {
 			"name": "Dutiful",
+			"teach_mult": 2.0,
 			"retreat_at": 0.3,
 			"greed": 0.2,
 			"duty": 2.2,

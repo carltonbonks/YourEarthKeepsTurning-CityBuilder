@@ -536,6 +536,8 @@ func walk_toward(unit: Unit, goal: Vector2, close := 2.0) -> bool:
 	if to_goal.length() <= close:
 		return true
 	var step_len := unit.speed * dt * pathing.speed_at(unit.pos, unit.is_enemy())
+	if unit.escorted:
+		step_len *= 1.0 + float(content.townsfolk["warrior"]["escort_speed"])
 	var here := pathing.index_of(unit.pos)
 	if not unit.is_enemy():
 		pathing.tread(unit.pos, dt)
