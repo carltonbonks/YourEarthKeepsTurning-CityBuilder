@@ -89,10 +89,20 @@ extends RefCounted
 ## 37: idle hands: per round "idle_seconds" (role -> daytime seconds townsfolk stood idle), "trips_bumped" (good ->
 ##     gathering trips a gatherer leaning to the good took over from one who didn't); impact rows gain "helped" (seconds
 ##     townsfolk lent a hand at buildings) and, for heroes, "drilled" (XP from drilling on quiet days).
-## 38: hero-shaping buildings: per round "drill_seconds" (hero-seconds drilled at the training yard), "hounds_given"
+## 38: rarities (data/rarity.json): a dawn pick entry has "offered_rarities" (one rarity id per offered card) and
+##     "legend": true when the hero taken was a legend (a few levels up, carrying a mythic item). Items' and relics'
+##     rarities follow from their ids and affixes (Loot.rarity, Content.rarity_of).
+## 39: opening rings: "rings_open" (rings of plots open at the end, and per round at its start); a "clear_ring"
+##     action ({"kind": "clear_ring", "ring": rings now open}) when the player paid to clear the next ring; a
+##     round's "build_hands" lists "ring" while the draft offered it.
+## 40: runners (a building tagged courier, the runners' hut): per round "supply_runs" (provision recipe -> runs a
+##     runner delivered to a hero in the wilds) and "runners_lost" (hero -> runners killed on the way); hero_spending
+##     gains "runners" (the fees); impact rows gain "supplied" (deliveries made, for townsfolk; taken, for heroes); a
+##     runner's delivery is also a "market" sale; trips_cut_short gains "runner" (a gatherer called away to run).
+## 41: hero-shaping buildings: per round "drill_seconds" (hero-seconds drilled at the training yard), "hounds_given"
 ##     (hounds the kennel handed out) and "duels" (bouts in the duelling ring), each only when it happened. Rows are
 ##     offered only once the town has one of their buildings, so a drafted row adds at most one blueprint.
-const RECORD_FORMAT := 38
+const RECORD_FORMAT := 41
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -139,6 +149,7 @@ func to_record() -> Dictionary:
 		"age": run.age,
 		"age_up_round": run.age_up_round,
 		"age_rounds": run.age_rounds.duplicate(),
+		"rings_open": run.rings_open,
 		"tools": run.tools.duplicate(),
 		"heroes": run.heroes.map(hero_snapshot),
 		"fallen": run.fallen.map(hero_snapshot),
@@ -162,7 +173,7 @@ func begin_round() -> void:
 		"heroes_start": run.living_heroes().size(), "actions": [], "picks": [],
 		"whims": [], "loot": [], "sales": [], "hero_spending": {},
 		"prices": run.prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
-		"age": run.age, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
+		"age": run.age, "rings_open": run.rings_open, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
 		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0, "towers_broken": 0,
 		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {}, "idle_seconds": {}, "trips_bumped": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),

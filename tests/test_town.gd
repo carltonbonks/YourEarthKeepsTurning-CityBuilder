@@ -54,17 +54,7 @@ func test_buildings_go_where_they_like() -> void:
 	run.build("hunting_lodge")
 	var town := run.world.town
 	check_eq(int(town.plots[run.world.buildings[0]["plot"]]["ring"]), 0, "a hut goes in the inner ring")
-	check_eq(int(town.plots[run.world.buildings[1]["plot"]]["ring"]), 2, "the hunting lodge goes in the outer ring")
-
-
-func test_outer_ring_opens_with_the_bronze_age() -> void:
-	var run := _run()
-	var town := run.world.town
-	var bronze_ring := town.plots.filter(func(p: Dictionary) -> bool: return p["age"] == "bronze")
-	check(not bronze_ring.is_empty(), "there is a bronze-age ring")
-	check(not town.ring_open(bronze_ring[0]), "it is closed in the stone age")
-	run.age = "bronze"
-	check(town.ring_open(bronze_ring[0]), "it opens in the bronze age")
+	check_eq(int(town.plots[run.world.buildings[1]["plot"]]["ring"]), run.rings_open - 1, "the hunting lodge goes in the outer open ring")
 
 
 func test_buildings_keep_off_paved_ground() -> void:

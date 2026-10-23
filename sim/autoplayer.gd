@@ -16,8 +16,10 @@ extends RefCounted
 ## Every style takes the offered relic it ranks highest (RELIC_RANK).
 ## Every style can only order basics, the age-up card and buildings it has drafted (run.hand). It drafts what it
 ## wanted to order and couldn't (see build), and rerolls the offers once when shells are spare and none of them is wanted.
+## Every style clears the next ring as soon as the draft offers it and it can pay, before drafting anything new.
 ## Every style builds the stone-layers' yard from round 5 so craftspeople pave the busiest paths,
 ## invites the pedlar its heroes would gain most from (see _pedlar),
+## orders the runners' hut once it sells provisions to two heroes (see `runners`),
 ## orders the forester and charcoal pit when they are needed (see _upkeep), the geomancer from round 3 (see spell_score),
 ## and orders up to `gates` gates from `gate_round` (see below), and a garden when food runs short.
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
@@ -46,6 +48,9 @@ var pedlar := true
 ## Takes a row card when it holds a building it was about to order (_order), except the workers style: its extra
 ## garden or drying rack ate the wood a town of gatherers needs (73% without rows, 62% with). balance_run.gd: rows=0 never does.
 var rows := true
+## Orders the runners' hut once the provisions stall and smoke hut stand and it has two heroes (the styles that build
+## them: market, bronze, medieval). balance_run.gd: runners=0 never does.
+var runners := true
 ## Rerolls the blueprint offers once a round when it has at least this many shells and no offer is wanted.
 var redraw_above := 40
 ## Buildings it tried to order this build phase without a blueprint for them, most wanted first.
@@ -75,6 +80,11 @@ func build(run: RunState) -> void:
 	_wishes = []
 	_build_pass(run)
 	while run.hand.picks > 0 and not run.hand.cards.is_empty():
+		# A town nearly out of room clears the next ring before drafting anything new.
+		if run.hand.can_clear_ring():
+			run.hand.clear_ring()
+			_build_pass(run)
+			continue
 		if _wanted_offer(run) == "" and int(run.stock["shells"]) >= redraw_above and run.hand.can_redraw():
 			run.hand.redraw()
 		_draft(run)
@@ -202,6 +212,9 @@ func _build_pass(run: RunState) -> void:
 		for type: String in ["market", "arms_stall", "knapper", "hide_stall", "hide_rack", "hunting_lodge",
 				"charm_stall", "bone_carver", "provisions_stall", "smoke_hut"]:
 			_order(run, type)
+		if runners and run.living_heroes().size() >= 2 and run.world.count_buildings("provisions_stall", false) > 0 \
+				and run.world.count_buildings("smoke_hut", false) > 0:
+			_order(run, "runners_hut")
 	elif style != "workers" and run.round_number >= 3:
 		for type: String in ["market", "arms_stall", "knapper", "hide_stall", "hide_rack"]:
 			_order(run, type)
@@ -402,10 +415,12 @@ func spell_score(run: RunState, card: Dictionary) -> float:
 
 ## Relics it likes most first, ranked by how often bot runs that held them won (40 runs x 3 styles,
 ## blind picks, 2026-10-20). Anything not listed ranks after these; ties keep the offer's order.
-const RELIC_RANK := ["lone_wolf_pelt", "horde_drum", "broken_crown", "levy_horn", "ram_thorn_stakes", "tithe_bowl",
-	"grave_salt", "ancestor_mask", "owl_eyes", "sacred_spring", "witchs_thread", "chieftains_torc", "elders_tale",
+const RELIC_RANK := ["sun_disc", "starfall_idol", "antler_crown", "ancestors_horn", "first_hearth_ember", "lone_wolf_pelt", "horde_drum", "broken_crown", "levy_horn", "ram_thorn_stakes", "tithe_bowl",
+	"grave_salt", "smith_gods_hammer", "blood_mark", "kinslayers_brand", "ancestor_mask", "owl_eyes", "sacred_spring", "witchs_thread", "chieftains_torc", "elders_tale",
 	"turncoats_torc", "fire_arrows", "bone_flute", "moneylenders_knot", "hollow_drum", "bear_tooth_charm",
 	"blood_brother_knot", "wanderers_fire", "ember_stone", "oxhide_sledges", "seed_cache", "ridgeheart",
+	"green_mothers_bough", "quarry_spirit", "ore_singer", "tanners_blessing", "knappers_spirit", "bone_readers_rite",
+	"spirit_knot", "skinning_knife", "ossuary_pit",
 	# Spoils last: taking a pack-train's goods over a relic cost the bots 8-20 win-rate points (40 seeds).
 	"raiders_spears", "wolfskin_cloaks", "bone_ward", "splintered_ram", "pack_train", "ram_timbers", "smoked_haunches", "grave_goods"]
 

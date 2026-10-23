@@ -55,8 +55,10 @@ static func card_for(t: Dictionary) -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 1)
 	_line(box, t.get("title", ""), 14, Color("#f0e6c8"))
-	for line: String in t.get("lines", []):
-		_line(box, line, 12, Color("#c8ccc0"))
+	var colors: Dictionary = t.get("line_colors", {})
+	var lines: Array = t.get("lines", [])
+	for i in lines.size():
+		_line(box, lines[i], 12, colors.get(i, Color("#c8ccc0")))
 	if not t.get("tags", []).is_empty():
 		_line(box, "Tags", 12, Color("#9fc4e0"))
 		for tag: String in t["tags"]:

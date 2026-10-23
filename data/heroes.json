@@ -1,7 +1,8 @@
 {
-	"_note": "Hero classes, personality traits, names and whims. wilds = how keen a hero is to hunt at the dens by day (0 = stays home). Traits also drive retreat, target choice, where heroes like to sleep (lodging, first match wins), when they feel tired (tired_at, energy 0-100), how they rate items (likes: weight per item stat) and how likely each whim is (whims: weights). max_markup = the dearest stall price a hero will pay (1.5 = Dear). A class with needs only turns up once that building stands, and card_cost replaces the usual hero card cost.",
+	"_note": "Hero classes, personality traits, names and whims. wilds = how keen a hero is to hunt at the dens by day (0 = stays home). Traits also drive retreat, target choice, where heroes like to sleep (lodging, first match wins), when they feel tired (tired_at, energy 0-100), how they rate items (likes: weight per item stat) and how likely each whim is (whims: weights). max_markup = the dearest stall price a hero will pay (1.5 = Dear). A class with needs only turns up once that building stands, and card_cost replaces the usual hero card cost. rarity (data/rarity.json): the colour of the class's dawn card.",
 	"classes": {
 		"hunter": {
+			"rarity": "yellow",
 			"name": "Hunter",
 			"hp": 40,
 			"attack": 6,
@@ -11,6 +12,7 @@
 			"color": "#5fbf6a"
 		},
 		"champion": {
+			"rarity": "yellow",
 			"name": "Champion",
 			"hp": 62,
 			"attack": 7,
@@ -20,6 +22,7 @@
 			"color": "#d9a441"
 		},
 		"stalker": {
+			"rarity": "yellow",
 			"name": "Stalker",
 			"hp": 44,
 			"attack": 9,
@@ -29,6 +32,7 @@
 			"color": "#9b7fe0"
 		},
 		"knight": {
+			"rarity": "orange",
 			"name": "Knight",
 			"tags": ["proud"],
 			"needs": "guildhall",

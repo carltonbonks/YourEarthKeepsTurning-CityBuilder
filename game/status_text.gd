@@ -97,6 +97,7 @@ static func chip_tip(run: RunState, id: String) -> Dictionary:
 				t["lines"].append("None yet. Survive a round to pick one.")
 			for rid in run.relics:
 				t["lines"].append("%s: %s" % [content.relics[rid]["name"], content.relics[rid]["text"]])
+				t["line_colors"][t["lines"].size() - 1] = content.rarity_color(content.rarity_of("relic", rid))
 			return t
 	return {}
 

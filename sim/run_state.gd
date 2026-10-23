@@ -65,6 +65,8 @@ var age := ""
 var age_up_round := 0
 ## The round each age after the first was reached: age id -> round.
 var age_rounds := {}
+## How many rings of plots are open (see Town.ring_open): start_rings in data/town.json, one more per age-up or cleared ring.
+var rings_open := 0
 ## Tool sets bought for townsfolk groups (ids from "tools" in data/ages.json).
 var tools: Array[String] = []
 ## Heroes who left town unhappy.
@@ -101,6 +103,7 @@ func _init(game_content: Content, seed_value: int) -> void:
 	kinds.sort()
 	for kind: String in kinds:
 		prices[kind] = "fair"
+	rings_open = int(content.town["start_rings"])
 	world = World.new(self)
 	var start_people: Dictionary = content.balance["start_people"]
 	var roles := start_people.keys()
@@ -121,12 +124,65 @@ func mod(key: String) -> float:
 	var total := 0.0
 	for id in relics:
 		var effects: Dictionary = content.relics[id]["effects"]
-		total += float(effects.get(key, 0.0))
+		var v: Variant = effects.get(key, 0.0)
+		total += float(v) if v is float or v is int else 0.0
 	for id in traditions:
 		total += float(content.traditions[id].get("effects", {}).get(key, 0.0))
 	if world != null:
 		total += float(world.building_effects.get(key, 0.0))
 	return total
+
+
+## Relic effects keyed on tags ({tag: ...}), read through tag_mod, tag_sums and gear_bonus.
+const TAG_EFFECTS := ["foe_damage", "foe_spoils", "gear_bonus", "node_yield"]
+
+
+## The effects of everything owned that has effects: relics, then traditions.
+func _owned_effects() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for id in relics:
+		out.append(content.relics[id]["effects"])
+	for id in traditions:
+		out.append(content.traditions[id].get("effects", {}))
+	return out
+
+
+## Tag-keyed effects ({tag: number}, e.g. foe_damage {"beast": 0.4}): the sum over owned relics of the
+## numbers for every tag in `tags`. So a relic for beasts also covers any new enemy that carries the tag.
+func tag_mod(key: String, tags: Array) -> float:
+	var total := 0.0
+	for effects in _owned_effects():
+		var by_tag: Dictionary = effects.get(key, {})
+		for tag: String in by_tag:
+			if tag in tags:
+				total += float(by_tag[tag])
+	return total
+
+
+## Tag-keyed effects whose values are goods or stats ({tag: {key: number}}, e.g. foe_spoils, gear_bonus):
+## summed per key over every tag in `tags`. Empty when nothing owned has the effect.
+func tag_sums(key: String, tags: Array) -> Dictionary:
+	var out := {}
+	for effects in _owned_effects():
+		var by_tag: Dictionary = effects.get(key, {})
+		for tag: String in by_tag:
+			if tag in tags:
+				for k: String in by_tag[tag]:
+					out[k] = float(out.get(k, 0.0)) + float(by_tag[tag][k])
+	return out
+
+
+## gear_bonus from every owned relic, merged: {tag: {stat: per tier}} for Loot.stat.
+func gear_bonus() -> Dictionary:
+	var out := {}
+	for effects in _owned_effects():
+		var by_tag: Dictionary = effects.get("gear_bonus", {})
+		for tag: String in by_tag:
+			var stats: Dictionary = out.get(tag, {})
+			for k: String in by_tag[tag]:
+				stats[k] = float(stats.get(k, 0.0)) + float(by_tag[tag][k])
+			out[tag] = stats
+	return out
 
 
 # --- Founding traditions -----------------------------------------------------
@@ -422,7 +478,26 @@ func on_building_done(type: String) -> void:
 		age_rounds[next_age] = round_number
 		record.note_value("aged_up", next_age)
 		world.town.lay_hearth_ground(next_age)
+		open_ring()
 		tell("The %s is raised. The %s begins: %s." % [def["name"], content.age_name(age), content.ages["ages"][age].get("begins", "")])
+
+
+# --- Rings ---------------------------------------------------
+
+## True if a ring of plots is still closed.
+func ring_closed() -> bool:
+	return rings_open < content.town["rings"].size()
+
+
+## What clearing the next closed ring costs ({} if none is closed).
+func ring_cost() -> Dictionary:
+	return content.town["rings"][rings_open].get("clear_cost", {}) if ring_closed() else {}
+
+
+## Opens the next closed ring (an age-up does it for free; BuildHand.clear_ring when the player pays).
+func open_ring() -> void:
+	if ring_closed():
+		rings_open += 1
 
 
 # --- Ages: tool sets -----------------------------------------
@@ -526,6 +601,9 @@ func choose_pick(index: int) -> void:
 		entry["offered_leanings"] = leanings
 	if took and pick_offer[index].has("leaning"):
 		entry["leaning"] = pick_offer[index]["leaning"]
+	entry["offered_rarities"] = pick_offer.map(people.card_rarity)
+	if took and pick_offer[index].get("legend", false):
+		entry["legend"] = true
 	if hunger_turned_away != "":
 		entry["hunger_turned_away"] = hunger_turned_away
 	if not venture.is_empty():
@@ -773,7 +851,7 @@ func choose_relic(relic_id: String) -> void:
 	elif relic_id != "" and relic_id in relic_offer:
 		_gain_relic(relic_id)
 		tell("Relic taken: %s." % content.relics[relic_id]["name"])
-		# Broken Crown: more relics at once, drawn from the ordinary ones.
+		# Broken Crown, Starfall Idol: more relics at once, drawn from the ordinary ones.
 		var gifts := int(content.relics[relic_id]["effects"].get("gain_relics", 0))
 		if gifts > 0:
 			var rng := SeededRng.stream(run_seed, "relic_gifts", round_number)
@@ -786,7 +864,7 @@ func choose_relic(relic_id: String) -> void:
 				pool.erase(gift)
 				_gain_relic(gift)
 				gifted.append(gift)
-				tell("The crown's shards become %s." % content.relics[gift]["name"])
+				tell("%s brings %s." % [content.relics[relic_id]["name"], content.relics[gift]["name"]])
 			record.note_value("relic_gifts", gifted)
 	record.note_value("relic_pick", relic_id)
 	if not spoils.is_empty():
@@ -904,20 +982,25 @@ func _relic_pool(pacts: bool) -> Array:
 	return pool
 
 
-## On pact rounds the offer is pacts, topped up from the rest if too few are left.
+## How likely a relic is to be drawn this round, by its rarity.
+func _relic_odds(id: String) -> float:
+	return content.rarity_odds(content.rarity_of("relic", id), round_number)
+
+
+## On pact rounds the offer is pacts, topped up from the rest if too few are left. Rarer relics are drawn less often.
 func _roll_relic_offer() -> Array[String]:
 	var rng := SeededRng.stream(run_seed, "relics", round_number)
 	var choices := maxi(1, content.int_num("relic_choices") + int(mod("relic_choices")))
 	var pool := _relic_pool(is_pact_round())
 	var offer: Array[String] = []
 	while offer.size() < choices and not pool.is_empty():
-		var pick: String = rng.pick(pool)
+		var pick: String = rng.pick_by(pool, _relic_odds)
 		pool.erase(pick)
 		offer.append(pick)
 	if offer.size() < choices and is_pact_round():
 		pool = _relic_pool(false)
 		while offer.size() < choices and not pool.is_empty():
-			var pick: String = rng.pick(pool)
+			var pick: String = rng.pick_by(pool, _relic_odds)
 			pool.erase(pick)
 			offer.append(pick)
 	spoils = _roll_spoils()

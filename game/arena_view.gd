@@ -51,6 +51,7 @@ var _slide_from_ms := -1.0
 var _pulse_from_ms := -1.0
 var night := NightCamera.new()
 var pickups := PickupPopups.new()
+var supplies := SupplyPopups.new()
 var celebrations := Celebrations.new()
 var light := Lighting.new()
 var _light_layer: Control
@@ -102,6 +103,7 @@ func _process(delta: float) -> void:
 	if run != null:
 		night.update(self, delta)
 		pickups.update(run.world, Time.get_ticks_msec())
+		supplies.update(run.world, Time.get_ticks_msec())
 		celebrations.update(run, Time.get_ticks_msec())
 	queue_redraw()
 	_light_layer.queue_redraw()
@@ -326,6 +328,8 @@ func _draw_top() -> void:
 	# Goods carried in rise over the hearth as "+2 stone", above the fire and its health bar.
 	var hearth_top := World.HEARTH_RADIUS * s * (ISO_SQUASH + 0.3 if iso else 1.0) + 16.0
 	pickups.draw(_top_layer, _to_screen(Vector2.ZERO) - Vector2(0.0, hearth_top), font, Time.get_ticks_msec(), main_color)
+	# Supplies a runner hands to a hero out in the wilds rise where they land.
+	supplies.draw(_top_layer, font, Time.get_ticks_msec(), _to_screen)
 	# The controls hint is for a first run's opening rounds, and never under the building cards.
 	if run.round_number <= HELP_ROUNDS and run.phase != RunState.Phase.BUILD:
 		var help := "Mouse wheel to zoom, drag to look around, V for %s view, point at anything for details" % ("flat" if iso else "tilted")
@@ -631,9 +635,10 @@ func _building_at(at: Vector2) -> int:
 ## A dark box beside the mouse: title, lines, tags, then warnings in orange. Kept inside the map.
 func _draw_tip(tip: Dictionary, at: Vector2, font: Font) -> void:
 	var rows: Array = [[tip["title"], 13, Color("#f0e6c8")]]
-	for line: String in tip["lines"]:
-		for part in _wrap(line):
-			rows.append([part, 11, Color("#c8ccc0")])
+	var colors: Dictionary = tip.get("line_colors", {})
+	for i in tip["lines"].size():
+		for part in _wrap(tip["lines"][i]):
+			rows.append([part, 11, colors.get(i, Color("#c8ccc0"))])
 	if not tip["tags"].is_empty():
 		rows.append(["Tags", 11, Color("#9fc4e0")])
 		for tag: String in tip["tags"]:

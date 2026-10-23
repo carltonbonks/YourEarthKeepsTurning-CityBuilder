@@ -23,6 +23,7 @@ func hero_tick(hero: Unit) -> void:
 	var retreat_at := clampf(float(t["retreat_at"]) + w.run.mod("retreat_shift"), 0.0, 0.95)
 	if hero.carry_amount > 0 and hero.pos.length() <= w.content.num("settlement_radius"):
 		sell_shards(hero)
+	_call_for_supplies(hero, t, retreat_at)
 	if not hero.retreating and hero.hp_fraction() < retreat_at + 0.1:
 		_use_provision(hero, "heal")
 	if not hero.retreating and hero.hp_fraction() < retreat_at:
@@ -36,6 +37,10 @@ func hero_tick(hero: Unit) -> void:
 		if w.wave_spawned:
 			w.wave_stats["retreats"] = int(w.wave_stats["retreats"]) + 1
 		w.run.tell("%s is badly hurt and falls back to the hearth." % hero.display_name)
+	# A hurt hero who has sent for a poultice waits for it where they are, unless something is coming for them.
+	if hero.retreating and runner_coming(hero) and w.nearest_enemy(hero.pos, w.content.num("supply_wait_safe")) == null:
+		hero.intent = "waiting for a runner with a poultice"
+		return
 	if hero.retreating:
 		hero.intent = "retreating to heal"
 		if w.go_heal(hero, 1.0 + w.run.mod("hearth_heal_mult")):
@@ -46,7 +51,7 @@ func hero_tick(hero: Unit) -> void:
 		rest_tick(hero)
 		return
 	var drain := w.content.num("energy_drain_wilds") if hero.pos.length() > w.content.num("settlement_radius") else w.content.num("energy_drain")
-	drain *= maxf(0.2, 1.0 - Loot.total(w.content, hero, "energy"))
+	drain *= maxf(0.2, 1.0 - Loot.total(w.content, hero, "energy", w.run.gear_bonus()))
 	if _lone():
 		drain *= 1.0 - w.run.mod("lone_tire")
 	var was_awake := hero.energy > 0.0
@@ -85,6 +90,9 @@ func hero_tick(hero: Unit) -> void:
 		return
 	if hero.target != null:
 		w.fight(hero, hero.target)
+		return
+	if runner_coming(hero):
+		hero.intent = "waiting for a runner with %s" % ("a poultice" if hero.supply_call == "heal" else "food")
 		return
 	if not w.is_dusk() and w.pedlar.wants_visit(hero, wilds):
 		hero.intent = "off to trade with the %s" % w.pedlar.def(w.pedlar.camp["id"])["name"].to_lower()
@@ -156,7 +164,8 @@ func _wants_bed(hero: Unit, t: Dictionary) -> String:
 	# Everyone knows the warned attack is coming, so heroes stay up for it unless worn out.
 	if w.is_dusk() and w.day_index() < w.content.int_num("days_per_round") - 1:
 		return "night is falling"
-	if hero.energy <= float(t.get("tired_at", 25)):
+	# A hero who has sent for food keeps going while a runner is on the way, unless worn right out.
+	if hero.energy <= float(t.get("tired_at", 25)) and not (hero.energy > 0.0 and runner_coming(hero)):
 		return "tired"
 	if _carousing(hero):
 		return "off to drink"
@@ -183,7 +192,7 @@ func rest_tick(hero: Unit) -> void:
 	if is_preferred(hero, bed):
 		rate *= w.content.num("energy_home_bonus")
 	hero.energy = minf(w.content.num("hero_energy_max"), hero.energy + rate * w.dt)
-	hero.hp = minf(hero.max_hp, hero.hp + (float(def.get("heal", 0.0)) + Loot.total(w.content, hero, "rest_heal")) * w.dt)
+	hero.hp = minf(hero.max_hp, hero.hp + (float(def.get("heal", 0.0)) + Loot.total(w.content, hero, "rest_heal", w.run.gear_bonus())) * w.dt)
 	if _carousing(hero):
 		hero.intent = "drinking in %s" % bed_name(bed)
 	elif w.pedlar.is_guard(hero):
@@ -356,9 +365,9 @@ func apply_hero_stats(hero: Unit) -> void:
 	var c: Dictionary = w.content.hero_classes[hero.type_id]
 	var old_max := hero.max_hp
 	hero.max_hp = maxf(1.0, float(c["hp"]) + (hero.level - 1) * w.content.num("level_hp") \
-		+ Loot.total(w.content, hero, "hp") + w.run.mod("hero_hp"))
+		+ Loot.total(w.content, hero, "hp", w.run.gear_bonus()) + w.run.mod("hero_hp"))
 	hero.attack = float(c["attack"]) + (hero.level - 1) * w.content.num("level_attack") \
-		+ Loot.total(w.content, hero, "attack") + w.run.mod("hero_attack")
+		+ Loot.total(w.content, hero, "attack", w.run.gear_bonus()) + w.run.mod("hero_attack")
 	# Trophy Belt: damage for every so many kills. Witch's Thread: cursed gear's HP penalty is lifted.
 	if w.run.has_effect("trophy_every"):
 		hero.attack += w.run.mod("trophy_damage") * (hero.kills / int(w.run.mod("trophy_every")))
@@ -370,7 +379,7 @@ func apply_hero_stats(hero: Unit) -> void:
 		hero.attack += float(kennel_def().get("attack", 0.0))
 	hero.attack_range = float(c["range"])
 	hero.cooldown = float(c["cooldown"])
-	hero.speed = float(c["speed"]) + Loot.total(w.content, hero, "speed")
+	hero.speed = float(c["speed"]) + Loot.total(w.content, hero, "speed", w.run.gear_bonus())
 	if old_max > 1.0 and hero.max_hp > old_max:
 		hero.hp += hero.max_hp - old_max
 	hero.hp = minf(hero.hp, hero.max_hp)
@@ -382,7 +391,7 @@ func give_item(hero: Unit, item: Dictionary) -> void:
 	var slot := Loot.slot(w.content, item)
 	var likes: Dictionary = w.content.traits[hero.trait_id].get("likes", {})
 	var current: Dictionary = hero.items.get(slot, {})
-	var equip := current.is_empty() or Loot.score(w.content, item, likes) > Loot.score(w.content, current, likes)
+	var equip := current.is_empty() or Loot.score(w.content, item, likes, w.run.gear_bonus()) > Loot.score(w.content, current, likes, w.run.gear_bonus())
 	if equip:
 		if not current.is_empty():
 			hero.spares.append(current)
@@ -483,7 +492,7 @@ func _want(hero: Unit, t: Dictionary, good: Dictionary) -> float:
 		var likes: Dictionary = t.get("likes", {})
 		var slot := Loot.slot(w.content, item)
 		var current: Dictionary = hero.items.get(slot, {})
-		var gain := Loot.score(w.content, item, likes) - (Loot.score(w.content, current, likes) if not current.is_empty() else 0.0)
+		var gain := Loot.score(w.content, item, likes, w.run.gear_bonus()) - (Loot.score(w.content, current, likes, w.run.gear_bonus()) if not current.is_empty() else 0.0)
 		return gain * (1.25 if slot == t.get("prefers", "") else 1.0)
 	var have := hero.pack.count(good["recipe"])
 	if have >= int(w.content.market["pack_limit"]):
@@ -578,6 +587,56 @@ func _use_provision(hero: Unit, effect: String) -> bool:
 			w.run.tell("%s presses a %s to their wounds." % [hero.display_name, p["name"]])
 		return true
 	return false
+
+
+## Out in the wilds with no provision left for what they are about to need, a hero who can pay sends for one: food
+## once their energy nears feeling tired, a poultice once their health nears falling back. A courier building's runner
+## brings it from the stall (FolkAI._dispatch_runners). Heroes who hoard only send when they have plenty to spare.
+func _call_for_supplies(hero: Unit, t: Dictionary, retreat_at: float) -> void:
+	hero.supply_call = ""
+	if hero.runner != null and not runner_coming(hero):
+		hero.runner = null
+	var hut := w.folk_ai.courier_hut()
+	if hut < 0 or w.is_dusk() or w.pedlar.is_guard(hero) or hero.pos.length() <= w.content.num("settlement_radius"):
+		return
+	var need := ""
+	if hero.hp_fraction() < retreat_at + w.content.num("supply_heal_margin") and not _has_provision(hero, "heal"):
+		need = "heal"
+	elif hero.energy <= float(t.get("tired_at", 25)) + w.content.num("supply_energy_margin") and not _has_provision(hero, "energy"):
+		need = "energy"
+	if need == "":
+		return
+	var pick := w.market.provision_on_stall(need)
+	if pick.is_empty():
+		return
+	var kind: String = w.content.buildings[w.buildings[pick["stall"]]["type"]]["stall"]["sells"]
+	if w.run.price_markup(kind) > float(t.get("max_markup", 1.5)) + 0.001:
+		return
+	if hero.gold < (int(pick["price"]) + w.folk_ai.runner_fee(hut)) * float(t.get("hoard", 1.0)):
+		return
+	hero.supply_call = need
+
+
+## A runner is on its way to this hero.
+func runner_coming(hero: Unit) -> bool:
+	return hero.runner != null and hero.runner.alive and hero.runner.errand_for == hero
+
+
+func _has_provision(hero: Unit, effect: String) -> bool:
+	for id in hero.pack:
+		if w.content.market["provisions"][w.content.market["recipes"][id]["provision"]].has(effect):
+			return true
+	return false
+
+
+## A runner has handed over a provision: the hero uses it at once, and one patched up enough stops falling back.
+func on_supplied(hero: Unit, effect: String) -> void:
+	_use_provision(hero, effect)
+	if effect == "heal" and hero.retreating:
+		var retreat_at := float(w.content.traits[hero.trait_id]["retreat_at"]) + w.run.mod("retreat_shift")
+		if hero.hp_fraction() >= retreat_at + 0.1:
+			hero.retreating = false
+			w.run.tell("%s is patched up and turns back to the hunt." % hero.display_name)
 
 
 ## The nearest earth find (a sunk den's hoard, starstone by a ridge) within this hero's reach, or -1.

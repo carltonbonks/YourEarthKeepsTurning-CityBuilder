@@ -86,8 +86,9 @@ func test_every_kind_of_card_shows() -> void:
 	for l in overlays.find_children("*", "Label", true, false):
 		texts.append((l as Label).text)
 	check(texts.has("A family"), "the family card shows")
-	check(texts.has("Knight a champion"), "the knighting card shows")
-	check(texts.has("Promote a craftsperson"), "the master craftsperson card shows")
+	# Rarer cards add their rarity to the top line ("Knight a champion · Mythic").
+	check(texts.any(func(t: String) -> bool: return t.begins_with("Knight a champion")), "the knighting card shows")
+	check(texts.any(func(t: String) -> bool: return t.begins_with("Promote a craftsperson")), "the master craftsperson card shows")
 	run.dispose()
 	screen.free()
 
