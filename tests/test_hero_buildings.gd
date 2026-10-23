@@ -157,3 +157,23 @@ func test_bots_use_the_new_buildings() -> void:
 					built[a.get("building", "")] = true
 	var used := ["training_yard", "kennel", "trophy_hall", "gibbet_post", "seer_tent", "duel_ring", "warden_hut", "brewhouse"].filter(func(t: String) -> bool: return built.has(t))
 	check(not used.is_empty(), "the balanced bot raises some of the new buildings (%s)" % [built.keys()])
+
+
+func test_rule_breakers_change_rules_while_they_stand() -> void:
+	var run := _run()
+	check(not run.has_effect("levy"), "no levy before")
+	_raise(run, "levy_hall")
+	check(run.has_effect("levy"), "tribespeople take up spears on the warned night")
+	_raise(run, "beacon_tower")
+	check(run.has_effect("one_side") and run.mod("wave_mult") > 0.0, "the attack comes from one side, larger")
+
+
+func test_the_oath_stone_strengthens_heroes_at_once() -> void:
+	var run := _run()
+	var hero := run.heroes[0]
+	var attack := hero.attack
+	var hp := hero.max_hp
+	_raise(run, "oath_stone")
+	check_eq(hero.attack, attack + 3.0, "hits 3 harder")
+	check_eq(hero.max_hp, hp + 15.0, "15 more health")
+	check_eq(run.mod("xp_mult"), -0.5, "learns half as fast")

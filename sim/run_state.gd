@@ -488,6 +488,11 @@ func on_building_done(type: String) -> void:
 		world.hero_ai.assign_lodgings()
 	if def.has("hearth_hp"):
 		world.hearth_hp = minf(hearth_max_hp(), world.hearth_hp + float(def["hearth_hp"]))
+	# A building with effects (an oath stone's hero_attack) changes heroes' stats the moment it stands.
+	if def.has("effects"):
+		world.market.refresh_prizes()
+		for hero in living_heroes():
+			world.hero_ai.apply_hero_stats(hero)
 	# Goods a building brings with it when it stands (the age-up buildings' founding gifts).
 	for good: String in def.get("gift", {}):
 		stock[good] = int(stock.get(good, 0)) + int(def["gift"][good])

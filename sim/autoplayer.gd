@@ -175,11 +175,13 @@ func _order(run: RunState, type: String) -> bool:
 
 
 ## Incentive and hero-shaping buildings the bot drafts when offered (after what it wished for) and raises
-## once drafted, best first. The workers style has no heroes to shape, so only the brewhouse.
+## once drafted, best first, with a few rule-breakers. The workers style has no heroes to shape: the brewhouse,
+## the levy hall and the bone pit.
 func _shaping_list() -> Array[String]:
 	if style == "workers":
-		return ["brewhouse"] as Array[String]
-	return ["training_yard", "trophy_hall", "kennel", "seer_tent", "gibbet_post", "duel_ring", "warden_hut", "brewhouse"] as Array[String]
+		return ["brewhouse", "levy_hall", "bone_pit"] as Array[String]
+	return ["training_yard", "trophy_hall", "kennel", "seer_tent", "oath_stone", "gibbet_post", "duel_ring", "warden_hut",
+		"levy_hall", "brewhouse"] as Array[String]
 
 
 func _build_pass(run: RunState) -> void:
