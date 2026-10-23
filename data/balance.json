@@ -1,5 +1,5 @@
 {
-	"_note": "Core balance numbers. Edit and reload; no code changes needed. Times are in seconds of game time. Gatherers plan each trip (sim/folk_ai.gd plan_trip): gather_trip_slack pads their walking estimate for detours, and gather_need_floor is how much they still value a good the town already has enough of (a full shortage counts 1).",
+	"_note": "Core balance numbers. Edit and reload; no code changes needed. Times are in seconds of game time. Gatherers plan each trip (sim/folk_ai.gd plan_trip): gather_trip_slack pads their walking estimate for detours, and gather_need_floor is how much they still value a good the town already has enough of (a full shortage counts 1). With no trip for a good the town is short of, townsfolk lend a hand at buildings (assist in buildings.json): assist_rate = how fast a helper works a workshop's craft, as a share of its work rate; assist_recheck = seconds a helper stays before looking for a trip again. A hero with no fight, errand or den to stalk on a quiet day drills drill_radius from the hearth for drill_xp_per_second XP (sim/hero_ai.gd).",
 	"rounds_to_win": 14,
 	"days_per_round": 3,
 	"day_seconds": 32,
@@ -89,8 +89,12 @@
 	"node_regrow_per_day": 2,
 	"gather_trip_slack": 1.15,
 	"gather_need_floor": 0.05,
+	"assist_rate": 0.5,
+	"assist_recheck": 5,
 
 	"xp_per_level": 10,
+	"drill_xp_per_second": 0.05,
+	"drill_radius": 60,
 	"level_hp": 8,
 	"level_attack": 1,
 	"between_round_heal": 0.5,
