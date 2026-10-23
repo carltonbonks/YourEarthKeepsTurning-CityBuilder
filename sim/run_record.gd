@@ -95,7 +95,11 @@ extends RefCounted
 ## 39: opening rings: "rings_open" (rings of plots open at the end, and per round at its start); a "clear_ring"
 ##     action ({"kind": "clear_ring", "ring": rings now open}) when the player paid to clear the next ring; a
 ##     round's "build_hands" lists "ring" while the draft offered it.
-const RECORD_FORMAT := 39
+## 40: runners (a building tagged courier, the runners' hut): per round "supply_runs" (provision recipe -> runs a
+##     runner delivered to a hero in the wilds) and "runners_lost" (hero -> runners killed on the way); hero_spending
+##     gains "runners" (the fees); impact rows gain "supplied" (deliveries made, for townsfolk; taken, for heroes); a
+##     runner's delivery is also a "market" sale; trips_cut_short gains "runner" (a gatherer called away to run).
+const RECORD_FORMAT := 40
 
 var run: RunState
 ## Finished rounds, oldest first.

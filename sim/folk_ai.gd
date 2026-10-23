@@ -77,6 +77,7 @@ func begin_step() -> void:
 			if unit.carry_amount > 0:
 				_inbound[unit.carrying] = int(_inbound.get(unit.carrying, 0)) + unit.carry_amount
 	_shadow_spots.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.length_squared() > b.length_squared())
+	_dispatch_runners()
 
 
 func _claim(node_index: int, amount: int) -> void:
@@ -232,6 +233,9 @@ func _worker_tick(unit: Unit) -> void:
 		w.walk_toward(unit, away.lerp(Vector2.ZERO, 0.5))
 		if danger.pos.distance_to(unit.pos) <= danger.attack_range + 4.0 and unit.cooldown_left <= 0.0:
 			w.hit(unit, danger)
+		return
+	if unit.errand_for != null:
+		_run_errand(unit)
 		return
 	if unit.carry_amount > 0 and (unit.task != "gather" or w.is_dusk()):
 		unit.task = "return"
@@ -626,3 +630,148 @@ func nearest_node(unit: Unit, want: String) -> int:
 ## How fast a craftsperson builds and crafts (tool sets included).
 func work_rate(unit: Unit) -> float:
 	return float(w.content.townsfolk[unit.type_id].get("build_rate", 0.5)) + w.run.tool_bonus(unit.type_id, "build_rate")
+
+
+# --- Runners ------------------------------------------------------------------
+
+## The first finished building tagged courier (the runners' hut), or -1.
+func courier_hut() -> int:
+	for i in w.buildings.size():
+		var b := w.buildings[i]
+		if float(b["work_left"]) <= 0.0 and w.content.has_tag("building", b["type"], "courier"):
+			return i
+	return -1
+
+
+func _runners_def(hut: int) -> Dictionary:
+	return w.content.buildings[w.buildings[hut]["type"]].get("runners", {})
+
+
+## Shells a hero pays a courier building's runner on top of the stall price.
+func runner_fee(hut: int) -> int:
+	return int(_runners_def(hut).get("fee", 0))
+
+
+## Each step: heroes in the wilds who sent for supplies (HeroAI._call_for_supplies) get a runner, while the courier
+## building has runners to spare. A runner is a tribesperson in town not hauling anything, nearest the building first.
+func _dispatch_runners() -> void:
+	if w.is_dusk():
+		return
+	var hut := courier_hut()
+	if hut < 0:
+		return
+	var def := _runners_def(hut)
+	var out := 0
+	var callers: Array[Unit] = []
+	for hero in w.run.heroes:
+		if not hero.alive:
+			continue
+		if w.hero_ai.runner_coming(hero):
+			out += 1
+		elif hero.supply_call != "" and hero.pos.length() <= float(def.get("reach", INF)):
+			callers.append(hero)
+	for hero in callers:
+		if out >= int(def.get("slots", 1)):
+			return
+		var runner := _free_runner(w.buildings[hut]["pos"])
+		if runner == null:
+			return
+		if runner.task == "gather":
+			w.run.record.note_count("trips_cut_short", 1, "runner")
+		runner.task = "run"
+		runner.errand_for = hero
+		runner.parcel = {}
+		hero.runner = runner
+		out += 1
+
+
+## The tribesperson in town nearest `at` who is free to run: alive, carrying nothing and not already running.
+func _free_runner(at: Vector2) -> Unit:
+	var best: Unit = null
+	var best_d := INF
+	for unit in w.folk:
+		if not unit.alive or unit.type_id != "tribesperson" or unit.errand_for != null or unit.carry_amount > 0 or levied(unit):
+			continue
+		if unit.pos.length() > w.content.num("settlement_radius"):
+			continue
+		var d := unit.pos.distance_squared_to(at)
+		if d < best_d:
+			best_d = d
+			best = unit
+	return best
+
+
+## A runner fetches the provision its hero sent for from the stall, then runs it out to them, chasing them as they
+## move. It gives up at dusk, when the hero dies, comes home or goes out of reach, or when the stall has none.
+func _run_errand(unit: Unit) -> void:
+	var hero := unit.errand_for
+	var hut := courier_hut()
+	var reach := float(_runners_def(hut).get("reach", INF)) if hut >= 0 else 0.0
+	if hut < 0 or w.is_dusk() or not hero.alive or hero.runner != unit or hero.pos.length() > reach + 60.0 \
+			or hero.pos.length() <= w.content.num("settlement_radius") or (unit.parcel.is_empty() and hero.supply_call == ""):
+		_end_errand(unit)
+		return
+	if unit.parcel.is_empty():
+		var pick := w.market.provision_on_stall(hero.supply_call)
+		if pick.is_empty():
+			_end_errand(unit)
+			return
+		var stall: Dictionary = w.buildings[pick["stall"]]
+		unit.intent = "fetching %s for %s" % [w.content.recipe_name(stall["goods"][pick["index"]]["recipe"]), hero.display_name]
+		if w.walk_toward(unit, stall["pos"], 12.0):
+			unit.parcel = stall["goods"][pick["index"]]
+			unit.parcel["stall"] = pick["stall"]
+			stall["goods"].remove_at(pick["index"])
+		return
+	unit.intent = "running %s out to %s" % [w.content.recipe_name(unit.parcel["recipe"]), hero.display_name]
+	if w.walk_toward(unit, hero.pos, 14.0):
+		_deliver(unit, hero)
+
+
+## The hero pays the stall price and the fee into the town's stock and takes the provision; a hero who can no longer
+## pay sends the runner back.
+func _deliver(unit: Unit, hero: Unit) -> void:
+	var good := unit.parcel.duplicate()
+	good.erase("stall")
+	var price := w.run.price_of(good)
+	var fee := runner_fee(courier_hut())
+	if hero.gold < price + fee:
+		_end_errand(unit)
+		return
+	hero.gold -= price + fee
+	w.run.stock["shells"] = int(w.run.stock["shells"]) + price + fee
+	w.run.record.note_hero_spending("market", price)
+	w.run.record.note_hero_spending("runners", fee)
+	w.run.record.note_market_sale(hero, good, price)
+	w.run.record.note_count("supply_runs", 1, good["recipe"])
+	w.run.record.note_impact("folk", unit.type_id, "supplied", 1.0)
+	var key := w.run.record.impact_key(hero)
+	if not key.is_empty():
+		w.run.record.note_impact(key[0], key[1], "supplied", 1.0)
+	var r: Dictionary = w.content.market["recipes"][good["recipe"]]
+	var effect := "heal" if w.content.market["provisions"][r["provision"]].has("heal") else "energy"
+	w.supply_drops.append({"pos": hero.pos, "text": "+%s" % w.content.recipe_name(good["recipe"])})
+	if w.supply_drops.size() > World.SUPPLY_DROPS_KEPT:
+		w.supply_drops.pop_front()
+	w.supplies_delivered += 1
+	w.run.tell("A runner reaches %s with %s (%d shells)." % [hero.display_name, w.content.recipe_name(good["recipe"]), price + fee])
+	unit.parcel = {}
+	hero.pack.append(good["recipe"])
+	w.hero_ai.on_supplied(hero, effect)
+	_end_errand(unit)
+
+
+## Ends a runner's errand. A provision it still carries goes back on its stall.
+func _end_errand(unit: Unit) -> void:
+	if not unit.parcel.is_empty():
+		var s := int(unit.parcel["stall"])
+		var good := unit.parcel.duplicate()
+		good.erase("stall")
+		if s < w.buildings.size() and w.content.buildings[w.buildings[s]["type"]].has("stall"):
+			w.buildings[s]["goods"].append(good)
+		unit.parcel = {}
+	var hero := unit.errand_for
+	if hero != null and hero.runner == unit:
+		hero.runner = null
+	unit.errand_for = null
+	unit.task = ""

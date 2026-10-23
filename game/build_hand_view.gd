@@ -198,6 +198,8 @@ func recommendation(type: String, need: String) -> String:
 			return "Your workshop needs a stall"
 		"heroes":
 			return "No hero lodging yet"
+		"runners":
+			return "%d heroes could send for supplies" % run.living_heroes().size()
 		"ageing":
 			return "Needed to age up"
 		"age":

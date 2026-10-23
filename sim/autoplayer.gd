@@ -19,6 +19,7 @@ extends RefCounted
 ## Every style clears the next ring as soon as the draft offers it and it can pay, before drafting anything new.
 ## Every style builds the stone-layers' yard from round 5 so craftspeople pave the busiest paths,
 ## invites the pedlar its heroes would gain most from (see _pedlar),
+## orders the runners' hut once it sells provisions to two heroes (see `runners`),
 ## orders the forester and charcoal pit when they are needed (see _upkeep), the geomancer from round 3 (see spell_score),
 ## and orders up to `gates` gates from `gate_round` (see below), and a garden when food runs short.
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
@@ -47,6 +48,9 @@ var pedlar := true
 ## Takes a row card when it holds a building it was about to order (_order), except the workers style: its extra
 ## garden or drying rack ate the wood a town of gatherers needs (73% without rows, 62% with). balance_run.gd: rows=0 never does.
 var rows := true
+## Orders the runners' hut once the provisions stall and smoke hut stand and it has two heroes (the styles that build
+## them: market, bronze, medieval). balance_run.gd: runners=0 never does.
+var runners := true
 ## Rerolls the blueprint offers once a round when it has at least this many shells and no offer is wanted.
 var redraw_above := 40
 ## Buildings it tried to order this build phase without a blueprint for them, most wanted first.
@@ -191,6 +195,9 @@ func _build_pass(run: RunState) -> void:
 		for type: String in ["market", "arms_stall", "knapper", "hide_stall", "hide_rack", "hunting_lodge",
 				"charm_stall", "bone_carver", "provisions_stall", "smoke_hut"]:
 			_order(run, type)
+		if runners and run.living_heroes().size() >= 2 and run.world.count_buildings("provisions_stall", false) > 0 \
+				and run.world.count_buildings("smoke_hut", false) > 0:
+			_order(run, "runners_hut")
 	elif style != "workers" and run.round_number >= 3:
 		for type: String in ["market", "arms_stall", "knapper", "hide_stall", "hide_rack"]:
 			_order(run, type)
