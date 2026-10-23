@@ -113,15 +113,15 @@ func _draft(run: RunState) -> void:
 				run.hand.draft_row(c["row"])
 				return
 	var pick := _wanted_offer(run)
-	# An upgrade to something it already has, when nothing it wished for is offered.
-	if pick == "" and not run.hand.upgrade_offers.is_empty():
-		run.hand.draft_upgrade(run.hand.upgrade_offers[0]["upgrade"])
-		return
 	if pick == "":
 		for type: String in _shaping_list():
 			if run.hand.can_draft(type):
 				pick = type
 				break
+	# Else an upgrade to something it already has.
+	if pick == "" and not run.hand.upgrade_offers.is_empty():
+		run.hand.draft_upgrade(run.hand.upgrade_offers[0]["upgrade"])
+		return
 	if pick == "":
 		for c in run.hand.cards:
 			if c["need"] != "":
@@ -175,12 +175,12 @@ func _order(run: RunState, type: String) -> bool:
 
 
 ## Incentive and hero-shaping buildings the bot drafts when offered (after what it wished for) and raises
-## once drafted, best first, with a few rule-breakers. The workers style has no heroes to shape: the brewhouse,
-## the levy hall and the bone pit.
+## once drafted, best first, with outposts and a few rule-breakers. The workers style has no heroes to shape:
+## outposts, the brewhouse, the levy hall and the bone pit.
 func _shaping_list() -> Array[String]:
 	if style == "workers":
-		return ["brewhouse", "levy_hall", "bone_pit"] as Array[String]
-	return ["training_yard", "trophy_hall", "kennel", "seer_tent", "oath_stone", "gibbet_post", "duel_ring", "warden_hut",
+		return ["woodcutters_camp", "quarry_camp", "brewhouse", "levy_hall", "foragers_camp", "bone_pit"] as Array[String]
+	return ["training_yard", "woodcutters_camp", "trophy_hall", "quarry_camp", "tin_diggings", "kennel", "seer_tent", "oath_stone", "gibbet_post", "duel_ring", "warden_hut",
 		"levy_hall", "brewhouse"] as Array[String]
 
 

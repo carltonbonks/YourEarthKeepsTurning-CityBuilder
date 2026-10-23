@@ -155,7 +155,7 @@ func test_bots_use_the_new_buildings() -> void:
 			for a: Dictionary in rd["actions"]:
 				if a.get("kind", "") == "build":
 					built[a.get("building", "")] = true
-	var used := ["training_yard", "kennel", "trophy_hall", "gibbet_post", "seer_tent", "duel_ring", "warden_hut", "brewhouse"].filter(func(t: String) -> bool: return built.has(t))
+	var used := ["training_yard", "kennel", "trophy_hall", "gibbet_post", "seer_tent", "duel_ring", "warden_hut", "brewhouse", "oath_stone", "levy_hall", "woodcutters_camp", "quarry_camp"].filter(func(t: String) -> bool: return built.has(t))
 	check(not used.is_empty(), "the balanced bot raises some of the new buildings (%s)" % [built.keys()])
 
 

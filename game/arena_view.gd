@@ -422,7 +422,7 @@ func _draw_building(bi: int, font: Font) -> void:
 	var lift := _building_lift(bi)
 	var p := _to_screen(b["pos"]) - Vector2(0.0, lift)  # The middle of the roof.
 	var half := maxf(4.0, 11.0 * s)
-	var shape := _screen_poly(w.town.plot_outline(b["plot"]))
+	var shape := _screen_poly(w.town.building_outline(bi))
 	var col := Color(def["color"])
 	var work_left := float(b["work_left"])
 	if work_left <= 0.0 and w.town.is_gate_type(b["type"]):
@@ -620,7 +620,7 @@ func _building_at(at: Vector2) -> int:
 	var best := -1
 	var best_y := -INF
 	for bi in w.buildings.size():
-		var base := _screen_poly(w.town.plot_outline(w.buildings[bi]["plot"]))
+		var base := _screen_poly(w.town.building_outline(bi))
 		var lift := _building_lift(bi)
 		for rise: float in ([0.0, 0.5, 1.0] if lift >= 1.0 else [0.0]):
 			if Geometry2D.is_point_in_polygon(at + Vector2(0.0, lift * rise), base):

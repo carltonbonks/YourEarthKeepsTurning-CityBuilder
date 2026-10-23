@@ -221,6 +221,7 @@ func step() -> void:
 	alarms = new_alarms
 	new_alarms = []
 	market.refresh_prizes()
+	market.outposts_tick()
 	pedlar.tick()
 	enemy_ai.dens_tick()
 	for enemy in enemies:
@@ -312,6 +313,7 @@ func _dawn() -> void:
 	town.patch_walls()
 	enemy_ai.mend_towers()
 	pedlar.hire_guards()
+	market.outposts_dawn()
 	hero_ai.kennel_dawn()
 	hero_ai.duels_dawn()
 	run.daily_upkeep()
@@ -470,6 +472,8 @@ func _place_dens() -> void:
 
 ## Orders a building: it goes on the free plot that suits it (see Town.choose_plot). False if none is left.
 func add_building(type: String) -> bool:
+	if content.buildings[type].has("outpost"):
+		return market.add_outpost(type)
 	var plot := town.choose_plot(type)
 	if plot < 0:
 		return false
@@ -497,6 +501,13 @@ func add_row(id: String) -> bool:
 			"row": id, "row_mate": first + 1 - n})
 		town.occupy(at[n], buildings.size() - 1)
 	return true
+
+
+## True if building type has somewhere to go now: a free plot, or for an outpost a node to stand by.
+func has_spot(type: String) -> bool:
+	if content.buildings[type].has("outpost"):
+		return market.outpost_node(type) >= 0
+	return town.choose_plot(type) >= 0
 
 
 func count_buildings(type: String, built_only := true) -> int:

@@ -294,7 +294,7 @@ func can_build(type: String) -> bool:
 		and world.count_buildings(type, false) < building_max(type) \
 		and (needs == "" or world.count_buildings(needs, false) > 0) \
 		and content.age_reached(age, def.get("age", "")) and population() >= int(def.get("min_people", 0)) \
-		and world.town.choose_plot(type) >= 0
+		and world.has_spot(type)
 
 
 ## How many of a building the town may have: its max, raised by max_by_age once the town reaches that age.

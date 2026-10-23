@@ -17,6 +17,9 @@ const LANE_PENALTY := 5000.0
 ## How much a gate likes a lane plot, in the same units as the feet passing through it.
 const GATE_LANE_BONUS := 40.0
 
+## Half the width of an outpost's square (outposts stand out in the wilds, off the plots).
+const OUTPOST_HALF := 12.0
+
 var w: World
 var pathing: Pathing
 ## {ring, sector, a0, a1, r0, r1, pos, cells: PackedInt32Array, obstacle, building, lane}
@@ -239,6 +242,8 @@ func cluster_plots(k: int) -> Array[int]:
 ## The other finished buildings in building i's cluster (indices into World.buildings).
 func cluster_mates(i: int) -> Array[int]:
 	var out: Array[int] = []
+	if int(w.buildings[i]["plot"]) < 0:
+		return out
 	for k in cluster_plots(int(w.buildings[i]["plot"])):
 		var b := int(plots[k]["building"])
 		if b >= 0 and b != i and float(w.buildings[b]["work_left"]) <= 0.0:
@@ -473,6 +478,16 @@ func plot_at(p: Vector2) -> int:
 
 
 ## Outline of a plot (a slice of ring) as world points, for drawing.
+## The ground building b stands on: its plot, or for an outpost out in the wilds (no plot) a small square round it.
+func building_outline(b: int) -> PackedVector2Array:
+	var k := int(w.buildings[b]["plot"])
+	if k >= 0:
+		return plot_outline(k)
+	var at: Vector2 = w.buildings[b]["pos"]
+	var r := OUTPOST_HALF
+	return PackedVector2Array([at + Vector2(-r, -r), at + Vector2(r, -r), at + Vector2(r, r), at + Vector2(-r, r)])
+
+
 func plot_outline(k: int, steps := 4) -> PackedVector2Array:
 	var plot := plots[k]
 	var out := PackedVector2Array()

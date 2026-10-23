@@ -249,7 +249,7 @@ func eligible(type: String) -> bool:
 		and (needs == "" or run.world.count_buildings(needs, false) > 0) \
 		and run.population() >= int(def.get("min_people", 0)) \
 		and not (def.has("ages_up") and content.age_reached(run.age, def["ages_up"])) \
-		and run.world.town.choose_plot(type) >= 0
+		and run.world.has_spot(type)
 
 
 ## Why the town wants a building now: "housing", "food", "beds", "regrow" (the nodes it tends are picked over),
