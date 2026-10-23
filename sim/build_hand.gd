@@ -361,7 +361,7 @@ func _fill_upgrades(rng: SeededRng, avoid: Array) -> void:
 	for id: String in ids:
 		if not upgradable(id):
 			continue
-		var weight := run.content.rarity_weight(run.content.upgrades[id].get("rarity", "white"))
+		var weight := run.content.rarity_odds(run.content.upgrades[id].get("rarity", "white"), run.round_number)
 		if avoid.has("upgrade:" + id):
 			weight *= 0.25
 		weights[id] = weight

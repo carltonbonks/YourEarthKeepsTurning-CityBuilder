@@ -119,14 +119,15 @@ func test_hover_names_the_row() -> void:
 
 
 func test_bots_take_row_cards() -> void:
-	# Rows wait for one of their buildings, so not every run gets one: look over a few.
-	var rows := 0
-	for seed_value in [1004, 1005]:
-		for rd: Dictionary in bot_record(seed_value, "balanced")["rounds"]:
-			for a: Dictionary in rd["actions"]:
-				if a["kind"] == "row":
-					rows += 1
-	check(rows > 0, "the bot orders rows")
+	# Whether a row comes up in a whole run depends on the draws, so set one up: a row adding a wished-for building.
+	var run := _run()
+	run.hand.blueprints = ["knapper"] as Array[String]
+	run.hand.rows = [{"row": "blade_row", "need": ""}] as Array[Dictionary]
+	run.hand.picks = 1
+	var bot := AutoPlayer.new()
+	bot._wishes = ["arms_stall"] as Array[String]
+	bot._draft(run)
+	check(run.hand.blueprints.has("arms_stall"), "the bot orders rows")
 
 
 func test_a_row_waits_for_one_of_its_buildings() -> void:
