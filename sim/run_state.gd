@@ -24,6 +24,7 @@ var phase := Phase.BUILD
 var world: World
 var people: People
 var hand: BuildHand
+var caravan: Caravan
 var waves: WavePlanner
 var record: RunRecord
 var stock := {}
@@ -66,8 +67,6 @@ var age_up_round := 0
 var age_rounds := {}
 ## Tool sets bought for townsfolk groups (ids from "tools" in data/ages.json).
 var tools: Array[String] = []
-## What the trader still has for sale this round: good -> count. Empty when no trader is here.
-var trader_stock := {}
 ## Heroes who left town unhappy.
 var departed: Array[Unit] = []
 ## The role of whoever left hungry this dawn ("" if nobody): none of that role come to the dawn pick.
@@ -92,6 +91,7 @@ func _init(game_content: Content, seed_value: int) -> void:
 	run_seed = seed_value
 	people = People.new(self)
 	hand = BuildHand.new(self)
+	caravan = Caravan.new(self)
 	waves = WavePlanner.new(self)
 	record = RunRecord.new(self)
 	age = content.ages["order"][0]
@@ -423,7 +423,7 @@ func on_building_done(type: String) -> void:
 		tell("The %s is raised. The %s begins: %s." % [def["name"], content.age_name(age), content.ages["ages"][age].get("begins", "")])
 
 
-# --- Ages: tool sets and the trader -----------------------------------------
+# --- Ages: tool sets -----------------------------------------
 
 func can_buy_tools(id: String) -> bool:
 	var def: Dictionary = content.ages["tools"][id]
@@ -459,40 +459,6 @@ func tool_bonus(role: String, key: String) -> float:
 func has_tools_with(role: String, flag: String) -> bool:
 	return tools.any(func(id: String) -> bool:
 		return content.ages["tools"][id]["role"] == role and content.ages["tools"][id].get(flag, false))
-
-
-func trader_price(good: String) -> int:
-	return int(content.ages["trader"]["goods"][good]["price"])
-
-
-func can_trade(good: String) -> bool:
-	return phase == Phase.BUILD and int(trader_stock.get(good, 0)) > 0 and int(stock["shells"]) >= trader_price(good)
-
-
-## Buys one of a good from the visiting trader.
-func trade(good: String) -> bool:
-	if not can_trade(good):
-		return false
-	stock["shells"] = int(stock["shells"]) - trader_price(good)
-	stock[good] = int(stock[good]) + 1
-	trader_stock[good] = int(trader_stock[good]) - 1
-	record.note_count("trades", 1, good)
-	return true
-
-
-## How many of a good the buyout would take: all the trader has left, or as many as the shells pay for.
-func buyout_count(good: String) -> int:
-	if phase != Phase.BUILD:
-		return 0
-	return mini(int(trader_stock.get(good, 0)), int(stock["shells"]) / trader_price(good))
-
-
-## Buys as many of a good as the trader has left and the shells pay for; returns how many.
-func buyout(good: String) -> int:
-	var n := buyout_count(good)
-	for i in n:
-		trade(good)
-	return n
 
 
 # --- Dawn picks ------------------------------------------------------------
@@ -853,12 +819,7 @@ func _enter_build() -> void:
 	pedlar = ""
 	pedlar_offer = world.pedlar.roll_offer() if world.pedlar.is_pedlar_round(round_number) else ([] as Array[Dictionary])
 	pedlar_settled = pedlar_offer.is_empty()
-	trader_stock = {}
-	var trader: Dictionary = content.ages["trader"]
-	if world.count_buildings(trader["needs"]) > 0:
-		for good: String in trader["goods"]:
-			trader_stock[good] = int(trader["goods"][good]["stock"])
-		tell("The %s has come with %s." % [trader["name"].to_lower(), ", ".join(trader_stock.keys())])
+	caravan.lay_out()
 	hand.deal()
 	record.begin_round()
 	for effect: String in _effects_between_rounds:
@@ -880,6 +841,7 @@ func dispose() -> void:
 	world.dispose()
 	people.run = null
 	hand.run = null
+	caravan.run = null
 	waves.run = null
 	record.run = null
 
