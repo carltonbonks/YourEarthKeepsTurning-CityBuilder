@@ -239,18 +239,6 @@ func cluster_plots(k: int) -> Array[int]:
 	return out
 
 
-## The other finished buildings in building i's cluster (indices into World.buildings).
-func cluster_mates(i: int) -> Array[int]:
-	var out: Array[int] = []
-	if int(w.buildings[i]["plot"]) < 0:
-		return out
-	for k in cluster_plots(int(w.buildings[i]["plot"])):
-		var b := int(plots[k]["building"])
-		if b >= 0 and b != i and float(w.buildings[b]["work_left"]) <= 0.0:
-			out.append(b)
-	return out
-
-
 ## The row (data/combos.json) building i is part of now, as a one-item list: it was ordered on a row card as the
 ## row's main building, and it and its partner both stand finished.
 func combos_of(i: int) -> Array[String]:

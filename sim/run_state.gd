@@ -753,11 +753,6 @@ func fuel_needed_tonight() -> int:
 	return maxi(0, int(ceil(need * (1.0 + mod("fuel_mult")) - mod("fuel_saving"))))
 
 
-## What gatherers should fetch next: whatever is shortest against two days of need.
-func most_needed_resource() -> String:
-	return needed_resources()[0]
-
-
 ## Gatherable goods, most needed first (shortest against two days of need).
 func needed_resources() -> Array[String]:
 	var wants := resource_wants()
