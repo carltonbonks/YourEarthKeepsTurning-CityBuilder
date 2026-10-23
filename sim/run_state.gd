@@ -121,10 +121,63 @@ func mod(key: String) -> float:
 	var total := 0.0
 	for id in relics:
 		var effects: Dictionary = content.relics[id]["effects"]
-		total += float(effects.get(key, 0.0))
+		var v: Variant = effects.get(key, 0.0)
+		total += float(v) if v is float or v is int else 0.0
 	for id in traditions:
 		total += float(content.traditions[id].get("effects", {}).get(key, 0.0))
 	return total
+
+
+## Relic effects keyed on tags ({tag: ...}), read through tag_mod, tag_sums and gear_bonus.
+const TAG_EFFECTS := ["foe_damage", "foe_spoils", "gear_bonus", "node_yield"]
+
+
+## The effects of everything owned that has effects: relics, then traditions.
+func _owned_effects() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for id in relics:
+		out.append(content.relics[id]["effects"])
+	for id in traditions:
+		out.append(content.traditions[id].get("effects", {}))
+	return out
+
+
+## Tag-keyed effects ({tag: number}, e.g. foe_damage {"beast": 0.4}): the sum over owned relics of the
+## numbers for every tag in `tags`. So a relic for beasts also covers any new enemy that carries the tag.
+func tag_mod(key: String, tags: Array) -> float:
+	var total := 0.0
+	for effects in _owned_effects():
+		var by_tag: Dictionary = effects.get(key, {})
+		for tag: String in by_tag:
+			if tag in tags:
+				total += float(by_tag[tag])
+	return total
+
+
+## Tag-keyed effects whose values are goods or stats ({tag: {key: number}}, e.g. foe_spoils, gear_bonus):
+## summed per key over every tag in `tags`. Empty when nothing owned has the effect.
+func tag_sums(key: String, tags: Array) -> Dictionary:
+	var out := {}
+	for effects in _owned_effects():
+		var by_tag: Dictionary = effects.get(key, {})
+		for tag: String in by_tag:
+			if tag in tags:
+				for k: String in by_tag[tag]:
+					out[k] = float(out.get(k, 0.0)) + float(by_tag[tag][k])
+	return out
+
+
+## gear_bonus from every owned relic, merged: {tag: {stat: per tier}} for Loot.stat.
+func gear_bonus() -> Dictionary:
+	var out := {}
+	for effects in _owned_effects():
+		var by_tag: Dictionary = effects.get("gear_bonus", {})
+		for tag: String in by_tag:
+			var stats: Dictionary = out.get(tag, {})
+			for k: String in by_tag[tag]:
+				stats[k] = float(stats.get(k, 0.0)) + float(by_tag[tag][k])
+			out[tag] = stats
+	return out
 
 
 # --- Founding traditions -----------------------------------------------------
