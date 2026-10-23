@@ -520,10 +520,32 @@ func _draw_folk(u: Unit) -> void:
 	var p := _stand(u.pos, r)
 	_shadow(u.pos, r)
 	draw_circle(p, r, Color(run.content.townsfolk[u.type_id]["color"]))
+	_draw_marker(u, p + Vector2(0.0, r), r * 0.55)
 	if u.carry_amount > 0:
 		draw_circle(p + Vector2(r, -r), r * 0.5, Color(main_color(u.carrying)))
 	if u.hp < u.max_hp:
 		_bar(p + Vector2(-r, -r - 4), r * 2.0, u.hp_fraction(), Color("#5ee07a"))
+
+
+## The small marker at a townsperson's feet: its mark's shape and colour (data/marks.json), or a diamond while a
+## warrior escorts it.
+func _draw_marker(u: Unit, at: Vector2, size: float) -> void:
+	var shape := ""
+	var color := Color.WHITE
+	if u.mark != "":
+		shape = run.content.marks[u.mark]["shape"]
+		color = Color(run.content.marks[u.mark]["color"])
+	elif u.escorted:
+		shape = "diamond"
+		color = Color(run.content.townsfolk["warrior"]["escort_color"])
+	match shape:
+		"diamond":
+			draw_colored_polygon(PackedVector2Array([at + Vector2(0, -size), at + Vector2(size, 0), at + Vector2(0, size),
+				at + Vector2(-size, 0)]), color)
+		"circle":
+			draw_circle(at, size * 0.8, color)
+		"square":
+			draw_rect(Rect2(at - Vector2(size, size) * 0.7, Vector2(size, size) * 1.4), color)
 
 
 func _draw_enemy(e: Unit) -> void:

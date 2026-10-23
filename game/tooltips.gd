@@ -52,6 +52,14 @@ static func folk(run: RunState, u: Unit) -> Dictionary:
 		t["lines"].append(def["leanings"][u.leaning]["text"])
 		t["lines"].append(band_line(run, u.type_id, u.leaning))
 	t["lines"].append("Health %d/%d, attack %s" % [roundi(u.hp), roundi(u.max_hp), _num(u.attack)])
+	if u.mark != "":
+		var m: Dictionary = c.marks[u.mark]
+		t["lines"].append("%s (drilled with %s): %s." % [m["name"], u.mark_from, m["text"]])
+	elif u.drill_seconds > 0.0 and u.type_id == "warrior":
+		t["lines"].append("Drilled %d of %d s toward a mark." % [roundi(u.drill_seconds), roundi(float(def["mark_seconds"]))])
+	if u.escorted:
+		t["lines"].append("Escorted by a warrior: walks %d%% faster while no foe is near." % roundi(
+			float(c.townsfolk["warrior"]["escort_speed"]) * 100.0))
 	if u.master_of != "":
 		t["lines"].append("Master of the %s (%s): %s." % [c.buildings[u.master_of]["name"].to_lower(),
 			run.craft_trait(u)["name"].to_lower(), "; ".join(master_effects(c, u.craft_trait, u.master_of)).to_lower()])

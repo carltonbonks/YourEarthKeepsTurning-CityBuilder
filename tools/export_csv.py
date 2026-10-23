@@ -20,6 +20,7 @@ RESOURCES = ["food", "fuel", "wood", "stone", "shells", "flint", "hides", "bone"
              "copper", "cassiterite", "tin", "bronze", "bog_iron", "charcoal", "iron", "steel"]
 ROLES = ["tribesperson", "warrior", "craftsperson"]
 LEANINGS = ["forager", "woodcutter", "quarrier", "brushcutter", "prospector"]
+MARKS = ["swift", "hardy", "sharp"]
 IMPACT_STATS = ["dealt", "taken", "kills", "lost", "made", "raised", "paved", "patched"]
 
 
@@ -188,6 +189,11 @@ def main(raw_folder, out_folder):
                 **{"idle_seconds_" + k: rd.get("idle_seconds", {}).get(k, 0) if "idle_seconds" in rd else ""
                    for k in ["tribesperson", "craftsperson"]},
                 "trips_bumped": sum(rd.get("trips_bumped", {}).values()) if "trips_bumped" in rd else "",
+                "escort_seconds": rd.get("escort_seconds", 0) if "marks_end" in rd else "",
+                "marks_earned": sum(rd.get("marks_earned", {}).values()) if "marks_end" in rd else "",
+                **{"marks_end_" + k: rd.get("marks_end", {}).get(k, 0) if "marks_end" in rd else "" for k in MARKS},
+                "folk_trained_seconds": round(sum(r.get("trained", 0) for r in rd.get("impact", {}).get("folk", {}).values()))
+                if "marks_end" in rd else "",
                 "folk_helped_seconds": round(sum(r.get("helped", 0) for r in rd.get("impact", {}).get("folk", {}).values()))
                 if "idle_seconds" in rd else "",
                 "heroes_drilled_xp": round(sum(r.get("drilled", 0) for r in rd.get("impact", {}).get("heroes", {}).values()), 1)

@@ -93,6 +93,16 @@ var well_fed := false
 var hound := false
 ## Townsfolk: the leaning their dawn card came with (a key of their role's "leanings"), or "".
 var leaning := ""
+## Townsfolk: a gatherer a warrior keeps watch over walks faster while no foe is near (set each step, FolkAI).
+var escorted := false
+## Townsfolk: the lasting mark earned (a key of data/marks.json, or "") and the hero who taught it.
+var mark := ""
+var mark_from := ""
+## Warriors: the hero they drill beside (null when not drilling) and seconds drilled toward a mark so far.
+var drill_with: Unit = null
+var drill_seconds := 0.0
+## Heroes: when they last drilled (World.time), so warriors drilling beside them know they still are.
+var drilled_at := -1.0
 
 # Enemy-only.
 var spawn_time := 0.0

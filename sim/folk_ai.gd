@@ -33,6 +33,14 @@ var _crafters := {}
 var _trip_need := 0.0
 ## Where gatherers out past the houses are this step, farthest first: by day warriors shadow them (_warrior_tick).
 var _shadow_spots: Array[Vector2] = []
+## The gatherers behind _shadow_spots, in the same order.
+var _shadowed: Array[Unit] = []
+## Warriors in slot order (as _warrior_slot numbers them), this step.
+var _warrior_list: Array[Unit] = []
+## Warriors free to drill beside a hero this step (patrolling by day, no mark yet, not drilling already).
+var _free_pupils: Array[Unit] = []
+## Hero -> how many warriors drill beside them this step.
+var _pupils_of := {}
 ## Living warriors this step.
 var _warriors := 0
 ## Role -> daytime seconds spent idle not yet written to the record (it counts whole seconds).
@@ -53,19 +61,27 @@ func begin_step() -> void:
 	_helpers.clear()
 	_crafters.clear()
 	_shadow_spots.clear()
+	_shadowed.clear()
+	_warrior_list.clear()
+	_free_pupils.clear()
+	_pupils_of.clear()
 	_warriors = 0
 	fighters = 0
 	leaning_counts = count_leanings()
 	for unit in w.folk:
 		if unit.alive and w.content.unit_has_tag(unit, "fighter"):
 			fighters += 1
+		unit.escorted = false
 		if unit.type_id == "warrior":
 			_warrior_slot[unit] = _warrior_slot.size()
+			_warrior_list.append(unit)
 			if unit.alive:
 				_warriors += 1
+				if unit.drill_with != null:
+					_pupils_of[unit.drill_with] = int(_pupils_of.get(unit.drill_with, 0)) + 1
 		elif unit.alive:
 			if (unit.task == "gather" or unit.task == "return") and unit.pos.length() > World.HOME_RADIUS:
-				_shadow_spots.append(unit.pos)
+				_shadowed.append(unit)
 			if unit.task == "gather":
 				var good: String = w.nodes[unit.task_index]["gives"]
 				_claim(unit.task_index, carry_of(unit, good, w.nodes[unit.task_index]["type"]))
@@ -76,7 +92,11 @@ func begin_step() -> void:
 				_crafters[unit.task_index] = int(_crafters.get(unit.task_index, 0)) + 1
 			if unit.carry_amount > 0:
 				_inbound[unit.carrying] = int(_inbound.get(unit.carrying, 0)) + unit.carry_amount
-	_shadow_spots.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.length_squared() > b.length_squared())
+	_shadowed.sort_custom(func(a: Unit, b: Unit) -> bool: return a.pos.length_squared() > b.pos.length_squared())
+	for unit in _shadowed:
+		_shadow_spots.append(unit.pos)
+	_note_escorts()
+	_note_free_pupils()
 	_dispatch_runners()
 
 
@@ -150,6 +170,11 @@ func apply_folk_stats(unit: Unit) -> void:
 	unit.attack_range = float(def["range"])
 	unit.cooldown = float(def["cooldown"])
 	unit.speed = float(def["speed"])
+	if unit.mark != "":
+		var m: Dictionary = w.content.marks[unit.mark]
+		unit.max_hp *= 1.0 + float(m.get("hp", 0.0))
+		unit.attack *= 1.0 + float(m.get("attack", 0.0))
+		unit.speed *= 1.0 + float(m.get("speed", 0.0))
 	unit.hp = minf(unit.hp, unit.max_hp)
 
 
@@ -190,8 +215,7 @@ func _warrior_tick(unit: Unit) -> void:
 	if index < 0:  # joined since the step began (or ticked outside World.step)
 		index = w.folk.filter(func(u: Unit) -> bool: return u.type_id == "warrior").find(unit)
 	var shadow := Vector2.INF
-	if not w.is_dusk() and not levied(unit) and index < int(_warriors * float(def.get("shadow_share", 0.0))) \
-			and index < _shadow_spots.size():
+	if not levied(unit) and _shadows(index):
 		shadow = _shadow_spots[index].limit_length(float(def["shadow_reach"]))
 		patrol = shadow.length()
 	if unit.hp_fraction() < 0.3:
@@ -211,6 +235,8 @@ func _warrior_tick(unit: Unit) -> void:
 		unit.intent = "answering a call for help"
 		w.fight(unit, call)
 		return
+	if unit.drill_with != null and _drill_with(unit):
+		return
 	if shadow != Vector2.INF:
 		unit.intent = "keeping watch over the gatherers"
 		w.walk_toward(unit, shadow - shadow.normalized() * 20.0, 6.0)
@@ -218,6 +244,89 @@ func _warrior_tick(unit: Unit) -> void:
 	var angle := w.time * 0.05 + index * 2.4
 	unit.intent = "patrolling"
 	w.walk_toward(unit, Vector2.from_angle(angle) * patrol)
+
+
+## True when the warrior in this slot shadows a gatherer this step (by day, the first shadow_share of them).
+func _shadows(index: int) -> bool:
+	return not w.is_dusk() and index < int(_warriors * float(w.content.townsfolk["warrior"].get("shadow_share", 0.0))) \
+			and index < _shadow_spots.size()
+
+
+# --- Escorts and drilling (idle warriors on quiet days) ---------------------------
+
+## Marks each gatherer whose shadowing warrior stands within escort_reach, while no foe is within escort_safe of it:
+## it walks escort_speed faster this step (World.walk_toward). Only the shadowed gatherers are looked at.
+func _note_escorts() -> void:
+	var def: Dictionary = w.content.townsfolk["warrior"]
+	for i in mini(_shadowed.size(), _warrior_list.size()):
+		var warrior := _warrior_list[i]
+		var gatherer := _shadowed[i]
+		if not _shadows(i) or not warrior.alive or warrior.retreating \
+				or warrior.pos.distance_to(gatherer.pos) > float(def["escort_reach"]) \
+				or w.nearest_enemy(gatherer.pos, float(def["escort_safe"])) != null:
+			continue
+		gatherer.escorted = true
+		if fmod(w.time, 1.0) < w.dt:
+			w.run.record.note_count("escort_seconds", 1)
+
+
+## Lists the warriors free to drill beside a hero this step: by day, patrolling (not shadowing), unhurt enough to
+## stay out, with no mark yet and no drill partner.
+func _note_free_pupils() -> void:
+	if w.is_dusk():
+		return
+	for i in _warrior_list.size():
+		var u := _warrior_list[i]
+		if u.alive and not u.retreating and u.mark == "" and u.drill_with == null and not _shadows(i):
+			_free_pupils.append(u)
+
+
+## A drilling hero whose class teaches a mark (teaches in data/heroes.json) takes the nearest free warriors as drill
+## partners, up to pupils_per_hero. Called by HeroAI as the hero drills.
+func take_pupils(hero: Unit) -> void:
+	if str(w.content.hero_classes[hero.type_id].get("teaches", "")) == "":
+		return
+	var room := int(w.content.townsfolk["warrior"]["pupils_per_hero"]) - int(_pupils_of.get(hero, 0))
+	while room > 0 and not _free_pupils.is_empty():
+		var best := 0
+		for i in _free_pupils.size():
+			if _free_pupils[i].pos.distance_squared_to(hero.pos) < _free_pupils[best].pos.distance_squared_to(hero.pos):
+				best = i
+		_free_pupils[best].drill_with = hero
+		_free_pupils.remove_at(best)
+		_pupils_of[hero] = int(_pupils_of.get(hero, 0)) + 1
+		room -= 1
+
+
+## A warrior drilling beside a hero: walks to them and drills, earning the hero's mark after mark_seconds (a teach_mult
+## trait teaches faster). Lets go (false) once it is dusk or the hero has stopped drilling.
+func _drill_with(unit: Unit) -> bool:
+	var hero := unit.drill_with
+	if w.is_dusk() or not hero.alive or w.time - hero.drilled_at > w.dt * 1.5:
+		unit.drill_with = null
+		return false
+	unit.intent = "drilling with %s" % hero.display_name
+	if w.walk_toward(unit, hero.pos, 18.0):
+		unit.drill_seconds += w.dt * float(w.content.traits[hero.trait_id].get("teach_mult", 1.0))
+		w.run.record.note_impact("folk", unit.type_id, "trained", w.dt)
+		if unit.drill_seconds >= float(w.content.townsfolk[unit.type_id]["mark_seconds"]):
+			grant_mark(unit, hero)
+	return true
+
+
+## A townsperson earns the mark the hero's class teaches, for good (data/marks.json).
+func grant_mark(unit: Unit, hero: Unit) -> void:
+	var mark: String = w.content.hero_classes[hero.type_id]["teaches"]
+	var m: Dictionary = w.content.marks[mark]
+	unit.mark = mark
+	unit.mark_from = "%s the %s" % [hero.display_name, w.content.hero_classes[hero.type_id]["name"].to_lower()]
+	unit.drill_with = null
+	var before := unit.max_hp
+	apply_folk_stats(unit)
+	unit.hp = minf(unit.max_hp, unit.hp + unit.max_hp - before)
+	w.run.record.note_count("marks_earned", 1, mark)
+	w.run.tell("A %s who drilled beside %s is now %s: %s." % [w.content.townsfolk[unit.type_id]["name"].to_lower(),
+		unit.mark_from, m["name"].to_lower(), m["text"]])
 
 
 ## Tribespeople and craftspeople: gather, haul, build, repair, and go home at dusk.

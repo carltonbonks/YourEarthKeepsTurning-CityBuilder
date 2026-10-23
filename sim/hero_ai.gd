@@ -129,7 +129,9 @@ func hero_tick(hero: Unit) -> void:
 		return
 	# A quiet day for a hero who doesn't roam: drill by the hearth for a trickle of XP.
 	hero.intent = "drilling by the hearth"
+	hero.drilled_at = w.time
 	if w.walk_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * w.content.num("drill_radius"), 4.0):
+		w.folk_ai.take_pupils(hero)
 		var xp := w.content.num("drill_xp_per_second") * w.dt
 		hero.xp += xp
 		var key := w.run.record.impact_key(hero)
@@ -733,7 +735,9 @@ func _drill_tick(hero: Unit, yard: int) -> void:
 	var b: Dictionary = w.buildings[yard]
 	var drills: Dictionary = w.content.buildings[b["type"]]["drills"]
 	hero.intent = "drilling at the %s" % w.content.buildings[b["type"]]["name"].to_lower()
+	hero.drilled_at = w.time
 	if w.walk_toward(hero, b["pos"], 24.0):
+		w.folk_ai.take_pupils(hero)
 		var xp := float(drills["xp_per_second"]) * w.dt
 		hero.xp += xp
 		var key := w.run.record.impact_key(hero)

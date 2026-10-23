@@ -107,7 +107,11 @@ extends RefCounted
 ##     "outpost_goods" (good -> amount outposts brought in), "outposts_wrecked" and "outposts_moved" (building -> count),
 ##     only when it happened; a final plot of an outpost has ring 0 and sector -1.
 ## 43: a run's own blueprint pool: top-level "pool" (building ids the run's draft could offer, sorted).
-const RECORD_FORMAT := 43
+## 44: escorts and marks: per round "escort_seconds" (gatherer-seconds walked faster with a warrior escorting) and
+##     "marks_earned" (mark id from data/marks.json -> townsfolk who earned it drilling beside a hero), each only when
+##     it happened; impact rows gain "trained" (seconds warriors drilled beside heroes); per round "marks_end"
+##     (mark id -> living townsfolk carrying it as the round ends).
+const RECORD_FORMAT := 44
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -196,10 +200,14 @@ func end_round() -> void:
 	entry["town"] = town_snapshot()
 	entry["townsfolk_end"] = folk_counts()
 	var leanings := {}
+	var marks := {}
 	for u in run.world.folk:
 		if u.leaning != "":
 			leanings[u.leaning] = int(leanings.get(u.leaning, 0)) + 1
+		if u.mark != "" and u.alive:
+			marks[u.mark] = int(marks.get(u.mark, 0)) + 1
 	entry["leanings_end"] = leanings
+	entry["marks_end"] = marks
 	var bands := {}
 	var counts := run.world.folk_ai.count_leanings()
 	for key: String in counts:
