@@ -390,10 +390,28 @@ func pick(run: RunState) -> int:
 				var benches := run.world.buildings.filter(func(b: Dictionary) -> bool:
 					return run.content.buildings[b["type"]].has("workshop")).size()
 				score = (4.0 if pending else 1.0) + benches * 1.2 - run.count_role("craftsperson") * 1.5
+		score += roll_value(run, card)
 		if score > best_score:
 			best_score = score
 			best = i
 	return best
+
+
+## A rolled card's modifiers are worth a little more than a plain card: a mark or powerful modifier lifts it, a
+## seer is a worker lost for an extra card, the bloodsworn and the ember-born cost the town later.
+func roll_value(run: RunState, card: Dictionary) -> float:
+	var value := 0.0
+	for id in CardRoll.mods_of(card):
+		match id:
+			"hollow_seer":
+				value += 0.5
+			"bloodsworn", "ember_born":
+				value += 1.0
+			"many_mother":
+				value += 2.0
+			_:
+				value += 0.8
+	return value
 
 
 ## A venture is worth it when it brings one of the two goods the town is shortest of and plenty of tribespeople stay home.

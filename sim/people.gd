@@ -45,10 +45,17 @@ func offer_picks() -> void:
 			and not content.balance["family_roles"].has(run.hunger_turned_away):
 		pool.append({"kind": "family", "role": "family", "cost": 0, "roles": content.balance["family_roles"].duplicate()})
 	run.pick_offer = []
+	_kin_join()
 	var promote := _promotion_card(rng)
 	var venture := _venture_card()
-	var slots := maxi(1, content.int_num("pick_choices") + int(run.mod("pick_bonus"))) - (0 if promote.is_empty() else 1) \
+	# A hollow-eyed seer (data/card_mods.json pick_bonus) adds a card while they live.
+	var seers := int(world.folk_ai.folk_sum("pick_bonus"))
+	if seers > 0:
+		run.record.note_count("card_mods_fired", seers, "hollow_seer")
+	var slots := maxi(1, content.int_num("pick_choices") + int(run.mod("pick_bonus")) + seers) - (0 if promote.is_empty() else 1) \
 		- (0 if venture.is_empty() else 1)
+	# Each card dealt rolls its own rarity (CardRoll), on a stream of its own so the cards dealt stay the same.
+	var roll_rng := SeededRng.stream(run.run_seed, "card_roll", run.round_number * 10 + world.day_index())
 	# Rarer cards are drawn less often, less so as the run goes on (Content.rarity_odds).
 	while run.pick_offer.size() < slots and not pool.is_empty():
 		var card: Dictionary = rng.pick_by(pool, func(c: Dictionary) -> float:
@@ -56,6 +63,8 @@ func offer_picks() -> void:
 		pool.erase(card)
 		if card["kind"] == "hero":
 			_maybe_legend(card, rng)
+		elif card["kind"] == "folk":
+			CardRoll.roll_folk(content, roll_rng, card, run.round_number)
 		run.pick_offer.append(card)
 	if not promote.is_empty():
 		run.pick_offer.append(promote)
@@ -82,6 +91,7 @@ func _maybe_legend(card: Dictionary, rng: SeededRng) -> void:
 	run.world.hero_ai.apply_hero_stats(hero)
 	hero.hp = hero.max_hp
 	card["legend"] = true
+	card["roll"] = content.rarest()
 	card["cost"] = int(card["cost"]) + content.int_num("legend_cost")
 
 
@@ -108,7 +118,7 @@ func card_people(card: Dictionary) -> int:
 			return 0
 		"family":
 			return card["roles"].size()
-	return 1
+	return 1 + CardRoll.extra_people(run.content, card)
 
 
 ## A dawn card's rarity (data/rarity.json), from the data of whatever it offers.
@@ -138,6 +148,30 @@ func card_label(card: Dictionary) -> String:
 	if card["kind"] == "family":
 		return "family"
 	return "hero:" + card["hero"].type_id if card["kind"] == "hero" else card["role"]
+
+
+# --- Rolled townsfolk (data/card_mods.json) -----------------------------------
+
+## A mother of many (kin_chance) may bring a plain tribesperson in free at dawn, while there is room.
+func _kin_join() -> void:
+	var rng := SeededRng.stream(run.run_seed, "kin", run.round_number * 10 + run.world.day_index())
+	for unit in run.world.folk.duplicate():
+		var chance := run.world.folk_ai.unit_mod(unit, "kin_chance")
+		if chance <= 0.0 or not unit.alive or run.population() >= run.housing() or rng.randf() >= chance:
+			continue
+		run.world.folk_ai.add_folk("tribesperson")
+		run.record.note_count("card_mods_fired", 1, "many_mother")
+		run.tell("Kin of the mother of many walk in from the wilds: a tribesperson joins.")
+
+
+## The bloodsworn (doom_rounds) burn out at the end of their last round.
+func spend_bloodsworn() -> void:
+	for unit in run.world.folk.duplicate():
+		var rounds := int(run.world.folk_ai.unit_mod(unit, "doom_rounds"))
+		if rounds > 0 and run.round_number - unit.joined_round + 1 >= rounds:
+			run.world.folk.erase(unit)
+			run.record.note_count("card_mods_fired", 1, "bloodsworn")
+			run.tell("A bloodsworn %s has given all they had and is laid to rest." % run.content.townsfolk[unit.type_id]["name"].to_lower())
 
 
 # --- Ventures ---------------------------------------------------------------

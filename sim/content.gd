@@ -7,7 +7,7 @@ extends RefCounted
 
 const DATA_DIR := "res://data"
 ## Kinds of entity that can carry "tags" in their data, for tags_of() and has_tag().
-const TAG_KINDS := ["enemy", "hero", "trait", "townsfolk", "building", "item", "relic", "node", "deal", "mark"]
+const TAG_KINDS := ["enemy", "hero", "trait", "townsfolk", "building", "item", "relic", "node", "deal", "mark", "card_mod"]
 
 var balance: Dictionary
 var hero_classes: Dictionary
@@ -32,6 +32,7 @@ var ventures: Dictionary  ## data/ventures.json: dawn cards that spend tribespeo
 var pedlars: Dictionary  ## data/pedlars.json: the pedlars invited on pedlar rounds and their camp (see PedlarCamp).
 var trades: Dictionary  ## data/trades.json: the caravan's trade cards (see Caravan).
 var marks: Dictionary  ## data/marks.json: lasting edges single townsfolk earn (warriors drilling beside heroes).
+var card_mods: Dictionary  ## data/card_mods.json: the powerful and transmuting modifiers a rolled card can carry.
 var upgrades: Dictionary  ## data/upgrades.json: draft offers that change a building the town has, for the run.
 var rarity: Dictionary  ## data/rarity.json: the four rarities (white, blue, yellow, orange) anything can carry.
 
@@ -64,6 +65,7 @@ static func load_default() -> Content:
 	c.trades = _strip(_read("trades.json"))
 	c.upgrades = _strip(_read("upgrades.json"))
 	c.marks = _strip(_read("marks.json"))
+	c.card_mods = _strip(_read("card_mods.json"))
 	return c
 
 
@@ -99,15 +101,19 @@ func has_tag(kind: String, id: String, tag: String) -> bool:
 	return tag in tags_of(kind, id)
 
 
-## Everything a unit is: an enemy's type tags; a hero's class and trait tags; a townsperson's role tags and its mark's.
+## Everything a unit is: an enemy's type tags; a hero's class and trait tags; a townsperson's role tags, its mark's
+## and its card modifiers'.
 func unit_tags(unit: Unit) -> Array:
 	if unit.is_enemy():
 		return tags_of("enemy", unit.type_id)
 	if unit.is_hero():
 		return tags_of("hero", unit.type_id) + tags_of("trait", unit.trait_id)
-	if unit.mark != "":
-		return tags_of("townsfolk", unit.type_id) + tags_of("mark", unit.mark)
-	return tags_of("townsfolk", unit.type_id)
+	if unit.mark == "" and unit.boons.is_empty():
+		return tags_of("townsfolk", unit.type_id)
+	var out := tags_of("townsfolk", unit.type_id) + (tags_of("mark", unit.mark) if unit.mark != "" else [])
+	for id in unit.boons:
+		out += tags_of("card_mod", id)
+	return out
 
 
 func unit_has_tag(unit: Unit, tag: String) -> bool:
@@ -169,6 +175,8 @@ func tag_table(kind: String) -> Dictionary:
 			return trades["deals"]
 		"mark":
 			return marks
+		"card_mod":
+			return card_mods
 	assert(false, "Unknown tag kind %s (see Content.TAG_KINDS)" % kind)
 	return {}
 

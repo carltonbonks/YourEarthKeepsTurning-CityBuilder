@@ -611,9 +611,17 @@ func choose_pick(index: int) -> void:
 			tell("A family of %d comes to settle." % card["roles"].size())
 		else:
 			var leaning: String = card.get("leaning", "")
-			world.folk_ai.add_folk(card["role"], leaning)
+			var newcomer := world.folk_ai.add_folk(card["role"], leaning)
+			CardRoll.apply_to(self, newcomer, card)
 			taken = card["role"]
-			tell("A %s joins the settlement." % folk_name(card["role"], leaning).to_lower())
+			if card.has("roll"):
+				tell("A %s joins the settlement: %s." % [folk_name(card["role"], leaning).to_lower(),
+					"; ".join(CardRoll.lines(content, card)).to_lower()])
+			else:
+				tell("A %s joins the settlement." % folk_name(card["role"], leaning).to_lower())
+			for i in CardRoll.extra_people(content, card):
+				world.folk_ai.add_folk(card["role"], leaning)
+				tell("Twins: a second %s comes too." % folk_name(card["role"], leaning).to_lower())
 			folk_cards_taken += 1
 			var every := int(mod("twin_every"))
 			if every > 0 and folk_cards_taken % every == 0:
@@ -627,6 +635,12 @@ func choose_pick(index: int) -> void:
 	if took and pick_offer[index].has("leaning"):
 		entry["leaning"] = pick_offer[index]["leaning"]
 	entry["offered_rarities"] = pick_offer.map(people.card_rarity)
+	var rolls := pick_offer.map(CardRoll.roll_of)
+	if rolls.any(func(r: String) -> bool: return r != "white"):
+		entry["offered_rolls"] = rolls
+	if took and pick_offer[index].has("roll"):
+		entry["roll"] = pick_offer[index]["roll"]
+		entry["mods"] = CardRoll.mods_of(pick_offer[index])
 	if took and pick_offer[index].get("legend", false):
 		entry["legend"] = true
 	if hunger_turned_away != "":
@@ -696,7 +710,9 @@ func food_needed_today() -> int:
 	for type: String in content.buildings:
 		eaten += world.count_buildings(type) * int(content.buildings[type].get("eats", {}).get("food", 0))
 	eaten += world.hero_ai.hounds() * int(world.hero_ai.kennel_def().get("food", 0))
-	return maxi(0, int(ceil(population() * content.num("food_per_person_per_day") * (1.0 - 0.25 * racks) - growth))) + eaten
+	# Light eaters and those who eat for two (marks and card modifiers: upkeep) shift the town's mouths.
+	var mouths := maxf(0.0, population() + world.folk_ai.folk_sum("upkeep"))
+	return maxi(0, int(ceil(mouths * content.num("food_per_person_per_day") * (1.0 - 0.25 * racks) - growth))) + eaten
 
 
 ## Food that standing buildings (gardens, fields) bring in each dawn, before anyone eats. A building
@@ -747,7 +763,8 @@ func daily_upkeep() -> void:
 
 
 func fuel_needed_tonight() -> int:
-	var need := content.num("fuel_per_night_base") + population() * content.num("fuel_per_person_per_night")
+	var need := content.num("fuel_per_night_base") + population() * content.num("fuel_per_person_per_night") \
+		+ world.folk_ai.folk_sum("night_fuel")
 	for type: String in content.buildings:
 		need += world.count_buildings(type) * float(content.buildings[type].get("fuel", 0.0))
 	return maxi(0, int(ceil(need * (1.0 + mod("fuel_mult")) - mod("fuel_saving"))))
@@ -824,6 +841,7 @@ func _finish_round() -> void:
 	record.note_value("deaths", world.deaths.duplicate())
 	for hero in heroes:
 		people.level_up(hero)
+	people.spend_bloodsworn()
 	if world.hearth_hp <= 0.0:
 		_lose()
 		return

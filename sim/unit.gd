@@ -98,6 +98,8 @@ var escorted := false
 ## Townsfolk: the lasting mark earned (a key of data/marks.json, or "") and the hero who taught it.
 var mark := ""
 var mark_from := ""
+## Townsfolk: the powerful or transmuting modifiers their rolled dawn card came with (keys of data/card_mods.json).
+var boons: Array[String] = []
 ## Warriors: the hero they drill beside (null when not drilling) and seconds drilled toward a mark so far.
 var drill_with: Unit = null
 var drill_seconds := 0.0
