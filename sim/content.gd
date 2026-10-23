@@ -116,6 +116,19 @@ func rarity_weight(rarity_id: String) -> float:
 	return float(rarity_tier(rarity_id)["weight"])
 
 
+## A rarity's weight in a given round: rarer things turn up more as the run goes on. By the last round each
+## rarity has closed rarity_climb (data/balance.json) of its gap to white.
+func rarity_odds(rarity_id: String, round_number: int) -> float:
+	var w := rarity_weight(rarity_id)
+	var t := clampf(float(round_number - 1) / maxf(1.0, num("rounds_to_win") - 1.0), 0.0, 1.0)
+	return w + (1.0 - w) * num("rarity_climb") * t
+
+
+## The rarest rarity (mythic, orange).
+func rarest() -> String:
+	return rarity["order"][-1]
+
+
 ## The data table for a tag kind (see TAG_KINDS), keyed by id.
 func tag_table(kind: String) -> Dictionary:
 	match kind:

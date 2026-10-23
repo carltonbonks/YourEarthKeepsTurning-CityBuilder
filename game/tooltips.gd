@@ -2,11 +2,12 @@ class_name Tooltips
 extends RefCounted
 ## Hover text for things on the map and in the build list. Read-only: it only
 ## looks at the run, so it can be swapped or restyled without touching the sim.
-## Each tip is {"title": String, "lines": Array[String], "tags": Array, "warnings": Array[String]}.
+## Each tip is {"title": String, "lines": Array[String], "tags": Array, "warnings": Array[String]};
+## "line_colors" (optional) maps a line's index to its colour, e.g. gear in its rarity's colour.
 
 
 static func new_tip(title: String) -> Dictionary:
-	return {"title": title, "lines": [] as Array[String], "tags": [], "warnings": [] as Array[String]}
+	return {"title": title, "lines": [] as Array[String], "tags": [], "warnings": [] as Array[String], "line_colors": {}}
 
 
 static func hero(run: RunState, u: Unit) -> Dictionary:
@@ -19,7 +20,8 @@ static func hero(run: RunState, u: Unit) -> Dictionary:
 		t["lines"].append("Well fed: +%d%% XP until dawn" % roundi(c.num("hearty_xp") * 100.0))
 	for slot: String in ["weapon", "armor", "charm"]:
 		if u.items.has(slot):
-			t["lines"].append("%s: %s" % [slot.capitalize(), Loot.describe(c, u.items[slot])])
+			t["lines"].append(gear_line(c, slot, u.items[slot]))
+			t["line_colors"][t["lines"].size() - 1] = c.rarity_color(Loot.rarity(c, u.items[slot]))
 	var whim: Dictionary = c.whims.get(u.whim, {})
 	if str(whim.get("name", "")) != "":
 		t["lines"].append("Today: %s" % whim["name"])
@@ -30,6 +32,12 @@ static func hero(run: RunState, u: Unit) -> Dictionary:
 	if u.mood <= c.num("mood_grumble_at"):
 		t["warnings"].append("Unhappy: leaves town at mood %d or below." % c.int_num("mood_leave_at"))
 	return t
+
+
+## e.g. "Weapon: keen flint blade (t2), Magic"; white gear leaves its rarity unsaid.
+static func gear_line(c: Content, slot: String, item: Dictionary) -> String:
+	var rarity := Loot.rarity(c, item)
+	return "%s: %s%s" % [slot.capitalize(), Loot.describe(c, item), "" if rarity == "white" else ", " + c.rarity_tier(rarity)["name"]]
 
 
 static func folk(run: RunState, u: Unit) -> Dictionary:

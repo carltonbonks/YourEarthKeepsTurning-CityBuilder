@@ -49,9 +49,13 @@ func offer_picks() -> void:
 	var venture := _venture_card()
 	var slots := maxi(1, content.int_num("pick_choices") + int(run.mod("pick_bonus"))) - (0 if promote.is_empty() else 1) \
 		- (0 if venture.is_empty() else 1)
+	# Rarer cards are drawn less often, less so as the run goes on (Content.rarity_odds).
 	while run.pick_offer.size() < slots and not pool.is_empty():
-		var card: Dictionary = rng.pick(pool)
+		var card: Dictionary = rng.pick_by(pool, func(c: Dictionary) -> float:
+			return content.rarity_odds(card_rarity(c), run.round_number))
 		pool.erase(card)
+		if card["kind"] == "hero":
+			_maybe_legend(card, rng)
 		run.pick_offer.append(card)
 	if not promote.is_empty():
 		run.pick_offer.append(promote)
@@ -63,6 +67,22 @@ func offer_picks() -> void:
 			run.pick_offer.append({"kind": "spell", "role": "spell", "cost": 0, "spell": id})
 	run.picks_left = 1 + int(run.mod("extra_picks"))
 	run.phase = RunState.Phase.PICK
+
+
+## Now and then a hero card is a legend (orange): a few levels up, carrying a mythic item, costing more.
+func _maybe_legend(card: Dictionary, rng: SeededRng) -> void:
+	var content := run.content
+	if rng.randf() >= content.num("legend_share") * content.rarity_odds(content.rarest(), run.round_number):
+		return
+	var hero: Unit = card["hero"]
+	var item := Loot.mythic(content, rng, run.round_number, run.age, str(content.traits[hero.trait_id].get("prefers", "")))
+	if not item.is_empty():
+		hero.items[Loot.slot(content, item)] = item
+	hero.level += content.int_num("legend_levels")
+	run.world.hero_ai.apply_hero_stats(hero)
+	hero.hp = hero.max_hp
+	card["legend"] = true
+	card["cost"] = int(card["cost"]) + content.int_num("legend_cost")
 
 
 ## The leanings a role's dawn cards can come with in the town's age, sorted.
@@ -89,6 +109,23 @@ func card_people(card: Dictionary) -> int:
 		"family":
 			return card["roles"].size()
 	return 1
+
+
+## A dawn card's rarity (data/rarity.json), from the data of whatever it offers.
+func card_rarity(card: Dictionary) -> String:
+	var content := run.content
+	match card["kind"]:
+		"hero":
+			return content.rarest() if card.get("legend", false) else content.rarity_of("hero", card["hero"].type_id)
+		"promote":
+			return str(content.promotions[card["role"]].get("rarity", "white"))
+		"venture":
+			return str(content.ventures[card["venture"]].get("rarity", "white"))
+		"spell":
+			return str(content.plates["spells"][card["spell"]].get("rarity", "white"))
+		"family":
+			return str(content.balance.get("family_rarity", "white"))
+	return content.rarity_of("townsfolk", card["role"])
 
 
 func card_label(card: Dictionary) -> String:

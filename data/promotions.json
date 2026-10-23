@@ -1,8 +1,8 @@
 {
-	"_note": "Townsfolk who stand out can be promoted at dawn. When someone qualifies, a Promote card takes one of the dawn card slots; taking it costs shells and means no newcomer that dawn. warrior: after kills enemies a warrior can become a named hero of class becomes at start_level (needs a lodging, like any hero card). champion: a champion hero of at least level can be knighted (becomes that class) once the class's building stands. craftsperson: after made goods at one workshop a craftsperson can become a named master of that workshop, with one of traits: craft_rate multiplies their speed at their own bench, affix_chance adds to the chance of an affixed item, extra_tier adds to the tier of gear they make.",
-	"warrior": {"kills": 6, "cost": 20, "becomes": "champion", "start_level": 2},
-	"champion": {"level": 5, "cost": 25, "becomes": "knight"},
-	"craftsperson": {"made": 8, "cost": 15,
+	"_note": "Townsfolk who stand out can be promoted at dawn. When someone qualifies, a Promote card takes one of the dawn card slots; taking it costs shells and means no newcomer that dawn. warrior: after kills enemies a warrior can become a named hero of class becomes at start_level (needs a lodging, like any hero card). champion: a champion hero of at least level can be knighted (becomes that class) once the class's building stands. craftsperson: after made goods at one workshop a craftsperson can become a named master of that workshop, with one of traits: craft_rate multiplies their speed at their own bench, affix_chance adds to the chance of an affixed item, extra_tier adds to the tier of gear they make. rarity (data/rarity.json): the colour of that promotion's dawn card.",
+	"warrior": {"rarity": "yellow", "kills": 6, "cost": 20, "becomes": "champion", "start_level": 2},
+	"champion": {"rarity": "orange", "level": 5, "cost": 25, "becomes": "knight"},
+	"craftsperson": {"rarity": "yellow", "made": 8, "cost": 15,
 		"traits": {
 			"meticulous": {"name": "Meticulous", "text": "Slow and careful: more of their gear comes out with a trait.", "craft_rate": 0.9, "affix_chance": 0.35},
 			"quick_hands": {"name": "Quick hands", "text": "Works twice as fast, but their gear is plain.", "craft_rate": 2.0, "affix_chance": 0.0},

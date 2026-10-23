@@ -89,7 +89,10 @@ extends RefCounted
 ## 37: idle hands: per round "idle_seconds" (role -> daytime seconds townsfolk stood idle), "trips_bumped" (good ->
 ##     gathering trips a gatherer leaning to the good took over from one who didn't); impact rows gain "helped" (seconds
 ##     townsfolk lent a hand at buildings) and, for heroes, "drilled" (XP from drilling on quiet days).
-const RECORD_FORMAT := 37
+## 38: rarities (data/rarity.json): a dawn pick entry has "offered_rarities" (one rarity id per offered card) and
+##     "legend": true when the hero taken was a legend (a few levels up, carrying a mythic item). Items' and relics'
+##     rarities follow from their ids and affixes (Loot.rarity, Content.rarity_of).
+const RECORD_FORMAT := 38
 
 var run: RunState
 ## Finished rounds, oldest first.

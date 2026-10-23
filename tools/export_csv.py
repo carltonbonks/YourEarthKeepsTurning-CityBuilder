@@ -227,6 +227,8 @@ def main(raw_folder, out_folder):
                     "hunger_turned_away": p.get("hunger_turned_away", ""),
                     **{"offered_leaning_%d" % (i + 1): (p.get("offered_leanings", []) + ["", "", ""])[i] for i in range(3)},
                     "taken_leaning": p.get("leaning", ""),
+                    **{"offered_rarity_%d" % (i + 1): (p.get("offered_rarities", []) + ["", "", ""])[i] for i in range(3)},
+                    "taken_legend": 1 if p.get("legend") else 0,
                     "venture_lost": p.get("venture_lost", ""),
                     "venture_goods": sum(p.get("venture_goods", {}).values()) if "venture_goods" in p else "",
                 })

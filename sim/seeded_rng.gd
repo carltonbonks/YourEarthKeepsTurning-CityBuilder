@@ -47,6 +47,21 @@ func weighted(weights: Dictionary) -> String:
 	return keys[-1]
 
 
+## One of `items`, chosen with chance in proportion to weight.call(item). null if empty or all weights are 0.
+func pick_by(items: Array, weight: Callable) -> Variant:
+	var sum := 0.0
+	for item in items:
+		sum += maxf(0.0, float(weight.call(item)))
+	if sum <= 0.0:
+		return null
+	var roll := _rng.randf() * sum
+	for item in items:
+		roll -= maxf(0.0, float(weight.call(item)))
+		if roll < 0.0:
+			return item
+	return items[-1]
+
+
 func randf_range(from: float, to: float) -> float:
 	return _rng.randf_range(from, to)
 
