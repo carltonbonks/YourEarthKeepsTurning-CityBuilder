@@ -7,7 +7,7 @@ extends RefCounted
 
 const DATA_DIR := "res://data"
 ## Kinds of entity that can carry "tags" in their data, for tags_of() and has_tag().
-const TAG_KINDS := ["enemy", "hero", "trait", "townsfolk", "building", "item", "relic", "node"]
+const TAG_KINDS := ["enemy", "hero", "trait", "townsfolk", "building", "item", "relic", "node", "deal"]
 
 var balance: Dictionary
 var hero_classes: Dictionary
@@ -30,6 +30,7 @@ var traditions: Dictionary  ## data/traditions.json: founding traditions picked 
 var combos: Dictionary  ## data/combos.json: row cards, two buildings ordered together that help each other.
 var ventures: Dictionary  ## data/ventures.json: dawn cards that spend tribespeople for goods.
 var pedlars: Dictionary  ## data/pedlars.json: the pedlars invited on pedlar rounds and their camp (see PedlarCamp).
+var trades: Dictionary  ## data/trades.json: the caravan's trade cards (see Caravan).
 var rarity: Dictionary  ## data/rarity.json: the four rarities (white, blue, yellow, orange) anything can carry.
 
 
@@ -58,6 +59,7 @@ static func load_default() -> Content:
 	c.ventures = _strip(_read("ventures.json"))
 	c.pedlars = _strip(_read("pedlars.json"))
 	c.rarity = _strip(_read("rarity.json"))
+	c.trades = _strip(_read("trades.json"))
 	return c
 
 
@@ -146,6 +148,8 @@ func tag_table(kind: String) -> Dictionary:
 			return relics
 		"node":
 			return world["nodes"]
+		"deal":
+			return trades["deals"]
 	assert(false, "Unknown tag kind %s (see Content.TAG_KINDS)" % kind)
 	return {}
 

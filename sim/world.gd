@@ -306,6 +306,8 @@ func _dawn() -> void:
 	enemy_ai.mend_towers()
 	pedlar.hire_guards()
 	run.daily_upkeep()
+	for b in buildings:
+		b["assisted"] = 0.0
 	pause = Pause.DAWN
 
 

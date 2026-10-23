@@ -68,7 +68,7 @@ def main(raw_folder, out_folder):
     records = load_records(raw_folder)
     tables = {name: [] for name in
               ["runs", "rounds", "picks", "builds", "wave_enemies", "deaths", "nights", "relic_offers", "relic_effects", "heroes",
-               "loot", "whims", "market_sales", "crafted", "promotions", "build_cards", "impact"]}
+               "loot", "whims", "market_sales", "crafted", "promotions", "build_cards", "impact", "trade_deals"]}
 
     for r in records:
         rid = r["_run_id"]
@@ -181,6 +181,13 @@ def main(raw_folder, out_folder):
                 "finds_dug": sum(rd.get("finds_dug", {}).values()) if "finds_dug" in rd else "",
                 **{"trips_cut_short_" + k: rd.get("trips_cut_short", {}).get(k, 0) if "trips_cut_short" in rd else ""
                    for k in ["dusk", "emptied", "unsafe"]},
+                **{"idle_seconds_" + k: rd.get("idle_seconds", {}).get(k, 0) if "idle_seconds" in rd else ""
+                   for k in ["tribesperson", "craftsperson"]},
+                "trips_bumped": sum(rd.get("trips_bumped", {}).values()) if "trips_bumped" in rd else "",
+                "folk_helped_seconds": round(sum(r.get("helped", 0) for r in rd.get("impact", {}).get("folk", {}).values()))
+                if "idle_seconds" in rd else "",
+                "heroes_drilled_xp": round(sum(r.get("drilled", 0) for r in rd.get("impact", {}).get("heroes", {}).values()), 1)
+                if "idle_seconds" in rd else "",
                 "families": sum(1 for p in rd.get("picks", []) if p.get("taken") == "family"),
                 "wave_to_town_power": round(rd["power"]["wave"] / rd["power"]["town"]["total"], 2)
                 if rd.get("power", {}).get("town", {}).get("total") else "",
@@ -280,6 +287,12 @@ def main(raw_folder, out_folder):
                                              **{"goods_" + k: row.get("goods", {}).get(k, 0) for k in RESOURCES}})
             for effect, count in rd.get("relic_effects", {}).items():
                 tables["relic_effects"].append({"run_id": rid, "round": rn, "effect": effect, "count": count})
+            taken_deals = [d.get("deal", "") for d in rd.get("deals", [])]
+            for deal in rd.get("deals_offered", []):
+                taken = next((d for d in rd.get("deals", []) if d.get("deal") == deal), {})
+                tables["trade_deals"].append({"run_id": rid, "round": rn, "deal": deal, "rarity": taken.get("rarity", ""),
+                                              "taken": 1 if deal in taken_deals else 0, "relic": taken.get("relic", ""),
+                                              "reforged": taken.get("reforged", 0)})
             for relic in rd.get("relic_offer", []):
                 tables["relic_offers"].append({"run_id": rid, "round": rn, "relic": relic,
                                                "picked": 1 if rd.get("relic_pick") == relic else 0})
@@ -305,6 +318,7 @@ def main(raw_folder, out_folder):
         "crafted": ["run_id", "round", "recipe", "count"],
         "promotions": ["run_id", "round", "day", "role", "name", "became", "trait", "joined_round"],
         "build_cards": ["run_id", "round", "deal", "building", "ordered", "drafted"],
+        "trade_deals": ["run_id", "round", "deal", "rarity", "taken", "relic", "reforged"],
         "impact": ["run_id", "round", "group", "who", "hero_class", *IMPACT_STATS, "goods_total",
                    *["goods_" + k for k in RESOURCES]],
     }

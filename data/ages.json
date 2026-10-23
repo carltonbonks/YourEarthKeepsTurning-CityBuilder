@@ -1,5 +1,5 @@
 {
-	"_note": "Tech ages in order. The run starts in the first; raising a building with ages_up (the Bronze moot, then the Stone keep) moves the town into the next; begins = what the story says the new age brings. Buildings, map nodes, item bases and tool sets with an age only appear once the town has reached it. tools = group upgrades bought with goods while building (one each per run): gather_mult speeds gathering, carry adds to what a gatherer brings back, build_rate adds to craftsperson work speed, attack/hp add to each member's stats, field_mult adds to the food worked fields bring in, metal means their hits pierce bronze shields, steel means they also cut through mail. trader = a caravan that visits during the build phase once its building stands; each good has a price in shells and how many it brings each round. hearth_ground = the ground the age lays for good on every open square round the hearth out to hearth_ground_radius as it begins (\"path\" for a dirt path, or a road id from data/town.json), never lowering better ground already there.",
+	"_note": "Tech ages in order. The run starts in the first; raising a building with ages_up (the Bronze moot, then the Stone keep) moves the town into the next; begins = what the story says the new age brings. Buildings, map nodes, item bases and tool sets with an age only appear once the town has reached it. tools = group upgrades bought with goods while building (one each per run): gather_mult speeds gathering, carry adds to what a gatherer brings back, build_rate adds to craftsperson work speed, attack/hp add to each member's stats, field_mult adds to the food worked fields bring in, metal means their hits pierce bronze shields, steel means they also cut through mail. The caravan that comes once the Bronze moot stands lays out trade cards (data/trades.json). hearth_ground = the ground the age lays for good on every open square round the hearth out to hearth_ground_radius as it begins (\"path\" for a dirt path, or a road id from data/town.json), never lowering better ground already there.",
 	"hearth_ground_radius": 60,
 	"order": ["neolithic", "bronze", "medieval"],
 	"ages": {
@@ -14,16 +14,5 @@
 		"iron_ploughs": {"name": "Iron ploughs and axes", "text": "Tribespeople gather 50% faster, carry 1 more, and worked fields bring in twice the food.", "role": "tribesperson", "age": "medieval", "cost": {"iron": 3}, "gather_mult": 0.5, "carry": 1, "field_mult": 1.0},
 		"iron_tools": {"name": "Iron saws and hammers", "text": "Craftspeople build and craft 50% faster.", "role": "craftsperson", "age": "medieval", "cost": {"iron": 3}, "build_rate": 0.5},
 		"mail_and_halberds": {"name": "Mail and halberds", "text": "Warriors hit 5 harder, have 20 more HP, and their steel cuts through mail and shields.", "role": "warrior", "age": "medieval", "cost": {"iron": 2, "steel": 2}, "attack": 5, "hp": 20, "metal": true, "steel": true}
-	},
-	"trader": {
-		"needs": "bronze_moot",
-		"name": "Southern caravan",
-		"text": "Traders from the south sell tin and a little cassiterite, plus timber and dressed stone, at a steep markup over what your own people bring in.",
-		"goods": {
-			"tin": {"price": 9, "stock": 3},
-			"cassiterite": {"price": 5, "stock": 1},
-			"wood": {"price": 3, "stock": 20},
-			"stone": {"price": 4, "stock": 8}
-		}
 	}
 }

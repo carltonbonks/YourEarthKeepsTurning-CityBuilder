@@ -105,9 +105,19 @@ func hero_tick(hero: Unit) -> void:
 		hero.intent = "stalking the %s" % w.content.world["dens"][den["type"]]["name"].to_lower()
 		w.walk_toward(hero, den["pos"] * 0.85, 10.0)
 		return
-	hero.intent = "guarding the camp"
 	var index := w.run.heroes.find(hero)
-	w.walk_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * (w.content.num("settlement_radius") * 0.6), 4.0)
+	if w.is_dusk():
+		hero.intent = "guarding the camp"
+		w.walk_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * (w.content.num("settlement_radius") * 0.6), 4.0)
+		return
+	# A quiet day for a hero who doesn't roam: drill by the hearth for a trickle of XP.
+	hero.intent = "drilling by the hearth"
+	if w.walk_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * w.content.num("drill_radius"), 4.0):
+		var xp := w.content.num("drill_xp_per_second") * w.dt
+		hero.xp += xp
+		var key := w.run.record.impact_key(hero)
+		if not key.is_empty():
+			w.run.record.note_impact(key[0], key[1], "drilled", xp)
 
 
 ## A hero guarding the pedlar's camp: fights anything near it, sleeps beside it, trades there once a day,
