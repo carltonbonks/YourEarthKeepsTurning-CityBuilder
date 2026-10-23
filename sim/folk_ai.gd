@@ -68,7 +68,7 @@ func begin_step() -> void:
 				_shadow_spots.append(unit.pos)
 			if unit.task == "gather":
 				var good: String = w.nodes[unit.task_index]["gives"]
-				_claim(unit.task_index, carry_of(unit, good))
+				_claim(unit.task_index, carry_of(unit, good, w.nodes[unit.task_index]["type"]))
 				_note_bumpable(unit, unit.task_index, good)
 			elif unit.task == "assist":
 				_helpers[unit.task_index] = int(_helpers.get(unit.task_index, 0)) + 1
@@ -91,7 +91,7 @@ func _note_bumpable(unit: Unit, node_index: int, good: String) -> void:
 	if unit.carry_amount == 0 and not leans_to(unit, good):
 		if not _bumpable.has(node_index):
 			_bumpable[node_index] = []
-		_bumpable[node_index].append([unit, carry_of(unit, good)])
+		_bumpable[node_index].append([unit, carry_of(unit, good, w.nodes[node_index]["type"])])
 
 
 ## How much a leaned gatherer could free at a node by bumping the gatherers there who don't lean to its good.
@@ -348,9 +348,12 @@ func _worker_tick(unit: Unit) -> void:
 			if w.walk_toward(unit, node["pos"], 10.0):
 				unit.task_timer -= w.dt
 				if unit.task_timer <= 0.0:
-					var take := mini(int(node["amount"]), carry_of(unit, node["gives"]))
+					var take := mini(int(node["amount"]), carry_of(unit, node["gives"], node["type"]))
 					# What the band added: this take less what the gatherer would have carried alone.
-					var band_extra := take - mini(int(node["amount"]), carry_of(unit))
+					var band_extra := take - mini(int(node["amount"]), carry_of(unit, "", node["type"]))
+					var plain := mini(int(node["amount"]), carry_of(unit, node["gives"]))
+					if take > plain:
+						w.run.relic_fired("node_yield", take - plain)
 					node["amount"] = int(node["amount"]) - take
 					w.run.record.note_count("gathered", take, node["gives"])
 					if leans_to(unit, node["gives"]):
@@ -416,9 +419,10 @@ func _choose_work(unit: Unit) -> void:
 	unit.task_index = best
 	var gives: String = w.nodes[best]["gives"]
 	unit.task_timer = gather_time(unit, gives)
+	var carry := carry_of(unit, gives, w.nodes[best]["type"])
 	if leans_to(unit, gives):
-		_bump(best, carry_of(unit, gives))
-	_claim(best, carry_of(unit, gives))
+		_bump(best, carry)
+	_claim(best, carry)
 	_note_bumpable(unit, best, gives)
 
 
@@ -514,7 +518,7 @@ func plan_trip(unit: Unit) -> int:
 		# First dibs: a gatherer leaning to the good counts what the others there who don't could leave it.
 		if leans_to(unit, good):
 			free += _bumpable_amount(i)
-		var take := mini(carry_of(unit, good), free)
+		var take := mini(carry_of(unit, good, node["type"]), free)
 		if take <= 0:
 			continue
 		var d := unit.pos.distance_to(node["pos"])
@@ -541,11 +545,15 @@ func leans_to(unit: Unit, good: String) -> bool:
 
 
 ## How much a townsperson brings back from one gathering trip of a good (tools, relics and its band included).
-func carry_of(unit: Unit, good := "") -> int:
+## node_type, when known, adds relics keyed on the node's tags (node_yield, e.g. more from stone ground).
+func carry_of(unit: Unit, good := "", node_type := "") -> int:
 	var carry := float(w.content.townsfolk[unit.type_id].get("carry", 2)) + w.run.tool_bonus(unit.type_id, "carry")
 	if leans_to(unit, good):
 		carry += float(band_tier(unit).get("carry", 0))
-	return int(carry * (1.0 + w.run.mod("carry_mult")))
+	var mult := 1.0 + w.run.mod("carry_mult")
+	if node_type != "":
+		mult += w.run.tag_mod("node_yield", w.content.tags_of("node", node_type))
+	return int(carry * mult)
 
 
 ## Seconds a townsperson spends gathering a good at a node (tools and its band included).

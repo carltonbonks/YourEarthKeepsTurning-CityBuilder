@@ -586,8 +586,11 @@ func hit(attacker: Unit, victim: Unit) -> void:
 			amount *= hero_ai.relic_damage_mult(attacker)
 		elif attacker.is_folk():
 			amount = folk_ai.relic_damage(attacker, amount)
-		if content.unit_has_tag(victim, "undead"):
-			amount *= 1.0 + run.mod("undead_damage")
+		# Relics keyed on the victim's tags (foe_damage), e.g. Grave Salt on undead.
+		var bane := run.tag_mod("foe_damage", content.unit_tags(victim))
+		if bane != 0.0:
+			amount *= 1.0 + bane
+			run.relic_fired("foe_damage")
 		amount *= enemy_ai.armour_left(victim, _blow_is(attacker, "metal"), _blow_is(attacker, "steel"))
 	damage(attacker, victim, amount)
 
@@ -650,7 +653,7 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 	attacker.kills += 1
 	attacker.xp += float(e["xp"]) * (1.0 + run.mod("xp_mult") + hero_ai.chosen_xp(attacker)
 		+ (content.num("hearty_xp") if attacker.well_fed else 0.0))
-	var earned := int(e["loot"]) + int(run.mod("loot_shells")) + int(Loot.total(content, attacker, "loot"))
+	var earned := int(e["loot"]) + int(run.mod("loot_shells")) + int(Loot.total(content, attacker, "loot", run.gear_bonus()))
 	var tithe := int(earned * run.mod("hero_tithe"))
 	if tithe > 0:
 		run.stock["shells"] = int(run.stock["shells"]) + tithe
@@ -663,7 +666,7 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 		run.tell("%s slays %s!" % [attacker.display_name, victim.display_name])
 
 
-## Relics that act when an enemy falls, whoever felled it: shells and fuel for the town,
+## Relics that act when an enemy falls, whoever felled it: shells and fuel for the town, goods for foes of a tag (foe_spoils),
 ## raiders who turn their coats, and the fallen raised to fight for the town tonight.
 func _relic_kill(victim: Unit) -> void:
 	if run.has_effect("kill_shells"):
@@ -672,6 +675,10 @@ func _relic_kill(victim: Unit) -> void:
 	if run.has_effect("kill_fuel") and victim.pos.length() <= content.num("settlement_radius"):
 		run.stock["fuel"] = int(run.stock["fuel"]) + int(run.mod("kill_fuel"))
 		run.relic_fired("kill_fuel", int(run.mod("kill_fuel")))
+	var spoils := run.tag_sums("foe_spoils", content.unit_tags(victim))
+	for good: String in spoils:
+		run.stock[good] = int(run.stock.get(good, 0)) + int(spoils[good])
+		run.relic_fired("foe_spoils", int(spoils[good]))
 	if run.has_effect("turncoat_chance") and not victim.is_boss and content.unit_has_tag(victim, "human") \
 			and turncoats_tonight < int(run.mod("turncoat_max")) and rng.randf() < run.mod("turncoat_chance"):
 		turncoats_tonight += 1

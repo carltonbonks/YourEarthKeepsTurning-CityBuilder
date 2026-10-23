@@ -47,7 +47,7 @@ func hero_tick(hero: Unit) -> void:
 		rest_tick(hero)
 		return
 	var drain := w.content.num("energy_drain_wilds") if hero.pos.length() > w.content.num("settlement_radius") else w.content.num("energy_drain")
-	drain *= maxf(0.2, 1.0 - Loot.total(w.content, hero, "energy"))
+	drain *= maxf(0.2, 1.0 - Loot.total(w.content, hero, "energy", w.run.gear_bonus()))
 	if _lone():
 		drain *= 1.0 - w.run.mod("lone_tire")
 	var was_awake := hero.energy > 0.0
@@ -183,7 +183,7 @@ func rest_tick(hero: Unit) -> void:
 	if is_preferred(hero, bed):
 		rate *= w.content.num("energy_home_bonus")
 	hero.energy = minf(w.content.num("hero_energy_max"), hero.energy + rate * w.dt)
-	hero.hp = minf(hero.max_hp, hero.hp + (float(def.get("heal", 0.0)) + Loot.total(w.content, hero, "rest_heal")) * w.dt)
+	hero.hp = minf(hero.max_hp, hero.hp + (float(def.get("heal", 0.0)) + Loot.total(w.content, hero, "rest_heal", w.run.gear_bonus())) * w.dt)
 	if _carousing(hero):
 		hero.intent = "drinking in %s" % bed_name(bed)
 	elif w.pedlar.is_guard(hero):
@@ -354,9 +354,9 @@ func apply_hero_stats(hero: Unit) -> void:
 	var c: Dictionary = w.content.hero_classes[hero.type_id]
 	var old_max := hero.max_hp
 	hero.max_hp = maxf(1.0, float(c["hp"]) + (hero.level - 1) * w.content.num("level_hp") \
-		+ Loot.total(w.content, hero, "hp") + w.run.mod("hero_hp"))
+		+ Loot.total(w.content, hero, "hp", w.run.gear_bonus()) + w.run.mod("hero_hp"))
 	hero.attack = float(c["attack"]) + (hero.level - 1) * w.content.num("level_attack") \
-		+ Loot.total(w.content, hero, "attack") + w.run.mod("hero_attack")
+		+ Loot.total(w.content, hero, "attack", w.run.gear_bonus()) + w.run.mod("hero_attack")
 	# Trophy Belt: damage for every so many kills. Witch's Thread: cursed gear's HP penalty is lifted.
 	if w.run.has_effect("trophy_every"):
 		hero.attack += w.run.mod("trophy_damage") * (hero.kills / int(w.run.mod("trophy_every")))
@@ -366,7 +366,7 @@ func apply_hero_stats(hero: Unit) -> void:
 				hero.max_hp -= float(w.content.items["affixes"]["cursed"].get("hp", 0.0))
 	hero.attack_range = float(c["range"])
 	hero.cooldown = float(c["cooldown"])
-	hero.speed = float(c["speed"]) + Loot.total(w.content, hero, "speed")
+	hero.speed = float(c["speed"]) + Loot.total(w.content, hero, "speed", w.run.gear_bonus())
 	if old_max > 1.0 and hero.max_hp > old_max:
 		hero.hp += hero.max_hp - old_max
 	hero.hp = minf(hero.hp, hero.max_hp)
@@ -378,7 +378,7 @@ func give_item(hero: Unit, item: Dictionary) -> void:
 	var slot := Loot.slot(w.content, item)
 	var likes: Dictionary = w.content.traits[hero.trait_id].get("likes", {})
 	var current: Dictionary = hero.items.get(slot, {})
-	var equip := current.is_empty() or Loot.score(w.content, item, likes) > Loot.score(w.content, current, likes)
+	var equip := current.is_empty() or Loot.score(w.content, item, likes, w.run.gear_bonus()) > Loot.score(w.content, current, likes, w.run.gear_bonus())
 	if equip:
 		if not current.is_empty():
 			hero.spares.append(current)
@@ -479,7 +479,7 @@ func _want(hero: Unit, t: Dictionary, good: Dictionary) -> float:
 		var likes: Dictionary = t.get("likes", {})
 		var slot := Loot.slot(w.content, item)
 		var current: Dictionary = hero.items.get(slot, {})
-		var gain := Loot.score(w.content, item, likes) - (Loot.score(w.content, current, likes) if not current.is_empty() else 0.0)
+		var gain := Loot.score(w.content, item, likes, w.run.gear_bonus()) - (Loot.score(w.content, current, likes, w.run.gear_bonus()) if not current.is_empty() else 0.0)
 		return gain * (1.25 if slot == t.get("prefers", "") else 1.0)
 	var have := hero.pack.count(good["recipe"])
 	if have >= int(w.content.market["pack_limit"]):

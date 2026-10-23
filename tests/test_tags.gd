@@ -33,6 +33,15 @@ func _prize_tags(c: Content) -> Array:
 	return out
 
 
+## Tags relics key their effects on (RunState.TAG_EFFECTS, e.g. foe_damage {"beast": 0.4}): rules read these too.
+func _relic_tags(c: Content) -> Array:
+	var out := []
+	for id: String in c.relics:
+		for key: String in RunState.TAG_EFFECTS:
+			out.append_array(c.relics[id]["effects"].get(key, {}).keys())
+	return out
+
+
 func _carried(c: Content, tag: String) -> bool:
 	for kind: String in Content.TAG_KINDS:
 		for id: String in c.tag_table(kind):
@@ -54,12 +63,15 @@ func test_every_tag_a_rule_reads_is_explained() -> void:
 		check(_carried(c, tag), "'%s' is read in %s but nothing in data/ carries it" % [tag, read[tag]])
 	for tag in _prize_tags(c):
 		check(_carried(c, tag), "a building pays a prize for '%s' but nothing in data/ carries it" % tag)
+	for tag in _relic_tags(c):
+		check(c.tags.has(tag), "a relic keys on '%s': add a line for it to data/tags.json" % tag)
+		check(_carried(c, tag), "a relic keys on '%s' but nothing in data/ carries it" % tag)
 
 
 func test_every_explained_tag_is_still_read() -> void:
 	var c := Content.load_default()
 	var read := _tags_read_in_code()
-	var prizes := _prize_tags(c)
+	var prizes := _prize_tags(c) + _relic_tags(c)
 	for tag: String in c.tags:
 		check(read.has(tag) or prizes.has(tag), "data/tags.json explains '%s', but no rule reads it any more" % tag)
 

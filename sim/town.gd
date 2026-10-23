@@ -19,7 +19,7 @@ const GATE_LANE_BONUS := 40.0
 
 var w: World
 var pathing: Pathing
-## {ring, sector, a0, a1, r0, r1, pos, cells: PackedInt32Array, age, obstacle, building, lane}
+## {ring, sector, a0, a1, r0, r1, pos, cells: PackedInt32Array, obstacle, building, lane}
 ## building = index into World.buildings, or -1. lane = left free between clusters (see _mark_lanes).
 var plots: Array[Dictionary] = []
 ## Patches of scrub that slow walkers: {pos, radius}.
@@ -61,7 +61,7 @@ func _make_plots() -> void:
 			plots.append({"ring": ring, "sector": i / per_sector, "ring_first": first, "ring_count": count, "a0": a0, "a1": a0 + width,
 				"r0": radius - depth / 2.0, "r1": radius + depth / 2.0,
 				"pos": Vector2.from_angle(a0 + width / 2.0) * radius, "cells": PackedInt32Array(),
-				"age": def.get("age", ""), "obstacle": "", "building": -1, "lane": false})
+				"obstacle": "", "building": -1, "lane": false})
 		for i in pathing.cells_in_circle(Vector2.ZERO, radius + depth / 2.0):
 			var p := pathing.center(i)
 			if p.length() < radius - depth / 2.0:
@@ -113,17 +113,18 @@ func _mark_lanes() -> void:
 			inner.append(ring_plots[i])
 
 
-## Boulders and old oaks already sit on a few plots of the opening rings.
+## Boulders and old oaks already sit on a few plots of the inner rings (obstacle_rings in data/town.json).
 func _place_obstacles() -> void:
 	var rng := SeededRng.stream(w.run.run_seed, "obstacles")
 	var ids: Array = w.content.town["obstacles"].keys()
+	var inner := int(w.content.town["obstacle_rings"])
 	ids.sort()
 	for id: String in ids:
 		for n in int(w.content.town["obstacles"][id]["count"]):
 			for attempt in 20:
 				var k := rng.randi_range(0, plots.size() - 1)
 				var plot := plots[k]
-				if plot["obstacle"] != "" or plot["age"] != "" or not _keeps_town_open(k):
+				if plot["obstacle"] != "" or int(plot["ring"]) >= inner or not _keeps_town_open(k):
 					continue
 				plot["obstacle"] = id
 				_set_plot_solid(k, true)
@@ -161,8 +162,21 @@ func _keeps_town_open(k: int) -> bool:
 	return open
 
 
+## True if the plot's ring is open: the first start_rings are, and each age-up or cleared ring opens the next.
 func ring_open(plot: Dictionary) -> bool:
-	return w.content.age_reached(w.run.age, plot["age"])
+	return int(plot["ring"]) < w.run.rings_open
+
+
+## How full the open rings are: the share of their building plots (not lanes or obstacles) with a building on.
+func fullness() -> float:
+	var usable := 0
+	var taken := 0
+	for plot in plots:
+		if ring_open(plot) and not plot["lane"] and plot["obstacle"] == "":
+			usable += 1
+			if int(plot["building"]) >= 0:
+				taken += 1
+	return float(taken) / maxf(1.0, float(usable))
 
 
 ## A plot nothing stands on, in an opened ring.

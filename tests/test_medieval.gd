@@ -79,14 +79,12 @@ func test_keep_shoots_and_counts_toward_town_power() -> void:
 	check(float(Power.town(run.world)["defences"]) > before, "the keep's crossbows and walls add to the defences")
 
 
-func test_fifth_ring_and_more_watch_posts_open_with_the_keep() -> void:
+func test_a_ring_and_more_watch_posts_open_with_the_keep() -> void:
 	var run := _run()
-	var outer := run.world.town.plots.filter(func(p: Dictionary) -> bool: return p["age"] == "medieval")
-	check(not outer.is_empty(), "the map has a medieval ring")
-	check(not run.world.town.ring_open(outer[0]), "it is closed before the keep")
 	check_eq(run.building_max("watch_post"), 4, "4 watch posts before the medieval age")
+	var before := run.rings_open
 	_medieval(run)
-	check(run.world.town.ring_open(outer[0]), "the keep opens the fifth ring")
+	check(run.rings_open > before, "ageing up opened rings (%d -> %d)" % [before, run.rings_open])
 	check_eq(run.building_max("watch_post"), 6, "6 watch posts in the medieval age")
 
 
