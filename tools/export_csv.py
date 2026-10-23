@@ -180,7 +180,7 @@ def main(raw_folder, out_folder):
                 if "spells" in rd else "",
                 "finds_dug": sum(rd.get("finds_dug", {}).values()) if "finds_dug" in rd else "",
                 **{"trips_cut_short_" + k: rd.get("trips_cut_short", {}).get(k, 0) if "trips_cut_short" in rd else ""
-                   for k in ["dusk", "emptied", "unsafe"]},
+                   for k in ["dusk", "emptied", "unsafe", "runner"]},
                 **{"idle_seconds_" + k: rd.get("idle_seconds", {}).get(k, 0) if "idle_seconds" in rd else ""
                    for k in ["tribesperson", "craftsperson"]},
                 "trips_bumped": sum(rd.get("trips_bumped", {}).values()) if "trips_bumped" in rd else "",
@@ -200,6 +200,9 @@ def main(raw_folder, out_folder):
                 "hero_spending_lodging": rd.get("hero_spending", {}).get("tavern", 0),
                 "hero_spending_carousing": rd.get("hero_spending", {}).get("carousing", 0),
                 "hero_spending_pedlar": rd.get("hero_spending", {}).get("pedlar", 0),
+                "hero_spending_runners": rd.get("hero_spending", {}).get("runners", 0),
+                "supply_runs": sum(rd.get("supply_runs", {}).values()),
+                "runners_lost": sum(rd.get("runners_lost", {}).values()),
                 "market_goods_sold": len(rd.get("market", [])),
                 "market_shells": sum(m.get("price", 0) for m in rd.get("market", [])),
                 "goods_crafted": sum(rd.get("crafted", {}).values()),

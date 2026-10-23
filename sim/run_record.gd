@@ -92,7 +92,11 @@ extends RefCounted
 ## 38: rarities (data/rarity.json): a dawn pick entry has "offered_rarities" (one rarity id per offered card) and
 ##     "legend": true when the hero taken was a legend (a few levels up, carrying a mythic item). Items' and relics'
 ##     rarities follow from their ids and affixes (Loot.rarity, Content.rarity_of).
-const RECORD_FORMAT := 38
+## 39: runners (a building tagged courier, the runners' hut): per round "supply_runs" (provision recipe -> runs a
+##     runner delivered to a hero in the wilds) and "runners_lost" (hero -> runners killed on the way); hero_spending
+##     gains "runners" (the fees); impact rows gain "supplied" (deliveries made, for townsfolk; taken, for heroes); a
+##     runner's delivery is also a "market" sale; trips_cut_short gains "runner" (a gatherer called away to run).
+const RECORD_FORMAT := 39
 
 var run: RunState
 ## Finished rounds, oldest first.

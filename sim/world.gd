@@ -68,6 +68,11 @@ var new_alarms: Array[Unit] = []
 ## Goods carried back to the hearth so far this run, by good: townsfolk hauls and what heroes bring in from the
 ## wilds (`bring_in`). Only grows. The view reads it for the "+2 stone" popups over the hearth.
 var brought_in := {}
+## Runners' deliveries to heroes in the wilds, newest last ({pos, text}), at most SUPPLY_DROPS_KEPT, and how many
+## there have been this run. The view reads them for the popups where supplies land.
+var supply_drops: Array[Dictionary] = []
+var supplies_delivered := 0
+const SUPPLY_DROPS_KEPT := 8
 
 ## Where enemies and friends (townsfolk and heroes) stand, for fast nearest-unit lookups (see UnitGrid).
 ## Rebuilt each step when those units stop moving; a stale grid is never read (the lookups scan the lists instead).
@@ -626,6 +631,12 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 		else:
 			run.tell("A %s was killed by a %s." % [victim.display_name.to_lower(), attacker.display_name.to_lower() if attacker != null else "beast"])
 		night_report["deaths"].append(victim.display_name)
+		if victim.errand_for != null:
+			run.record.note_count("runners_lost", 1, victim.errand_for.display_name)
+			run.tell("The runner carrying supplies to %s never arrives." % victim.errand_for.display_name)
+			victim.errand_for.runner = null
+			victim.errand_for = null
+			victim.parcel = {}
 		return
 	night_report["kills"] = int(night_report["kills"]) + 1
 	market.carcass(victim)

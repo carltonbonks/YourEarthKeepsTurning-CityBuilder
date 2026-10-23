@@ -49,6 +49,10 @@ var woke_night := -1
 var spares: Array[Dictionary] = []
 ## Provisions bought at the market (recipe ids, e.g. "smoked_meat"), used up in the field.
 var pack: Array[String] = []
+## What a hero out in the wilds has sent for ("energy" or "heal"), "" if nothing (HeroAI._call_for_supplies).
+var supply_call := ""
+## The runner bringing it, or null.
+var runner: Unit = null
 ## The night_key of the day this hero last traded at the pedlar's camp (once a day), or -1.
 var pedlar_visit := -1
 ## Building index of the stall a hero is walking to, or -1.
@@ -76,6 +80,10 @@ var home := Vector2.ZERO
 var joined_round := 1
 ## Goods finished at each workshop type, e.g. {"knapper": 5}.
 var made := {}
+## A runner's errand: the hero it carries supplies to (null when not running) and the stall good it carries ({} until
+## fetched). See FolkAI._run_errand.
+var errand_for: Unit = null
+var parcel := {}
 ## A promoted craftsperson: the workshop type they master and their craft trait (data/promotions.json).
 var master_of := ""
 var craft_trait := ""

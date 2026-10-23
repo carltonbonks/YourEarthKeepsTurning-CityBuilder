@@ -255,6 +255,8 @@ func need(type: String) -> String:
 		return "stall"
 	if def.has("stall") and not _has_stall(def["stall"]["sells"]) and _supplied(def["stall"]["sells"]):
 		return "stall"
+	if def.has("runners") and _has_stall("provisions") and run.living_heroes().size() >= 2:
+		return "runners"
 	var own_age: String = def.get("age", "")
 	if own_age != "" and own_age == run.age and run.world.count_buildings(type, false) == 0:
 		return "age"

@@ -26,6 +26,25 @@ func stall_index(kind: String) -> int:
 	return -1
 
 
+## The cheapest provision on any finished stall that has `effect` ("energy" or "heal"): {stall, index, price}, or {}.
+## Runners fetch from here (FolkAI._run_errand).
+func provision_on_stall(effect: String) -> Dictionary:
+	var best := {}
+	for i in w.buildings.size():
+		var b := w.buildings[i]
+		if float(b["work_left"]) > 0.0 or not w.content.buildings[b["type"]].has("stall"):
+			continue
+		for j in b["goods"].size():
+			var good: Dictionary = b["goods"][j]
+			var r: Dictionary = w.content.market["recipes"][good["recipe"]]
+			if not r.has("provision") or not w.content.market["provisions"][r["provision"]].has(effect):
+				continue
+			var price := w.run.price_of(good)
+			if best.is_empty() or price < int(best["price"]):
+				best = {"stall": i, "index": j, "price": price}
+	return best
+
+
 ## Goods on a kind's stall plus those being made for it right now.
 func _stall_load(kind: String) -> int:
 	var s := stall_index(kind)
