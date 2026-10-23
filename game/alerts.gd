@@ -4,14 +4,18 @@ extends VBoxContainer
 ## raise buildings, fuel or food running out, an unhappy hero, a battered hearth, the warband holding
 ## back. Each one shows when its problem starts, fades after a few seconds (or on a click), and comes
 ## back only if the problem clears and returns. `active` is the read-only rule, so tests can check it.
+## `fit` keeps them to the room the screen gives them: the ones that don't fit wait (their clock
+## stopped) and show as the ones above fade.
 
 const SHOW_SECONDS := 8.0
 const FADE_SECONDS := 1.0
+const WIDTH := 320.0
 
 var run: RunState
 ## Alert id -> seconds it has been on screen (problems still true, so they don't come back).
 var _seen := {}
 var _labels := {}
+var _max_height := INF
 
 
 func _init() -> void:
@@ -75,8 +79,29 @@ func reset() -> void:
 	_seen.clear()
 
 
+## Shows as many alerts, oldest first, as fit in max_height (kept for later alerts); returns how many wait.
+func fit(max_height: float) -> int:
+	_max_height = max_height
+	var used := 0.0
+	var waiting := 0
+	var sep := float(get_theme_constant("separation"))
+	for child in get_children():
+		var label := child as Label
+		if label == null or label.is_queued_for_deletion():
+			continue
+		var h := label.get_combined_minimum_size().y
+		label.visible = waiting == 0 and used + h <= max_height
+		if label.visible:
+			used += h + sep
+		else:
+			waiting += 1
+	return waiting
+
+
 func _process(delta: float) -> void:
 	for id: String in _labels.keys():
+		if not (_labels[id] as Label).visible:
+			continue
 		_seen[id] = float(_seen.get(id, 0.0)) + delta
 		var age: float = _seen[id]
 		var label: Label = _labels[id]
@@ -90,7 +115,9 @@ func _add(id: String, text: String) -> void:
 	var l := Label.new()
 	l.text = text
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
-	l.custom_minimum_size.x = 320
+	l.custom_minimum_size.x = WIDTH
+	# Sized now, so fit can measure its wrapped height before the screen lays it out.
+	l.size.x = WIDTH
 	l.add_theme_font_size_override("font_size", 13)
 	l.add_theme_color_override("font_color", Color("#ffe0b0"))
 	var style := StyleBoxFlat.new()
@@ -107,6 +134,7 @@ func _add(id: String, text: String) -> void:
 			_drop(id))
 	add_child(l)
 	_labels[id] = l
+	fit(_max_height)
 
 
 ## Takes an alert off screen; its problem stays in _seen so it doesn't pop up again until it clears.
@@ -114,3 +142,4 @@ func _drop(id: String) -> void:
 	if _labels.has(id):
 		(_labels[id] as Label).queue_free()
 		_labels.erase(id)
+		fit(_max_height)

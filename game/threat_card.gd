@@ -2,10 +2,11 @@ class_name ThreatCard
 extends VBoxContainer
 ## The round's attack as a small card in the map's top-right corner: where it comes from, your town's
 ## power against the attack's as one bar with a plain verdict, and a gold banner when the warband holds
-## raiders back (catch-up). The enemy list is in the hover card. While building, the Begin round
-## button sits under it, with what the earth's last turn did (EarthReport) between them.
-
-signal begin_pressed
+## raiders back (catch-up). The enemy list is in the hover card. While building, what the earth's
+## last turn did (EarthReport) sits under it.
+## When the room left between the draft window and the building hand is short, `fit` folds the extras
+## (the earth's details, the ways, the warband banner) into the hover cards, so the card never runs
+## into the hand.
 
 const WIDTH := 280.0
 ## Attack power over town power above this reads as outmatched (bots lose about 1 round in 5 there).
@@ -23,14 +24,18 @@ var _bar: ColorRect
 var _numbers: Label
 var _verdict: Label
 var _eased: Label
-var _begin: Button
+var _more: Label
+## The extras `fit` may fold away, least needed first, and whether refresh wants each one shown.
+var _foldable: Array[Control] = []
+var _wanted := {}
+var _max_height := INF
 
 
 func _init() -> void:
 	custom_minimum_size.x = WIDTH
 	add_theme_constant_override("separation", 4)
 	var chip := TipChip.new()
-	chip.tip = func() -> Dictionary: return tip(run) if run != null else {}
+	chip.tip = func() -> Dictionary: return _tip_with_folded() if run != null else {}
 	add_child(chip)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 3)
@@ -61,7 +66,7 @@ func _init() -> void:
 	box.add_child(_eased)
 	# What the earth's last turn did: a hover of its own, so the attack's hover stays about the attack.
 	var earth_chip := TipChip.new()
-	earth_chip.tip = func() -> Dictionary: return earth_tip(run) if run != null else {}
+	earth_chip.tip = func() -> Dictionary: return _earth_tip_with_folded() if run != null else {}
 	add_child(earth_chip)
 	_earth_box = VBoxContainer.new()
 	_earth_box.add_theme_constant_override("separation", 2)
@@ -73,8 +78,10 @@ func _init() -> void:
 	# What the geomancer is working on (spells are chosen on dawn cards).
 	_spell = UiKit.note(self, "", 12, Color("#c8a8e0"))
 	_spell.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_begin = UiKit.primary(UiKit.button(self, "", func() -> void: begin_pressed.emit()), 18)
-	_begin.custom_minimum_size.y = 48
+	# Shown when fit folded something away.
+	_more = UiKit.note(self, "More on hover", 10)
+	_more.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_foldable = [_earth_lines, _ways, _eased, _earth_box.get_parent(), _spell]
 
 
 func refresh() -> void:
@@ -93,24 +100,73 @@ func refresh() -> void:
 	var ratio := float(attack) / maxf(1.0, town)
 	_verdict.text = "They outmatch you" if ratio > OUTMATCHED else ("An even fight" if ratio > EVEN else "You should hold")
 	_verdict.add_theme_color_override("font_color", Color("#ff7060") if ratio > OUTMATCHED else (Color("#e0c070") if ratio > EVEN else Color("#a8d890")))
-	_eased.visible = run.wave_eased > 0
+	_wanted[_eased] = run.wave_eased > 0
 	_eased.text = "The warband holds back %d raider%s: your town looks too weak to be worth them all.%s" % [
 		run.wave_eased, "" if run.wave_eased == 1 else "s",
 		" %d make a war camp in the wilds." % run.camp_joined if run.camp_joined > 0 else ""]
 	_ways.text = "\n".join(EarthReport.ways(run))
-	_ways.visible = building or not w.wave_spawned
+	_wanted[_ways] = building or not w.wave_spawned
 	var headline := EarthReport.headline(run)
-	_earth_box.get_parent().visible = building and headline != ""
-	_spell.visible = not run.spell.is_empty()
-	if _spell.visible:
+	_wanted[_earth_box.get_parent()] = building and headline != ""
+	_wanted[_spell] = not run.spell.is_empty()
+	if _wanted[_spell]:
 		var nights := int(run.spell["nights_left"])
 		_spell.text = "The geomancer works on %s: done in %d night%s." % [
 			String(content.plates["spells"][run.spell["id"]]["name"]).to_lower(), nights, "" if nights == 1 else "s"]
 	_earth_title.text = headline
 	_earth_lines.text = "\n".join(EarthReport.lines(run))
-	_earth_lines.visible = _earth_lines.text != ""
-	_begin.visible = building
-	_begin.text = "Begin round %d" % run.round_number
+	_wanted[_earth_lines] = _earth_lines.text != ""
+	fit(_max_height)
+
+
+## Shows what refresh wants, then folds the extras one by one until the card is no taller than
+## max_height (kept for later refreshes). What is folded moves into the hover cards; returns how many
+## parts were folded.
+func fit(max_height: float) -> int:
+	_max_height = max_height
+	for part in _foldable:
+		part.visible = _wanted.get(part, false)
+	# A wrapping label that was hidden at the last layout measures as one word a line; give it the
+	# width it will have first (less the hover chip's margins inside one).
+	for label: Label in find_children("*", "Label", true, false):
+		if label.autowrap_mode != TextServer.AUTOWRAP_OFF:
+			label.size.x = WIDTH if label.get_parent() == self else WIDTH - 12.0
+	_more.visible = false
+	var folded := 0
+	for part in _foldable:
+		if get_combined_minimum_size().y <= max_height:
+			break
+		if part.visible:
+			part.visible = false
+			_more.visible = true
+			folded += 1
+	return folded
+
+
+func _is_folded(part: Control) -> bool:
+	return _wanted.get(part, false) and not part.visible
+
+
+## The attack's hover card, plus whatever fit folded off the card.
+func _tip_with_folded() -> Dictionary:
+	var t := tip(run)
+	if _is_folded(_ways):
+		t["lines"].append_array(EarthReport.ways(run))
+	if _is_folded(_eased):
+		t["lines"].append(_eased.text)
+	if _is_folded(_spell):
+		t["lines"].append(_spell.text)
+	if _is_folded(_earth_box.get_parent()):
+		t["lines"].append(_earth_title.text)
+		t["lines"].append_array(EarthReport.lines(run))
+	return t
+
+
+func _earth_tip_with_folded() -> Dictionary:
+	var t := earth_tip(run)
+	if _is_folded(_earth_lines):
+		t["lines"].append_array(EarthReport.lines(run))
+	return t
 
 
 ## The hover card: who is coming, and what the power numbers mean.

@@ -4,6 +4,10 @@ extends PanelContainer
 ## sits apart from the cards the town orders from. Drag it by its title bar to see the town under it,
 ## or hide it down to the title bar and show it again. It remembers where it was put for the rest of
 ## the run. BuildHandView fills `cards` and decides when it shows; this file is only the window.
+## On a map too narrow for all the offers it shrinks to fit. `moved` fires whenever it moves, folds or
+## changes size, so the panels beside it can make room (HudLayout).
+
+signal moved
 
 const BORDER := Color("#ffd28a")
 
@@ -87,10 +91,23 @@ func open() -> void:
 func _fit() -> void:
 	reset_size()
 	var area := get_parent_area_size()
+	if area.x > 0.0:
+		var s := minf(1.0, (area.x - 16.0) / size.x)
+		scale = Vector2(s, s)
 	if not _placed and area.x > 0.0:
 		_placed = true
-		position = Vector2((area.x - size.x) * 0.5, 8.0)
+		position = Vector2((area.x - shown_size().x) * 0.5, 8.0)
 	_keep_inside()
+
+
+## The window's size on screen, after any shrinking.
+func shown_size() -> Vector2:
+	return size * scale
+
+
+## The part of the map the window covers.
+func shown_rect() -> Rect2:
+	return Rect2(position, shown_size())
 
 
 func _on_bar_input(event: InputEvent) -> void:
@@ -98,7 +115,7 @@ func _on_bar_input(event: InputEvent) -> void:
 		_dragging = event.pressed
 		accept_event()
 	elif event is InputEventMouseMotion and _dragging:
-		position += event.relative
+		position += event.relative * scale
 		_keep_inside()
 		accept_event()
 
@@ -106,5 +123,6 @@ func _on_bar_input(event: InputEvent) -> void:
 ## Never lets the window leave the map, so it can't be lost off screen.
 func _keep_inside() -> void:
 	var area := get_parent_area_size()
-	position.x = clampf(position.x, 0.0, maxf(0.0, area.x - size.x))
-	position.y = clampf(position.y, 0.0, maxf(0.0, area.y - size.y))
+	position.x = clampf(position.x, 0.0, maxf(0.0, area.x - shown_size().x))
+	position.y = clampf(position.y, 0.0, maxf(0.0, area.y - shown_size().y))
+	moved.emit()

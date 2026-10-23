@@ -1,7 +1,8 @@
 class_name StoryLog
 extends HBoxContainer
 ## The story's last few lines under the map, with a button for the whole log (Overlays.show_log)
-## and, in tiny text under it, which build is running (build_label).
+## and, in tiny text under it, which build is running (build_label). On a narrow window, where long
+## lines wrap, it shows fewer lines rather than cutting the newest off.
 
 signal open_pressed
 ## The Who did what button (Overlays.show_impact).
@@ -28,6 +29,7 @@ func _init() -> void:
 	_text.custom_minimum_size.y = 68
 	_text.add_theme_font_size_override("normal_font_size", 12)
 	_text.add_theme_font_size_override("bold_font_size", 12)
+	_text.resized.connect(func() -> void: _shown = -1)
 	add_child(_text)
 	var side := VBoxContainer.new()
 	side.add_theme_constant_override("separation", 2)
@@ -56,10 +58,15 @@ func refresh() -> void:
 	if run.story.size() == _shown:
 		return
 	_shown = run.story.size()
-	var lines := PackedStringArray()
-	for line in run.story.slice(maxi(0, _shown - LINES)):
-		lines.append(as_bbcode(line))
-	_text.text = "\n".join(lines)
+	var from := maxi(0, _shown - LINES)
+	while true:
+		var lines := PackedStringArray()
+		for line in run.story.slice(from):
+			lines.append(as_bbcode(line))
+		_text.text = "\n".join(lines)
+		if from >= _shown - 1 or _text.size.y <= 0.0 or _text.get_content_height() <= _text.size.y:
+			break
+		from += 1
 
 
 ## Which build is running, such as "PR #41 · 1a2b3c4", or "dev build" when run outside CI.
