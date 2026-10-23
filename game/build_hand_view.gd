@@ -302,10 +302,14 @@ func _deal_card(index: int) -> Button:
 	var rarity := content.rarity_of("deal", id)
 	var colour := content.rarity_color(rarity)
 	var top: String = offer["need"] if offer["need"] != "" else "Caravan · %s" % content.rarity_tier(rarity)["name"]
-	var btn := UiKit.card(top, def["name"], UiKit.cost_text(run.stock, def["give"]), deal_brings(run, id),
+	# Spelled out as a trade: what you hand over, then what you get back.
+	var terms := "[color=#9da2ab]You pay[/color] %s\n[color=#9da2ab]You get[/color] [color=#a8d890]%s[/color]" % [
+		UiKit.cost_text(run.stock, def["give"]), deal_brings(run, id)]
+	var btn := UiKit.card(top, def["name"], terms, def["text"],
 		"", CARD_SIZE, colour, offer["need"] != "", Color.WHITE if rarity == "white" else colour)
-	btn.tooltip_text = "%s deal from the %s (rarer deals come up less often).\n%s\nYou get: %s.\nOnce this round." % [
-		content.rarity_tier(rarity)["name"], content.trades["name"].to_lower(), def["text"], deal_brings(run, id)]
+	var pays := ", ".join(PackedStringArray(def["give"].keys().map(func(g: String) -> String: return "%d %s" % [def["give"][g], g])))
+	btn.tooltip_text = "%s deal from the %s (rarer deals come up less often).\n%s\nYou pay: %s.\nYou get: %s.\nOnce this round." % [
+		content.rarity_tier(rarity)["name"], content.trades["name"].to_lower(), def["text"], pays, deal_brings(run, id)]
 	btn.disabled = not run.caravan.can_take(index)
 	var blocked := run.caravan.blocker(index)
 	UiKit.fade_if_disabled(btn, blocked if blocked != "" else UiKit.shortfall(run.stock, def["give"]))
@@ -324,7 +328,7 @@ static func deal_brings(r: RunState, id: String) -> String:
 		var n := int(def["folk"][role])
 		parts.append("%d %s%s join" % [n, r.content.townsfolk[role]["name"].to_lower(), "s" if n > 1 else ""])
 	if int(def.get("smith", 0)) > 0:
-		parts.append("every hero's weapon +%d tier%s" % [def["smith"], "s" if int(def["smith"]) > 1 else ""])
+		parts.append("hero weapons +%d tier%s" % [def["smith"], "s" if int(def["smith"]) > 1 else ""])
 	if int(def.get("relic", 0)) > 0:
 		parts.append("a relic")
 	return ", ".join(parts)
