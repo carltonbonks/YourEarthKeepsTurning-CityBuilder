@@ -34,10 +34,13 @@ static func hero(run: RunState, u: Unit) -> Dictionary:
 	return t
 
 
-## e.g. "Weapon: keen flint blade (t2), Magic"; white gear leaves its rarity unsaid.
+## e.g. "Weapon: keen flint blade (t2), Magic [stone]"; white gear leaves its rarity unsaid, and the base's tags
+## (what relics can key on) close the line.
 static func gear_line(c: Content, slot: String, item: Dictionary) -> String:
 	var rarity := Loot.rarity(c, item)
-	return "%s: %s%s" % [slot.capitalize(), Loot.describe(c, item), "" if rarity == "white" else ", " + c.rarity_tier(rarity)["name"]]
+	var tags := c.tags_of("item", item["base"])
+	return "%s: %s%s%s" % [slot.capitalize(), Loot.describe(c, item), "" if rarity == "white" else ", " + c.rarity_tier(rarity)["name"],
+		"" if tags.is_empty() else " [%s]" % ", ".join(PackedStringArray(tags))]
 
 
 static func folk(run: RunState, u: Unit) -> Dictionary:
@@ -136,8 +139,19 @@ static func tag_notes(run: RunState, kind: String, id: String) -> Array[String]:
 			if prize.get("tag", "") == tag:
 				var built := run.world.count_buildings(b) > 0
 				notes.append("the %s pays %d shells per kill%s" % [c.buildings[b]["name"].to_lower(), int(prize["shells"]), "" if built else " (not built)"])
+		for r: String in run.relics:
+			if _relic_keys_on(c.relics[r]["effects"], tag):
+				notes.append("your %s acts on it" % c.relics[r]["name"])
 		out.append(tag if notes.is_empty() else "%s: %s" % [tag, "; ".join(notes)])
 	return out
+
+
+## True if a relic's effects include a tag-keyed one (RunState.TAG_EFFECTS) naming this tag.
+static func _relic_keys_on(effects: Dictionary, tag: String) -> bool:
+	for key: String in RunState.TAG_EFFECTS:
+		if effects.get(key, {}).has(tag):
+			return true
+	return false
 
 
 static func building(run: RunState, index: int) -> Dictionary:
