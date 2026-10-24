@@ -8,13 +8,16 @@ extends Control
 ## menu) and lays out the screen. The parts live in their own files: TopBar, BuildHandView (the
 ## building cards, with the blueprint draft in a DraftPopup), ThreatCard (the attack), Alerts, HeroStrip, StoryLog, Overlays
 ## (picks, relics, end screen, menu, Run history, dev tuning) and ArenaView (the map). HudLayout keeps
-## the panels over the map out of each other's way.
+## the panels over the map out of each other's way. The game opens on the TitleScreen (skipped when the
+## page address names a seed), each run opens on how a round works (WelcomePanel) before the traditions,
+## and FirstTips points out each thing the first time it happens. GameSettings holds the player's settings.
 
 ## How often the live panels are rebuilt while the sim runs (the map redraws every frame).
 const LIVE_REFRESH_SECONDS := 0.1
 
 var content: Content
 var run: RunState
+var settings: GameSettings
 var speed := 2
 ## The speed Space returns to after a pause.
 var _play_speed := 2
@@ -39,16 +42,25 @@ var _clock_label: RichTextLabel
 var _heroes: HeroStrip
 var _story: StoryLog
 var _overlays: Overlays
+var _title_screen: TitleScreen
+var _tips: FirstTips
 
 
 func _ready() -> void:
 	content = Content.load_default()
+	settings = GameSettings.load_saved()
+	settings.persist = save_runs
+	settings.apply(get_window() if is_inside_tree() else null)
 	_build_ui()
-	_new_run(_initial_seed())
+	var url_seed := _url_seed()
+	_new_run(url_seed if url_seed >= 0 else _random_seed())
+	# A playtest link with ?seed= goes straight into that run.
+	if url_seed < 0:
+		_show_title()
 
 
 func _process(delta: float) -> void:
-	if run.phase != RunState.Phase.SIM or _overlays.visible:
+	if run.phase != RunState.Phase.SIM or _overlays.visible or _title_screen.visible:
 		return
 	_live_acc += delta
 	if speed == 0:
@@ -72,11 +84,22 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:
 		return
-	if key.keycode == KEY_ESCAPE:
-		_close_menu() if _menu_open else _open_menu()
+	if event.is_action_pressed("menu"):
+		if _title_screen.visible:
+			_overlays.hide()
+		else:
+			_close_menu() if _menu_open else _open_menu()
 		get_viewport().set_input_as_handled()
-	elif key.keycode == KEY_SPACE and not _overlays.visible:
+	elif _title_screen.visible or _overlays.visible:
+		return
+	elif event.is_action_pressed("pause"):
 		_set_speed(_play_speed if speed == 0 else 0)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("faster") or event.is_action_pressed("slower"):
+		var speeds: Array = TopBar.SPEEDS.filter(func(s: int) -> bool: return s > 0)
+		var at := speeds.find(_play_speed)
+		at = clampi(at + (1 if event.is_action_pressed("faster") else -1), 0, speeds.size() - 1)
+		_set_speed(speeds[at])
 		get_viewport().set_input_as_handled()
 
 
@@ -94,14 +117,31 @@ func _new_run(seed_value: int) -> void:
 	_alerts.reset()
 	_story.refresh()
 	_menu_open = false
+	_title_screen.hide()
+	_overlays.welcome_pending = true
+	_set_speed(settings.start_speed)
 	_refresh()
 	_overlays.show_for_phase()
+
+
+func _show_title() -> void:
+	_menu_open = false
+	_overlays.hide()
+	_title_screen.show()
+	_tips.hide()
+
+
+## A setting changed: put it into effect.
+func _apply_settings() -> void:
+	settings.apply(get_window() if is_inside_tree() else null)
+	_arena.night_camera = settings.night_camera
 
 
 func _found(ids: Array) -> void:
 	run.choose_traditions(ids)
 	_overlays.hide()
 	_refresh()
+	_overlays.show_for_phase()
 
 
 func _invite_pedlar(id: String) -> void:
@@ -170,9 +210,12 @@ func _open_menu() -> void:
 	_overlays.show_menu(_dev_mode())
 
 
-## The menu, the log or a dev panel closed: back to whatever the run is waiting on.
+## The menu, the log or a dev panel closed: back to whatever the run is waiting on (or the title screen).
 func _close_menu() -> void:
 	_menu_open = false
+	if _title_screen.visible:
+		_overlays.hide()
+		return
 	_refresh()
 	_overlays.show_for_phase()
 
@@ -203,6 +246,24 @@ func _refresh_live() -> void:
 	_heroes.refresh()
 	_story.refresh()
 	_layout_hud()
+	if _tips != null:
+		_tips.check(run, _menu_open or _title_screen.visible)
+
+
+## Where a one-time tip sits: by the part of the screen it is about, kept on screen.
+func _tip_position(at: String, tip_size: Vector2) -> Vector2:
+	var map := _map_box.get_global_rect()
+	var p := Vector2(map.get_center().x - tip_size.x * 0.5, map.position.y + 12.0)
+	match at:
+		"hand":
+			p = Vector2(map.position.x + 24.0, _hand_view.get_global_rect().position.y - tip_size.y - 12.0)
+		"threat":
+			var card := _threat.get_global_rect()
+			p = Vector2(card.position.x - tip_size.x - 12.0, card.position.y)
+		"map":
+			p = Vector2(map.get_center().x - tip_size.x * 0.5, map.position.y + map.size.y * 0.3)
+	var screen := size - tip_size - Vector2(8, 8)
+	return Vector2(clampf(p.x, 8.0, maxf(8.0, screen.x)), clampf(p.y, 8.0, maxf(8.0, screen.y)))
 
 
 ## Gives each panel over the map its own room (HudLayout): the draft window keeps its place, the hand
@@ -236,13 +297,13 @@ func _layout_hud() -> void:
 
 # --- Seeds -----------------------------------------------------------------
 
-## Uses ?seed=1234 from the page address in the browser build, else a random seed.
-func _initial_seed() -> int:
+## ?seed=1234 from the page address in the browser build, else -1.
+func _url_seed() -> int:
 	if OS.has_feature("web"):
 		var from_url: Variant = JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('seed')")
 		if from_url is String and (from_url as String).is_valid_int():
 			return int(from_url)
-	return _random_seed()
+	return -1
 
 
 ## Dev tools show in desktop runs, or in the browser with ?dev=1 in the address.
@@ -353,4 +414,25 @@ func _build_ui() -> void:
 	_overlays.new_run_requested.connect(_restart)
 	_overlays.seed_run_requested.connect(_new_run)
 	_overlays.closed.connect(_close_menu)
+	_overlays.settings_changed.connect(_apply_settings)
+	_overlays.title_requested.connect(_show_title)
+	_overlays.settings = settings
+
+	# The title screen covers the game; the menu's screens (Run history, Settings) open over it.
+	_title_screen = TitleScreen.new()
+	_title_screen.visible = false
+	_title_screen.start_pressed.connect(func(seed_value: int) -> void:
+		_new_run(seed_value if seed_value >= 0 else _random_seed()))
+	_title_screen.how_to_play_pressed.connect(func() -> void: _overlays.show_welcome(false))
+	_title_screen.history_pressed.connect(func() -> void: _overlays.show_history())
+	_title_screen.settings_pressed.connect(func() -> void: _overlays.show_settings())
+	add_child(_title_screen)
 	add_child(_overlays)
+
+	# One-time tips sit above everything, picks included.
+	_tips = FirstTips.new()
+	_tips.settings = settings
+	_tips.content = content
+	_tips.anchor = _tip_position
+	add_child(_tips)
+	_arena.night_camera = settings.night_camera
