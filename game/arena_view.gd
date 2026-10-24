@@ -50,6 +50,7 @@ var _shift_seen := [-1, null, 0]
 var _slide_from_ms := -1.0
 var _pulse_from_ms := -1.0
 var night := NightCamera.new()
+var turn := TurnCamera.new()
 ## Off in Settings: the map stays where the player put it at night.
 var night_camera := true
 var pickups := PickupPopups.new()
@@ -66,11 +67,13 @@ func reset_camera() -> void:
 	zoom = 1.2
 	pan = Vector2.ZERO
 	night = NightCamera.new()
+	turn = TurnCamera.new()
 
 
 ## Points the view at a ground point, zooming in a little if the view is wide.
 func look_at_point(p: Vector2) -> void:
 	night.release()
+	turn.release()
 	pan = p
 	zoom = maxf(zoom, 2.0)
 
@@ -105,6 +108,7 @@ func _process(delta: float) -> void:
 	if run != null:
 		if night_camera:
 			night.update(self, delta)
+		turn.update(self)
 		pickups.update(run.world, Time.get_ticks_msec())
 		supplies.update(run.world, Time.get_ticks_msec())
 		celebrations.update(run, Time.get_ticks_msec())
@@ -119,6 +123,7 @@ func _gui_input(event: InputEvent) -> void:
 		if mb.pressed and (mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN):
 			var before := _to_world(mb.position)
 			night.release()
+			turn.release()
 			zoom = clampf(zoom * (1.15 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15), MIN_ZOOM, MAX_ZOOM)
 			pan += before - _to_world(mb.position)
 			accept_event()
@@ -133,6 +138,7 @@ func _gui_input(event: InputEvent) -> void:
 			_moved = true
 		if _dragging and _moved:
 			night.release()
+			turn.release()
 			pan -= _unproject((event as InputEventMouseMotion).relative / _scale())
 
 
@@ -830,9 +836,22 @@ func _watch_shift() -> void:
 	if _shift_seen[1] == w and w.earth.turned > int(_shift_seen[0]):
 		_slide_from_ms = Time.get_ticks_msec()
 		_pulse_from_ms = _slide_from_ms
+		turn.start(self)
 	elif _shift_seen[1] == w and w.earth.changes > int(_shift_seen[2]):
 		_pulse_from_ms = Time.get_ticks_msec()
 	_shift_seen = seen
+
+
+## True while the map is pulled out to show the earth turning.
+func turn_playing() -> bool:
+	return turn.playing()
+
+
+## Ends the turn's beat at once: the plates are in place and the camera is back where the player had it.
+func skip_turn() -> void:
+	turn.skip(self)
+	if _slide_from_ms >= 0.0:
+		_slide_from_ms = Time.get_ticks_msec() - SLIDE_MS
 
 
 ## Rings that swell out from each place the last shift changed, for a few seconds after it.
