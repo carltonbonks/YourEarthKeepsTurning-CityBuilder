@@ -15,7 +15,7 @@ extends SceneTree
 ## deals a Promote card for a craftsperson with that craft trait as the first dawn card.
 ## ageup=1 plays on from that round until the town reaches a new age and shows the celebration (style=bronze or
 ## medieval gets there); levelup=1 levels up the first hero so the halo shows.
-## deals=<id,id,...> lays out those caravan trade cards (data/trades.json) in the build hand.
+## deals=<id,id,...> lays out those caravan trade cards (data/trades.json) in the build hand; id:roll:mod:mod rolls one.
 ## rolled=1 (with pick=1) deals rolled townsfolk cards: a magic warrior, a powerful forager and a mythic tribesperson;
 ## rolled=2 a magic family, a mythic venture and a powerful hero.
 ## size=<W>x<H> sets the window size (default 1600x1000), to check the screen layout at other sizes.
@@ -114,8 +114,14 @@ func _init() -> void:
 			main._take_pick(0)
 	if args["deals"] != "" and run.phase == RunState.Phase.BUILD:
 		run.caravan.offers.clear()
-		for id in args["deals"].split(","):
-			run.caravan.offers.append({"deal": id, "need": run.caravan.need(id), "taken": false})
+		for spec in args["deals"].split(","):
+			var parts: PackedStringArray = spec.split(":")
+			var id := parts[0]
+			var offer := {"deal": id, "need": run.caravan.need(id), "taken": false}
+			if parts.size() > 2:
+				offer["roll"] = parts[1]
+				offer["boons"] = Array(parts.slice(2))
+			run.caravan.offers.append(offer)
 	main._refresh()
 	main._arena.celebrations.update(run, Time.get_ticks_msec())
 	if args["ageup"] == "1":
