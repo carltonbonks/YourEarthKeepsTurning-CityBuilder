@@ -7,7 +7,7 @@ extends RefCounted
 
 const DATA_DIR := "res://data"
 ## Kinds of entity that can carry "tags" in their data, for tags_of() and has_tag().
-const TAG_KINDS := ["enemy", "hero", "trait", "townsfolk", "building", "item", "relic", "node", "deal", "mark", "card_mod"]
+const TAG_KINDS := ["enemy", "hero", "trait", "townsfolk", "building", "item", "relic", "node", "deal", "mark", "card_mod", "plate"]
 
 var balance: Dictionary
 var hero_classes: Dictionary
@@ -179,6 +179,8 @@ func tag_table(kind: String) -> Dictionary:
 			return marks
 		"card_mod":
 			return card_mods
+		"plate":
+			return plates["near_kinds"]
 	assert(false, "Unknown tag kind %s (see Content.TAG_KINDS)" % kind)
 	return {}
 

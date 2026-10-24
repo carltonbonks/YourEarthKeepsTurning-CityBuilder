@@ -278,7 +278,7 @@ func towers_tick() -> void:
 func sighted(from: Vector2, reach: float) -> Unit:
 	var sights: Array = [1.0]
 	for kind: String in w.content.plates["near_kinds"]:
-		var s := float(w.content.plates["near_kinds"][kind].get("sight", 1.0))
+		var s := float(w.earth.kind_def(kind).get("sight", 1.0))
 		if not sights.has(s):
 			sights.append(s)
 	sights.sort()

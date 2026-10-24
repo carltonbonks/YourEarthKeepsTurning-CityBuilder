@@ -178,16 +178,24 @@ func refresh_prizes() -> void:
 	_prizes = _posted_prizes()
 	_prize_xp = {}
 	var effects := {}
+	var knobs := {}
 	for b in w.buildings:
 		var def: Dictionary = w.content.buildings[b["type"]]
 		if float(b["work_left"]) > 0.0:
 			continue
+		for tag: String in def.get("plate_knobs", {}):
+			if not knobs.has(tag):
+				knobs[tag] = {}
+			for knob: String in def["plate_knobs"][tag]:
+				knobs[tag][knob] = float(knobs[tag].get(knob, 0.0)) + float(def["plate_knobs"][tag][knob])
 		var prize: Dictionary = def.get("prize", {})
 		if prize.has("xp"):
 			_prize_xp[prize["tag"]] = float(_prize_xp.get(prize["tag"], 0.0)) + float(prize["xp"])
 		for key: String in def.get("effects", {}):
 			effects[key] = float(effects.get(key, 0.0)) + float(def["effects"][key])
 	w.building_effects = effects
+	if knobs != w.building_plate_knobs:
+		w.building_plate_knobs = knobs
 
 
 ## Extra XP share a hero earns for killing this creature type, from buildings whose prize carries "xp".

@@ -138,7 +138,7 @@ func mod(key: String) -> float:
 
 
 ## Relic effects keyed on tags ({tag: ...}), read through tag_mod, tag_sums and gear_bonus.
-const TAG_EFFECTS := ["foe_damage", "foe_spoils", "gear_bonus", "node_yield"]
+const TAG_EFFECTS := ["foe_damage", "foe_spoils", "gear_bonus", "node_yield", "plate_knobs"]
 
 
 ## The effects of everything owned that has effects: relics, then traditions.

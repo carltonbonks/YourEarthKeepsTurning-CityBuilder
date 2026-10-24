@@ -65,6 +65,10 @@ var _cell_a := PackedFloat32Array()
 var _j_of := PackedInt32Array()  ## Square -> its place in _cells, or -1 on the still ground.
 var _ring_angles: Array[PackedFloat32Array] = []  ## Per ring, its squares' angles in order (for arcs).
 var _ring_js: Array[PackedInt32Array] = []  ## Per ring, the _cells places in that order.
+## Each near kind's numbers with what relics, traditions and standing buildings add by its tags (plate_knobs),
+## and what they were worked out from: [relic count, tradition count, World.building_plate_knobs].
+var _kinds_now := {}
+var _kinds_from := []
 
 
 func _init(world: World) -> void:
@@ -158,8 +162,32 @@ func crossing(a: float, extra := 0) -> String:
 	return kind_at_angle(a - extra * float(rings[0]["step"]))
 
 
+## What a near kind's numbers are before anything adds to them (a kind leaves out the ones it doesn't change).
+const KNOB_BASE := {"walk": 1.0, "raider_walk": 1.0, "sight": 1.0, "regrow": 0.0, "rise_chance": 0.0, "grave_goods": 0.0}
+
+
+## A near kind's data (data/plates.json near_kinds), with its numbers as they stand now: plate_knobs
+## ({tag: {knob: add}}) from owned relics, traditions and standing buildings add to every kind with that tag.
 func kind_def(kind: String) -> Dictionary:
-	return def["near_kinds"].get(kind, {})
+	var base: Dictionary = def["near_kinds"].get(kind, {})
+	if base.is_empty():
+		return base
+	var from := [w.run.relics.size(), w.run.traditions.size(), w.building_plate_knobs]
+	if _kinds_from.size() != 3 or _kinds_from[0] != from[0] or _kinds_from[1] != from[1] or not is_same(_kinds_from[2], from[2]):
+		_kinds_now = {}
+		_kinds_from = from
+	if not _kinds_now.has(kind):
+		var tags: Array = base.get("tags", [])
+		var adds := w.run.tag_sums("plate_knobs", tags)
+		for tag: String in w.building_plate_knobs:
+			if tag in tags:
+				for knob: String in w.building_plate_knobs[tag]:
+					adds[knob] = float(adds.get(knob, 0.0)) + float(w.building_plate_knobs[tag][knob])
+		var out := base.duplicate()
+		for knob: String in adds:
+			out[knob] = maxf(0.0, float(base.get(knob, KNOB_BASE.get(knob, 0.0))) + float(adds[knob]))
+		_kinds_now[kind] = out
+	return _kinds_now[kind]
 
 
 ## How fast someone walks at p for its near plate's kind (1 elsewhere): a Fen slows everyone, a Stonefield

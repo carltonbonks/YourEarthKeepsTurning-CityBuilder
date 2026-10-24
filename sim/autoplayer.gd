@@ -489,6 +489,8 @@ const RELIC_RANK := ["sun_disc", "starfall_idol", "antler_crown", "ancestors_hor
 	"blood_brother_knot", "wanderers_fire", "ember_stone", "oxhide_sledges", "seed_cache", "ridgeheart",
 	"green_mothers_bough", "quarry_spirit", "ore_singer", "tanners_blessing", "knappers_spirit", "bone_readers_rite",
 	"spirit_knot", "skinning_knife", "ossuary_pit",
+	# Plate-kind relics only pay when the attack crosses their kind, and the bot doesn't aim the earth by them.
+	"barrow_kings_lamp", "bog_drowners_stake", "cairn_wardens_cord", "thorn_witchs_veil",
 	# Spoils last: taking a pack-train's goods over a relic cost the bots 8-20 win-rate points (40 seeds).
 	"raiders_spears", "wolfskin_cloaks", "bone_ward", "splintered_ram", "pack_train", "ram_timbers", "smoked_haunches", "grave_goods"]
 
