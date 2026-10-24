@@ -41,6 +41,8 @@ var upgrades: Array[String] = []
 var traditions_settled := false
 ## The spoils in this round's relic offer: {id, kind (enemy tag), foes (how many of that kind came)}, or {}.
 var spoils := {}
+## An echoing spell leaves the geomancer spent: no spell cards until this round has passed (0 = never spent).
+var geomancer_rests_until := 0
 ## Max hearth HP the town has earned for good (Ancestor Bones).
 var bonus_hearth_hp := 0.0
 ## Dawn cards still to take this dawn (Twin Fires gives two), and townsfolk cards taken this run (Hearth-mother's Doll).
@@ -382,7 +384,7 @@ func build_row(id: String) -> bool:
 ## True once a building that works the earth (a Geomancer's lodge) stands and no spell is under way, so dawn
 ## offers spell cards.
 func can_cast() -> bool:
-	if not spell.is_empty():
+	if not spell.is_empty() or round_number <= geomancer_rests_until:
 		return false
 	for type: String in content.buildings:
 		if content.buildings[type].get("spells", false) and world.count_buildings(type) > 0:
@@ -391,11 +393,13 @@ func can_cast() -> bool:
 
 
 ## Sets the geomancer to work on a spell (an id from "spells" in data/plates.json).
-func cast_spell(id: String) -> void:
+func cast_spell(id: String, card := {}) -> void:
 	if not can_cast() or not content.plates["spells"].has(id):
 		return
-	var nights := int(content.plates["spells"][id]["nights"])
+	var nights := maxi(1, int(content.plates["spells"][id]["nights"]) + int(CardRoll.card_sum(content, card, "nights")))
 	spell = {"id": id, "nights_left": nights}
+	if card.has("boons"):
+		spell["boons"] = card["boons"].duplicate()
 	tell("The geomancer begins to %s (%d night%s)." % [String(content.plates["spells"][id]["name"]).to_lower(), nights, "" if nights == 1 else "s"])
 	record.note_list("spells", {"day": world.day_index() + 1, "cast": id})
 
@@ -408,11 +412,25 @@ func _work_spell() -> void:
 	if int(spell["nights_left"]) > 0:
 		return
 	var id: String = spell["id"]
+	var worked := {"boons": spell.get("boons", [])}
 	spell = {}
 	var rng := SeededRng.stream(run_seed, "spell", round_number * 10 + world.day_index())
-	var line := world.earth.finish_spell(id, rng)
+	var line := world.earth.finish_spell(id, rng, int(CardRoll.card_sum(content, worked, "lasts")))
 	tell("The geomancer's spell is done: %s." % line)
 	record.note_list("spells", {"day": world.day_index() + 1, "finished": id, "did": world.earth.spell_done.duplicate(true)})
+	# A rolled spell card's modifiers (data/card_mods.json): it echoes, leaves goods, spends the geomancer.
+	if CardRoll.card_sum(content, worked, "echo") > 0.0:
+		tell("The spell echoes: %s." % world.earth.finish_spell(id, rng, int(CardRoll.card_sum(content, worked, "lasts"))))
+		record.note_count("card_mods_fired", 1, "echoing")
+	var goods := CardRoll.card_goods(content, worked, "goods")
+	for good: String in goods:
+		stock[good] = int(stock.get(good, 0)) + int(goods[good])
+	if not goods.is_empty():
+		tell("The worked earth leaves %s." % ", ".join(goods.keys().map(func(g: String) -> String: return "%d %s" % [goods[g], g])))
+	var rest := int(CardRoll.card_sum(content, worked, "rest_rounds"))
+	if rest > 0:
+		geomancer_rests_until = round_number + rest
+		tell("The geomancer is spent and will cast nothing for %d rounds." % rest)
 
 
 ## True while building on a pedlar round until the player invites a pedlar or none (after the traditions).
@@ -589,6 +607,8 @@ func choose_pick(index: int) -> void:
 	if took:
 		var card := pick_offer[index]
 		stock["shells"] = int(stock["shells"]) - int(card["cost"])
+		if card["kind"] != "folk":
+			CardRoll.note_taken(self, card)
 		if card["kind"] == "hero":
 			var hero: Unit = card["hero"]
 			people.add_hero(hero)
@@ -598,17 +618,16 @@ func choose_pick(index: int) -> void:
 			people.promote(card)
 			taken = people.card_label(card)
 		elif card["kind"] == "spell":
-			cast_spell(card["spell"])
+			cast_spell(card["spell"], card)
 			taken = people.card_label(card)
 		elif card["kind"] == "venture":
 			venture = people.go_venturing(card)
 			last_venture = venture
 			taken = people.card_label(card)
 		elif card["kind"] == "family":
-			for role: String in card["roles"]:
-				world.folk_ai.add_folk(role)
+			var arrived := people.settle_family(card)
 			taken = "family"
-			tell("A family of %d comes to settle." % card["roles"].size())
+			tell("A family of %d comes to settle." % arrived)
 		else:
 			var leaning: String = card.get("leaning", "")
 			var newcomer := world.folk_ai.add_folk(card["role"], leaning)

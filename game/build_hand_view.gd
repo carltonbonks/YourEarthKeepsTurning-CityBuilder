@@ -398,33 +398,37 @@ func _deal_card(index: int) -> Button:
 	var offer: Dictionary = run.caravan.offers[index]
 	var id: String = offer["deal"]
 	var def := run.caravan.deal(id)
-	var rarity := content.rarity_of("deal", id)
-	var colour := content.rarity_color(rarity)
-	var top: String = offer["need"] if offer["need"] != "" else "Caravan · %s" % content.rarity_tier(rarity)["name"]
+	# The frame shows the deal's own roll (CardRoll); a small gem shows how rare this kind of deal is.
+	var roll := CardRoll.roll_of(offer)
+	var colour := content.rarity_color(roll)
+	var give := run.caravan.gives(id, offer)
+	var top: String = offer["need"] if offer["need"] != "" else "Caravan"
 	# Spelled out as a trade: what you hand over, then what you get back.
 	var terms := "[color=#9da2ab]You pay[/color] %s\n[color=#9da2ab]You get[/color] [color=#a8d890]%s[/color]" % [
-		UiKit.cost_text(run.stock, def["give"]), deal_brings(run, id)]
+		UiKit.cost_text(run.stock, give) if not give.is_empty() else "nothing", deal_brings(run, id, offer)]
 	var btn := UiKit.card(top, def["name"], terms, def["text"],
-		"", CARD_SIZE, colour, offer["need"] != "", Color.WHITE if rarity == "white" else colour)
-	var pays := ", ".join(PackedStringArray(def["give"].keys().map(func(g: String) -> String: return "%d %s" % [def["give"][g], g])))
-	btn.tooltip_text = "%s deal from the %s (rarer deals come up less often).\n%s\nYou pay: %s.\nYou get: %s.\nOnce this round." % [
-		content.rarity_tier(rarity)["name"], content.trades["name"].to_lower(), def["text"], pays, deal_brings(run, id)]
+		"", CARD_SIZE, colour, offer["need"] != "", Color.WHITE if roll == "white" else colour)
+	var pays := ", ".join(PackedStringArray(give.keys().map(func(g: String) -> String: return "%d %s" % [give[g], g])))
+	btn.tooltip_text = "A deal from the %s.\n%s\nYou pay: %s.\nYou get: %s.\nOnce this round." % [
+		content.trades["name"].to_lower(), def["text"], pays if pays != "" else "nothing", deal_brings(run, id, offer)]
+	UiKit.mark_roll(btn, content, roll, content.rarity_of("deal", id), CardRoll.lines(content, offer))
 	btn.disabled = not run.caravan.can_take(index)
 	var blocked := run.caravan.blocker(index)
-	UiKit.fade_if_disabled(btn, blocked if blocked != "" else UiKit.shortfall(run.stock, def["give"]))
+	UiKit.fade_if_disabled(btn, blocked if blocked != "" else UiKit.shortfall(run.stock, give))
 	btn.pressed.connect(_act.bind(run.caravan.take.bind(index)))
 	return btn
 
 
 ## What a deal brings, in words: "+4 tin", "2 warriors join", "every hero's weapon +1 tier", "a relic".
-static func deal_brings(r: RunState, id: String) -> String:
+static func deal_brings(r: RunState, id: String, offer := {}) -> String:
 	var def := r.caravan.deal(id)
 	var parts: PackedStringArray = []
-	var got := r.caravan.gets(id)
+	var got := r.caravan.gets(id, offer)
 	for good: String in got:
 		parts.append("+%d %s" % [got[good], good])
-	for role: String in def.get("folk", {}):
-		var n := int(def["folk"][role])
+	var folk := r.caravan.folk_of(id, offer)
+	for role: String in folk:
+		var n := int(folk[role])
 		parts.append("%d %s%s join" % [n, r.content.townsfolk[role]["name"].to_lower(), "s" if n > 1 else ""])
 	if int(def.get("smith", 0)) > 0:
 		parts.append("hero weapons +%d tier%s" % [def["smith"], "s" if int(def["smith"]) > 1 else ""])

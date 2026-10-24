@@ -16,7 +16,8 @@ extends SceneTree
 ## ageup=1 plays on from that round until the town reaches a new age and shows the celebration (style=bronze or
 ## medieval gets there); levelup=1 levels up the first hero so the halo shows.
 ## deals=<id,id,...> lays out those caravan trade cards (data/trades.json) in the build hand.
-## rolled=1 (with pick=1) deals rolled townsfolk cards: a magic warrior, a powerful forager and a mythic tribesperson.
+## rolled=1 (with pick=1) deals rolled townsfolk cards: a magic warrior, a powerful forager and a mythic tribesperson;
+## rolled=2 a magic family, a mythic venture and a powerful hero.
 ## size=<W>x<H> sets the window size (default 1600x1000), to check the screen layout at other sizes.
 
 func _init() -> void:
@@ -99,6 +100,15 @@ func _init() -> void:
 				{"kind": "folk", "role": "tribesperson", "cost": 0, "leaning": "forager", "roll": "yellow", "mark": "nimble",
 					"boons": ["born_leader", "twins"]},
 				{"kind": "folk", "role": "tribesperson", "cost": 0, "leaning": "woodcutter", "roll": "orange", "boons": ["many_mother"]}]
+		if args["rolled"] == "2":
+			run.pick_offer = [{"kind": "family", "role": "family", "cost": 0, "roles": ["tribesperson", "warrior"], "roll": "blue",
+				"boons": ["big_family"]},
+				{"kind": "venture", "role": "venture", "cost": 0, "venture": run.content.ventures.keys()[0], "roll": "orange",
+					"boons": ["cursed_road"]}]
+			var hero := run.people.make_hero(true)
+			var card := {"kind": "hero", "role": "hero", "cost": 25, "hero": hero, "roll": "yellow", "boons": ["war_tested", "houndmaster"]}
+			run.people._shape_hero(card, SeededRng.new(1))
+			run.pick_offer.append(card)
 		main._overlays.show_for_phase()
 		if args["venture_taken"] == "1":
 			main._take_pick(0)

@@ -252,7 +252,7 @@ func _pick_card(card: Dictionary) -> Button:
 			var parts := PackedStringArray()
 			for role: String in who:
 				parts.append("%d %s" % [who[role], content.townsfolk[role]["name"].to_lower()])
-			btn = UiKit.card("Family", "A family", UiKit.cost_text(run.stock, {}), ", ".join(parts), "Needs %d beds" % card["roles"].size(), PICK_SIZE, UiKit.CARD_BORDER)
+			btn = UiKit.card("Family", "A family", UiKit.cost_text(run.stock, {}), ", ".join(parts), "Needs %d beds" % run.people.card_people(card), PICK_SIZE, UiKit.CARD_BORDER)
 			btn.tooltip_text = "A whole family moves in at once: %s.\nEach eats %s a day." % [", ".join(parts), _food_each()]
 		"promote":
 			btn = _promote_card(card)
@@ -282,7 +282,7 @@ func _pick_card(card: Dictionary) -> Button:
 ## A venture: send tribespeople out, some never come back, the rest bring goods home.
 func _venture_card(card: Dictionary) -> Button:
 	var v: Dictionary = run.content.ventures[card["venture"]]
-	var terms := run.people.venture_terms(card["venture"])
+	var terms := run.people.venture_terms(card["venture"], card)
 	var lose: Array = terms["lose"]
 	var losing := "%d" % lose[0] if lose[0] == lose[1] else "%d-%d" % [lose[0], lose[1]]
 	var brings := ", ".join(terms["goods"].keys().map(func(g: String) -> String: return "%d %s" % [terms["goods"][g], g.replace("_", " ")]))
@@ -309,7 +309,7 @@ func _venture_card(card: Dictionary) -> Button:
 ## A geomancy spell: how many nights it takes and what it does when done.
 func _spell_card(card: Dictionary) -> Button:
 	var sd: Dictionary = run.content.plates["spells"][card["spell"]]
-	var nights := int(sd["nights"])
+	var nights := maxi(1, int(sd["nights"]) + int(CardRoll.card_sum(run.content, card, "nights")))
 	var btn := UiKit.card("Geomancy: %d night%s" % [nights, "" if nights == 1 else "s"], sd["name"], "", sd["text"],
 		"Instead of a newcomer", SPELL_SIZE, Color("#7a5a8a"))
 	btn.tooltip_text = "%s\nThe geomancer works on one spell at a time; when it is done, dawn offers spells again." % sd["text"]
