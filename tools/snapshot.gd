@@ -20,9 +20,11 @@ extends SceneTree
 ## rolled=1 (with pick=1) deals rolled townsfolk cards: a magic warrior, a powerful forager and a mythic tribesperson;
 ## rolled=2 a magic family, a mythic venture and a powerful hero.
 ## size=<W>x<H> sets the window size (default 1600x1000), to check the screen layout at other sizes.
+## screen=title|welcome|settings shows the title screen, how a round works or Settings; tips=1 shows the
+## one-time tip due at that moment (off otherwise, so pictures stay clear); seen=<id,id> marks tips as seen. The player's settings are never saved.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "size": "1600x1000"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": ""}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -32,6 +34,9 @@ func _init() -> void:
 	var main: Control = load("res://game/main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame
+	main.settings.persist = false
+	main.settings.tips = args["tips"] == "1"
+	main.settings.tips_seen = Array(args["seen"].split(",", false))
 	main._new_run(int(args["seed"]))
 	var run: RunState = main.run
 	if args["give"] != "":
@@ -181,8 +186,18 @@ func _init() -> void:
 	main._arena.iso = args["flat"] != "1"
 	if args["night"] != "1":
 		main._arena.zoom = float(args["zoom"])
+	match args["screen"]:
+		"title":
+			main._show_title()
+		"welcome":
+			main._overlays.show_welcome(true)
+		"settings":
+			main._overlays.show_settings()
+	main._refresh_live()
 	for i in 4:
 		await process_frame
+	main._refresh_live()
+	await process_frame
 	var image := root.get_texture().get_image()
 	image.save_png(args["out"])
 	print("Saved %s (round %d)" % [args["out"], run.round_number])

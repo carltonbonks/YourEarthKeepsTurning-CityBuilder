@@ -16,8 +16,15 @@ signal new_run_requested(replay: bool)
 signal seed_run_requested(seed_value: int)
 ## The menu, log or tuning panel closed: the screen refreshes and shows the right overlay again.
 signal closed
+## A setting changed on the Settings screen: the screen applies it.
+signal settings_changed
+## Back to the title screen (from the menu).
+signal title_requested
 
 var run: RunState
+var settings: GameSettings
+## A new run opens on "how a round works" before the traditions pick (every run, Yusuf 2026-10-24).
+var welcome_pending := false
 var _box: VBoxContainer
 
 
@@ -49,7 +56,10 @@ func _init() -> void:
 ## Shows whatever the run is waiting on (a pick, a relic, the end), or hides.
 func show_for_phase() -> void:
 	if run.awaiting_traditions():
-		show_traditions()
+		if welcome_pending:
+			show_welcome(true)
+		else:
+			show_traditions()
 		return
 	if run.awaiting_pedlar():
 		show_pedlars()
@@ -159,6 +169,25 @@ func show_traditions(chosen: Array = []) -> void:
 	var found := UiKit.primary(UiKit.button(row, "Found the town", func() -> void: traditions_chosen.emit(chosen)))
 	found.disabled = chosen.size() < to_pick
 	UiKit.button(row, "No traditions", func() -> void: traditions_chosen.emit([]))
+	show()
+
+
+## How a round works (WelcomePanel). Before a run it moves on to the traditions pick; from the title
+## screen or the menu it just closes.
+func show_welcome(before_run: bool) -> void:
+	_clear()
+	if before_run:
+		WelcomePanel.fill(_box, run.content, settings, "Choose your founding traditions", func() -> void:
+			welcome_pending = false
+			show_traditions())
+	else:
+		WelcomePanel.fill(_box, run.content, settings, "Back", func() -> void: closed.emit())
+	show()
+
+
+func show_settings() -> void:
+	_clear()
+	SettingsPanel.fill(_box, settings, func() -> void: settings_changed.emit(), func() -> void: closed.emit())
 	show()
 
 
@@ -534,6 +563,8 @@ func show_end() -> void:
 	summary.autowrap_mode = TextServer.AUTOWRAP_WORD
 	summary.custom_minimum_size.x = 420
 	_box.add_child(summary)
+	if not won:
+		UiKit.note(_box, content.tips["welcome"]["lost_line"], 16, Color("#d9cbb3")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	UiKit.primary(UiKit.button(_box, "New run", func() -> void: new_run_requested.emit(false)))
 	UiKit.button(_box, "Replay seed %d" % run.run_seed, func() -> void: new_run_requested.emit(true))
 	UiKit.button(_box, "Who did what", func() -> void: show_impact(true))
@@ -692,10 +723,14 @@ func show_menu(dev_mode: bool) -> void:
 	seed_row.add_child(restart)
 	UiKit.button(_box, "New run (new seed)", func() -> void: new_run_requested.emit(false))
 	UiKit.button(_box, "Run history", show_history)
+	UiKit.button(_box, "How to play", func() -> void: show_welcome(false))
+	UiKit.button(_box, "Settings", show_settings)
 	if dev_mode:
 		UiKit.button(_box, "Tune market (dev)", show_tuning)
-	UiKit.note(_box, "Space pauses, V tilts the map, point at anything for details.", 12)
-	UiKit.primary(UiKit.button(_box, "Resume (Esc)", func() -> void: closed.emit())).custom_minimum_size.y = 44
+	UiKit.button(_box, "Title screen", func() -> void: title_requested.emit())
+	UiKit.note(_box, "%s pauses, %s tilts the map, point at anything for details." % [
+		GameSettings.key_name(settings.keys["pause"]), GameSettings.key_name(settings.keys["tilt_map"])], 12)
+	UiKit.primary(UiKit.button(_box, "Resume (%s)" % GameSettings.key_name(settings.keys["menu"]), func() -> void: closed.emit())).custom_minimum_size.y = 44
 	show()
 
 

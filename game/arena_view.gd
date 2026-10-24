@@ -50,6 +50,8 @@ var _shift_seen := [-1, null, 0]
 var _slide_from_ms := -1.0
 var _pulse_from_ms := -1.0
 var night := NightCamera.new()
+## Off in Settings: the map stays where the player put it at night.
+var night_camera := true
 var pickups := PickupPopups.new()
 var supplies := SupplyPopups.new()
 var celebrations := Celebrations.new()
@@ -101,7 +103,8 @@ func _layer(draw_with: Callable) -> Control:
 
 func _process(delta: float) -> void:
 	if run != null:
-		night.update(self, delta)
+		if night_camera:
+			night.update(self, delta)
 		pickups.update(run.world, Time.get_ticks_msec())
 		supplies.update(run.world, Time.get_ticks_msec())
 		celebrations.update(run, Time.get_ticks_msec())
@@ -135,7 +138,7 @@ func _gui_input(event: InputEvent) -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	if key != null and key.pressed and not key.echo and key.keycode == KEY_V:
+	if key != null and not key.echo and event.is_action_pressed("tilt_map"):
 		iso = not iso
 		get_viewport().set_input_as_handled()
 

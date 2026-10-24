@@ -35,6 +35,7 @@ var marks: Dictionary  ## data/marks.json: lasting edges single townsfolk earn (
 var card_mods: Dictionary  ## data/card_mods.json: the powerful and transmuting modifiers a rolled card can carry.
 var upgrades: Dictionary  ## data/upgrades.json: draft offers that change a building the town has, for the run.
 var rarity: Dictionary  ## data/rarity.json: the four rarities (white, blue, yellow, orange) anything can carry.
+var tips: Dictionary  ## data/tips.json: what a new player is told (the round screen before each run, one-time tips).
 
 
 static func load_default() -> Content:
@@ -66,6 +67,7 @@ static func load_default() -> Content:
 	c.upgrades = _strip(_read("upgrades.json"))
 	c.marks = _strip(_read("marks.json"))
 	c.card_mods = _strip(_read("card_mods.json"))
+	c.tips = _strip(_read("tips.json"))
 	return c
 
 
