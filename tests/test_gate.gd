@@ -222,12 +222,14 @@ func test_watch_posts_take_gates_in_turn() -> void:
 	_fill(run, east, false)
 	var first := _gate(run)
 	var second := _gate(run)
+	# The attack comes in by the newer gate's side, so the first post leans that way.
+	w.wave_sides.assign([(w.buildings[second]["pos"] as Vector2).angle()])
 	check(run.build("watch_post"), "a first watch post")
 	var p1: Dictionary = w.buildings[-1]
 	check(run.build("watch_post"), "a second watch post")
 	var p2: Dictionary = w.buildings[-1]
-	check(_near(run, p1["pos"], w.buildings[first]["pos"]), "the first post guards the older gate")
-	check(_near(run, p2["pos"], w.buildings[second]["pos"]), "the second post goes to the other gate")
+	check(_near(run, p1["pos"], w.buildings[second]["pos"]), "the first post guards the gate the attack comes in by")
+	check(_near(run, p2["pos"], w.buildings[first]["pos"]), "the second post goes to the other gate")
 	for post: Dictionary in [p1, p2]:
 		check(not town.plots[post["plot"]]["lane"], "a post never stands in a lane")
 

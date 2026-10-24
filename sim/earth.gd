@@ -570,7 +570,7 @@ func _wake(ri: int, k: int, rng: SeededRng) -> String:
 					w.pathing.set_ground(i, Pathing.PLAIN)
 					w.pathing.traffic[i] = 0.0
 			for di in range(w.dens.size() - 1, -1, -1):
-				if not w.dens[di].get("camp", false) and _under_wake(w.dens[di]["pos"], entry):
+				if _under_wake(w.dens[di]["pos"], entry):
 					_swallow_den(di, true)
 			return "a seam to the %s swallows its lip" % where
 		"collide":
@@ -670,7 +670,12 @@ func _swallow_den(di: int, great := false) -> void:
 	# What the den held stays where it went under, for a hero to dig out.
 	_leave_find("hoard", w.dens[di]["pos"], great)
 	_feed_the_deep(int(w.run.mod("swallow_den_shells")), w.run.has_effect("swallow_item"))
-	w.run.tell("The earth swallows the %s, and everything in it." % w.content.world["dens"][w.dens[di]["type"]]["name"].to_lower())
+	if w.dens[di].get("camp", false):
+		# The war camp's raiders go down with it, and so do the spoils heroes would have won clearing it.
+		last["camp_swallowed"] = true
+		w.run.tell("The earth swallows the war camp, raiders, spoils and all.")
+	else:
+		w.run.tell("The earth swallows the %s, and everything in it." % w.content.world["dens"][w.dens[di]["type"]]["name"].to_lower())
 	for e in w.enemies:
 		if e.den_index == di:
 			e.alive = false

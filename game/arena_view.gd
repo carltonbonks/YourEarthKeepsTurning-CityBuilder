@@ -799,9 +799,11 @@ func _draw_earth() -> void:
 					draw_arc(at, 3.0, 0, TAU, 10, Color(colors["mark"], 0.35), 1.0)
 	# Cracks under what a full trench will swallow at the next turn.
 	var crack := Color(colors["crack"], 0.85)
-	for node in run.world.nodes:
-		if run.world.node_active(node) and earth.doomed(node["pos"]):
-			var c := _to_screen(_slid(node["pos"]))
+	var under: Array = run.world.nodes.filter(func(n: Dictionary) -> bool: return run.world.node_active(n)).map(func(n: Dictionary) -> Vector2: return n["pos"])
+	under.append_array(run.world.dens.map(func(d: Dictionary) -> Vector2: return d["pos"]))
+	for at: Vector2 in under:
+		if earth.doomed(at):
+			var c := _to_screen(_slid(at))
 			draw_polyline(PackedVector2Array([c + Vector2(-9, -3), c + Vector2(-4, 2), c + Vector2(0, -2), c + Vector2(5, 3), c + Vector2(9, -1)]), crack, 1.5)
 
 

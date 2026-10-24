@@ -1,5 +1,5 @@
 {
-	"_note": "Core balance numbers. Edit and reload; no code changes needed. Times are in seconds of game time. Gatherers plan each trip (sim/folk_ai.gd plan_trip): gather_trip_slack pads their walking estimate for detours, and gather_need_floor is how much they still value a good the town already has enough of (a full shortage counts 1). With no trip for a good the town is short of, townsfolk lend a hand at buildings (assist in buildings.json): assist_rate = how fast a helper works a workshop's craft, as a share of its work rate; assist_recheck = seconds a helper stays before looking for a trip again. A hero with no fight, errand or den to stalk on a quiet day drills drill_radius from the hearth for drill_xp_per_second XP (sim/hero_ai.gd). With a runners' hut standing, a hero in the wilds with no provision left sends for one once their energy is within supply_energy_margin of feeling tired, or their health within supply_heal_margin (a share of max HP) of falling back (sim/hero_ai.gd _call_for_supplies). A hero falling back hurt waits for the runner while no enemy is within supply_wait_safe.",
+	"_note": "Core balance numbers. Edit and reload; no code changes needed. Times are in seconds of game time. Gatherers plan each trip (sim/folk_ai.gd plan_trip): gather_trip_slack pads their walking estimate for detours, and gather_need_floor is how much they still value a good the town already has enough of (a full shortage counts 1). With no trip for a good the town is short of, townsfolk lend a hand at buildings (assist in buildings.json): assist_rate = how fast a helper works a workshop's craft, as a share of its work rate; assist_recheck = seconds a helper stays before looking for a trip again. A hero with no fight, errand or den to stalk on a quiet day drills drill_radius from the hearth for drill_xp_per_second XP (sim/hero_ai.gd). With a runners' hut standing, a hero in the wilds with no provision left sends for one once their energy is within supply_energy_margin of feeling tired, or their health within supply_heal_margin (a share of max HP) of falling back (sim/hero_ai.gd _call_for_supplies). A hero falling back hurt waits for the runner while no enemy is within supply_wait_safe. On the attack's dusk a bold hero waits for it meet_attack_at from the hearth on the way it comes in (over the near plate it crosses); attack_way_keep_off is how much gatherers mark down a node within attack_way_band radians of that way on the attack's day (sim/folk_ai.gd plan_trip).",
 	"rounds_to_win": 14,
 	"days_per_round": 3,
 	"day_seconds": 32,
@@ -99,6 +99,9 @@
 	"xp_per_level": 10,
 	"drill_xp_per_second": 0.05,
 	"drill_radius": 60,
+	"meet_attack_at": 300,
+	"attack_way_band": 0.5,
+	"attack_way_keep_off": 0.5,
 	"supply_energy_margin": 20,
 	"supply_heal_margin": 0.2,
 	"supply_wait_safe": 120,
