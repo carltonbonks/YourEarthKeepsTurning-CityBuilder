@@ -221,6 +221,37 @@ func test_a_venture_shows_its_dead_as_red_crosses() -> void:
 	screen.free()
 
 
+func test_two_picks_a_dawn_keeps_the_pick_open() -> void:
+	# Twin Fires and Antler Crown take two newcomers a dawn: after the first, the pick must show again
+	# (it used to hide, leaving neither the cards nor the Begin round button).
+	var screen: Control = load("res://game/main.tscn").instantiate()
+	screen.set("save_runs", false)
+	screen.call("_ready")
+	screen.call("_new_run", 4821)
+	var run: RunState = screen.get("run")
+	run.choose_traditions([])
+	run.call("_gain_relic", "antler_crown")
+	AutoPlayer.new().build(run)
+	screen.call("_begin_round")
+	var overlays: Overlays = screen.get("_overlays")
+	check_eq(run.phase, RunState.Phase.PICK, "the round opens on a dawn pick")
+	check_eq(run.picks_left, 2, "the crown gives two picks")
+	var first := -1
+	for i in run.pick_offer.size():
+		if run.pick_offer[i]["kind"] == "folk":
+			first = i
+			break
+	check(first >= 0, "a newcomer is on offer")
+	screen.call("_take_pick", first)
+	check_eq(run.phase, RunState.Phase.PICK, "the dawn waits for the second newcomer")
+	check(overlays.visible, "the dawn pick shows again for the second newcomer")
+	screen.call("_take_pick", 0)
+	check_eq(run.phase, RunState.Phase.SIM, "the day begins after the second pick")
+	check(not overlays.visible, "and the pick closes")
+	run.dispose()
+	screen.free()
+
+
 func test_a_pedlar_round_opens_on_the_pedlar_choice_after_the_relic() -> void:
 	# Every round ends on a relic pick, so the pedlar choice must show once the relic is taken
 	# (it used to be hidden, and starting the round quietly invited nobody).
