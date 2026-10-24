@@ -410,7 +410,7 @@ func test_stillstone_holds_the_near_ring() -> void:
 	check(earth.turn_of(0, 0, 1) != 0.0, "the near ring turns")
 	_give(run, "stillstone")
 	check_eq(earth.turn_of(0, 0, 1), 0.0, "and then it doesn't")
-	check(earth.turn_of(1, 0, 1) != 0.0, "the others still do")
+	check(earth.turn_of(2, 0, 1) != 0.0, "the others still do")
 	run.dispose()
 
 
@@ -429,25 +429,35 @@ func test_hungry_deep_pays_for_what_sinks() -> void:
 	run.dispose()
 
 
-func _earth_over_run(relic: String, key: String) -> int:
-	var run := _run(61823)
-	if relic != "":
-		_give(run, relic)
+## Seams of `kind` that woke over a run's turns, over a few seeds.
+func _wakes_over_runs(relic: String, kind: String) -> int:
 	var total := 0
-	for i in 13:
-		run.world.earth.shift()
-		for type: String in run.world.earth.last[key]:
-			total += int(run.world.earth.last[key][type])
-	run.dispose()
+	for seed_value in [61823, 4821, 777, 9001]:
+		var run := _run(seed_value)
+		if relic != "":
+			_give(run, relic)
+		for i in 13:
+			run.world.earth.shift()
+			total += run.world.earth.woken.filter(func(s: Dictionary) -> bool: return s["kind"] == kind).size()
+		run.dispose()
 	return total
 
 
-func test_rift_seed_grows_more() -> void:
-	check(_earth_over_run("rift_seed", "grown") > _earth_over_run("", "grown"), "more fresh ground over a run")
+func test_rift_seed_fills_rifts_faster_and_grows_more() -> void:
+	check(_wakes_over_runs("rift_seed", "rift") > _wakes_over_runs("", "rift"), "more rifts wake over a run")
+	var run := _run()
+	_give(run, "rift_seed")
+	var earth := run.world.earth
+	earth.rings[0]["kinds"][0] = "rift"
+	earth.rings[0]["pressure"][0] = int(run.content.plates["pressure"]["full"])
+	earth.shift()
+	check_eq(earth.events.filter(func(e: Dictionary) -> bool: return e["kind"] == "grew").size(),
+		int(run.content.plates["wake"]["rift_nodes"]) + 1, "a valley grows one more patch")
+	run.dispose()
 
 
-func test_ridgeheart_raises_more() -> void:
-	check(_earth_over_run("ridgeheart", "raised") > _earth_over_run("", "raised"), "more upthrust over a run")
+func test_ridgeheart_fills_colliding_seams_faster() -> void:
+	check(_wakes_over_runs("ridgeheart", "collide") > _wakes_over_runs("", "collide"), "more ridges heave up over a run")
 
 
 # --- Economy ----------------------------------------------------------------------------

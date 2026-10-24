@@ -627,10 +627,11 @@ func hovered(at: Vector2) -> Dictionary:
 	var seam: Dictionary = w.earth.seam_near(_to_world(at), 6.0 / _scale())
 	if not seam.is_empty():
 		return Tooltips.seam(run, seam)
-	if w.earth.raw_at(_to_world(at)) and w.pathing.ground[square] == Pathing.THICKET:
-		return Tooltips.earth(run, "raw")
 	if w.pathing.ground[square] != Pathing.PLAIN :
 		return Tooltips.ground(run, square)
+	var kind := w.earth.kind_at(_to_world(at))
+	if kind != "":
+		return Tooltips.plate(run, kind)
 	return {}
 
 
@@ -742,26 +743,69 @@ func _draw_preview() -> void:
 	draw_polyline(_closed(shape), Color(1.0, 0.9, 0.5, 0.55 + 0.45 * pulse), 2.5)
 
 
-## The earth plates: raw rifts, ridges, and faint lines for the ring edges and seams. The earth just shifts:
-## the map shows the land as it is, not what the next shift will do (Yusuf, 2026-10-20).
+## The earth plates: the near plates tinted faintly by kind, ridges, faint lines for the ring edges and seams,
+## each seam's pressure marks (a full one glows), and cracks under what a full trench will swallow. The map shows
+## the land as it is (Yusuf, 2026-10-20); a full seam's cracks are its one warning, drawn on the thing itself.
 func _draw_earth() -> void:
 	var earth := run.world.earth
 	if not earth.enabled():
 		return
 	var colors: Dictionary = run.content.plates["colors"]
-	for strip in earth.raw:
-		var ring: Dictionary = earth.rings[int(strip["ring"])]
-		draw_colored_polygon(_screen_poly(_sector(float(ring["r0"]), float(ring["r1"]), strip["a0"], strip["a1"])),
-			Color(colors["raw"], 0.85))
+	var near: Dictionary = earth.rings[0]
+	var near_seams: Array = near["seams"]
+	var slide := _slide_angle(0)
+	for k in near_seams.size():
+		var kind: String = near["plate_kinds"][k]
+		if kind == "":
+			continue
+		var a0 := float(near_seams[k]) + slide
+		var a1 := float(near_seams[(k + 1) % near_seams.size()]) + slide
+		draw_colored_polygon(_screen_poly(_sector(float(near["r0"]), float(near["r1"]), a0, a1)), Color(colors.get(kind, "#555555"), 0.26))
+		# Its name, faintly, across the plate's middle.
+		var mid := a0 + fposmod(a1 - a0, TAU) / 2.0
+		var label: String = String(earth.kind_def(kind)["name"]).to_upper()
+		var font := get_theme_default_font()
+		var at := _to_screen(Vector2.from_angle(mid) * (float(near["r0"]) + float(near["r1"])) / 2.0)
+		var width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+		draw_string(font, at - Vector2(width / 2.0, -4.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(colors.get(kind, "#888888")).lightened(0.45))
 	var cell := run.world.pathing.cell
 	for i in earth.ridge_cells():
 		_ground_square(run.world.pathing.center(i), cell * 0.55, Color(colors["ridge"]))
 	var faint := Color(colors["seam"], 0.3)
-	for ring in earth.rings:
-		draw_polyline(_closed(_ground_ring(Vector2.ZERO, float(ring["r0"]), 96)), faint, 1.0)
-		for a: float in ring["seams"]:
-			var dir := Vector2.from_angle(a)
-			draw_line(_to_screen(dir * float(ring["r0"])), _to_screen(dir * float(ring["r1"])), faint, 1.0)
+	var full := int(run.content.plates["pressure"]["full"])
+	for ri in earth.rings.size():
+		var ring: Dictionary = earth.rings[ri]
+		var r0 := float(ring["r0"])
+		var r1 := float(ring["r1"])
+		draw_polyline(_closed(_ground_ring(Vector2.ZERO, r0, 96)), faint, 1.0)
+		var turn := _slide_angle(ri)
+		for k in ring["seams"].size():
+			var dir := Vector2.from_angle(float(ring["seams"][k]) + turn)
+			var marks := int(ring["pressure"][k])
+			var line := Color(colors["full"], 0.75) if marks >= full else faint
+			draw_line(_to_screen(dir * r0), _to_screen(dir * r1), line, 2.0 if marks >= full else 1.0)
+			# Pressure marks: one dot each, a hollow one for each still to fill, at the seam's outer end.
+			for m in full:
+				var at := _to_screen(dir * (r1 - 14.0 - m * 12.0))
+				if m < marks:
+					draw_circle(at, 3.0, Color(colors["full"]) if marks >= full else Color(colors["mark"], 0.8))
+				else:
+					draw_arc(at, 3.0, 0, TAU, 10, Color(colors["mark"], 0.35), 1.0)
+	# Cracks under what a full trench will swallow at the next turn.
+	var crack := Color(colors["crack"], 0.85)
+	for node in run.world.nodes:
+		if run.world.node_active(node) and earth.doomed(node["pos"]):
+			var c := _to_screen(_slid(node["pos"]))
+			draw_polyline(PackedVector2Array([c + Vector2(-9, -3), c + Vector2(-4, 2), c + Vector2(0, -2), c + Vector2(5, 3), c + Vector2(9, -1)]), crack, 1.5)
+
+
+## How far ring ri is still drawn short of where it lies while the land slides into place after a turn.
+func _slide_angle(ri: int) -> float:
+	if _slide_from_ms < 0.0 or run.world.earth.last_turns.is_empty():
+		return 0.0
+	var t := clampf((Time.get_ticks_msec() - _slide_from_ms) / SLIDE_MS, 0.0, 1.0)
+	var ease_t := 1.0 - pow(1.0 - t, 3.0)
+	return -(1.0 - ease_t) * float(run.world.earth.last_turns[ri])
 
 
 ## Ground points outlining the strip of rings between radii r0 and r1, from angle a0 clockwise to a1.
@@ -780,10 +824,10 @@ func _sector(r0: float, r1: float, a0: float, a1: float) -> PackedVector2Array:
 ## geomancer's spell has just changed the land.
 func _watch_shift() -> void:
 	var w := run.world
-	var seen := [w.earth.shifts, w, w.earth.changes]
+	var seen := [w.earth.turned, w, w.earth.changes]
 	if seen == _shift_seen:
 		return
-	if _shift_seen[1] == w and w.earth.shifts > int(_shift_seen[0]):
+	if _shift_seen[1] == w and w.earth.turned > int(_shift_seen[0]):
 		_slide_from_ms = Time.get_ticks_msec()
 		_pulse_from_ms = _slide_from_ms
 	elif _shift_seen[1] == w and w.earth.changes > int(_shift_seen[2]):

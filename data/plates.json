@@ -1,40 +1,211 @@
 {
-	"_note": "The shifting earth (sim/earth.gd). Past the town the land is rings of earth plates, the cuts staggered ring to ring like bricks. Once between rounds every ring turns round the still town (everything nearer the hearth than the first ring's r0 never moves). Each ring runs from r0 to r1 and has plates plates; turn = degrees the whole ring turns each shift (positive is clockwise on screen); sway = how far each plate's own speed swings either way, in degrees a shift, following a slow wave of sway_period_min to sway_period_max shifts (rolled per plate from the seed), so a seam closes for a few rounds and then opens. Where a plate catches the one ahead the seam closes: each seam is rolled once per run as subducting (subduct_share of seams: one plate dives and what sits on its edge is swallowed; a swallowed resource node turns to embers, a den is swallowed with its monsters, paving is refunded) or colliding (a ridge rises along the seam: solid ground ridge_half_width either side, with a pass of pass_width in the middle; it grows one step each colliding shift and wears down one step each other shift; once it is upthrust_height steps high it raises one upthrust node, while fewer than upthrust_cap upthrust nodes stand on the map; upthrust = node type by age). Where a plate pulls away the seam opens a rift: the new strip is raw ground (walked at the thicket speed) until the next shift, and a rift at least rift_min_degrees wide grows a fresh node with rift_node_chance, a type from the ring's rift_nodes (none in the wilds), starting at rift_node_share of full, while the map has fewer than rift_node_cap times that type's starting count. Each shift one seam wakes, the one that closes or opens furthest (its degrees times its ring's wake_weight and its kind's weight in wake.weights; a rift only in a ring with rift_nodes), and does something big (wake): a waking subducting seam swallows every node and den on its diving side within swallow_band units of it; a waking colliding seam raises its ridge to upthrust_height at once and breaks open an upthrust node holding rich times the usual amount (past upthrust_cap); a waking rift opens a valley of rift_nodes fresh nodes, each rift_share full, past rift_node_cap. Seams closing or opening by less than quiet_degrees do nothing. min_plate_degrees: a plate never shrinks below this (the seam waits instead). embers = the node type a swallowed node becomes. spells = what a Geomancer's lodge (buildings.json \"spells\") can work on: once it stands and has no spell under way, each dawn offers one card per spell beside the newcomers, and taking one is instead of a newcomer (RunState.cast_spell); the spell takes nights dawns to finish, then happens at once (Earth.finish_spell). quicken: a random seam in one of rings (ring indexes) grows a valley of valley_nodes fresh nodes from the ring's rift_nodes, or, in a ring with none, breaks open an upthrust node holding rich times the usual amount with starstone beside it. ridge: a ridge rises in the near ring at r, length units long and half_width either side of r, facing the warned attack (blocking raiders and your own people alike, with no pass), sprouts one node of each sprouts type on the town side, turns with the near ring and wears away after lasts turns of the earth. sink_den: the earth swallows the den the warned attack marches from (else the nearest), with its monsters, leaving its hoard for heroes to dig out. finds = earth finds (world.json nodes with find): starstone = the node a waking colliding seam leaves beside its rich vein, hoard = the node a sunk den leaves where it went under; heroes dig them out for an item (see find_* in data/balance.json). enabled = false keeps the earth still (for tests that need a fixed map). colors = how the map draws seams (faintly), ridges and raw ground; the map never shows what the next shift will do; texts = hover text for seams, ridges and raw ground. rarity on a spell (data/rarity.json): the colour of its dawn card.",
+	"_note": "The shifting earth (sim/earth.gd), the earth dial (Yusuf, 2026-10-24). Past the town the land is rings of earth plates, the cuts staggered ring to ring like bricks. Once between rounds the rings click round the still town (everything nearer the hearth than the first ring's r0 never moves): each ring turns by one plate's width (360 / plates degrees) every click_every turns of the earth, dir 1 clockwise on screen and -1 the other way. The whole ring turns as one, so plates keep their places in it. The near ring's plates each have a kind (near_kinds, dealt one each per run in a seeded order): the ground the night's attack has to cross on its way in from its den. walk = how fast anyone walks over it (x), raider_walk = how fast raiders walk over it (x, on top of walk), sight = how far the hearth and towers see raiders standing on it (x their range), regrow = share of full that plant-tagged nodes on it regrow each dawn, rise_chance = chance a raider who falls on it gets up again once at rise_hp of its health, grave_goods = chance a hero who kills a raider on it digs up an item, grows = what a waking rift there and the geomancer's valleys grow on it; gives and takes = what the plate's hover and the Feed card say, short = the threat card's few words. Each seam between plates has a kind rolled once per run (seam_shares; a rift only where something grows: the near ring by its plates' kinds, other rings by rift_nodes) and pressure marks: each turn of the earth adds pressure.per_turn marks to seams chosen at random (weight = the ring's wake_weight x the kind's weight in pressure.weights), and a seam with pressure.full marks wakes at the next turn and does its big thing (wake): a subducting seam swallows every node and den on its diving side within swallow_band units of it (a swallowed resource turns to embers, a den goes under with its monsters and leaves its hoard, paving is refunded); a colliding seam raises a ridge (solid, with a pass of pass_width in the middle, ridge_half_width either side) that stands ridge_turns turns and breaks open an upthrust node of the age's stone (upthrust) holding rich times the usual amount with starstone beside it; a rift opens a valley of rift_nodes fresh nodes, each rift_share full. A full seam warns a turn ahead: what its wake will take shows cracks, gatherers strip it first and heroes dig out finds there first (crack_gather x a trip's worth). feed = the Feed the earth card (build phase, once a round): cast stone into the near seam and the near ring turns one more plate now; it costs cost stone plus step more for each time the town fed the earth before this run, times geomancer_share while a Geomancer's lodge stands. spells = what a Geomancer's lodge (buildings.json \"spells\") can work on: once it stands and has no spell under way, each dawn offers one card per spell beside the newcomers, and taking one is instead of a newcomer (RunState.cast_spell); the spell takes nights dawns to finish, then happens at once (Earth.finish_spell). hold: the near ring skips its next turn (a Feed still turns it). wake: the seam with the most pressure marks (nearest ring first on a tie) wakes now. ridge: a ridge rises in the near ring at r, length units long and half_width either side of r, facing the warned attack (blocking raiders and your own people alike, with no pass), sprouts one node of each sprouts type on the town side, turns with the near ring and wears away after lasts turns of the earth. sink_den: the earth swallows the den the warned attack marches from (else the nearest), with its monsters, leaving its hoard for heroes to dig out. outpost_ride: an outpost (buildings.json \"outpost\") that has stood through a turn of the earth brings in bonus more each dawn for every turn it has stood, up to cap; wrecked or moved, it starts again. finds = earth finds (world.json nodes with find): starstone = the node a waking colliding seam leaves beside its rich vein, hoard = the node a sunk den leaves where it went under; heroes dig them out for an item (see find_* in data/balance.json). enabled = false keeps the earth still (for tests that need a fixed map). colors = how the map draws seams (faintly), pressure marks, cracks, ridges and the near plates' kinds; texts = hover text. rarity on a spell (data/rarity.json): the colour of its dawn card.",
 	"enabled": true,
 	"rings": [
-		{"name": "Near", "r0": 280, "r1": 420, "plates": 4, "turn": 8, "sway": 6, "wake_weight": 1.5, "rift_nodes": ["berries", "brush", "grove"]},
-		{"name": "Middle", "r0": 420, "r1": 580, "plates": 5, "turn": -10, "sway": 5, "wake_weight": 1.2, "rift_nodes": ["grove", "rocks", "brush"]},
-		{"name": "Far", "r0": 580, "r1": 800, "plates": 6, "turn": 12, "sway": 4, "wake_weight": 1.0, "rift_nodes": []}
+		{
+			"name": "Near",
+			"r0": 280,
+			"r1": 420,
+			"plates": 4,
+			"click_every": 1,
+			"dir": 1,
+			"wake_weight": 1.5,
+			"rift_nodes": []
+		},
+		{
+			"name": "Middle",
+			"r0": 420,
+			"r1": 580,
+			"plates": 5,
+			"click_every": 2,
+			"dir": -1,
+			"wake_weight": 1.2,
+			"rift_nodes": [
+				"grove",
+				"rocks",
+				"brush"
+			]
+		},
+		{
+			"name": "Far",
+			"r0": 580,
+			"r1": 800,
+			"plates": 6,
+			"click_every": 1,
+			"dir": -1,
+			"wake_weight": 1.0,
+			"rift_nodes": []
+		}
 	],
-	"sway_period_min": 6,
-	"sway_period_max": 10,
-	"subduct_share": 0.5,
-	"quiet_degrees": 1.0,
-	"min_plate_degrees": 24,
+	"near_kinds": {
+		"fen": {
+			"name": "Fen",
+			"walk": 0.7,
+			"grows": [
+				"brush",
+				"berries"
+			],
+			"tags": [
+				"wet"
+			],
+			"gives": "Raiders wade at 70% speed, so the hearth and towers get more shots.",
+			"takes": "Your gatherers wade through it too.",
+			"short": "raiders wade slowly under your towers"
+		},
+		"greenwood": {
+			"name": "Greenwood",
+			"sight": 0.6,
+			"regrow": 0.1,
+			"grows": [
+				"grove",
+				"berries"
+			],
+			"tags": [
+				"plant"
+			],
+			"gives": "Groves and berries on it regrow each dawn.",
+			"takes": "Raiders come out of cover close to town: the hearth and towers see them at 60% of their range.",
+			"short": "raiders come out of cover close to town"
+		},
+		"stonefield": {
+			"name": "Stonefield",
+			"sight": 1.25,
+			"raider_walk": 1.2,
+			"grows": [
+				"rocks"
+			],
+			"tags": [
+				"stone"
+			],
+			"gives": "Open ground: the hearth and towers see raiders on it from a quarter further off.",
+			"takes": "Hard ground: raiders march over it 20% faster.",
+			"short": "open ground, but raiders march fast"
+		},
+		"barrow": {
+			"name": "Barrow",
+			"rise_chance": 0.25,
+			"rise_hp": 0.5,
+			"grave_goods": 0.12,
+			"grows": [
+				"brush"
+			],
+			"tags": [
+				"grave"
+			],
+			"gives": "A hero who kills a raider on it may dig up grave goods (an item).",
+			"takes": "A raider who falls on it may get up again, once.",
+			"short": "the fallen may get up again"
+		}
+	},
+	"seam_shares": {
+		"subduct": 0.4,
+		"collide": 0.35,
+		"rift": 0.25
+	},
+	"pressure": {
+		"full": 3,
+		"per_turn": 3,
+		"weights": {
+			"subduct": 1.2,
+			"collide": 1.0,
+			"rift": 0.8
+		},
+		"crack_gather": 2.0
+	},
+	"ridge_turns": 3,
+	"feed": {
+		"name": "Feed the earth",
+		"cost": 6,
+		"step": 4,
+		"geomancer_share": 0.5,
+		"text": "Cast stone into the near seam. The hungry ring turns one plate to swallow it."
+	},
+	"outpost_ride": {
+		"bonus": 1,
+		"cap": 4
+	},
 	"ridge_half_width": 7,
 	"pass_width": 36,
-	"upthrust_height": 2,
-	"upthrust_cap": 3,
-	"upthrust": {"neolithic": "obsidian", "bronze": "cassiterite", "medieval": "obsidian"},
-	"rift_min_degrees": 4,
-	"rift_node_chance": 0.1,
-	"rift_node_share": 0.5,
-	"rift_node_cap": 1.5,
-	"wake": {"weights": {"subduct": 1.4, "collide": 1.0, "rift": 0.7}, "swallow_band": 120, "rich": 2.0, "rift_nodes": 2, "rift_share": 0.6},
-	"spells": {
-		"quicken": {"rarity": "blue", "name": "Quicken a far seam", "nights": 1, "rings": [1, 2], "valley_nodes": 2, "rich": 2.0, "text": "A far seam, wherever the earth wills, wakes: a valley of fresh growth, or a rich vein with starstone beside it."},
-		"ridge": {"rarity": "yellow", "name": "Raise a near ridge", "nights": 2, "r": 310, "length": 180, "half_width": 12, "lasts": 3, "sprouts": ["rocks", "grove"], "text": "A ridge rises near town across the attack's way. Raiders must go round it, and so must your gatherers. Stone and timber sprout by it. Lasts 3 rounds."},
-		"sink_den": {"rarity": "orange", "name": "Sink a den", "nights": 3, "text": "The earth swallows the den the attack comes by, monsters and all, leaving its hoard for a bold hero to dig out."}
+	"upthrust": {
+		"neolithic": "obsidian",
+		"bronze": "cassiterite",
+		"medieval": "obsidian"
 	},
-
-	"finds": {"starstone": "starstone", "hoard": "sunk_hoard"},
+	"wake": {
+		"swallow_band": 120,
+		"rich": 2.0,
+		"rift_nodes": 2,
+		"rift_share": 0.6
+	},
+	"spells": {
+		"hold": {
+			"rarity": "blue",
+			"name": "Hold the near ring",
+			"nights": 1,
+			"text": "The near ring stays where it is at the next turn of the earth, and tonight's ground stays at your gates. Feeding the earth still turns it."
+		},
+		"wake": {
+			"rarity": "blue",
+			"name": "Wake a seam",
+			"nights": 1,
+			"text": "The fullest seam wakes now: a trench swallows its lip, a ridge breaks open rare stone, a rift grows a valley."
+		},
+		"ridge": {
+			"rarity": "yellow",
+			"name": "Raise a near ridge",
+			"nights": 2,
+			"r": 310,
+			"length": 180,
+			"half_width": 12,
+			"lasts": 3,
+			"sprouts": [
+				"rocks",
+				"grove"
+			],
+			"text": "A ridge rises near town across the attack's way. Raiders must go round it, and so must your gatherers. Stone and timber sprout by it. Lasts 3 rounds."
+		},
+		"sink_den": {
+			"rarity": "orange",
+			"name": "Sink a den",
+			"nights": 3,
+			"text": "The earth swallows the den the attack comes by, monsters and all, leaving its hoard for a bold hero to dig out."
+		}
+	},
+	"finds": {
+		"starstone": "starstone",
+		"hoard": "sunk_hoard"
+	},
 	"embers": "embers",
-	"colors": {"seam": "#5d5a48", "ridge": "#8f7d62", "raw": "#3b2b1e"},
+	"colors": {
+		"seam": "#5d5a48",
+		"ridge": "#8f7d62",
+		"mark": "#d8c08a",
+		"full": "#e07050",
+		"crack": "#ff7a5a",
+		"fen": "#5f7f63",
+		"greenwood": "#3f6b45",
+		"stonefield": "#9a978c",
+		"barrow": "#6d5b77"
+	},
 	"texts": {
-		"subduct": {"name": "Subducting seam", "text": "One plate dives under the other here. When it closes, what sits on the diving plate's edge sinks: resources turn to embers, dens go under."},
-		"collide": {"name": "Colliding seam", "text": "The plates ride up into each other here. When it closes, everything is pushed to the seam and a ridge rises; a tall ridge breaks open rare stone."},
-		"rift": {"name": "Rift", "text": "The plates pull apart here. The new ground is raw and slow for a round, and fresh plants often take root in it."},
-		"ridge": {"name": "Ridge", "text": "Rock pushed up where two plates collide. Nobody can cross it except at the pass in the middle. It wears down when the plates stop pushing."},
-		"raw": {"name": "Raw ground", "text": "Fresh earth from a rift: everyone walks through it slowly until the next shift."}
+		"subduct": {
+			"name": "Subducting seam",
+			"text": "One plate dives under the other here. When the seam fills and wakes, what sits on the diving side sinks: resources turn to embers, dens go under."
+		},
+		"collide": {
+			"name": "Colliding seam",
+			"text": "The plates grind into each other here. When the seam fills and wakes, a ridge rises and breaks open rare stone, with starstone beside it."
+		},
+		"rift": {
+			"name": "Rift",
+			"text": "The plates pull apart here. When the seam fills and wakes, a valley of fresh growth opens."
+		},
+		"ridge": {
+			"name": "Ridge",
+			"text": "Rock pushed up where two plates collide. Nobody can cross it except at the pass in the middle. It wears away after a few turns of the earth."
+		},
+		"pressure": {
+			"text": "Each turn of the earth fills a few seams. A full seam wakes at the next turn; what it will take shows cracks."
+		}
 	}
 }

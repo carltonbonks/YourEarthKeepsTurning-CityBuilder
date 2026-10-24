@@ -1,7 +1,7 @@
 class_name EarthReport
 extends RefCounted
 ## What the earth's last turn did, in a few short lines the threat card shows while building, and where the
-## attack's ways lie now that the dens have moved. It reports what happened and never what comes next.
+## attack's ways lie now that the rings have clicked round: which den it comes by and which near plate it crosses.
 
 const MAX_LINES := 4
 
@@ -12,15 +12,17 @@ static func headline(run: RunState) -> String:
 	if earth.shifts == 0 or earth.last.is_empty():
 		return ""
 	if earth.woke.is_empty():
-		return "The earth turned quietly."
+		return "The earth turned quietly." if not bool(earth.last.get("held", false)) else "The earth turned; the near ring held still."
 	var where := World.compass(float(earth.woke["angle"]))
+	var more := earth.woken.size() - 1
+	var also := "" if more <= 0 else " (and %d more seam%s woke)" % [more, "" if more == 1 else "s"]
 	match earth.woke["kind"]:
 		"subduct":
-			return "The earth turned: a seam swallowed land to the %s." % where
+			return "The earth turned: a seam swallowed land to the %s%s." % [where, also]
 		"collide":
-			return "The earth turned: plates crashed together to the %s." % where
+			return "The earth turned: a ridge heaved up to the %s%s." % [where, also]
 		_:
-			return "The earth turned: the ground split open to the %s." % where
+			return "The earth turned: the ground split into a valley to the %s%s." % [where, also]
 
 
 ## What the turn did, the town's own losses first.
@@ -55,7 +57,10 @@ static func lines(run: RunState) -> Array[String]:
 			grown[_node_name(c, ev["type"]).to_lower()] = true
 	var grew := earth.events.filter(func(ev: Dictionary) -> bool: return ev["kind"] == "grew").size()
 	if grew > 0:
-		out.append("%d fresh patch%s grew in the rifts (%s)." % [grew, "" if grew == 1 else "es", ", ".join(grown.keys())])
+		out.append("%d fresh patch%s grew in a valley (%s)." % [grew, "" if grew == 1 else "es", ", ".join(grown.keys())])
+	var full := earth.full_seams().size()
+	if full > 0:
+		out.append("%d seam%s full: %s at the next turn. Cracks show what a trench will take." % [full, " is" if full == 1 else "s are", "it wakes" if full == 1 else "they wake"])
 	return out.slice(0, MAX_LINES)
 
 
@@ -67,17 +72,19 @@ static func ways(run: RunState) -> Array[String]:
 		var type: String = w.wave_side_dens[i] if i < w.wave_side_dens.size() else ""
 		var where := World.compass(w.wave_sides[i])
 		if type == "":
-			out.append("From the %s, over open country." % where)
+			out.append("From the %s, over open country%s." % [where, _across(run, w.wave_sides[i])])
 			continue
-		var line := "From the %s, by the %s's way" % [where, _den_name(run.content, type).to_lower()]
-		var turned := 0.0
-		for den in w.dens:
-			if den["type"] == type:
-				turned = float(den.get("turned", 0.0))
-		if roundi(absf(turned)) > 0:
-			line += ": the earth carried it %d° round" % roundi(absf(turned))
-		out.append(line + ".")
+		out.append("From the %s, by the %s's way%s." % [where, _den_name(run.content, type).to_lower(), _across(run, w.wave_sides[i])])
 	return out
+
+
+## ", across the Fen: raiders wade slowly under your towers" for the near plate an attack from angle a crosses.
+static func _across(run: RunState, a: float) -> String:
+	var kind := run.world.earth.crossing(a)
+	if kind == "":
+		return ""
+	var kd := run.world.earth.kind_def(kind)
+	return ", across the %s: %s" % [kd["name"], kd["short"]]
 
 
 static func _den_name(c: Content, type: String) -> String:

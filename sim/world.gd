@@ -309,6 +309,7 @@ func _dawn() -> void:
 		if regrows(node):
 			node["amount"] = mini(int(node["max"]), int(node["amount"]) + content.int_num("node_regrow_per_day"))
 	_tend_nodes()
+	earth.dawn()
 	pathing.wear_trails()
 	town.patch_walls()
 	enemy_ai.mend_towers()
@@ -535,7 +536,7 @@ func walk_toward(unit: Unit, goal: Vector2, close := 2.0) -> bool:
 	var to_goal := goal - unit.pos
 	if to_goal.length() <= close:
 		return true
-	var step_len := unit.speed * dt * pathing.speed_at(unit.pos, unit.is_enemy())
+	var step_len := unit.speed * dt * pathing.speed_at(unit.pos, unit.is_enemy()) * earth.walk_factor(unit.pos, unit.is_enemy())
 	if unit.escorted:
 		step_len *= 1.0 + float(content.townsfolk["warrior"]["escort_speed"])
 	var here := pathing.index_of(unit.pos)
@@ -632,6 +633,14 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 			victim.target_tower = -1
 			victim.grudge_until = time + 8.0
 		return
+	# A raider who falls on a Barrow may get up again, once (data/plates.json near_kinds).
+	if victim.is_enemy() and not victim.rose_again and not victim.risen and earth.kind_at(victim.pos) != "":
+		var kd := earth.kind_def(earth.kind_at(victim.pos))
+		if rng.randf() < float(kd.get("rise_chance", 0.0)):
+			victim.rose_again = true
+			victim.hp = victim.max_hp * float(kd.get("rise_hp", 0.5))
+			run.record.note_count("earth_risen", 1, victim.type_id)
+			return
 	victim.alive = false
 	victim.hp = 0.0
 	if victim.risen:
@@ -679,6 +688,12 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 	hero_ai.count_trophy(attacker)
 	market.pay_prizes(attacker, victim)
 	hero_ai.maybe_drop(attacker, victim)
+	# A hero who kills on a Barrow may dig up grave goods.
+	var grave := float(earth.kind_def(earth.kind_at(victim.pos)).get("grave_goods", 0.0))
+	if grave > 0.0 and rng.randf() < grave:
+		hero_ai.give_item(attacker, Loot.roll(content, rng, run.round_number, run.age))
+		run.record.note_count("grave_goods", 1)
+		run.tell("%s turns up grave goods on the barrow." % attacker.display_name)
 	if victim.is_boss:
 		run.tell("%s slays %s!" % [attacker.display_name, victim.display_name])
 

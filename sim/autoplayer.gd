@@ -51,6 +51,12 @@ var rows := true
 ## Orders the runners' hut once the provisions stall and smoke hut stand and it has two heroes (the styles that build
 ## them: market, bronze, medieval). balance_run.gd: runners=0 never does.
 var runners := true
+## Feeds the earth when one more click of the near ring puts the night's attack on better ground (FEED_GROUND),
+## keeping feed_reserve stone after paying, and never while saving for its age-up. balance_run.gd: feed=0 never does.
+var feed := true
+var feed_reserve := 10
+## How much it likes the attack to cross each near plate's kind: wading raiders under the towers best, cover worst.
+const FEED_GROUND := {"fen": 2, "stonefield": 1, "barrow": 0, "greenwood": -1}
 ## Rerolls the blueprint offers once a round when it has at least this many shells and no offer is wanted.
 var redraw_above := 40
 ## Buildings it tried to order this build phase without a blueprint for them, most wanted first.
@@ -89,6 +95,24 @@ func build(run: RunState) -> void:
 			run.hand.redraw()
 		_draft(run)
 		_build_pass(run)
+	_feed_earth(run)
+
+
+## Feeds the earth when the next plate along is enough better ground for the night's attack to cross.
+func _feed_earth(run: RunState) -> void:
+	if not feed or not run.can_feed_earth():
+		return
+	var saving_for := "stone_keep" if style == "medieval" else ("bronze_moot" if style in ["bronze", "medieval"] else "")
+	if saving_for != "" and run.world.count_buildings(saving_for, false) == 0 and run.hand.offers(saving_for):
+		return
+	var earth := run.world.earth
+	var now := 0
+	var then := 0
+	for a: float in run.world.wave_sides:
+		now += int(FEED_GROUND.get(earth.crossing(a), 0))
+		then += int(FEED_GROUND.get(earth.crossing(a, 1), 0))
+	if then - now >= 2 and int(run.stock["stone"]) - int(earth.feed_cost()["stone"]) >= feed_reserve:
+		run.feed_earth()
 
 
 ## The first building it wished for that is on offer ("" if none).
@@ -441,14 +465,19 @@ func venture_score(run: RunState, card: Dictionary) -> float:
 
 ## One spell a dawn is worth a newcomer: a ridge on the round's first dawn when the attack looks even or worse (it rises
 ## before night 3), else sinking the den the attack comes by from round 4 (done by the next round's first dawn), else
-## quickening a far seam.
+## holding the near ring when the attack crosses good ground (FEED_GROUND), else waking the fullest seam.
 func spell_score(run: RunState, card: Dictionary) -> float:
 	var ratio := Power.wave(run.content, run.next_wave) / maxf(1.0, float(Power.town(run.world)["total"]))
-	var want := "quicken"
+	var want := "wake"
+	var ground := 0
+	for a: float in run.world.wave_sides:
+		ground += int(FEED_GROUND.get(run.world.earth.crossing(a), 0))
 	if run.world.day_index() == 0 and ratio > 0.9:
 		want = "ridge"
 	elif run.round_number >= 4 and run.world.dens.any(func(d: Dictionary) -> bool: return not d.get("camp", false)):
 		want = "sink_den"
+	elif ground >= 2 and not run.world.earth.hold_near:
+		want = "hold"
 	return 4.5 if card["spell"] == want else -10.0
 
 

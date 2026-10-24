@@ -498,6 +498,8 @@ func begin_round() -> void:
 	traditions_settled = true
 	if not pedlar_settled:
 		choose_pedlar("")
+	if world.earth.enabled():
+		record.note_value("crossing", world.wave_sides.map(func(a: float) -> String: return world.earth.crossing(a)))
 	world.start_round()
 	if pedlar != "":
 		world.pedlar.open(pedlar_choice())
@@ -567,6 +569,30 @@ func buy_tools(id: String) -> bool:
 		world.folk_ai.apply_folk_stats(u)
 	record.note_action({"kind": "tools", "tools": id})
 	tell("%s for the %ss." % [def["name"], content.townsfolk[def["role"]]["name"].to_lower()])
+	return true
+
+
+## True while building when the town can Feed the earth: once a round, for its stone (Earth.feed_cost).
+func can_feed_earth() -> bool:
+	var earth := world.earth
+	return phase == Phase.BUILD and earth.enabled() and not has_effect("still_ring") and earth.fed_round != round_number \
+		and can_afford(earth.feed_cost())
+
+
+## Feeds the earth: stone into the near seam, and the near ring turns one more plate now, so the night's attack
+## crosses the next plate along.
+func feed_earth() -> bool:
+	if not can_feed_earth():
+		return false
+	var cost := world.earth.feed_cost()
+	var before := world.wave_sides.map(func(a: float) -> String: return world.earth.crossing(a))
+	for r: String in cost:
+		stock[r] = int(stock[r]) - int(cost[r])
+	world.earth.feed()
+	var after := world.wave_sides.map(func(a: float) -> String: return world.earth.crossing(a))
+	record.note_action({"kind": "feed_earth", "cost": cost, "from": before, "to": after})
+	var names := after.map(func(k: String) -> String: return String(world.earth.kind_def(k).get("name", "open ground")))
+	tell("The town feeds the earth %d stone. The near ring turns: the attack will cross the %s." % [int(cost.get("stone", 0)), " and the ".join(names)])
 	return true
 
 

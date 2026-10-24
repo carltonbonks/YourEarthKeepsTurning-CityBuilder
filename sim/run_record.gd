@@ -123,7 +123,13 @@ extends RefCounted
 ##     rarity, in "cards" order, only when one rolled above white); a drafted blueprint's entry in "blueprints" and an
 ##     "upgrade" action gain "roll" and "mods" when it rolled; "card_mods_taken" counts blueprint and upgrade
 ##     modifiers and "card_mods_fired" counts twin_built's free building.
-const RECORD_FORMAT := 47
+## 48: the earth dial (Yusuf, 2026-10-24): the rings click a whole plate; per round "crossing" (per warned side, the
+##     near plate's kind the attack crosses: an id from data/plates.json near_kinds) as the round begins; a
+##     "feed_earth" action ({"kind": "feed_earth", "cost", "from", "to": crossings before and after}); a round's
+##     "shift" drops "rifts" and gains "wakes" (seams that woke) and "held" (the geomancer held the near ring);
+##     per round "earth_risen" (enemy type -> raiders who got up again on a Barrow) and "grave_goods" (items heroes dug
+##     up there), each only when it happened. The quicken spell is gone; "hold" and "wake" are new spell ids.
+const RECORD_FORMAT := 48
 
 var run: RunState
 ## Finished rounds, oldest first.

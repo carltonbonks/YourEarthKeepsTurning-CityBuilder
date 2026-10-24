@@ -9,7 +9,7 @@
 			{"when": "3 · Days and nights", "name": "Watch", "text": "Townsfolk gather and craft, heroes hunt in the wilds. The third night brings the attack the card on the right warns of. Hold, and you pick a relic."}
 		],
 		"rounds_line": "Survive %d rounds. Raise the next age when you're ready: it costs a lot, and pays back.",
-		"earth_line": "Between rounds the earth turns.",
+		"earth_line": "Between rounds the earth clicks round, and the attack crosses different ground. Feed it stone to turn it further.",
 		"ages_line": "Neolithic, then Bronze, then Medieval, at your pace",
 		"closing": "Try things. If the village falls, it is one more human story lost to time.",
 		"lost_line": "One more human story lost to time. Try something different next run."
@@ -21,7 +21,7 @@
 		"first_hero": {"title": "A hero", "at": "top", "text": "Heroes cost shells and choose their own fights, gear and beds. You can only tempt them."},
 		"first_night": {"title": "First night", "at": "map", "text": "Space pauses. Point at anyone to see what they're up to."},
 		"first_relic": {"title": "First relic", "at": "top", "text": "Relics last the whole run. Look for ones that suit your town."},
-		"first_earth": {"title": "The earth turned", "at": "threat", "text": "The land beyond the town shifted. The attack card says what moved."},
+		"first_earth": {"title": "The earth turned", "at": "threat", "text": "The rings clicked round a plate. The attack card says which ground the attack crosses now; Feed the earth in the hand turns it one more."},
 		"first_age": {"title": "A new age", "at": "hand", "text": "Raising an age costs a lot, but opens a new ring of plots and new buildings."}
 	}
 }
