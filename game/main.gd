@@ -176,9 +176,13 @@ func _take_pick(index: int) -> void:
 	run.choose_pick(index)
 	_overlays.hide()
 	_refresh()
-	# A venture holds the day for a moment to show who never came home.
+	# A venture holds the day for a moment to show who never came home; carrying on from it shows what
+	# the run waits on next.
 	if not run.last_venture.is_empty():
 		_overlays.show_venture_result()
+	else:
+		# A second newcomer the same dawn (Twin Fires, Antler Crown) keeps the dawn pick open.
+		_overlays.show_for_phase()
 
 
 func _pick_relic(relic_id: String) -> void:
