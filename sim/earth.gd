@@ -561,7 +561,7 @@ func _open_rifts(plans: Array, rng: SeededRng) -> void:
 
 
 ## The seam that wakes this shift (see "wake" in data/plates.json): the one that closes or opens furthest,
-## weighted by its ring's wake_weight and its kind's weight; a rift only where its ring grows something. {} when none moves.
+## weighted by its ring's wake_weight (the nearest ring's raised by near_wake) and its kind's weight; a rift only where its ring grows something. {} when none moves.
 func _woken(plans: Array) -> Dictionary:
 	var best := {}
 	var best_score := 0.0
@@ -572,6 +572,9 @@ func _woken(plans: Array) -> Dictionary:
 			if not res["kind"] in ["subduct", "collide", "rift"] or (res["kind"] == "rift" and rd["rift_nodes"].is_empty()):
 				continue
 			var score := float(res["degrees"]) * float(rd.get("wake_weight", 1.0)) * float(def["wake"]["weights"][res["kind"]])
+			# A Wellspring (data/card_mods.json) draws the waking to the ring nearest the town.
+			if ri == 0:
+				score *= 1.0 + w.run.mod("near_wake")
 			if score > best_score:
 				best_score = score
 				best = {"ring": ri, "seam": k, "kind": res["kind"], "angle": float(plans[ri]["seams"][k])}

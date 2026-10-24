@@ -16,12 +16,13 @@ extends SceneTree
 ## ageup=1 plays on from that round until the town reaches a new age and shows the celebration (style=bronze or
 ## medieval gets there); levelup=1 levels up the first hero so the halo shows.
 ## deals=<id,id,...> lays out those caravan trade cards (data/trades.json) in the build hand; id:roll:mod:mod rolls one.
+## drafts=<type:roll:mod,...> lays out those blueprint offers in the draft; upgrade.<id>:roll:mod offers an upgrade.
 ## rolled=1 (with pick=1) deals rolled townsfolk cards: a magic warrior, a powerful forager and a mythic tribesperson;
 ## rolled=2 a magic family, a mythic venture and a powerful hero.
 ## size=<W>x<H> sets the window size (default 1600x1000), to check the screen layout at other sizes.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "rolled": "0", "size": "1600x1000"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "size": "1600x1000"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -122,6 +123,25 @@ func _init() -> void:
 				offer["roll"] = parts[1]
 				offer["boons"] = Array(parts.slice(2))
 			run.caravan.offers.append(offer)
+	if args["drafts"] != "" and run.phase == RunState.Phase.BUILD:
+		run.hand.cards.clear()
+		run.hand.upgrade_offers.clear()
+		run.hand.rows.clear()
+		run.hand.picks = maxi(1, run.hand.picks)
+		for spec in args["drafts"].split(","):
+			var parts: PackedStringArray = spec.split(":")
+			var offer := {}
+			if parts[0].begins_with("upgrade."):
+				offer = {"upgrade": parts[0].trim_prefix("upgrade.")}
+			else:
+				offer = {"building": parts[0], "need": run.hand.need(parts[0])}
+			if parts.size() > 2:
+				offer["roll"] = parts[1]
+				offer["boons"] = Array(parts.slice(2))
+			if offer.has("upgrade"):
+				run.hand.upgrade_offers.append(offer)
+			else:
+				run.hand.cards.append(offer)
 	main._refresh()
 	main._arena.celebrations.update(run, Time.get_ticks_msec())
 	if args["ageup"] == "1":

@@ -4,8 +4,9 @@ extends RefCounted
 ## apart from how often its kind is offered, and a rolled card carries modifiers. Blue: one mark (data/marks.json).
 ## Yellow: a mark and one or two powerful modifiers (data/card_mods.json). Orange: one transmutation, a trade-off
 ## that bends a rule. Every dawn card (townsfolk, heroes, families, ventures, spells) and the caravan's trade cards
-## roll; the card keeps "roll", "mark" (townsfolk only) and "boons" (card modifier ids). A legend is the orange roll
-## of a hero card.
+## roll, and so do blueprint and upgrade offers in the build draft; the card keeps "roll", "mark" (townsfolk only) and
+## "boons" (card modifier ids). A legend is the orange roll of a hero card. A drafted blueprint or upgrade writes its
+## modifiers into the building's numbers for the rest of the run (`apply_to_building`).
 
 
 ## The rarity a dealt card rolls this round: each rolled rarity's chance climbs evenly from its first to its last
@@ -100,7 +101,76 @@ static func fits_card(m: Dictionary, kind: String, fits: Dictionary) -> bool:
 	for need: String in ["leaning", "weapon", "give", "get"]:
 		if m.get("needs_" + need, false) and not fits.get(need, false):
 			return false
+	if fits.has("def"):
+		return fits_building(m, fits["def"])
 	return true
+
+
+## True when a blueprint or upgrade modifier fits a building's data: it has every key in needs, at least one of the
+## keys mult or add change (if any), and a max of at least min_max.
+static func fits_building(m: Dictionary, def: Dictionary) -> bool:
+	if int(def.get("max", 99)) < int(m.get("min_max", 0)):
+		return false
+	for key: String in m.get("needs", []):
+		if not _has_path(def, key):
+			return false
+	var keys: Array = m.get("mult", {}).keys() + m.get("add", {}).keys()
+	return keys.is_empty() or keys.any(func(key: String) -> bool: return _has_path(def, key))
+
+
+## Rolls a blueprint or upgrade offer (kind "blueprint" or "upgrade") for the building it is or changes.
+static func roll_building(content: Content, rng: SeededRng, card: Dictionary, kind: String, type: String, round_number: int) -> void:
+	roll_card(content, rng, card, kind, {"def": content.buildings[type]}, round_number)
+
+
+## Writes a drafted card's modifiers into this run's data for a building (Content.for_run keeps it to this run), so
+## every one of it, built or still to come, is changed: mult and add only where the building has the key, grant always.
+static func apply_to_building(run: RunState, type: String, card: Dictionary) -> void:
+	var def: Dictionary = run.content.buildings[type]
+	for id: String in card.get("boons", []):
+		var m: Dictionary = run.content.card_mods[id]
+		for key: String in m.get("mult", {}):
+			if not _has_path(def, key):
+				continue
+			var share := float(m["mult"][key])
+			var at: Variant = _get_path(def, key)
+			if at is Dictionary:
+				for r: String in at:
+					at[r] = roundi(float(at[r]) * (1.0 + share)) if share <= -1.0 else maxi(1, roundi(float(at[r]) * (1.0 + share)))
+			else:
+				_set_path(def, key, float(at) * (1.0 + share))
+		for key: String in m.get("add", {}):
+			if _has_path(def, key):
+				_set_path(def, key, float(_get_path(def, key)) + float(m["add"][key]))
+		for key: String in m.get("grant", {}):
+			_set_path(def, key, float(_get_path(def, key) if _has_path(def, key) else 0.0) + float(m["grant"][key]))
+		run.record.note_count("card_mods_taken", 1, id)
+
+
+static func _has_path(def: Dictionary, key: String) -> bool:
+	var at: Variant = def
+	for part in key.split("."):
+		if not (at is Dictionary and at.has(part)):
+			return false
+		at = at[part]
+	return true
+
+
+static func _get_path(def: Dictionary, key: String) -> Variant:
+	var at: Variant = def
+	for part in key.split("."):
+		at = at[part]
+	return at
+
+
+static func _set_path(def: Dictionary, key: String, value: Variant) -> void:
+	var parts := key.split(".")
+	var at: Dictionary = def
+	for i in parts.size() - 1:
+		if not at.has(parts[i]):
+			at[parts[i]] = {}
+		at = at[parts[i]]
+	at[parts[parts.size() - 1]] = value
 
 
 ## Up to count different modifiers of a rarity that fit a card of this kind.

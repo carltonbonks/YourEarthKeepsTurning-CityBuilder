@@ -263,8 +263,10 @@ func towers_tick() -> void:
 			b["cooldown_left"] = float(def["cooldown"])
 			w.shots.append({"from": b["pos"], "to": target.pos, "ranged": true, "tower": true, "time": w.time})
 			w.damage(null, target, (float(def["attack"]) + w.run.mod("tower_attack")) * armour_left(target), b["type"])
-			# Sentient raiders turn on the tower that shot them (siege engines only want gates and the hearth).
-			if target.alive and def.has("tower_hp") and w.content.unit_has_tag(target, "sentient") \
+			# Sentient raiders turn on the tower that shot them (siege engines only want gates and the hearth); every
+			# raider turns on a Wrathful one (grudge_all, data/card_mods.json).
+			if target.alive and def.has("tower_hp") \
+					and (w.content.unit_has_tag(target, "sentient") or float(def.get("grudge_all", 0.0)) > 0.0) \
 					and not w.content.unit_has_tag(target, "siege"):
 				target.target = null
 				target.target_tower = w.buildings.find(b)

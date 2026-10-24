@@ -321,7 +321,8 @@ func build(type: String) -> bool:
 
 
 ## Takes an upgrade (data/upgrades.json): its numbers are added to its building's data for the rest of the run.
-func take_upgrade(id: String) -> void:
+## A rolled offer (BuildHand.draft_upgrade) also notes its roll and modifiers in the action.
+func take_upgrade(id: String, offer := {}) -> void:
 	var up: Dictionary = content.upgrades[id]
 	var def: Dictionary = content.buildings[up["building"]]
 	for key: String in up["add"]:
@@ -334,7 +335,11 @@ func take_upgrade(id: String) -> void:
 		var last := parts[parts.size() - 1]
 		at[last] = float(at.get(last, 0.0)) + float(up["add"][key])
 	upgrades.append(id)
-	record.note_action({"kind": "upgrade", "upgrade": id})
+	var action := {"kind": "upgrade", "upgrade": id}
+	if offer.has("roll"):
+		action["roll"] = offer["roll"]
+		action["mods"] = offer["boons"].duplicate()
+	record.note_action(action)
 	tell("%s: %s" % [up["name"], up["text"]])
 
 

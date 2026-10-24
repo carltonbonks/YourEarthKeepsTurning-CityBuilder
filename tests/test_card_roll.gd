@@ -331,3 +331,113 @@ func test_a_lingering_deal_waits_one_round() -> void:
 	run.caravan.lay_out()
 	check(not run.caravan.offers.any(func(o: Dictionary) -> bool: return o["deal"] == "timber_load" and o.get("lingered", false)),
 		"only for one round")
+
+
+# Slice 3: blueprint and upgrade offers roll, and a drafted roll changes the building for the run.
+
+func test_building_modifiers_only_fit_buildings_that_have_what_they_change() -> void:
+	var c := Content.load_default()
+	var b := c.buildings
+	check(CardRoll.fits_building(c.card_mods["thrifty"], b["watch_post"]), "any building can be thrifty")
+	check(CardRoll.fits_building(c.card_mods["roomy"], b["longhouse"]), "a longhouse can be roomy")
+	check(not CardRoll.fits_building(c.card_mods["roomy"], b["watch_post"]), "a watch post can't")
+	check(CardRoll.fits_building(c.card_mods["wrathful"], b["watch_post"]), "a watch post can be wrathful")
+	check(not CardRoll.fits_building(c.card_mods["wrathful"], b["gate"]), "a gate has no attack")
+	check(not CardRoll.fits_building(c.card_mods["twin_built"], b["longhouse"]), "only one longhouse, so no twin")
+	check(not CardRoll.fits_building(c.card_mods["bloodwood"], b["watch_post"]), "bloodwood needs room, benches or harvest")
+	var rng := SeededRng.new(9)
+	var seen := {}
+	for i in 3000:
+		var card := {"building": "knapper"}
+		CardRoll.roll_building(c, rng, card, "blueprint", "knapper", 14)
+		seen[CardRoll.roll_of(card)] = true
+		for id: String in card.get("boons", []):
+			check(CardRoll.fits_building(c.card_mods[id], b["knapper"]), "%s fits a knapper" % id)
+			check(c.card_mods[id]["cards"].has("blueprint"), "%s comes on blueprints" % id)
+	check(seen.has("blue") and seen.has("yellow") and seen.has("orange"), "every rarity turns up (%s)" % seen.keys())
+
+
+func test_a_drafted_roll_changes_the_building_for_the_run() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	var b := run.content.buildings
+	CardRoll.apply_to_building(run, "watch_post", {"roll": "yellow", "boons": ["thrifty", "sturdy", "hearthstone"]})
+	check_eq(b["watch_post"]["cost"], {"wood": 7, "stone": 2}, "15% off, never below 1")
+	check(is_equal_approx(float(b["watch_post"]["tower_hp"]), 84.0), "40% sturdier")
+	check(is_equal_approx(float(b["watch_post"]["hearth_hp"]), 15.0), "hearthstone is granted")
+	check(not b["watch_post"].has("gate_hp"), "sturdy adds no gate to a post")
+	CardRoll.apply_to_building(run, "shrine", {"roll": "orange", "boons": ["wellspring"]})
+	check_eq(b["shrine"]["cost"], {"wood": 0, "stone": 0}, "a wellspring costs nothing")
+	check(is_equal_approx(float(b["shrine"]["effects"]["near_wake"]), 3.0), "and draws the earth's waking")
+	CardRoll.apply_to_building(run, "longhouse", {"roll": "blue", "boons": ["roomy"]})
+	check_eq(int(b["longhouse"]["lodging"]["beds"]), 4, "a bed more")
+	check_eq(int(b["longhouse"]["housing"]), 3, "and room for one more")
+	check_eq(int(Content.load_default().buildings["longhouse"]["lodging"]["beds"]), 3, "only this run changes")
+
+
+func test_drafting_a_rolled_blueprint_keeps_its_roll() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	var card: Dictionary = run.hand.cards[0]
+	var type: String = card["building"]
+	var cost: Dictionary = run.content.buildings[type]["cost"].duplicate()
+	card["roll"] = "blue"
+	card["boons"] = ["thrifty"]
+	check(run.hand.draft(type), "drafted")
+	check_eq(run.hand.rolled[type]["boons"], ["thrifty"], "the hand keeps the roll")
+	for r: String in cost:
+		check(int(run.content.buildings[type]["cost"][r]) <= int(cost[r]), "%s costs less %s" % [type, r])
+	var entry: Dictionary = run.record.entry["blueprints"][-1]
+	check_eq(entry["roll"], "blue", "the record keeps the roll")
+	check_eq(entry["mods"], ["thrifty"], "and its modifiers")
+
+
+func test_twin_built_raises_a_free_one() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	run.hand.cards = [{"building": "watch_post", "need": "", "roll": "yellow", "boons": ["twin_built", "thrifty"]}]
+	var wood := int(run.stock["wood"])
+	check(run.hand.draft("watch_post"), "drafted")
+	check_eq(run.world.count_buildings("watch_post", false), 1, "one goes up at once")
+	check_eq(int(run.stock["wood"]), wood, "for free")
+
+
+func test_a_rolled_upgrade_changes_its_building_too() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	run.world.add_building("hut")
+	run.hand.upgrade_offers = [{"upgrade": "sturdy_huts", "roll": "blue", "boons": ["snug"]}]
+	var fuel := float(run.content.buildings["hut"]["fuel"])
+	check(run.hand.draft_upgrade("sturdy_huts"), "taken")
+	check(is_equal_approx(float(run.content.buildings["hut"]["fuel"]), fuel * 0.5), "huts burn half the fuel")
+	check_eq(int(run.content.buildings["hut"]["housing"]), 4, "and the upgrade itself still applies")
+	var action: Dictionary = run.record.entry["actions"].filter(func(a: Dictionary) -> bool: return a["kind"] == "upgrade")[0]
+	check_eq(action["mods"], ["snug"], "the record keeps the upgrade's modifiers")
+
+
+func test_draft_offers_roll_and_the_record_keeps_their_rolls() -> void:
+	var rolled := 0
+	for s in 40:
+		var run := RunState.new(Content.load_default(), 100 + s)
+		for c in run.hand.cards:
+			if c.has("roll"):
+				rolled += 1
+				check(c["boons"].size() >= 1, "a rolled offer has modifiers")
+		check_eq(run.hand.rolls().size(), run.hand.labels().size(), "a roll for every offer")
+	check(rolled > 0, "some offers roll over 40 runs (%d)" % rolled)
+
+
+func test_wrathful_towers_draw_every_raider() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	CardRoll.apply_to_building(run, "watch_post", {"roll": "orange", "boons": ["wrathful"]})
+	run.stock["wood"] = 99
+	run.stock["stone"] = 99
+	check(run.build("watch_post"), "a watch post")
+	var post := run.world.buildings.size() - 1
+	run.world.buildings[post]["work_left"] = 0.0
+	run.world.enemies.clear()
+	var knight := run.world.enemy_ai.make_enemy("hollow_knight", Vector2.ZERO, 0.0)
+	knight.hp = 999.0
+	run.world.enemies.append(knight)
+	run.world.buildings[post]["cooldown_left"] = 0.0
+	knight.pos = Vector2(run.world.buildings[post]["pos"]) + Vector2(60, 0)
+	run.world.enemy_ai.towers_tick()
+	check_eq(knight.target_tower, post, "even a hollow knight turns on a wrathful tower")
+	check(is_equal_approx(float(run.content.buildings["watch_post"]["attack"]),
+		3.0 * float(Content.load_default().buildings["watch_post"]["attack"])), "and it hits three times as hard")

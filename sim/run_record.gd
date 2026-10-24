@@ -119,7 +119,11 @@ extends RefCounted
 ##     cover hero, family, venture and spell cards too (a legend is a hero card's "legend" modifier); per round
 ##     "deals_rolls" (each deal's rolled rarity, in deals_offered order), and a taken deal's entry in "deals" gains
 ##     "roll" and "mods" when it rolled; "card_mods_fired" also counts echoing, smugglers_hoard and cursed_gold.
-const RECORD_FORMAT := 46
+## 47: blueprint and upgrade offers roll (sim/card_roll.gd): a "build_hands" entry gains "rolls" (each offer's rolled
+##     rarity, in "cards" order, only when one rolled above white); a drafted blueprint's entry in "blueprints" and an
+##     "upgrade" action gain "roll" and "mods" when it rolled; "card_mods_taken" counts blueprint and upgrade
+##     modifiers and "card_mods_fired" counts twin_built's free building.
+const RECORD_FORMAT := 47
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -199,7 +203,7 @@ func begin_round() -> void:
 		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {}, "idle_seconds": {}, "trips_bumped": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
 		"camps_cleared": 0, "camp_spoils": 0, "hearty_meals": 0,
-		"build_hands": [{"cards": run.hand.labels()}], "blueprints": [], "impact": {}, "spells": [],
+		"build_hands": [run.hand.hand_entry()], "blueprints": [], "impact": {}, "spells": [],
 		"deals_offered": run.caravan.labels(), "deals_rolls": run.caravan.offers.map(CardRoll.roll_of), "deals": []}
 
 
