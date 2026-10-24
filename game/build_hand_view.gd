@@ -6,7 +6,7 @@ extends PanelContainer
 ## tool sets, once there are any) and Trading (the caravan's trade cards, once it comes). While a draft is
 ## left, the blueprint offers (each says what it adds to the dawn picks), the offer to clear the next ring
 ## once the town is nearly full, and the reroll sit apart in
-## the DraftPopup window over the map. A card the town needs says why on a gold strip at the top
+## the DraftPopup window over the map. Every card is a CardView. A card the town needs says why on a bone ribbon at the top
 ## ("Food runs out in 2 days"); a card the town can't take says why on a red strip at the bottom
 ## ("Need 3 more wood"). Costs show red where the town is short. Shown only while building.
 ## Every choice goes through run.hand; `changed` asks the screen to refresh. Hovering a building
@@ -18,17 +18,11 @@ signal changed
 signal previewing(type: String)
 signal begin_pressed
 
-const RECOMMEND_COLOR := UiKit.RECOMMEND_COLOR
-const CARD_SIZE := Vector2(150, 132)
-const BASIC_SIZE := Vector2(118, 132)
-const ROW_SIZE := Vector2(176, 132)
-const ROW_BORDER := Color("#9ec27a")
-const RING_BORDER := Color("#c9a27a")
-## Each section's colour: its heading, its edge and a faint tint behind its cards.
-const CORE_COLOR := Color("#c8ccd4")
-const BLUEPRINT_COLOR := Color("#ffd28a")
-const UPGRADE_COLOR := Color("#8fb8e8")
-const TRADE_COLOR := Color("#c0a060")
+## The height the hand keeps for its small cards (CardView), so the strip doesn't jump as cards change.
+const HAND_HEIGHT := 140.0
+## The sections share one plain look: the cards' own bands say what kind each is, and the rarity colours stay
+## for the cards' frames.
+const SECTION_COLOR := Color("#d8d4c8")
 
 var run: RunState
 ## The window the blueprint offers go in; main.gd places it over the map.
@@ -50,8 +44,10 @@ func _init() -> void:
 	line.add_theme_constant_override("separation", 10)
 	add_child(line)
 	var scroll := ScrollContainer.new()
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size.y = CARD_SIZE.y + 50
+	# SHOW_NEVER, not DISABLED: the strip keeps its own height instead of taking the cards' (a new card measures
+	# itself tall for a frame before its width is known, CardView).
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	scroll.custom_minimum_size.y = HAND_HEIGHT + 40
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	line.add_child(scroll)
 	_row = HBoxContainer.new()
@@ -69,10 +65,10 @@ func refresh() -> void:
 	for child in _row.get_children():
 		child.queue_free()
 	_draft_cards()
-	var core := _section("Core", "Always on offer", CORE_COLOR)
+	var core := _section("Core", "Always on offer")
 	for type: String in run.hand.basics():
 		core.add_child(_card(type, run.hand.need(type), "basic"))
-	var mine := _section("Your blueprints", "Drafted this run", BLUEPRINT_COLOR)
+	var mine := _section("Your blueprints", "Drafted this run")
 	for type: String in run.hand.blueprints:
 		if run.world.count_buildings(type, false) < run.building_max(type):
 			mine.add_child(_card(type, run.hand.need(type), "blueprint"))
@@ -83,25 +79,26 @@ func refresh() -> void:
 		empty.custom_minimum_size.x = 120
 		empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		empty.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var upgrades := _section("Upgrades", "Ageing up and tool sets", UPGRADE_COLOR)
+	var upgrades := _section("Upgrades", "Ageing up and tool sets")
 	if not run.hand.milestone.is_empty():
 		upgrades.add_child(_card(run.hand.milestone["building"], "", "age"))
 	_tool_cards(upgrades)
 	_drop_if_empty(upgrades)
-	var trading := _section("Trading", "The caravan's deals, once each this round", TRADE_COLOR)
+	var trading := _section("Trading", "The caravan's deals, once each this round")
 	_caravan_cards(trading)
 	_drop_if_empty(trading)
 
 
-## A labelled block of cards with a coloured edge and tint, so where one kind of card ends and the
-## next begins is plain at a glance. Returns the row to put its cards in.
-func _section(title: String, hint: String, color: Color) -> HBoxContainer:
+## A labelled block of cards with a plain edge, so where one kind of card ends and the next begins is plain
+## at a glance. Returns the row to put its cards in.
+func _section(title: String, hint: String) -> HBoxContainer:
+	var color := SECTION_COLOR
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(color, 0.08)
-	style.border_color = color
-	style.border_width_left = 4
-	style.border_width_top = 2
+	style.bg_color = Color(color, 0.04)
+	style.border_color = Color(color, 0.35)
+	style.border_width_left = 3
+	style.border_width_top = 1
 	style.set_corner_radius_all(6)
 	style.content_margin_left = 10
 	style.content_margin_right = 8
@@ -148,7 +145,8 @@ func _draft_cards() -> void:
 	if run.hand.picks <= 0 or (run.hand.cards.is_empty() and run.hand.rows.is_empty() and not run.hand.ring_offer() and run.hand.upgrade_offers.is_empty()):
 		draft.visible = false
 		return
-	draft.set_title("Draft %d blueprints" % run.hand.picks if run.hand.picks > 1 else "Draft a blueprint", pool_line(run))
+	draft.set_title("Draft %d blueprints" % run.hand.picks if run.hand.picks > 1 else "Draft a blueprint",
+		"Pick one: it joins Your blueprints below and stays on offer for the whole run.\n" + pool_line(run))
 	for card: Dictionary in run.hand.cards:
 		draft.cards.add_child(_card(card["building"], card["need"], "draft", card))
 	for card: Dictionary in run.hand.rows:
@@ -159,7 +157,7 @@ func _draft_cards() -> void:
 		draft.cards.add_child(_upgrade_card(card))
 	var redraw := UiKit.secondary(Button.new(), 13)
 	redraw.text = "Reroll\n%d shells" % run.hand.redraw_cost() if run.hand.redraws == 0 else "Rerolled\nthis round"
-	redraw.custom_minimum_size = Vector2(86, CARD_SIZE.y)
+	redraw.custom_minimum_size = Vector2(86, 120)
 	redraw.disabled = not run.hand.can_redraw()
 	redraw.tooltip_text = "Once a round: swap these offers for a fresh draw."
 	redraw.pressed.connect(_act.bind(run.hand.redraw))
@@ -263,30 +261,55 @@ func recommendation(type: String, need: String) -> String:
 
 
 ## offer = the draft offer (with its roll); a drafted blueprint shows the roll it was drafted with.
-func _card(type: String, need: String, kind: String, offer := {}) -> Button:
-	var def: Dictionary = run.content.buildings[type]
+## A draft offer is a medium card in the draft window; a card in the hand is a small one (its detail is on hover).
+func _card(type: String, need: String, kind: String, offer := {}) -> CardView:
+	var content := run.content
+	var def: Dictionary = content.buildings[type]
 	var owned := run.world.count_buildings(type, false)
-	var why := recommendation(type, need)
-	var top: String = why if why != "" else {"basic": "Always on offer", "age": "Ageing up", "blueprint": "Your blueprint"}.get(kind, "New building")
-	var border := RECOMMEND_COLOR if why != "" else (UiKit.HEADING_COLOR if kind == "age" else UiKit.CARD_BORDER)
+	var drafting := kind == "draft"
+	var tags: Array = content.tags_of("building", type)
+	var band: String = {"basic": "Core", "age": "Ageing up", "blueprint": "Blueprint"}.get(kind, "New building")
+	var text: String = def["text"]
+	if drafting and "rule_breaker" in tags:
+		band = "Rule-breaker"
+	elif drafting and "outpost" in tags:
+		band = "Outpost"
+	var btn := CardView.new(CardView.Size.MEDIUM if drafting else CardView.Size.SMALL, "building", band, def["name"])
+	if kind == "age":
+		btn.set_band_icon("up")
+	elif band == "Outpost":
+		btn.set_band_icon("flag")
+	btn.set_advice(recommendation(type, need))
+	btn.set_price(run.stock, def["cost"])
 	var dawn := dawn_line(run, type)
-	var hint := row_hint(run, type) if kind == "draft" else ""
-	var footer := (dawn if dawn != "" else hint) if kind == "draft" else ("You have %d" % owned if owned > 0 else "")
-	var rarity := run.content.rarity_of("building", type)
-	# The frame shows the offer's own roll (CardRoll); the corner gem how rare this blueprint is.
-	var rolled: Dictionary = offer if kind == "draft" else run.hand.rolled.get(type, {})
+	var hint := row_hint(run, type) if drafting else ""
+	if drafting:
+		# The sun says "at dawn", so the chip keeps only what comes.
+		if dawn != "":
+			var what := dawn.trim_prefix("Dawn: ")
+			btn.add_chip(what[0].to_upper() + what.substr(1), "sun", CardView.BONE)
+		if hint != "":
+			btn.add_chip(hint.replace("Opens a row: ", "Opens "), "house", CardView.TEXT, btn.family_color())
+		if "outpost" in tags:
+			btn.add_chip("can be lost", "", CardView.DANGER)
+	# The band already says "Rule-breaker" or "Outpost", so the body skips saying it again. A draft offer keeps
+	# its body to one line so the draft window leaves the attack card room beside it.
+	btn.set_body(text.trim_prefix("Rule-breaker. ").trim_prefix("Outpost. "))
+	if drafting:
+		btn.set_body_lines(1)
+	if not drafting and owned > 0:
+		btn.set_footer("You have %d" % owned)
+	# The frame shows the offer's own roll (CardRoll); the band's gem how rare this blueprint is.
+	var rolled: Dictionary = offer if drafting else run.hand.rolled.get(type, {})
 	var roll := CardRoll.roll_of(rolled)
-	var btn := UiKit.card(top, def["name"], UiKit.cost_text(run.stock, def["cost"]), def["text"],
-		footer, BASIC_SIZE if kind == "basic" else CARD_SIZE, border, why != "",
-		UiKit.HEADING_COLOR if kind == "age" else (Color.WHITE if roll == "white" else run.content.rarity_color(roll)))
-	btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], roundi(float(def["work"]))]
-	if kind == "draft" or kind == "blueprint":
-		UiKit.mark_roll(btn, run.content, roll, rarity, CardRoll.lines(run.content, rolled))
-		if roll != "white" and kind == "draft":
+	btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [text, roundi(float(def["work"]))]
+	if drafting or kind == "blueprint":
+		btn.set_roll(content, roll, content.rarity_of("building", type), CardRoll.mods_of(rolled))
+		if roll != "white" and drafting:
 			btn.tooltip_text += "\nDrafted, its modifiers change every one you build for the rest of the run."
 	if dawn != "":
 		btn.tooltip_text += "\n" + dawn + "."
-	if kind == "draft":
+	if drafting:
 		btn.tooltip_text = "Draft it: you can order it, paying its cost, for the rest of the run.\n" + btn.tooltip_text
 		if hint != "":
 			btn.tooltip_text += "\n%s: a later draft can add its partner, side by side for a bonus." % hint
@@ -313,35 +336,33 @@ func _card(type: String, need: String, kind: String, offer := {}) -> Button:
 
 
 ## An upgrade offer: changes a building the town has for the rest of the run, instead of a new blueprint.
-func _upgrade_card(offer: Dictionary) -> Button:
+func _upgrade_card(offer: Dictionary) -> CardView:
 	var id: String = offer["upgrade"]
 	var up: Dictionary = run.content.upgrades[id]
-	var roll := CardRoll.roll_of(offer)
-	var rarity: String = up.get("rarity", "white")
 	var building: String = run.content.buildings[up["building"]]["name"]
-	var btn := UiKit.card("Upgrade your %s" % building.to_lower(), up["name"], "", up["text"], "Instead of a new blueprint",
-		CARD_SIZE, UiKit.HEADING_COLOR, false, Color.WHITE if roll == "white" else run.content.rarity_color(roll))
+	var btn := CardView.new(CardView.Size.MEDIUM, "building", "Upgrade", up["name"]).set_band_icon("hammer")
+	btn.add_chip("for your " + building.to_lower(), "house", CardView.TEXT, btn.family_color())
+	btn.set_body(up["text"]).set_body_lines(1).set_footer("Instead of a new blueprint")
 	btn.tooltip_text = "Draft it: every %s, built or still to come, is changed for the rest of the run.\n%s" % [building.to_lower(), up["text"]]
-	UiKit.mark_roll(btn, run.content, roll, rarity, CardRoll.lines(run.content, offer))
+	btn.set_roll(run.content, CardRoll.roll_of(offer), up.get("rarity", "white"), CardRoll.mods_of(offer))
 	btn.disabled = not run.hand.can_draft_upgrade(id)
 	btn.pressed.connect(_act.bind(run.hand.draft_upgrade.bind(id)))
 	return btn
 
 
 ## A row card: two buildings ordered together, side by side, for less, and the bonus they make together.
-func _row_card(id: String, need: String, drafting: bool) -> Button:
+func _row_card(id: String, need: String, drafting: bool) -> CardView:
 	var content := run.content
 	var row: Dictionary = content.combos[id]
 	var a: String = content.buildings[row["building"]]["name"]
 	var b: String = content.buildings[row["partner"]]["name"]
 	var why := recommendation(row["building"] if run.hand.need(row["building"]) == need else row["partner"], need)
 	var cost := run.row_cost(id)
-	var body := "%s + %s, side by side. %s" % [a, b, row["text"]]
-	if drafting:
-		body = "%s %s" % [row_offer_line(run, id), row["text"]]
-	var btn := UiKit.card(why if why != "" else ("Draft a row" if drafting else "Your row"), row["name"], UiKit.cost_text(run.stock, cost),
-		body, "", ROW_SIZE, RECOMMEND_COLOR if why != "" else ROW_BORDER,
-		why != "", ROW_BORDER)
+	var btn := CardView.new(CardView.Size.MEDIUM if drafting else CardView.Size.SMALL, "building", "Draft a row" if drafting else "Row", row["name"])
+	btn.set_advice(why)
+	btn.set_price(run.stock, cost)
+	btn.add_chip("%s + %s" % [a, b], "house", CardView.TEXT, btn.family_color())
+	btn.set_body("%s %s" % [row_offer_line(run, id), row["text"]] if drafting else row["text"]).set_body_lines(1 if drafting else 2)
 	btn.tooltip_text = "%s and %s go up together in one cluster, a fifth cheaper than ordering both.\n%s\nOnly buildings ordered as a row make this bonus." % [
 		a, b, row["text"]]
 	if drafting:
@@ -359,12 +380,14 @@ func _row_card(id: String, need: String, drafting: bool) -> Button:
 
 
 ## The offer to clear the next ring of plots, in place of a building, once the open rings are nearly full.
-func _ring_card() -> Button:
+func _ring_card() -> CardView:
 	var cost := run.ring_cost()
 	var full := roundi(run.world.town.fullness() * 100.0)
-	var btn := UiKit.card("Room to grow: %d%% full" % full, "Clear a new ring", UiKit.cost_text(run.stock, cost),
-		"Opens the next ring of plots round the town for good. A bigger town has a longer edge to hold.",
-		"Ring %d of %d" % [run.rings_open + 1, run.content.town["rings"].size()], CARD_SIZE, RECOMMEND_COLOR, true, RING_BORDER)
+	var btn := CardView.new(CardView.Size.MEDIUM, "building", "Clear a ring", "Clear a new ring").set_band_icon("ring")
+	btn.set_advice("Room to grow: %d%% full" % full)
+	btn.set_price(run.stock, cost)
+	btn.set_body("Opens the next ring of plots round the town for good. A bigger town has a longer edge to hold.").set_body_lines(1)
+	btn.set_footer("Ring %d of %d" % [run.rings_open + 1, run.content.town["rings"].size()])
 	btn.tooltip_text = "Takes this draft instead of a new building: pay to clear the next ring, and buildings can stand there from now on.\nAgeing up also opens a ring, for free."
 	btn.disabled = not run.hand.can_clear_ring()
 	UiKit.fade_if_disabled(btn, UiKit.shortfall(run.stock, cost))
@@ -383,8 +406,9 @@ func _tool_cards(parent: HBoxContainer) -> void:
 		var def: Dictionary = content.ages["tools"][id]
 		if run.tools.has(id) or not content.age_reached(run.age, def.get("age", "")):
 			continue
-		var btn := UiKit.card("Tool set for %ss" % content.townsfolk[def["role"]]["name"].to_lower(), def["name"],
-			UiKit.cost_text(run.stock, def["cost"]), def["text"], "", CARD_SIZE, Color("#8fa0b8"))
+		var btn := CardView.new(CardView.Size.SMALL, "building", "Tool set", def["name"]).set_band_icon("hammer")
+		btn.set_price(run.stock, def["cost"])
+		btn.add_chip("for %ss" % content.townsfolk[def["role"]]["name"].to_lower(), "folk", CardView.TEXT, CardView.FAMILIES["folk"]["color"])
 		btn.tooltip_text = "%s\nOnce only. Every ingot spent here is one the smiths can't turn into hero gear.\nYou have %d bronze%s." % [
 			def["text"], run.stock["bronze"], ", %d iron, %d steel" % [run.stock["iron"], run.stock["steel"]] if content.age_reached(run.age, "medieval") else ""]
 		btn.disabled = not run.can_buy_tools(id)
@@ -393,32 +417,39 @@ func _tool_cards(parent: HBoxContainer) -> void:
 		parent.add_child(btn)
 
 
-## The southern caravan's trade cards (run.caravan): each deal once a round, its border and name in its rarity's
-## colour, a gold strip when the town wants it, a red one when it can't be taken.
+## The southern caravan's trade cards (run.caravan): each deal once a round, its frame in its roll's colour,
+## a bone ribbon when the town wants it, a red one when it can't be taken.
 func _caravan_cards(parent: HBoxContainer) -> void:
 	for i in run.caravan.offers.size():
 		parent.add_child(_deal_card(i))
 
 
-func _deal_card(index: int) -> Button:
+## A deal reads as a trade: the price you pay top right, what you get on the gives row after an arrow.
+func _deal_card(index: int) -> CardView:
 	var content := run.content
 	var offer: Dictionary = run.caravan.offers[index]
 	var id: String = offer["deal"]
 	var def := run.caravan.deal(id)
-	# The frame shows the deal's own roll (CardRoll); a small gem shows how rare this kind of deal is.
-	var roll := CardRoll.roll_of(offer)
-	var colour := content.rarity_color(roll)
 	var give := run.caravan.gives(id, offer)
-	var top: String = offer["need"] if offer["need"] != "" else "Caravan"
-	# Spelled out as a trade: what you hand over, then what you get back.
-	var terms := "[color=#9da2ab]You pay[/color] %s\n[color=#9da2ab]You get[/color] [color=#a8d890]%s[/color]" % [
-		UiKit.cost_text(run.stock, give) if not give.is_empty() else "nothing", deal_brings(run, id, offer)]
-	var btn := UiKit.card(top, def["name"], terms, def["text"],
-		"", CARD_SIZE, colour, offer["need"] != "", Color.WHITE if roll == "white" else colour)
+	var btn := CardView.new(CardView.Size.SMALL, "trade", "Caravan", def["name"])
+	btn.set_advice(offer["need"])
+	btn.set_price(run.stock, give)
+	btn.add_chip("you get", "", CardView.DIM)
+	btn.add_goods(run.caravan.gets(id, offer))
+	var folk := run.caravan.folk_of(id, offer)
+	for role: String in folk:
+		var roles: Array = []
+		for i in int(folk[role]):
+			roles.append(role)
+		btn.add_people(roles)
+	if int(def.get("smith", 0)) > 0:
+		btn.add_chip("weapons +%d tier%s" % [def["smith"], "s" if int(def["smith"]) > 1 else ""], "", CardView.GOOD)
+	if int(def.get("relic", 0)) > 0:
+		btn.add_chip("a relic", "relic", CardView.GOOD)
 	var pays := ", ".join(PackedStringArray(give.keys().map(func(g: String) -> String: return "%d %s" % [give[g], g])))
 	btn.tooltip_text = "A deal from the %s.\n%s\nYou pay: %s.\nYou get: %s.\nOnce this round." % [
 		content.trades["name"].to_lower(), def["text"], pays if pays != "" else "nothing", deal_brings(run, id, offer)]
-	UiKit.mark_roll(btn, content, roll, content.rarity_of("deal", id), CardRoll.lines(content, offer))
+	btn.set_roll(content, CardRoll.roll_of(offer), content.rarity_of("deal", id), CardRoll.mods_of(offer))
 	btn.disabled = not run.caravan.can_take(index)
 	var blocked := run.caravan.blocker(index)
 	UiKit.fade_if_disabled(btn, blocked if blocked != "" else UiKit.shortfall(run.stock, give))

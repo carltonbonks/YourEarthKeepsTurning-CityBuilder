@@ -17,11 +17,6 @@ signal seed_run_requested(seed_value: int)
 ## The menu, log or tuning panel closed: the screen refreshes and shows the right overlay again.
 signal closed
 
-const PICK_SIZE := Vector2(196, 176)
-const SPELL_SIZE := Vector2(236, 160)
-const RELIC_SIZE := Vector2(210, 150)
-const PEDLAR_SIZE := Vector2(230, 210)
-
 var run: RunState
 var _box: VBoxContainer
 
@@ -43,10 +38,10 @@ func _init() -> void:
 	center.add_child(panel)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 20)
+		margin.add_theme_constant_override("margin_" + side, 16)
 	panel.add_child(margin)
 	_box = VBoxContainer.new()
-	_box.add_theme_constant_override("separation", 10)
+	_box.add_theme_constant_override("separation", 8)
 	margin.add_child(_box)
 	hide()
 
@@ -75,42 +70,44 @@ func show_pick() -> void:
 	_clear()
 	var day := run.world.day_index() + 1
 	_title("Dawn of day %d: who joins the settlement?" % day)
-	_night_summary()
 	var room := run.population() < run.housing()
-	var sub := Label.new()
-	sub.text = "Shells: %d   Room: %d / %d%s" % [run.stock["shells"], run.population(), run.housing(),
-		"" if room else "\nNo room for anyone new. Build huts at the start of the next round."]
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.add_theme_font_size_override("font_size", 17)
-	sub.add_theme_color_override("font_color", Color("#e8e8e8") if room else Color("#e0a050"))
-	_box.add_child(sub)
+	_night_summary("Shells %d  ·  Room %d / %d" % [run.stock["shells"], run.population(), run.housing()])
+	if not room:
+		UiKit.note(_box, "No room for anyone new. Build huts at the start of the next round.", 14, Color("#e0a050")) \
+			.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if run.hunger_turned_away != "":
-		var away := Label.new()
 		var role: String = content.townsfolk[run.hunger_turned_away]["name"].to_lower()
-		away.text = "Word has spread that a %s left hungry: no %s will join today." % [role, role]
-		away.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		away.add_theme_color_override("font_color", Color("#e0a050"))
-		_box.add_child(away)
+		UiKit.note(_box, "Word has spread that a %s left hungry: no %s will join today." % [role, role], 14, Color("#e0a050")) \
+			.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_box.add_child(row)
-	# The geomancer's spells sit in their own row under the newcomers; taking one is instead of a newcomer.
-	var spells := HBoxContainer.new()
-	spells.add_theme_constant_override("separation", 10)
-	spells.alignment = BoxContainer.ALIGNMENT_CENTER
+	# Newcomers first, then the geomancer's spells past a divider in the same row: the band and the footer
+	# ("Instead of a newcomer") tell them apart. A crowded dawn uses medium cards so the row fits the screen.
+	var sz := CardView.Size.LARGE if run.pick_offer.size() <= 4 else CardView.Size.MEDIUM
+	var order: Array[int] = []
 	for i in run.pick_offer.size():
-		var btn := _pick_card(run.pick_offer[i])
+		if run.pick_offer[i]["kind"] != "spell":
+			order.append(i)
+	for i in run.pick_offer.size():
+		if run.pick_offer[i]["kind"] == "spell":
+			if not order.is_empty() and run.pick_offer[order[-1]]["kind"] != "spell":
+				order.append(-1)
+			order.append(i)
+	for i in order:
+		if i < 0:
+			var sep := VSeparator.new()
+			sep.add_theme_constant_override("separation", 12)
+			row.add_child(sep)
+			continue
 		var card := run.pick_offer[i]
-		UiKit.mark_roll(btn, run.content, CardRoll.roll_of(card), run.people.card_rarity(card), CardRoll.lines(run.content, card))
+		var btn := _pick_card(card, sz)
+		btn.set_roll(run.content, CardRoll.roll_of(card), run.people.card_rarity(card), CardRoll.mods_of(card))
 		btn.disabled = not run.can_take_pick(i)
-		UiKit.fade_if_disabled(btn, _why_not_pick(run.pick_offer[i]))
+		UiKit.fade_if_disabled(btn, _why_not_pick(card))
 		btn.pressed.connect(func() -> void: pick_taken.emit(i))
-		(spells if run.pick_offer[i]["kind"] == "spell" else row).add_child(btn)
-	if spells.get_child_count() > 0:
-		var head := UiKit.note(_box, "Or set the geomancer to work (instead of a newcomer):", 15, UiKit.HEADING_COLOR)
-		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_box.add_child(spells)
+		row.add_child(btn)
 	_skip_button("Nobody today", func() -> void: pick_taken.emit(-1))
 	show()
 
@@ -139,10 +136,12 @@ func show_traditions(chosen: Array = []) -> void:
 	for id: String in ids:
 		var t: Dictionary = content.traditions[id]
 		var picked := chosen.has(id)
-		var start := ", ".join(t.get("start", {}).keys().map(func(g: String) -> String: return "%d %s" % [t["start"][g], g]))
-		var btn := UiKit.card("Chosen" if picked else "Tradition", t["name"], "", t["text"], "Start with " + start if start != "" else "",
-			RELIC_SIZE, UiKit.HEADING_COLOR, picked, UiKit.HEADING_COLOR)
-		(btn.get_child(0).get_child(2) as Label).add_theme_font_size_override("font_size", 12)
+		var btn := CardView.new(CardView.Size.LARGE, "tradition", "Chosen" if picked else "Tradition", t["name"])
+		btn.custom_minimum_size.x = 210
+		btn.set_selected(picked).set_body(t["text"], CardView.TEXT).set_body_lines(5)
+		var start: Dictionary = t.get("start", {})
+		if not start.is_empty():
+			btn.add_goods(start)
 		btn.tooltip_text = t["text"]
 		btn.disabled = not picked and chosen.size() >= to_pick
 		btn.pressed.connect(func() -> void:
@@ -190,12 +189,14 @@ func show_pedlars() -> void:
 		if not who["guarded"].is_empty():
 			footer += "\nOnce guarded: " + ", ".join(who["guarded"])
 		var where := "Camps %d out, %s" % [roundi(pos.length()), World.compass(pos.angle())]
-		var blurb := "%s\nSells %s, about tier %d.\n%s." % [d["text"], slots.get(d["slot"], d["slot"]),
-			run.world.pedlar.ware_tier(id), where]
-		var btn := UiKit.card("Pedlar, %s" % d["camp"], d["name"], "", blurb, footer, PEDLAR_SIZE, UiKit.HEADING_COLOR,
-			false, UiKit.HEADING_COLOR)
-		(btn.get_child(0).get_child(2) as Label).add_theme_font_size_override("font_size", 12)
-		btn.tooltip_text = blurb + "\n" + footer
+		var sells: String = slots.get(d["slot"], d["slot"])
+		var btn := CardView.new(CardView.Size.LARGE, "trade", "Pedlar · %s" % d["camp"], d["name"])
+		btn.custom_minimum_size.x = 220
+		btn.add_chip("sells " + sells)
+		btn.add_chip("tier %d" % run.world.pedlar.ware_tier(id))
+		btn.add_chip(where.to_lower(), "map", CardView.TEXT, btn.family_color())
+		btn.set_body(d["text"]).set_body_lines(3).set_footer(footer)
+		btn.tooltip_text = "%s\nSells %s, about tier %d.\n%s.\n%s" % [d["text"], sells, run.world.pedlar.ware_tier(id), where, footer]
 		btn.pressed.connect(func() -> void: pedlar_chosen.emit(id))
 		row.add_child(btn)
 	_skip_button("No pedlar", func() -> void: pedlar_chosen.emit(""))
@@ -221,27 +222,33 @@ func _food_each() -> String:
 	return "%s food" % (str(int(n)) if n == floorf(n) else str(n))
 
 
-## One dawn card: what kind, who, the cost and one line; the full detail is in its tooltip.
-func _pick_card(card: Dictionary) -> Button:
+## One dawn card (CardView): what kind in the band, who in the title, the price, what arrives, and one line;
+## the full detail is in its hover panel.
+func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 	var content := run.content
 	var eats := "Eats %s a day" % _food_each()
-	var btn: Button
+	var btn: CardView
 	match card["kind"]:
 		"hero":
 			var hero: Unit = card["hero"]
 			var c: Dictionary = content.hero_classes[hero.type_id]
 			var likes: Array = content.traits[hero.trait_id].get("lodging", [])
 			var beds := " or ".join(likes.map(func(id: String) -> String: return content.buildings[id]["name"].to_lower()))
-			var who := "%s %s" % [content.traits[hero.trait_id]["name"], c["name"].to_lower()]
 			var legend := ""
 			if card.get("legend", false):
 				var gear := PackedStringArray()
 				for slot: String in hero.items:
 					gear.append(Loot.describe(content, hero.items[slot]))
 				legend = "A legend, level %d%s." % [hero.level, ", carrying " + " and ".join(gear) if not gear.is_empty() else ""]
-			btn = UiKit.card("Legend" if legend != "" else "Hero", hero.display_name, UiKit.cost_text(run.stock, {"shells": card["cost"]}),
-				who if legend == "" else "%s\n%s" % [who, legend],
-				"Sleeps in: %s" % beds, PICK_SIZE, Color(c["color"]), false, Color(c["color"]))
+			btn = CardView.new(sz, "hero", ("Legend · " if legend != "" else "Hero · ") + c["name"], hero.display_name)
+			# The hero's own colour, as on the hero strip under the map, as a dot: a gold class colour on the
+			# name would read as a rarity.
+			btn.add_title_dot(Color(c["color"]))
+			btn.set_price(run.stock, {"shells": card["cost"]})
+			btn.add_chip("Lv %d" % hero.level)
+			btn.add_chip(content.traits[hero.trait_id]["name"])
+			btn.set_body(legend if legend != "" else _wilds_line(hero.trait_id))
+			btn.set_footer("Sleeps in " + beds)
 			btn.tooltip_text = "%s, %s %s\nHealth %d, damage %d%s\n%sLikes to sleep in: %s\n%s\n%s." % [hero.display_name,
 				content.traits[hero.trait_id]["name"], c["name"].to_lower(), int(hero.max_hp), int(hero.attack),
 				", ranged" if hero.attack_range > 60 else "", legend + "\n" if legend != "" else "", beds, _trait_hint(hero.trait_id), eats]
@@ -252,66 +259,77 @@ func _pick_card(card: Dictionary) -> Button:
 			var parts := PackedStringArray()
 			for role: String in who:
 				parts.append("%d %s" % [who[role], content.townsfolk[role]["name"].to_lower()])
-			btn = UiKit.card("Family", "A family", UiKit.cost_text(run.stock, {}), ", ".join(parts), "Needs %d beds" % run.people.card_people(card), PICK_SIZE, UiKit.CARD_BORDER)
+			btn = CardView.new(sz, "folk", "Family", "A family")
+			btn.set_price(run.stock, {})
+			var roles: Array = card["roles"].duplicate()
+			for i in CardRoll.extra_people(content, card):
+				roles.append("tribesperson")
+			btn.add_people(roles)
+			btn.set_body(", ".join(parts)).set_footer("Needs %d beds" % run.people.card_people(card))
 			btn.tooltip_text = "A whole family moves in at once: %s.\nEach eats %s a day." % [", ".join(parts), _food_each()]
 		"promote":
-			btn = _promote_card(card)
+			btn = _promote_card(card, sz)
 		"venture":
-			btn = _venture_card(card)
+			btn = _venture_card(card, sz)
 		"spell":
-			btn = _spell_card(card)
+			btn = _spell_card(card, sz)
 		_:
 			var def: Dictionary = content.townsfolk[card["role"]]
+			var roles: Array = [card["role"]]
+			for i in CardRoll.extra_people(content, card):
+				roles.append(card["role"])
 			if card.has("leaning"):
 				var lean: Dictionary = def["leanings"][card["leaning"]]
 				var key: String = card["role"] + "/" + card["leaning"]
 				var size := int(run.world.folk_ai.count_leanings().get(key, 0))
 				var level := run.world.folk_ai.band_level(card["role"], card["leaning"], size)
 				var grows := run.world.folk_ai.band_level(card["role"], card["leaning"], size + 1) > level
-				var top: String = ("Forms a band" if level == 0 else "Band grows stronger") if grows else def["name"]
-				btn = UiKit.card(top, lean["name"], UiKit.cost_text(run.stock, {}), lean["text"], eats, PICK_SIZE, UiKit.CARD_BORDER, grows)
+				btn = CardView.new(sz, "folk", def["name"], lean["name"])
+				if grows:
+					btn.set_advice("Forms a band" if level == 0 else "Band grows stronger")
+				btn.set_price(run.stock, {})
+				btn.add_people(roles)
+				for good: String in lean["goods"].slice(0, 2):
+					btn.add_good_label(good)
+				btn.set_body(lean["text"]).set_footer(eats)
 				btn.tooltip_text = "%s\n%s Still fetches anything the town is short of, but picks trips for %s first.\n%s\n%s." % [
 					def["text"], lean["text"], ", ".join(lean["goods"]).replace("_", " "),
 					Tooltips.band_line(run, card["role"], card["leaning"], true), eats]
 			else:
-				btn = UiKit.card("Townsperson", def["name"], UiKit.cost_text(run.stock, {}), def["text"], eats, PICK_SIZE, UiKit.CARD_BORDER)
+				btn = CardView.new(sz, "folk", "Townsperson", def["name"])
+				btn.set_price(run.stock, {})
+				btn.add_people(roles)
+				btn.set_body(def["text"]).set_footer(eats)
 				btn.tooltip_text = "%s\n%s." % [def["text"], eats]
 	return btn
 
 
 ## A venture: send tribespeople out, some never come back, the rest bring goods home.
-func _venture_card(card: Dictionary) -> Button:
+func _venture_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 	var v: Dictionary = run.content.ventures[card["venture"]]
 	var terms := run.people.venture_terms(card["venture"], card)
 	var lose: Array = terms["lose"]
 	var losing := "%d" % lose[0] if lose[0] == lose[1] else "%d-%d" % [lose[0], lose[1]]
 	var brings := ", ".join(terms["goods"].keys().map(func(g: String) -> String: return "%d %s" % [terms["goods"][g], g.replace("_", " ")]))
-	var btn := UiKit.card("Venture: send %d tribespeople" % terms["send"], v["name"], "[color=#ff7a6a]%s won't come back[/color]" % losing,
-		"Brings home %s" % brings, "", PICK_SIZE, UiKit.CARD_BORDER)
+	var btn := CardView.new(sz, "venture", "Venture · send %d" % terms["send"], v["name"])
+	# One figure per person sent, crossed out red for those who won't come back.
+	btn.add_control(VentureFigures.make(terms["send"], lose[0], lose[1] - lose[0], 16.0))
+	btn.add_chip("%s won't come back" % losing, "", CardView.DANGER)
+	# The reward never clips: each good is its own chip.
+	btn.add_goods(terms["goods"])
+	btn.set_footer("Instead of a newcomer")
 	btn.tooltip_text = "%s\nSend %d tribespeople (you have %d). %s of them never come home; the rest bring %s.\nInstead of a newcomer today.\nA bold red X is a sure death, a faint one may or may not come home." % [
 		v["text"], terms["send"], run.count_role("tribesperson"), losing, brings]
-	# One figure per person sent, crossed out red for those who won't come back, under the cost line.
-	var box: Control = btn.get_child(0)
-	var figures := VentureFigures.make(terms["send"], lose[0], lose[1] - lose[0], 18.0)
-	box.add_child(figures)
-	box.move_child(figures, 3)
-	# The reward must never clip away (a two-line name used to squeeze it off the card), so it
-	# shows whole in green on a slightly taller card, and "instead of a newcomer" lives in the tooltip.
-	btn.custom_minimum_size.y += 22
-	var reward: Label = box.get_child(4)
-	reward.clip_text = false
-	reward.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
-	reward.add_theme_font_size_override("font_size", 12)
-	reward.add_theme_color_override("font_color", Color("#9be08a"))
 	return btn
 
 
 ## A geomancy spell: how many nights it takes and what it does when done.
-func _spell_card(card: Dictionary) -> Button:
+func _spell_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 	var sd: Dictionary = run.content.plates["spells"][card["spell"]]
 	var nights := maxi(1, int(sd["nights"]) + int(CardRoll.card_sum(run.content, card, "nights")))
-	var btn := UiKit.card("Geomancy: %d night%s" % [nights, "" if nights == 1 else "s"], sd["name"], "", sd["text"],
-		"Instead of a newcomer", SPELL_SIZE, Color("#7a5a8a"))
+	var btn := CardView.new(sz, "earth", "Geomancy", sd["name"])
+	btn.add_nights(nights)
+	btn.set_body(sd["text"]).set_body_lines(3).set_footer("Instead of a newcomer")
 	btn.tooltip_text = "%s\nThe geomancer works on one spell at a time; when it is done, dawn offers spells again." % sd["text"]
 	return btn
 
@@ -344,35 +362,46 @@ func show_venture_result() -> void:
 	show()
 
 
-func _promote_card(card: Dictionary) -> Button:
+## A promotion: who, what they become (before and after), and the price.
+func _promote_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 	var content := run.content
-	var cost := UiKit.cost_text(run.stock, {"shells": card["cost"]})
-	var btn: Button
+	var btn: CardView
 	match card["role"]:
 		"warrior":
 			var u: Unit = card["unit"]
 			var hero: Unit = card["hero"]
 			var cls: String = content.hero_classes[hero.type_id]["name"]
-			btn = UiKit.card("Promote a veteran warrior", hero.display_name, cost, "becomes a %s %s" % [
-				content.traits[hero.trait_id]["name"].to_lower(), cls.to_lower()], "Needs a bed like any hero", PICK_SIZE, UiKit.RECOMMEND_COLOR, true)
+			btn = CardView.new(sz, "promote", "Promote a veteran warrior", hero.display_name)
+			btn.add_chip("%d kills" % u.kills)
+			btn.add_chip("→ %s %s" % [content.traits[hero.trait_id]["name"].to_lower(), cls.to_lower()], "", CardView.GOOD)
+			btn.set_footer("Needs a bed like any hero")
 			btn.tooltip_text = "A warrior with %d kills, here since round %d, becomes %s, %s %s, level %d.\nNeeds a bed like any hero." % [
 				u.kills, u.joined_round, hero.display_name, content.traits[hero.trait_id]["name"], cls.to_lower(), hero.level]
 		"champion":
 			var hero: Unit = card["hero"]
 			var knight: String = content.hero_classes[content.promotions["champion"]["becomes"]]["name"]
-			btn = UiKit.card("Knight a champion", hero.display_name, cost, "becomes a %s" % knight.to_lower(), "Level %d" % hero.level,
-				PICK_SIZE, UiKit.RECOMMEND_COLOR, true)
+			btn = CardView.new(sz, "promote", "Knight a champion", hero.display_name)
+			btn.add_chip("Lv %d" % hero.level)
+			btn.add_chip("→ " + knight.to_lower(), "", CardView.GOOD)
 			btn.tooltip_text = "%s, a level %d champion, is knighted and becomes a %s." % [hero.display_name, hero.level, knight.to_lower()]
 		_:
 			var u: Unit = card["unit"]
 			var shop: String = content.buildings[card["workshop"]]["name"].to_lower()
 			var t: Dictionary = content.promotions["craftsperson"]["traits"][card["trait"]]
 			var effects := Tooltips.master_effects(content, card["trait"], card["workshop"])
-			btn = UiKit.card("Promote a craftsperson", card["name"], cost, "%s master of the %s: %s." % [t["name"], shop,
-				", ".join(Tooltips.master_effects(content, card["trait"], card["workshop"], true))], "", PICK_SIZE, UiKit.RECOMMEND_COLOR, true)
+			btn = CardView.new(sz, "promote", "Promote a craftsperson", card["name"])
+			btn.add_chip("%s master of the %s" % [t["name"], shop], "", CardView.GOOD)
+			btn.set_body(", ".join(Tooltips.master_effects(content, card["trait"], card["workshop"], true)) + ".", CardView.TEXT).set_body_lines(4)
 			btn.tooltip_text = "A craftsperson who made %d goods at the %s becomes %s, master of the %s.\n%s: %s\n%s.\nA master goes to their own bench before any other." % [
 				int(u.made[card["workshop"]]), shop, card["name"], shop, t["name"], t["text"], ".\n".join(effects)]
+	btn.set_price(run.stock, {"shells": card["cost"]})
 	return btn
+
+
+## Where a hero of this trait goes by day, as one line for the card.
+func _wilds_line(trait_id: String) -> String:
+	var w := float(run.content.traits[trait_id]["wilds"])
+	return "Hunts far out at the dens by day." if w > 0.6 else ("Stays near the camp." if w < 0.2 else "Ventures out sometimes.")
 
 
 func _trait_hint(trait_id: String) -> String:
@@ -382,10 +411,13 @@ func _trait_hint(trait_id: String) -> String:
 		roundi(float(t["retreat_at"]) * 100.0), int(t.get("tired_at", 25))]
 
 
-## One line on what happened last night, above the dawn and relic picks.
-func _night_summary() -> void:
+## One line on what happened last night, above the dawn and relic picks, with `extra` (shells and room at dawn)
+## on the same line so the window stays short.
+func _night_summary(extra := "") -> void:
 	var n := run.last_night
 	if n.is_empty():
+		if extra != "":
+			UiKit.note(_box, extra, 14, Color("#e8e8e8")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		return
 	var deaths: Array = n["deaths"]
 	var left: Array = n.get("left", [])
@@ -399,7 +431,7 @@ func _night_summary() -> void:
 		lost.append("%s (%s)" % [name, "left unhappy" if unhappy.has(name) else "left hungry"])
 	text += "Lost: %s." % ", ".join(lost) if not lost.is_empty() else "Nobody was lost."
 	var label := Label.new()
-	label.text = text
+	label.text = text + ("\n" + extra if extra != "" else "")
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	label.custom_minimum_size.x = 600
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -426,7 +458,6 @@ func _impact_line() -> void:
 
 
 func show_relic_pick() -> void:
-	var content := run.content
 	_clear()
 	_title(("Round %d survived! Choose a pact" if run.is_pact_round() else "Round %d survived! Choose a relic") % run.round_number)
 	_night_summary()
@@ -436,30 +467,59 @@ func show_relic_pick() -> void:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_box.add_child(row)
 	for id in run.relic_offer:
-		var r: Dictionary = content.relics[id]
-		var kind := "Pact" if content.has_tag("relic", id, "pact") else "Relic"
-		var text: String = r["text"]
-		var footer := ""
-		if id == run.spoils.get("id", ""):
-			kind = "Spoils of the %s" % str(content.balance.get("spoils_kinds", {}).get(run.spoils["kind"], run.spoils["kind"]))
-			var now := run.spoils_now()
-			var parts := PackedStringArray()
-			for good: String in now["goods"]:
-				parts.append("%d %s" % [now["goods"][good], good])
-			for role: String in now["folk"]:
-				parts.append("%d %s" % [now["folk"][role], content.townsfolk[role]["name"].to_lower()])
-			if not parts.is_empty():
-				footer = "Now: " + ", ".join(parts)
-			text += "\n%d of them came. Instead of a relic." % int(run.spoils["foes"])
-		var btn := UiKit.card(kind, r["name"], "", text, footer, RELIC_SIZE, UiKit.HEADING_COLOR, false, UiKit.HEADING_COLOR)
-		# A relic's one line is the whole story, so it gets room instead of being cut short.
-		(btn.get_child(0).get_child(2) as Label).add_theme_font_size_override("font_size", 12)
-		UiKit.mark_rarity(btn, content, content.rarity_of("relic", id))
-		btn.tooltip_text = text + ("\n" + footer if footer != "" else "")
-		btn.pressed.connect(func() -> void: relic_picked.emit(id))
-		row.add_child(btn)
+		row.add_child(_relic_card(id))
 	_skip_button("Skip the relic", func() -> void: relic_picked.emit(""))
 	show()
+
+
+## One relic, pact or spoils card (CardView). Relics don't roll, so the frame is the relic's own rarity. Chips name
+## the tags a tag-keyed relic acts on; spoils show what taking them brings now.
+func _relic_card(id: String) -> CardView:
+	var content := run.content
+	var r: Dictionary = content.relics[id]
+	var is_spoils: bool = id == run.spoils.get("id", "")
+	var kind := "Pact" if "pact" in content.tags_of("relic", id) else "Relic"
+	var text: String = r["text"]
+	if is_spoils:
+		kind = "Spoils of the %s" % str(content.balance.get("spoils_kinds", {}).get(run.spoils["kind"], run.spoils["kind"]))
+	var btn := CardView.new(CardView.Size.LARGE, "spoils" if is_spoils else "relic", kind, r["name"])
+	btn.custom_minimum_size.x = 206
+	btn.set_roll(content, content.rarity_of("relic", id), "white", [])
+	# A relic's text is the whole card, so it gets room instead of being cut short.
+	btn.set_body(text, CardView.TEXT).set_body_lines(5)
+	for key: String in RunState.TAG_EFFECTS:
+		for tag: String in r.get("effects", {}).get(key, {}):
+			btn.add_chip(tag.replace("_", " "), "spark", CardView.TEXT, btn.family_color())
+	var footer := _relic_footer(r)
+	if is_spoils:
+		var now := run.spoils_now()
+		btn.add_goods(now["goods"])
+		var roles: Array = []
+		for role: String in now["folk"]:
+			for i in int(now["folk"][role]):
+				roles.append(role)
+		if not roles.is_empty():
+			btn.add_people(roles)
+		footer = "%d of them came. Instead of a relic." % int(run.spoils["foes"])
+	btn.set_footer(footer)
+	var tags := Tooltips.tag_notes(run, "relic", id)
+	btn.tooltip_text = text + ("\n" + footer if footer != "" else "") + ("\nTags: " + "\n".join(tags) if not tags.is_empty() else "")
+	btn.pressed.connect(func() -> void: relic_picked.emit(id))
+	return btn
+
+
+## What a tag-keyed relic would act on in this town now ("Your heroes carry 3 bone items"), or "".
+func _relic_footer(r: Dictionary) -> String:
+	var bonus: Dictionary = r.get("effects", {}).get("gear_bonus", {})
+	if bonus.is_empty():
+		return ""
+	var count := 0
+	for hero: Unit in run.living_heroes():
+		for slot: String in hero.items:
+			for tag: String in bonus:
+				if tag in run.content.tags_of("item", hero.items[slot]["base"]):
+					count += 1
+	return "Your heroes carry %d such item%s" % [count, "" if count == 1 else "s"]
 
 
 func show_end() -> void:
@@ -697,6 +757,6 @@ func _clear() -> void:
 func _title(text: String) -> void:
 	var title := Label.new()
 	title.text = text
-	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_font_size_override("font_size", 22)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_box.add_child(title)

@@ -9,7 +9,7 @@ extends PanelContainer
 
 signal moved
 
-const BORDER := Color("#ffd28a")
+const BORDER := Color("#e6e1d3", 0.7)
 
 ## The row the offers and the reroll go in.
 var cards: HBoxContainer
@@ -43,7 +43,7 @@ func _init() -> void:
 	_title = UiKit.note(bar, "", 17, UiKit.HEADING_COLOR)
 	_title.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var drag := UiKit.note(bar, "drag to move", 11)
+	var drag := UiKit.note(bar, "pick one, kept all run · drag to move", 11)
 	drag.autowrap_mode = TextServer.AUTOWRAP_OFF
 	drag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	drag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -55,11 +55,13 @@ func _init() -> void:
 	_body = VBoxContainer.new()
 	_body.add_theme_constant_override("separation", 6)
 	box.add_child(_body)
-	UiKit.note(_body, "Pick one: it joins Your blueprints below and stays on offer for the whole run.", 12).autowrap_mode = TextServer.AUTOWRAP_OFF
 	cards = HBoxContainer.new()
 	cards.add_theme_constant_override("separation", 8)
 	_body.add_child(cards)
 	set_collapsed(false)
+	# Cards settle their height a frame after they are added (CardView): the window refits to them, and
+	# tells the panels beside it to make room again.
+	minimum_size_changed.connect(_fit)
 
 
 func set_title(text: String, tip := "") -> void:
