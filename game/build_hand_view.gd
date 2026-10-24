@@ -150,13 +150,13 @@ func _draft_cards() -> void:
 		return
 	draft.set_title("Draft %d blueprints" % run.hand.picks if run.hand.picks > 1 else "Draft a blueprint", pool_line(run))
 	for card: Dictionary in run.hand.cards:
-		draft.cards.add_child(_card(card["building"], card["need"], "draft"))
+		draft.cards.add_child(_card(card["building"], card["need"], "draft", card))
 	for card: Dictionary in run.hand.rows:
 		draft.cards.add_child(_row_card(card["row"], card["need"], true))
 	if run.hand.ring_offer():
 		draft.cards.add_child(_ring_card())
 	for card: Dictionary in run.hand.upgrade_offers:
-		draft.cards.add_child(_upgrade_card(card["upgrade"]))
+		draft.cards.add_child(_upgrade_card(card))
 	var redraw := UiKit.secondary(Button.new(), 13)
 	redraw.text = "Reroll\n%d shells" % run.hand.redraw_cost() if run.hand.redraws == 0 else "Rerolled\nthis round"
 	redraw.custom_minimum_size = Vector2(86, CARD_SIZE.y)
@@ -262,7 +262,8 @@ func recommendation(type: String, need: String) -> String:
 	return ""
 
 
-func _card(type: String, need: String, kind: String) -> Button:
+## offer = the draft offer (with its roll); a drafted blueprint shows the roll it was drafted with.
+func _card(type: String, need: String, kind: String, offer := {}) -> Button:
 	var def: Dictionary = run.content.buildings[type]
 	var owned := run.world.count_buildings(type, false)
 	var why := recommendation(type, need)
@@ -272,12 +273,17 @@ func _card(type: String, need: String, kind: String) -> Button:
 	var hint := row_hint(run, type) if kind == "draft" else ""
 	var footer := (dawn if dawn != "" else hint) if kind == "draft" else ("You have %d" % owned if owned > 0 else "")
 	var rarity := run.content.rarity_of("building", type)
+	# The frame shows the offer's own roll (CardRoll); the corner gem how rare this blueprint is.
+	var rolled: Dictionary = offer if kind == "draft" else run.hand.rolled.get(type, {})
+	var roll := CardRoll.roll_of(rolled)
 	var btn := UiKit.card(top, def["name"], UiKit.cost_text(run.stock, def["cost"]), def["text"],
 		footer, BASIC_SIZE if kind == "basic" else CARD_SIZE, border, why != "",
-		UiKit.HEADING_COLOR if kind == "age" else (Color.WHITE if rarity == "white" else run.content.rarity_color(rarity)))
-	btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], def["work"]]
-	if rarity != "white":
-		btn.tooltip_text = "%s blueprint (rarer ones come up less often).\n" % run.content.rarity_tier(rarity)["name"] + btn.tooltip_text
+		UiKit.HEADING_COLOR if kind == "age" else (Color.WHITE if roll == "white" else run.content.rarity_color(roll)))
+	btn.tooltip_text = "%s\nA craftsperson needs about %d seconds to raise it." % [def["text"], roundi(float(def["work"]))]
+	if kind == "draft" or kind == "blueprint":
+		UiKit.mark_roll(btn, run.content, roll, rarity, CardRoll.lines(run.content, rolled))
+		if roll != "white" and kind == "draft":
+			btn.tooltip_text += "\nDrafted, its modifiers change every one you build for the rest of the run."
 	if dawn != "":
 		btn.tooltip_text += "\n" + dawn + "."
 	if kind == "draft":
@@ -307,15 +313,16 @@ func _card(type: String, need: String, kind: String) -> Button:
 
 
 ## An upgrade offer: changes a building the town has for the rest of the run, instead of a new blueprint.
-func _upgrade_card(id: String) -> Button:
+func _upgrade_card(offer: Dictionary) -> Button:
+	var id: String = offer["upgrade"]
 	var up: Dictionary = run.content.upgrades[id]
+	var roll := CardRoll.roll_of(offer)
 	var rarity: String = up.get("rarity", "white")
 	var building: String = run.content.buildings[up["building"]]["name"]
 	var btn := UiKit.card("Upgrade your %s" % building.to_lower(), up["name"], "", up["text"], "Instead of a new blueprint",
-		CARD_SIZE, UiKit.HEADING_COLOR, false, Color.WHITE if rarity == "white" else run.content.rarity_color(rarity))
+		CARD_SIZE, UiKit.HEADING_COLOR, false, Color.WHITE if roll == "white" else run.content.rarity_color(roll))
 	btn.tooltip_text = "Draft it: every %s, built or still to come, is changed for the rest of the run.\n%s" % [building.to_lower(), up["text"]]
-	if rarity != "white":
-		btn.tooltip_text = "%s upgrade (rarer ones come up less often).\n" % run.content.rarity_tier(rarity)["name"] + btn.tooltip_text
+	UiKit.mark_roll(btn, run.content, roll, rarity, CardRoll.lines(run.content, offer))
 	btn.disabled = not run.hand.can_draft_upgrade(id)
 	btn.pressed.connect(_act.bind(run.hand.draft_upgrade.bind(id)))
 	return btn

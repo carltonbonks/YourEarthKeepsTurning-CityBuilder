@@ -256,11 +256,15 @@ def main(raw_folder, out_folder):
                 tables["builds"].append({"run_id": rid, "round": rn, "building": a.get("building", a.get("kind", ""))})
             built = [a.get("building", "") for a in rd.get("actions", []) if a.get("kind", "build") == "build"]
             drafted = [b.get("building", "") for b in rd.get("blueprints", [])]
+            drafted_mods = {b.get("building", ""): " ".join(b.get("mods", [])) for b in rd.get("blueprints", [])}
             for deal, hand in enumerate(rd.get("build_hands", [])):
-                for building in hand.get("cards", []):
+                hand_rolls = hand.get("rolls", [])
+                for n, building in enumerate(hand.get("cards", [])):
                     tables["build_cards"].append({"run_id": rid, "round": rn, "deal": deal + 1, "building": building,
                                                   "ordered": 1 if building in built else 0,
-                                                  "drafted": 1 if building in drafted else 0})
+                                                  "drafted": 1 if building in drafted else 0,
+                                                  "roll": hand_rolls[n] if n < len(hand_rolls) else "white",
+                                                  "drafted_mods": drafted_mods.get(building, "")})
             for enemy, count in wave.items():
                 tables["wave_enemies"].append({"run_id": rid, "round": rn, "enemy": enemy, "count": count})
             for d in deaths:
@@ -337,7 +341,7 @@ def main(raw_folder, out_folder):
         "market_sales": ["run_id", "round", "day", "hero", "trait", "recipe", "tier", "price", "stall"],
         "crafted": ["run_id", "round", "recipe", "count"],
         "promotions": ["run_id", "round", "day", "role", "name", "became", "trait", "joined_round"],
-        "build_cards": ["run_id", "round", "deal", "building", "ordered", "drafted"],
+        "build_cards": ["run_id", "round", "deal", "building", "ordered", "drafted", "roll", "drafted_mods"],
         "trade_deals": ["run_id", "round", "deal", "rarity", "taken", "relic", "reforged", "roll", "mods"],
         "impact": ["run_id", "round", "group", "who", "hero_class", *IMPACT_STATS, "goods_total",
                    *["goods_" + k for k in RESOURCES]],

@@ -99,6 +99,14 @@ func _wanted_offer(run: RunState) -> String:
 	return ""
 
 
+## The offers with rolled ones first, each part in its dealt order.
+static func _rolled_first(offers: Array[Dictionary]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	out.assign(offers.filter(func(c: Dictionary) -> bool: return c.has("roll")))
+	out.append_array(offers.filter(func(c: Dictionary) -> bool: return not c.has("roll")))
+	return out
+
+
 ## Drafts a row holding a wished-for building (not the workers style, see `rows`), else the most wished-for
 ## offer, else one the town needs, else the first offered.
 func _draft(run: RunState) -> void:
@@ -118,17 +126,19 @@ func _draft(run: RunState) -> void:
 			if run.hand.can_draft(type):
 				pick = type
 				break
-	# Else an upgrade to something it already has.
+	# Else an upgrade to something it already has (a rolled one first).
 	if pick == "" and not run.hand.upgrade_offers.is_empty():
-		run.hand.draft_upgrade(run.hand.upgrade_offers[0]["upgrade"])
+		run.hand.draft_upgrade(_rolled_first(run.hand.upgrade_offers)[0]["upgrade"])
 		return
+	# Else one the town needs, then any offer; a rolled offer before a plain one.
+	var offers := _rolled_first(run.hand.cards)
 	if pick == "":
-		for c in run.hand.cards:
+		for c in offers:
 			if c["need"] != "":
 				pick = c["building"]
 				break
-	if pick == "" and not run.hand.cards.is_empty():
-		pick = run.hand.cards[0]["building"]
+	if pick == "" and not offers.is_empty():
+		pick = offers[0]["building"]
 	if pick != "":
 		run.hand.draft(pick)
 

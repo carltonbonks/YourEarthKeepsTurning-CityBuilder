@@ -12,19 +12,25 @@ extends RefCounted
 ## Each run drafts from its own pool of blueprints (Yusuf, 2026-10-23): buildings tagged staple, the founding
 ## traditions' buildings and what the age-ups require are always in it, and blueprint_pool_share of the rest, per age,
 ## is dealt from the run's seed, so runs differ in which buildings they can have at all (`in_pool`).
+## Blueprint and upgrade offers roll their own rarity each time they are dealt (CardRoll, Yusuf 2026-10-23): a rolled
+## offer carries modifiers, and drafting it writes them into the building's numbers for the rest of the run, so the
+## rolled blueprint is the one in the town's hand. Rows, the ring offer and the age-up card don't roll.
 ## Numbers are in data/balance.json (blueprint_*, build_need_weight, build_new_weight, build_redraw_cost).
 
 var run: RunState
-## This round's draft offers, each {"building": type, "need": why the town wants it ("" if nothing in particular)}.
+## This round's draft offers, each {"building": type, "need": why the town wants it ("" if nothing in particular)},
+## plus "roll" and "boons" (CardRoll) when it rolled above white.
 var cards: Array[Dictionary] = []
 ## The ageing-up card ({} when no age-up building can be ordered).
 var milestone := {}
 ## Row offers in the draft, each {"row": id from data/combos.json, "need": why the town wants either building}.
 var rows: Array[Dictionary] = []
-## Upgrade offers in the draft, each {"upgrade": id from data/upgrades.json}.
+## Upgrade offers in the draft, each {"upgrade": id from data/upgrades.json}, plus "roll" and "boons" when it rolled.
 var upgrade_offers: Array[Dictionary] = []
 ## Buildings drafted this run, in the order they were taken: on offer for good.
 var blueprints: Array[String] = []
+## Drafted blueprints and taken upgrades that rolled: building type or "upgrade:<id>" -> {"roll", "boons"}.
+var rolled := {}
 ## Rows drafted this run.
 var row_blueprints: Array[String] = []
 ## Drafts left to take (unspent picks carry over to the next round).
@@ -35,6 +41,7 @@ var _dealt_round := -1
 ## This run's blueprint pool (see `in_pool`), dealt once the founding traditions are chosen.
 var _pool: Array[String] = []
 var _dealt_age := ""
+var _fills := 0
 
 
 func _init(run_state: RunState) -> void:
@@ -69,7 +76,7 @@ func redraw() -> bool:
 	var before := labels()
 	_fill(SeededRng.stream(run.run_seed, "build_cards", run.round_number * 10 + redraws), before)
 	run.record.note_action({"kind": "redraw", "cost": redraw_cost()})
-	run.record.note_list("build_hands", {"cards": labels()})
+	run.record.note_list("build_hands", hand_entry())
 	return true
 
 
@@ -138,7 +145,8 @@ func can_draft(type: String) -> bool:
 func draft(type: String) -> bool:
 	if not can_draft(type):
 		return false
-	_take(type)
+	var card: Dictionary = cards.filter(func(c: Dictionary) -> bool: return c["building"] == type)[0]
+	_take(type, card)
 	run.record.note_action({"kind": "blueprint", "building": type})
 	_after_draft()
 	return true
@@ -187,16 +195,36 @@ func draft_row(id: String) -> bool:
 	return true
 
 
-func _take(type: String) -> void:
+## Adds a blueprint; a rolled offer's modifiers change the building for the rest of the run, and Twin-built raises
+## one for free at once.
+func _take(type: String, card := {}) -> void:
 	blueprints.append(type)
-	run.record.note_list("blueprints", {"building": type})
+	var entry := {"building": type}
+	if card.has("roll"):
+		entry["roll"] = card["roll"]
+		entry["mods"] = card["boons"].duplicate()
+		_apply_roll(type, card, type)
+	run.record.note_list("blueprints", entry)
+
+
+## Writes a drafted roll into a building's numbers and raises Twin-built's free one (if a plot is free).
+func _apply_roll(type: String, card: Dictionary, key: String) -> void:
+	rolled[key] = {"roll": card["roll"], "boons": card["boons"].duplicate()}
+	CardRoll.apply_to_building(run, type, card)
+	var name: String = run.content.buildings[type]["name"]
+	run.tell("%s %s: %s." % [run.content.rarity_tier(card["roll"])["name"], name.to_lower(),
+		"; ".join(PackedStringArray(CardRoll.lines(run.content, card)))])
+	if CardRoll.card_has(run.content, card, "free_copy") and run.world.count_buildings(type, false) < run.building_max(type) \
+			and run.world.add_building(type):
+		run.record.note_count("card_mods_fired", 1, "twin_built")
+		run.tell("A second %s goes up for free." % name.to_lower())
 
 
 func _after_draft() -> void:
 	picks -= 1
 	if picks > 0:
 		_fill(SeededRng.stream(run.run_seed, "build_cards", run.round_number * 10 + 5 + blueprints.size()))
-		run.record.note_list("build_hands", {"cards": labels()})
+		run.record.note_list("build_hands", hand_entry())
 	else:
 		cards = []
 		rows = []
@@ -284,6 +312,27 @@ func ageing_need() -> String:
 		if needs != "" and not blueprints.has(needs) and run.world.count_buildings(needs, false) == 0:
 			return needs
 	return ""
+
+
+## A "build_hands" record entry: the offers, and their rolls when any rolled above white.
+func hand_entry() -> Dictionary:
+	var entry := {"cards": labels()}
+	var r := rolls()
+	if r.any(func(x: String) -> bool: return x != "white"):
+		entry["rolls"] = r
+	return entry
+
+
+## Each draft offer's rolled rarity, in labels() order, for the run record.
+func rolls() -> Array:
+	var out := cards.map(CardRoll.roll_of)
+	for c in rows:
+		out.append("white")
+	if ring_offer():
+		out.append("white")
+	for c in upgrade_offers:
+		out.append(CardRoll.roll_of(c))
+	return out
 
 
 ## The draft offers, for the run record.
@@ -411,6 +460,13 @@ func _fill(rng: SeededRng, avoid: Array = []) -> void:
 		var type := rng.weighted(weights)
 		weights.erase(type)
 		cards.append({"building": type, "need": need(type)})
+	# Each offer rolls on its own stream, so the roll never changes which buildings are offered.
+	_fills += 1
+	var roll_rng := SeededRng.stream(run.run_seed, "blueprint_roll", _fills)
+	for c in cards:
+		CardRoll.roll_building(content, roll_rng, c, "blueprint", c["building"], run.round_number)
+	for c in upgrade_offers:
+		CardRoll.roll_building(content, roll_rng, c, "upgrade", content.upgrades[c["upgrade"]]["building"], run.round_number)
 
 
 ## Offers up to upgrade_cards upgrades not taken yet for buildings the town has standing, weighted by rarity.
@@ -444,7 +500,10 @@ func can_draft_upgrade(id: String) -> bool:
 func draft_upgrade(id: String) -> bool:
 	if not can_draft_upgrade(id):
 		return false
-	run.take_upgrade(id)
+	var offer: Dictionary = upgrade_offers.filter(func(c: Dictionary) -> bool: return c["upgrade"] == id)[0]
+	run.take_upgrade(id, offer)
+	if offer.has("roll"):
+		_apply_roll(run.content.upgrades[id]["building"], offer, "upgrade:" + id)
 	_after_draft()
 	return true
 

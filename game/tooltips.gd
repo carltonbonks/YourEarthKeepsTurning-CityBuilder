@@ -172,6 +172,12 @@ static func building(run: RunState, index: int) -> Dictionary:
 	var def: Dictionary = c.buildings[b["type"]]
 	var t := new_tip(def["name"])
 	t["lines"].append(def["text"])
+	# Rolled blueprints and upgrades drafted for it (CardRoll): one line a modifier.
+	for key: String in run.hand.rolled:
+		var up: String = key.trim_prefix("upgrade:")
+		if key == b["type"] or (key.begins_with("upgrade:") and c.upgrades[up]["building"] == b["type"]):
+			for line in CardRoll.lines(c, run.hand.rolled[key]):
+				t["lines"].append(line)
 	var work_left := float(b["work_left"])
 	if work_left > 0.0:
 		t["lines"].append("Being built: %d%% done" % roundi(100.0 * (1.0 - work_left / float(def["work"]))))
