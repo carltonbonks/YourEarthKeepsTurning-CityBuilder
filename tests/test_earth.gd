@@ -305,6 +305,28 @@ func test_a_full_trench_takes_a_den_and_its_wanderers() -> void:
 	run.dispose()
 
 
+func test_a_full_trench_takes_the_war_camp_raiders_spoils_and_all() -> void:
+	var run := _run()
+	var w := run.world
+	var earth := w.earth
+	var far := earth.rings.size() - 1
+	_make_full(earth, far, 0, "subduct")
+	var p := _beside(earth, far, 0, true)
+	w.dens.append({"type": "war_camp", "spawns": "wolf", "pos": p, "respawn_left": 0.0, "camp": true, "joined": 1})
+	var camper := w.enemy_ai.make_enemy("wolf", p, 0.0)
+	camper.spawned = true
+	camper.den_index = w.dens.size() - 1
+	w.enemies.append(camper)
+	check(earth.doomed(p), "the camp's ground cracks before it goes")
+	var shells: int = run.stock["shells"]
+	earth.shift()
+	check_eq(w.camp_index(), -1, "the war camp went under")
+	check(not camper.alive, "its raiders went with it")
+	check(bool(earth.last.get("camp_swallowed", false)), "the shift reports the camp")
+	check_eq(int(run.stock["shells"]), shells, "nobody won the camp's spoils")
+	run.dispose()
+
+
 func test_a_full_colliding_seam_raises_a_ridge_with_a_rich_vein() -> void:
 	var content := Content.load_default()
 	content.plates["pressure"]["per_turn"] = 0

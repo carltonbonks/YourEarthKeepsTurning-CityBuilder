@@ -618,12 +618,21 @@ func assisted_food(b: Dictionary) -> int:
 	return mini(earned, int(assist.get("food_max", 0)))
 
 
+## True if a point lies outside the town within attack_way_band radians of one of this round's attack ways.
+func _on_attack_way(p: Vector2) -> bool:
+	if p.length() <= w.content.num("settlement_radius"):
+		return false
+	var band := w.content.num("attack_way_band")
+	return w.wave_sides.any(func(side: float) -> bool: return absf(angle_difference(side, p.angle())) < band)
+
+
 ## Picks the gathering trip worth the most to the town, or -1. Each trip is scored by how badly the town
 ## needs the good (after what is already on its way in) times what this gatherer can carry back from what
 ## the node will have left once the others heading there have taken theirs, over the time the round trip takes.
 ## A trip that can't reach the node and finish gathering before dusk isn't started.
 ## Craftspeople only fetch wood. A gatherer's leaning makes trips for its goods worth leaning_weight times more, and
 ## gives it first dibs on them: it counts what gatherers there who don't lean to the good claimed as free (_choose_work bumps them).
+## On the attack's day trips out along the way it comes in are worth attack_way_keep_off as much.
 func plan_trip(unit: Unit) -> int:
 	_trip_need = 0.0
 	var time_left := w.content.num("day_seconds") - w.content.num("dusk_seconds") - w.time_of_day()
@@ -640,6 +649,7 @@ func plan_trip(unit: Unit) -> int:
 		need[good] = maxf(floor_need, short / maxf(float(wants[good]), 1.0))
 	var best := -1
 	var best_score := 0.0
+	var attack_day := w.day_index() == w.content.int_num("days_per_round") - 1
 	for i in w.nodes.size():
 		var node := w.nodes[i]
 		var good: String = node["gives"]
@@ -666,6 +676,9 @@ func plan_trip(unit: Unit) -> int:
 		# Ground a full seam will swallow at the next turn shows cracks: strip it while it lasts.
 		if w.earth.doomed(node["pos"]):
 			score *= float(w.content.plates["pressure"]["crack_gather"])
+		# On the attack's day they keep away from the way it will come in.
+		if attack_day and _on_attack_way(node["pos"]):
+			score *= w.content.num("attack_way_keep_off")
 		if score > best_score:
 			best_score = score
 			best = i

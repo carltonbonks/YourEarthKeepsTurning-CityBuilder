@@ -189,6 +189,37 @@ func test_night_closes_in_on_the_town_and_keeps_the_speed() -> void:
 	screen.free()
 
 
+func test_the_earth_turning_pulls_the_camera_out_and_can_be_skipped() -> void:
+	var screen: Control = load("res://game/main.tscn").instantiate()
+	screen.call("_ready")
+	screen.call("_new_run", 4821)
+	var run: RunState = screen.get("run")
+	var arena: ArenaView = screen.get("_arena")
+	arena.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	arena.size = Vector2(1280, 720)
+	arena.call("_watch_shift")
+	check(not arena.turn_playing(), "showing a run for the first time is not a turn")
+	arena.zoom = 2.0
+	arena.pan = Vector2(150, 80)
+	run.world.earth.shift()
+	arena.call("_watch_shift")
+	check(arena.turn_playing(), "a turn of the earth starts the beat")
+	check_eq(TurnCamera.weight_at(0.0), 0.0, "the beat starts from the player's camera")
+	check_eq(TurnCamera.weight_at(TurnCamera.BEAT_MS / 2.0), 1.0, "mid-beat every ring is in view")
+	check_eq(TurnCamera.weight_at(TurnCamera.BEAT_MS), 0.0, "the beat ends on the player's camera")
+	var rings: Array = run.content.plates["rings"]
+	check(arena.zoom_to_fit(float(rings[-1]["r1"]), TurnCamera.FILL) < 2.0, "the widest view is wider than the player's")
+	arena.zoom = 0.9
+	arena.pan = Vector2.ZERO
+	# The pause key calls this while the beat plays (main.gd), so Space skips it.
+	arena.skip_turn()
+	check(not arena.turn_playing(), "skipping ends the beat")
+	check_eq(arena.zoom, 2.0, "skipping gives the zoom back")
+	check_eq(arena.pan, Vector2(150, 80), "skipping gives the camera back")
+	run.dispose()
+	screen.free()
+
+
 func test_a_venture_shows_its_dead_as_red_crosses() -> void:
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")

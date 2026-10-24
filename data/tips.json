@@ -21,7 +21,7 @@
 		"first_hero": {"title": "A hero", "at": "top", "text": "Heroes cost shells and choose their own fights, gear and beds. You can only tempt them."},
 		"first_night": {"title": "First night", "at": "map", "text": "Space pauses. Point at anyone to see what they're up to."},
 		"first_relic": {"title": "First relic", "at": "top", "text": "Relics last the whole run. Look for ones that suit your town."},
-		"first_earth": {"title": "The earth turned", "at": "threat", "text": "The rings clicked round a plate. The attack card says which ground the attack crosses now; Feed the earth in the hand turns it one more."},
+		"first_earth": {"title": "The earth turned", "at": "threat", "text": "The rings clicked round a plate. The attack card says which ground the attack crosses now; Feed the earth in the hand turns it one more. Space skips the turn's view."},
 		"first_age": {"title": "A new age", "at": "hand", "text": "Raising an age costs a lot, but opens a new ring of plots and new buildings."}
 	}
 }

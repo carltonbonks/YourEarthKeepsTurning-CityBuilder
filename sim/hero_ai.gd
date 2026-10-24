@@ -118,6 +118,13 @@ func hero_tick(hero: Unit) -> void:
 		w.walk_toward(hero, den["pos"] * 0.85, 10.0)
 		return
 	var index := w.run.heroes.find(hero)
+	if w.is_dusk() and _meets_attack(hero):
+		# On the attack's dusk the bold go out to meet it on the plate it crosses.
+		var side: float = w.wave_sides[index % w.wave_sides.size()]
+		var kind := w.earth.crossing(side)
+		hero.intent = "waiting for the attack on the %s" % String(w.earth.kind_def(kind)["name"]).to_lower() if kind != "" else "waiting for the attack"
+		w.walk_toward(hero, Vector2.from_angle(side) * w.content.num("meet_attack_at"), 6.0)
+		return
 	if w.is_dusk():
 		hero.intent = "guarding the camp"
 		w.walk_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * (w.content.num("settlement_radius") * 0.6), 4.0)
@@ -137,6 +144,11 @@ func hero_tick(hero: Unit) -> void:
 		var key := w.run.record.impact_key(hero)
 		if not key.is_empty():
 			w.run.record.note_impact(key[0], key[1], "drilled", xp)
+
+
+## A bold hero goes out to meet the round's attack on the way it comes in, from the dusk before it.
+func _meets_attack(hero: Unit) -> bool:
+	return not w.wave_sides.is_empty() and w.day_index() == w.content.int_num("days_per_round") - 1 and w.content.unit_has_tag(hero, "bold")
 
 
 ## A hero guarding the pedlar's camp: fights anything near it, sleeps beside it, trades there once a day,

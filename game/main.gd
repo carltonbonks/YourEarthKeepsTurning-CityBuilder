@@ -92,6 +92,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif _title_screen.visible or _overlays.visible:
 		return
+	elif event.is_action_pressed("pause") and _arena.turn_playing():
+		_arena.skip_turn()
+		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("pause"):
 		_set_speed(_play_speed if speed == 0 else 0)
 		get_viewport().set_input_as_handled()

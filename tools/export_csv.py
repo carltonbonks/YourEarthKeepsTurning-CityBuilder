@@ -182,6 +182,7 @@ def main(raw_folder, out_folder):
                 "earth_finds": sum(rd["shift"].get("finds", {}).values()) if "shift" in rd else "",
                 "earth_wakes": rd["shift"].get("wakes", "") if "shift" in rd else "",
                 "earth_held": rd["shift"].get("held", "") if "shift" in rd else "",
+                "earth_camp_swallowed": rd["shift"].get("camp_swallowed", False) if "shift" in rd else "",
                 "earth_crossing": "|".join(rd.get("crossing", [])),
                 "earth_fed": sum(1 for a in rd.get("actions", []) if a.get("kind") == "feed_earth") if "crossing" in rd else "",
                 "earth_risen": sum(rd.get("earth_risen", {}).values()) if "crossing" in rd else "",

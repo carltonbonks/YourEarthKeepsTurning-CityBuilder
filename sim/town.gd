@@ -352,8 +352,16 @@ func _plot_score(type: String, k: int) -> float:
 	return score
 
 
+## How far round from this round's attack ways a point lies, in radians (PI when no way is known).
+func _off_the_way(at: Vector2) -> float:
+	var facing := PI
+	for side in w.wave_sides:
+		facing = minf(facing, absf(angle_difference(side, at.angle())))
+	return facing
+
+
 ## Where the next watch post should stand: just outside the gate with the fewest posts guarding
-## it (the oldest on a tie). Once every gate has one, or there is no gate, it guards the next
+## it (on a tie, the one facing the way the attack comes in across the plates). Once every gate has one, or there is no gate, it guards the next
 ## likely gate spot instead: an unguarded lane beside buildings that the most feet pass through,
 ## facing the warned attack on a tie. A post guards the gate or lane nearest it within guard_within.
 func _guard_point() -> Vector2:
@@ -364,12 +372,15 @@ func _guard_point() -> Vector2:
 			posts.append(b["pos"])
 	var target := Vector2.INF
 	var fewest := 1
+	var nearest_way := INF
 	for b in w.buildings:
 		if is_gate_type(b["type"]):
 			var guards := posts.filter(func(p: Vector2) -> bool: return p.distance_to(b["pos"]) < within).size()
-			if guards < fewest:
+			var way := _off_the_way(b["pos"])
+			if guards < fewest or (guards == fewest and target != Vector2.INF and way < nearest_way - 0.01):
 				fewest = guards
 				target = b["pos"]
+				nearest_way = way
 	if target == Vector2.INF:
 		var best := INF
 		for k in plots.size():
@@ -378,9 +389,7 @@ func _guard_point() -> Vector2:
 			var at: Vector2 = plots[k]["pos"]
 			if posts.any(func(p: Vector2) -> bool: return p.distance_to(at) < within):
 				continue
-			var facing := PI
-			for side in w.wave_sides:
-				facing = minf(facing, absf(angle_difference(side, at.angle())))
+			var facing := _off_the_way(at)
 			var closed := _sides_closed(k)
 			var score := _gate_score(k) + (200000.0 if closed == 0 else 0.0) + facing * 10.0
 			if score < best:

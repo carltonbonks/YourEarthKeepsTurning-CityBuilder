@@ -129,7 +129,8 @@ extends RefCounted
 ##     "shift" drops "rifts" and gains "wakes" (seams that woke) and "held" (the geomancer held the near ring);
 ##     per round "earth_risen" (enemy type -> raiders who got up again on a Barrow) and "grave_goods" (items heroes dug
 ##     up there), each only when it happened. The quicken spell is gone; "hold" and "wake" are new spell ids.
-const RECORD_FORMAT := 48
+## 49: a round's "shift" may have "camp_swallowed" (true when a waking trench took the war camp).
+const RECORD_FORMAT := 49
 
 var run: RunState
 ## Finished rounds, oldest first.
