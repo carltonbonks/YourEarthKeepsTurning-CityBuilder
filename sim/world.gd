@@ -89,6 +89,8 @@ var enemy_ai: EnemyAI
 var pedlar: PedlarCamp
 ## Effects of the finished buildings that carry "effects" (data/buildings.json), summed; RunState.mod() adds them in.
 var building_effects := {}
+## plate_knobs from standing buildings ({tag: {knob: add}}, Earth.kind_def); a new dict whenever they change.
+var building_plate_knobs := {}
 
 
 func _init(run_state: RunState) -> void:

@@ -363,8 +363,23 @@ static func plate(run: RunState, kind: String) -> Dictionary:
 	var t := new_tip("%s (near ring)" % kd["name"])
 	t["lines"].append("Gives: %s" % kd["gives"])
 	t["lines"].append("Takes: %s" % kd["takes"])
+	var by: Array[String] = []
+	for id: String in run.relics:
+		if _knobs_on(run.content.relics[id]["effects"].get("plate_knobs", {}), kd):
+			by.append(run.content.relics[id]["name"])
+	for b: Dictionary in run.world.buildings:
+		var bd: Dictionary = run.content.buildings[b["type"]]
+		if float(b["work_left"]) <= 0.0 and _knobs_on(bd.get("plate_knobs", {}), kd) and not by.has(bd["name"]):
+			by.append(bd["name"])
+	if not by.is_empty():
+		t["lines"].append("Changed by your %s." % ", ".join(by))
 	t["lines"].append("The near ring turns a plate each round, so the ground the attack crosses changes. Feed the earth in the build to turn it one more.")
 	return t
+
+
+## True if plate_knobs ({tag: {knob: add}}) name one of this near kind's tags.
+static func _knobs_on(knobs: Dictionary, kd: Dictionary) -> bool:
+	return knobs.keys().any(func(tag: String) -> bool: return tag in kd.get("tags", []))
 
 
 ## The war camp: who is in it, what it holds, and what clearing it pays.
