@@ -108,6 +108,31 @@ static func mark_rarity(btn: Button, content: Content, rarity_id: String) -> voi
 		head.add_theme_color_override("font_color", color)
 
 
+## A dealt card that rolled its own rarity (sim/card_roll.gd): the frame and top line show the roll (mark_rarity),
+## a small gem in the top corner shows how often its kind turns up (its own rarity, none for white), and its
+## modifiers sit under the name in the roll's colour, one a line.
+static func mark_roll(btn: Button, content: Content, roll: String, kind_rarity: String, mods: Array[String]) -> void:
+	mark_rarity(btn, content, roll)
+	if kind_rarity != "white":
+		var gem := ColorRect.new()
+		gem.color = content.rarity_color(kind_rarity)
+		gem.size = Vector2(7, 7)
+		gem.pivot_offset = gem.size * 0.5
+		gem.rotation = PI / 4.0
+		gem.position = Vector2(btn.custom_minimum_size.x - 14.0, 7.0)
+		gem.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn.add_child(gem)
+		btn.tooltip_text += "\nThis kind of card is %s: it turns up less often." % content.rarity_tier(kind_rarity)["name"].to_lower()
+	if mods.is_empty():
+		return
+	var box := btn.get_child(0) as VBoxContainer
+	var lines := card_label(box, "\n".join(mods), 11)
+	lines.add_theme_color_override("font_color", content.rarity_color(roll).lightened(0.25))
+	box.move_child(lines, 2)
+	btn.custom_minimum_size.y += 15.0 * mods.size()
+	btn.tooltip_text += "\n%s card: %s." % [content.rarity_tier(roll)["name"], "; ".join(mods)]
+
+
 ## A card's border and face: lifts and lights up gold under the mouse so it reads as clickable,
 ## faded when it can't be taken.
 static func card_frame(btn: Button, border: Color, width := 1) -> void:

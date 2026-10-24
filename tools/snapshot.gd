@@ -16,10 +16,11 @@ extends SceneTree
 ## ageup=1 plays on from that round until the town reaches a new age and shows the celebration (style=bronze or
 ## medieval gets there); levelup=1 levels up the first hero so the halo shows.
 ## deals=<id,id,...> lays out those caravan trade cards (data/trades.json) in the build hand.
+## rolled=1 (with pick=1) deals rolled townsfolk cards: a magic warrior, a powerful forager and a mythic tribesperson.
 ## size=<W>x<H> sets the window size (default 1600x1000), to check the screen layout at other sizes.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "size": "1600x1000"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "lodge": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "rolled": "0", "size": "1600x1000"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -93,6 +94,11 @@ func _init() -> void:
 			crafter.made["knapper"] = 9
 			run.pick_offer[0] = {"kind": "promote", "role": "craftsperson", "cost": 15, "unit": crafter, "workshop": "knapper",
 				"trait": args["master"], "name": run.people.unused_name()}
+		if args["rolled"] == "1":
+			run.pick_offer = [{"kind": "folk", "role": "warrior", "cost": 0, "roll": "blue", "mark": "swift"},
+				{"kind": "folk", "role": "tribesperson", "cost": 0, "leaning": "forager", "roll": "yellow", "mark": "nimble",
+					"boons": ["born_leader", "twins"]},
+				{"kind": "folk", "role": "tribesperson", "cost": 0, "leaning": "woodcutter", "roll": "orange", "boons": ["many_mother"]}]
 		main._overlays.show_for_phase()
 		if args["venture_taken"] == "1":
 			main._take_pick(0)

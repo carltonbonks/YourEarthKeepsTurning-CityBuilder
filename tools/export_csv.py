@@ -244,6 +244,9 @@ def main(raw_folder, out_folder):
                     "taken_leaning": p.get("leaning", ""),
                     **{"offered_rarity_%d" % (i + 1): (p.get("offered_rarities", []) + ["", "", ""])[i] for i in range(3)},
                     "taken_legend": 1 if p.get("legend") else 0,
+                    **{"offered_roll_%d" % (i + 1): (p.get("offered_rolls", []) + ["", "", ""])[i] for i in range(3)},
+                    "taken_roll": p.get("roll", ""),
+                    "taken_mods": " ".join(p.get("mods", [])),
                     "venture_lost": p.get("venture_lost", ""),
                     "venture_goods": sum(p.get("venture_goods", {}).values()) if "venture_goods" in p else "",
                 })
@@ -317,7 +320,7 @@ def main(raw_folder, out_folder):
         "rounds": list(tables["rounds"][0].keys()) if tables["rounds"] else ["run_id"],
         "picks": ["run_id", "round", "day", "offered_1", "offered_2", "offered_3", "hero_offered", "taken", "taken_kind", "hunger_turned_away",
                   "offered_leaning_1", "offered_leaning_2", "offered_leaning_3", "taken_leaning",
-                  "venture_lost", "venture_goods"],
+                  "venture_lost", "venture_goods", "offered_roll_1", "offered_roll_2", "offered_roll_3", "taken_roll", "taken_mods"],
         "builds": ["run_id", "round", "building"],
         "wave_enemies": ["run_id", "round", "enemy", "count"],
         "deaths": ["run_id", "round", "day", "at_night", "name", "role", "is_hero", "killer"],

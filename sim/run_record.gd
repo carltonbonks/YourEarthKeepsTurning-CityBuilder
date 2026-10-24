@@ -111,7 +111,11 @@ extends RefCounted
 ##     "marks_earned" (mark id from data/marks.json -> townsfolk who earned it drilling beside a hero), each only when
 ##     it happened; impact rows gain "trained" (seconds warriors drilled beside heroes); per round "marks_end"
 ##     (mark id -> living townsfolk carrying it as the round ends).
-const RECORD_FORMAT := 44
+## 45: rolled dawn cards (sim/card_roll.gd): a pick entry gains "offered_rolls" (each card's rolled rarity, only when
+##     one rolled above white) and, for a rolled card taken, "roll" and "mods" (its mark and card modifiers, mark first);
+##     a legend hero's roll is orange. Per round "card_mods_taken" (modifier id -> newcomers who arrived with it) and
+##     "card_mods_fired" (hollow_seer extra cards, many_mother kin, bloodsworn laid to rest), each only when it happened.
+const RECORD_FORMAT := 45
 
 var run: RunState
 ## Finished rounds, oldest first.

@@ -170,12 +170,29 @@ func apply_folk_stats(unit: Unit) -> void:
 	unit.attack_range = float(def["range"])
 	unit.cooldown = float(def["cooldown"])
 	unit.speed = float(def["speed"])
-	if unit.mark != "":
-		var m: Dictionary = w.content.marks[unit.mark]
-		unit.max_hp *= 1.0 + float(m.get("hp", 0.0))
-		unit.attack *= 1.0 + float(m.get("attack", 0.0))
-		unit.speed *= 1.0 + float(m.get("speed", 0.0))
+	unit.max_hp *= 1.0 + unit_mod(unit, "hp")
+	unit.attack *= 1.0 + unit_mod(unit, "attack")
+	unit.speed *= 1.0 + unit_mod(unit, "speed")
 	unit.hp = minf(unit.hp, unit.max_hp)
+
+
+## One effect key summed over a townsperson's mark (data/marks.json) and card modifiers (data/card_mods.json).
+func unit_mod(unit: Unit, key: String) -> float:
+	if unit.mark == "" and unit.boons.is_empty():
+		return 0.0
+	var total := float(w.content.marks[unit.mark].get(key, 0.0)) if unit.mark != "" else 0.0
+	for id in unit.boons:
+		total += float(w.content.card_mods[id].get(key, 0.0))
+	return total
+
+
+## One effect key summed over every living townsperson (for dawn and night rules, not per step).
+func folk_sum(key: String) -> float:
+	var total := 0.0
+	for unit in w.folk:
+		if unit.alive:
+			total += unit_mod(unit, key)
+	return total
 
 
 func folk_tick(unit: Unit) -> void:
@@ -183,6 +200,11 @@ func folk_tick(unit: Unit) -> void:
 	# Rest at night heals anyone not in a fight.
 	if w.is_night() and w.nearest_enemy(unit.pos, 120.0) == null:
 		unit.hp = minf(unit.max_hp, unit.hp + w.content.num("folk_night_heal") * w.dt)
+	# A hollow-eyed seer (data/card_mods.json idle) never works: they stay by their home, seeing.
+	if not unit.boons.is_empty() and unit_mod(unit, "idle") > 0.0:
+		unit.intent = "staring into the fire, seeing what is to come"
+		w.walk_toward(unit, unit.home, 8.0)
+		return
 	if unit.type_id == "warrior" or levied(unit):
 		_warrior_tick(unit)
 	else:
@@ -656,7 +678,8 @@ func leans_to(unit: Unit, good: String) -> bool:
 ## How much a townsperson brings back from one gathering trip of a good (tools, relics and its band included).
 ## node_type, when known, adds relics keyed on the node's tags (node_yield, e.g. more from stone ground).
 func carry_of(unit: Unit, good := "", node_type := "") -> int:
-	var carry := float(w.content.townsfolk[unit.type_id].get("carry", 2)) + w.run.tool_bonus(unit.type_id, "carry")
+	var carry := float(w.content.townsfolk[unit.type_id].get("carry", 2)) + w.run.tool_bonus(unit.type_id, "carry") \
+		+ unit_mod(unit, "carry")
 	if leans_to(unit, good):
 		carry += float(band_tier(unit).get("carry", 0))
 	var mult := 1.0 + w.run.mod("carry_mult")
@@ -667,7 +690,7 @@ func carry_of(unit: Unit, good := "", node_type := "") -> int:
 
 ## Seconds a townsperson spends gathering a good at a node (tools and its band included).
 func gather_time(unit: Unit, good := "") -> float:
-	var mult := w.run.tool_bonus(unit.type_id, "gather_mult")
+	var mult := w.run.tool_bonus(unit.type_id, "gather_mult") + unit_mod(unit, "gather_mult")
 	if leans_to(unit, good):
 		mult += float(band_tier(unit).get("gather_mult", 0))
 	return float(w.content.townsfolk[unit.type_id].get("gather_seconds", 3)) / (1.0 + mult)
@@ -679,7 +702,8 @@ func count_leanings() -> Dictionary:
 	for unit in w.folk:
 		if unit.alive and unit.leaning != "":
 			var key := unit.type_id + "/" + unit.leaning
-			out[key] = int(out.get(key, 0)) + 1
+			# A born leader (data/card_mods.json band_weight) counts as more than one.
+			out[key] = int(out.get(key, 0)) + 1 + int(unit_mod(unit, "band_weight"))
 	return out
 
 
@@ -744,7 +768,8 @@ func nearest_node(unit: Unit, want: String) -> int:
 
 ## How fast a craftsperson builds and crafts (tool sets included).
 func work_rate(unit: Unit) -> float:
-	return float(w.content.townsfolk[unit.type_id].get("build_rate", 0.5)) + w.run.tool_bonus(unit.type_id, "build_rate")
+	return (float(w.content.townsfolk[unit.type_id].get("build_rate", 0.5)) + w.run.tool_bonus(unit.type_id, "build_rate")) \
+		* (1.0 + unit_mod(unit, "build"))
 
 
 # --- Runners ------------------------------------------------------------------

@@ -101,7 +101,8 @@ func show_pick() -> void:
 	spells.alignment = BoxContainer.ALIGNMENT_CENTER
 	for i in run.pick_offer.size():
 		var btn := _pick_card(run.pick_offer[i])
-		UiKit.mark_rarity(btn, run.content, run.people.card_rarity(run.pick_offer[i]))
+		var card := run.pick_offer[i]
+		UiKit.mark_roll(btn, run.content, CardRoll.roll_of(card), run.people.card_rarity(card), CardRoll.lines(run.content, card))
 		btn.disabled = not run.can_take_pick(i)
 		UiKit.fade_if_disabled(btn, _why_not_pick(run.pick_offer[i]))
 		btn.pressed.connect(func() -> void: pick_taken.emit(i))
