@@ -1,11 +1,12 @@
 class_name UiKit
 extends RefCounted
-## Small builders for the placeholder UI, shared by the screen's panels.
+## Small builders for the placeholder UI, shared by the screen's panels. Cards are CardView.
 
 const HINT_COLOR := Color("#9aa")
 const HEADING_COLOR := Color("#e8d9a8")
-const RECOMMEND_COLOR := Color("#ffd28a")
-const CARD_BORDER := Color("#5a606c")
+## Advice and the one button that moves the game on: bone, never a rarity colour (white, blue, yellow and
+## orange are kept for card frames, CardView).
+const RECOMMEND_COLOR := Color("#e6e1d3")
 
 
 static func heading(parent: Control, text: String) -> void:
@@ -40,123 +41,6 @@ static func note(parent: Control, text: String, font_size := 12, color := HINT_C
 	if font_size > 0:
 		l.add_theme_font_size_override("font_size", font_size)
 	l.add_theme_color_override("font_color", color)
-	parent.add_child(l)
-	return l
-
-
-## A card button like the building hand's, laid out so what decides the choice stands out: a small
-## top line (when `gold`, the reason the town wants it, on a gold strip), a big name, the cost (BBCode,
-## see cost_text: red where the town is short), a dim short blurb, and a small footer. Detail belongs
-## in the card's tooltip_text. A card that can't be taken says why on its face (block).
-static func card(top: String, title: String, cost: String, blurb: String, footer: String, card_size: Vector2,
-		border: Color, gold := false, title_color := Color.WHITE) -> Button:
-	var btn := Button.new()
-	btn.custom_minimum_size = card_size
-	btn.clip_text = true
-	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	# Space pauses the game, so a card clicked a moment ago must not take it.
-	btn.focus_mode = Control.FOCUS_NONE
-	var box := VBoxContainer.new()
-	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 7)
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_theme_constant_override("separation", 3)
-	btn.add_child(box)
-	card_frame(btn, border, 2 if gold else 1)
-	var head := card_label(box, top, 11)
-	head.add_theme_color_override("font_color", Color("#1a1408") if gold else HINT_COLOR)
-	# Every card keeps room here, so names line up along a row.
-	head.custom_minimum_size.y = 30
-	head.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	if gold:
-		var hl := StyleBoxFlat.new()
-		hl.bg_color = RECOMMEND_COLOR
-		hl.set_corner_radius_all(3)
-		hl.set_content_margin_all(3)
-		head.add_theme_stylebox_override("normal", hl)
-	card_label(box, title, 17).add_theme_color_override("font_color", title_color)
-	if cost != "":
-		var price := RichTextLabel.new()
-		price.bbcode_enabled = true
-		price.fit_content = true
-		price.scroll_active = false
-		price.autowrap_mode = TextServer.AUTOWRAP_WORD
-		price.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		price.add_theme_font_size_override("normal_font_size", 13)
-		price.add_theme_font_size_override("bold_font_size", 13)
-		price.text = cost
-		box.add_child(price)
-	var text := card_label(box, blurb, 10)
-	text.add_theme_color_override("font_color", Color("#9da2ab"))
-	text.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	text.clip_text = true
-	text.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	if footer != "":
-		card_label(box, footer, 10).add_theme_color_override("font_color", HINT_COLOR)
-	return btn
-
-
-## Colours a card by its rarity (data/rarity.json): the border, and the rarity's name on the top line.
-## White (base) cards keep their usual look; a recommended (gold) top line keeps its gold.
-static func mark_rarity(btn: Button, content: Content, rarity_id: String) -> void:
-	if rarity_id == "white":
-		return
-	var color := content.rarity_color(rarity_id)
-	card_frame(btn, color, 2)
-	var head := btn.get_child(0).get_child(0) as Label
-	head.text = "%s · %s" % [head.text, content.rarity_tier(rarity_id)["name"]]
-	if not head.has_theme_stylebox_override("normal"):
-		head.add_theme_color_override("font_color", color)
-
-
-## A dealt card that rolled its own rarity (sim/card_roll.gd): the frame and top line show the roll (mark_rarity),
-## a small gem in the top corner shows how often its kind turns up (its own rarity, none for white), and its
-## modifiers sit under the name in the roll's colour, one a line.
-static func mark_roll(btn: Button, content: Content, roll: String, kind_rarity: String, mods: Array[String]) -> void:
-	mark_rarity(btn, content, roll)
-	if kind_rarity != "white":
-		var gem := ColorRect.new()
-		gem.color = content.rarity_color(kind_rarity)
-		gem.size = Vector2(7, 7)
-		gem.pivot_offset = gem.size * 0.5
-		gem.rotation = PI / 4.0
-		gem.position = Vector2(btn.custom_minimum_size.x - 14.0, 7.0)
-		gem.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		btn.add_child(gem)
-		btn.tooltip_text += "\nThis kind of card is %s: it turns up less often." % content.rarity_tier(kind_rarity)["name"].to_lower()
-	if mods.is_empty():
-		return
-	var box := btn.get_child(0) as VBoxContainer
-	var lines := card_label(box, "\n".join(mods), 11)
-	lines.add_theme_color_override("font_color", content.rarity_color(roll).lightened(0.25))
-	box.move_child(lines, 2)
-	btn.custom_minimum_size.y += 15.0 * mods.size()
-	btn.tooltip_text += "\n%s card: %s." % [content.rarity_tier(roll)["name"], "; ".join(mods)]
-
-
-## A card's border and face: lifts and lights up gold under the mouse so it reads as clickable,
-## faded when it can't be taken.
-static func card_frame(btn: Button, border: Color, width := 1) -> void:
-	for state: String in ["normal", "hover", "pressed", "disabled", "focus"]:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = {"hover": Color("#3a404c"), "pressed": Color("#454c5a"), "disabled": Color("#24272d")}.get(state, Color("#2c3038"))
-		if state == "focus":
-			sb.draw_center = false
-		sb.border_color = HEADING_COLOR if state == "hover" or state == "pressed" else (border if state != "disabled" else Color(border, 0.35))
-		sb.set_border_width_all(maxi(width, 2) if state == "hover" else width)
-		sb.set_corner_radius_all(6)
-		if state == "normal" or state == "hover":
-			sb.shadow_color = Color(0, 0, 0, 0.45 if state == "hover" else 0.3)
-			sb.shadow_size = 5 if state == "hover" else 2
-			sb.shadow_offset = Vector2(0, 3 if state == "hover" else 1)
-		btn.add_theme_stylebox_override(state, sb)
-
-
-static func card_label(parent: Control, text: String, font_size: int) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD
-	l.add_theme_font_size_override("font_size", font_size)
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(l)
 	return l
 
@@ -209,14 +93,14 @@ static func shortfall(stock: Dictionary, cost: Dictionary) -> String:
 	return "Need " + ", ".join(parts) if not parts.is_empty() else ""
 
 
-## The look of the one button that moves the game on (Begin round, Resume): solid gold, dark text.
+## The look of the one button that moves the game on (Begin round, Resume): solid bone, dark text.
 static func primary(btn: Button, font_size := 17) -> Button:
 	btn.add_theme_font_size_override("font_size", font_size)
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	btn.focus_mode = Control.FOCUS_NONE
 	for state: String in ["normal", "hover", "pressed", "disabled", "focus"]:
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = {"hover": Color("#ffe0a0"), "pressed": Color("#d8a858"), "disabled": Color("#5a5040")}.get(state, RECOMMEND_COLOR)
+		sb.bg_color = {"hover": Color("#f7f4ec"), "pressed": Color("#c9c3b2"), "disabled": Color("#55524a")}.get(state, RECOMMEND_COLOR)
 		if state == "focus":
 			sb.draw_center = false
 		sb.set_corner_radius_all(6)

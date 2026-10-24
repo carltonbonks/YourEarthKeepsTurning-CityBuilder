@@ -114,15 +114,15 @@ func test_the_venture_card_shows_its_reward_unclipped() -> void:
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	var overlays: Overlays = screen.get("_overlays")
-	var btn: Button = overlays.call("_pick_card", {"kind": "venture", "role": "venture", "cost": 0, "venture": "herd_raid"})
-	var reward := ""
-	for child in btn.get_child(0).get_children():
-		if child is Label and (child as Label).text.begins_with("Brings home"):
-			reward = child.text
-			check(not (child as Label).clip_text, "the reward line never clips")
+	var btn: CardView = overlays.call("_pick_card", {"kind": "venture", "role": "venture", "cost": 0, "venture": "herd_raid"})
+	# Each good is its own chip on the card's face (CardView.add_goods), so none can be cut off.
+	var shown := {}
+	for chip in btn.find_children("*", "PanelContainer", true, false):
+		if chip.has_meta("good"):
+			shown[chip.get_meta("good")] = int(chip.get_meta("amount"))
 	var terms := run.people.venture_terms("herd_raid")
 	for good: String in terms["goods"]:
-		check(reward.contains("%d %s" % [terms["goods"][good], good]), "the card face names %s (%s)" % [good, reward])
+		check_eq(shown.get(good, -1), int(terms["goods"][good]), "the card face shows the %s it brings" % good)
 	btn.free()
 	run.dispose()
 	screen.free()
