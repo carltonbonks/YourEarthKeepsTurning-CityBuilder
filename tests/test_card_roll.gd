@@ -224,7 +224,7 @@ func test_every_dawn_card_kind_can_roll() -> void:
 func test_modifiers_only_fit_cards_that_can_use_them() -> void:
 	var c := Content.load_default()
 	check(not CardRoll.fits_card(c.card_mods["well_armed"], "hero", {"weapon": false}), "no better weapon without a weapon")
-	check(not CardRoll.fits_card(c.card_mods["hastened"], "spell", {"spell": "quicken", "nights": 1}), "a one-night spell can't be sooner")
+	check(not CardRoll.fits_card(c.card_mods["hastened"], "spell", {"spell": "wake", "nights": 1}), "a one-night spell can't be sooner")
 	check(not CardRoll.fits_card(c.card_mods["deep_working"], "spell", {"spell": "sink_den", "nights": 3}), "only a ridge lasts longer")
 	check(not CardRoll.fits_card(c.card_mods["bulk"], "trade", {"give": true, "get": false}), "no bulk on a service")
 	check(not CardRoll.fits_card(c.card_mods["exile"], "family", {}), "exiles are given, never dealt")
@@ -251,7 +251,7 @@ func test_a_hastened_spell_is_done_a_night_sooner_and_an_echo_rests_the_geomance
 	run.cast_spell("ridge", {"roll": "blue", "boons": ["hastened"]})
 	check_eq(int(run.spell["nights_left"]), 1, "one night instead of two")
 	run.spell = {}
-	run.cast_spell("quicken", {"roll": "orange", "boons": ["echoing"]})
+	run.cast_spell("wake", {"roll": "orange", "boons": ["echoing"]})
 	run._work_spell()
 	check(run.spell.is_empty(), "done")
 	check_eq(run.record.entry["card_mods_fired"], {"echoing": 1}, "it echoed")

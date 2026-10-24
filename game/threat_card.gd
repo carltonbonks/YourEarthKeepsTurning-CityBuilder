@@ -81,7 +81,8 @@ func _init() -> void:
 	# Shown when fit folded something away.
 	_more = UiKit.note(self, "More on hover", 10)
 	_more.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_foldable = [_earth_lines, _ways, _eased, _earth_box.get_parent(), _spell]
+	# The ways (which den, across which near plate) fold last: they are what a Feed changes.
+	_foldable = [_earth_lines, _eased, _earth_box.get_parent(), _spell, _ways]
 
 
 func refresh() -> void:
@@ -180,7 +181,7 @@ static func tip(r: RunState) -> Dictionary:
 		t["lines"].append("%s x%d" % [content.enemies[id]["name"], counts[id]])
 	t["lines"].append("Power counts heroes, warriors, the hearth and towers against every raider coming.")
 	t["lines"].append("Earlier nights bring only wanderers and small probes.")
-	t["lines"].append("The warband comes by a den's way. The earth carries the dens round between rounds, and the attack with them; a den the earth swallows takes its way with it.")
+	t["lines"].append("The warband comes by a den's way and crosses one near plate on its way in. Each round the rings click round, so the den and the ground it crosses change; Feed the earth turns the near ring one more plate.")
 	if r.wave_eased > 0:
 		t["lines"].append("Catch-up: the warband holds back raiders when your town has fallen far behind. A strong town never faces more for being strong.")
 		t["lines"].append("Held-back raiders make a war camp out in the wilds: it blocks gathering nearby until heroes clear it, and clearing it pays.")
@@ -190,8 +191,9 @@ static func tip(r: RunState) -> Dictionary:
 ## The earth report's hover card: how the earth works, in short.
 static func earth_tip(r: RunState) -> Dictionary:
 	var t := Tooltips.new_tip("The shifting earth")
-	t["lines"].append("Between rounds the rings of land past the town turn; the town itself never moves.")
-	t["lines"].append("Each turn one seam wakes: it swallows the land on one side, raises a rich vein of stone, or splits open a valley of fresh plants.")
-	t["lines"].append("The places it changed pulse on the map for a few moments.")
-	t["lines"].append("A Geomancer's lodge offers spells on dawn cards: quicken a far seam, raise a ridge against the attack, or sink a den. Bold and greedy heroes dig out what the earth leaves: a sunk den's hoard, starstone by a ridge.")
+	t["lines"].append("Between rounds the rings of land past the town click round, a whole plate at a time; the town itself never moves.")
+	t["lines"].append("The near ring's four plates are Fen, Greenwood, Stonefield and Barrow. The attack crosses one of them, and each kind helps you and hurts you: hover a plate to see how.")
+	t["lines"].append("Feed the earth (in the build hand) turns the near ring one more plate, for stone that rises each time.")
+	t["lines"].append("Each turn fills a few seams with pressure (the dots on each seam). A full seam glows and wakes at the next turn: a trench swallows its lip, a ridge breaks open rare stone, a rift grows a valley. What a trench will take shows cracks, and gatherers strip it first.")
+	t["lines"].append("A Geomancer's lodge offers spells on dawn cards (hold the near ring, wake the fullest seam, raise a ridge, sink a den) and halves the stone the earth asks. Bold and greedy heroes dig out what the earth leaves: a sunk den's hoard, starstone by a ridge.")
 	return t

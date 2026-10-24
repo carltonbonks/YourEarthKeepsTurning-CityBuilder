@@ -1,50 +1,62 @@
 class_name Earth
 extends RefCounted
-## The shifting earth (`world.earth`). Past the still town the land is rings of earth plates, the cuts
-## staggered ring to ring like bricks, and once between rounds every ring turns round the hearth
-## (`shift`, called by RunState as a new round begins). Each plate also sways a little faster or slower
-## than its ring, so the seams between plates close and open:
-## - a closing seam that subducts swallows what sits on the diving plate's edge (nodes turn to embers,
-##   dens go under with their monsters, paving is refunded);
-## - a closing seam that collides pushes everything to the seam and raises a ridge (solid, with a pass)
-##   that grows each colliding shift and in time raises an upthrust node;
-## - an opening seam is a rift: raw, slow ground until the next shift, often with a fresh node.
-## Everything on a plate rides it: resource nodes, dens and the war camp, thickets, trails and roads,
-## and anyone standing out there. The next shift can be worked out in advance (`forecast`, `doomed`) for
-## tests and for later buildings, relics and heroes that read the earth; the map doesn't show it. Numbers are in data/plates.json.
+## The shifting earth (`world.earth`), read as a dial (Yusuf, 2026-10-24). Past the still town the land is
+## rings of earth plates, the cuts staggered ring to ring like bricks, and once between rounds the rings click
+## round the hearth (`shift`, called by RunState as a new round begins): each ring turns a whole plate's width
+## at its own pace and way, so the motion can be learned. The whole ring turns as one; plates keep their places.
+## - The near ring's plates have kinds (Fen, Greenwood, Stonefield, Barrow): the ground the night's attack must
+##   cross on its way in (`kind_at`, `crossing`). Each kind gives and takes: how fast people walk on it
+##   (`walk_factor`), how far the hearth and towers see raiders on it (`sight_at`), plants regrowing (`dawn`),
+##   raiders getting up again and heroes digging grave goods (World.damage).
+## - The town can Feed the earth once a round (`feed`): the near ring turns one more plate now.
+## - Each seam has a kind (subducting, colliding, a rift) and pressure marks. Each turn fills a few marks; a full
+##   seam warns for a round (`doomed`, `full_seams`) and then wakes at the next turn: a trench swallows what sits
+##   on its diving side, a colliding seam raises a ridge with a rich vein of rare stone, a rift grows a valley.
+## Everything on a plate rides it: resource nodes, dens and the war camp, thickets, trails and roads, outposts
+## and anyone standing out there. Numbers are in data/plates.json.
 
 var w: World
 var def: Dictionary
-## Per ring: {name, r0, r1, turn, sway (radians), seams: Array[float] (plate k runs from seams[k] to
-## seams[k + 1]; seam k sits between plate k - 1 behind it and plate k ahead), kinds: per seam "subduct"
-## or "collide" (rolled once per run), divers: per seam 0 when the plate behind dives, 1 the plate ahead,
-## periods / phases: each plate's sway wave, ridges: per seam the ridge's height, upthrust: per seam the
-## index of the node its ridge raised, or -1}.
+## Per ring: {name, r0, r1, step (radians a click turns it), click_every, seams: Array[float] (plate k runs from
+## seams[k] to seams[k + 1]), kinds: per seam "subduct", "collide" or "rift" (rolled once per run), divers: per seam
+## 0 when the plate behind dives, 1 the plate ahead, pressure: per seam its marks, ridges: per seam the turns its
+## ridge still stands, upthrust: per seam the index of the node its ridge raised, or -1, plate_kinds: per plate its
+## kind id from near_kinds (the near ring only; "" elsewhere)}.
 var rings: Array[Dictionary] = []
 ## Shifts so far this run.
 var shifts := 0
-## Rift strips that stay raw ground until the next shift: {ring, a0, a1} (radians, a0 to a1 clockwise).
-var raw: Array[Dictionary] = []
-## What the last shift did (see RunRecord "shift"): {shift, swallowed, dens_swallowed, ridges, raised,
-## rifts, grown, roads_refunded, woke (the kind of seam that woke, "" for none), woke_ring, omen (always "" since
-## the geomancer casts spells instead), finds (node type -> earth finds left)}. Empty before the first shift.
+## Times the town fed the earth this run.
+var fed := 0
+## The round the town last fed the earth (once a round).
+var fed_round := -1
+## The geomancer's Hold: the near ring skips its next turn.
+var hold_near := false
+## What the last shift did (see RunRecord "shift"): {shift, swallowed, dens_swallowed, ridges, raised, grown,
+## roads_refunded, woke (the kind of the first seam that woke, "" for none), woke_ring, wakes (how many woke),
+## held (the near ring was held), finds (node type -> earth finds left)}. Empty before the first shift.
 var last := {}
 ## Where the last shift did each thing, for the earth report and the map's pulses: {kind ("sank", "den_sank",
-## "grew", "raised", "find"), type (node or den type), pos, worked (a node the town had gathered from), great (done by the
+## "grew", "raised", "find"), type (node or den type), pos, worked (a node the town had gathered from), great (done by a
 ## seam that woke)}.
 var events: Array[Dictionary] = []
-## The seam that woke in the last shift: {ring, seam, kind, angle}, or {} when none did.
+## The first seam that woke in the last shift: {ring, seam, kind, angle}, or {} when none did; `woken` has them all.
 var woke := {}
+var woken: Array[Dictionary] = []
 ## Short ridges the geomancer raised in the near ring: {a (angle), r, length, lasts (turns of the earth left)}.
 ## They ride the near ring's plates and wear away.
 var raised_ridges: Array[Dictionary] = []
 ## Goes up whenever the land changes outside a shift (a spell), so the map pulses the new events.
 var changes := 0
+## Goes up whenever the rings turn (a shift or a feeding), so the map slides the land into place.
+var turned := 0
 ## What the last finished spell did: {grown, raised, dens_swallowed, finds} (see finish_spell).
 var spell_done := {}
-## The last shift's turn per ring and plate, in radians (for the map's slide).
+## The last turn's turn per ring and plate, in radians (for the map's slide).
 var last_turns: Array = []
 var _ridge_cells := PackedInt32Array()
+## The full subducting seams (for doomed), and the [shifts, turned, changes] they were found for.
+var _doomers: Array = []
+var _doomers_for: Array = []
 ## The squares out on the plates (see _index_cells).
 var _cells := PackedInt32Array()
 var _cell_ring := PackedByteArray()
@@ -53,8 +65,6 @@ var _cell_a := PackedFloat32Array()
 var _j_of := PackedInt32Array()  ## Square -> its place in _cells, or -1 on the still ground.
 var _ring_angles: Array[PackedFloat32Array] = []  ## Per ring, its squares' angles in order (for arcs).
 var _ring_js: Array[PackedInt32Array] = []  ## Per ring, the _cells places in that order.
-var _plan_cache := {}
-var _plan_for := -1
 
 
 func _init(world: World) -> void:
@@ -62,6 +72,13 @@ func _init(world: World) -> void:
 	def = w.content.plates
 	var rng := SeededRng.stream(w.run.run_seed, "earth")
 	var start := rng.randf() * TAU
+	var kinds: Array = def["near_kinds"].keys()
+	kinds.sort()
+	var dealt: Array = []
+	while not kinds.is_empty():
+		var k: String = rng.pick(kinds)
+		kinds.erase(k)
+		dealt.append(k)
 	for ri in def["rings"].size():
 		var rd: Dictionary = def["rings"][ri]
 		var n := int(rd["plates"])
@@ -69,21 +86,29 @@ func _init(world: World) -> void:
 		# Each ring starts half a plate on from the one inside it, so the cuts never line up (like bricks).
 		var first: float = start + ri * width * 0.5
 		var ring := {"name": rd["name"], "r0": float(rd["r0"]), "r1": float(rd["r1"]),
-			"turn": deg_to_rad(float(rd["turn"])), "sway": deg_to_rad(float(rd["sway"])),
-			"seams": [], "kinds": [], "divers": [], "periods": [], "phases": [], "ridges": [], "upthrust": []}
+			"step": width * float(rd.get("dir", 1)), "click_every": maxi(1, int(rd.get("click_every", 1))),
+			"seams": [], "kinds": [], "divers": [], "pressure": [], "ridges": [], "upthrust": [], "plate_kinds": []}
+		var shares: Dictionary = def["seam_shares"].duplicate()
+		if not _grows_rifts(ri):
+			shares.erase("rift")
 		for k in n:
-			ring["seams"].append(first + k * width + rng.randf_range(-0.2, 0.2) * width)
-			ring["kinds"].append("subduct" if rng.randf() < float(def["subduct_share"]) else "collide")
+			ring["seams"].append(first + k * width + rng.randf_range(-0.15, 0.15) * width)
+			ring["kinds"].append(rng.weighted(shares))
 			ring["divers"].append(rng.randi_range(0, 1))
-			ring["periods"].append(rng.randi_range(int(def["sway_period_min"]), int(def["sway_period_max"])))
-			ring["phases"].append(rng.randf() * TAU)
+			ring["pressure"].append(0)
 			ring["ridges"].append(0)
 			ring["upthrust"].append(-1)
+			ring["plate_kinds"].append(dealt[k % dealt.size()] if ri == 0 else "")
 		rings.append(ring)
 
 
 func enabled() -> bool:
 	return bool(def.get("enabled", true))
+
+
+## True if a rift in ring ri has something to grow (the near ring by its plates' kinds).
+func _grows_rifts(ri: int) -> bool:
+	return ri == 0 or not def["rings"][ri]["rift_nodes"].is_empty()
 
 
 # --- Where things are ----------------------------------------------------------
@@ -111,138 +136,110 @@ static func _in_span(a: float, s0: float, s1: float) -> bool:
 	return fposmod(a - s0, TAU) < fposmod(s1 - s0, TAU)
 
 
-## How fast plate k of ring ri turns on shift n, in radians: its ring's turn plus its own slow sway.
-func turn_of(ri: int, k: int, n: int) -> float:
-	# Stillstone holds the near ring still.
-	if ri == 0 and w.run.has_effect("still_ring"):
+## The near plate's kind (an id from near_kinds) at angle a, as the land lies now.
+func kind_at_angle(a: float) -> String:
+	if rings.is_empty():
+		return ""
+	return rings[0]["plate_kinds"][plate_at(0, a)]
+
+
+## The near plate's kind under p, or "" off the near ring.
+func kind_at(p: Vector2) -> String:
+	if not enabled() or ring_at(p) != 0:
+		return ""
+	return kind_at_angle(p.angle())
+
+
+## The kind of near ground an attack from angle a crosses on its way in: now, or after `extra` more clicks of the
+## near ring (a Feed shows what one more would do).
+func crossing(a: float, extra := 0) -> String:
+	if not enabled():
+		return ""
+	return kind_at_angle(a - extra * float(rings[0]["step"]))
+
+
+func kind_def(kind: String) -> Dictionary:
+	return def["near_kinds"].get(kind, {})
+
+
+## How fast someone walks at p for its near plate's kind (1 elsewhere): a Fen slows everyone, a Stonefield
+## speeds raiders.
+func walk_factor(p: Vector2, enemy: bool) -> float:
+	var kind := kind_at(p)
+	if kind == "":
+		return 1.0
+	var kd := kind_def(kind)
+	return float(kd.get("walk", 1.0)) * (float(kd.get("raider_walk", 1.0)) if enemy else 1.0)
+
+
+## How far the hearth and towers see a raider standing at p, against their range (1 off the near ring).
+func sight_at(p: Vector2) -> float:
+	var kind := kind_at(p)
+	return float(kind_def(kind).get("sight", 1.0)) if kind != "" else 1.0
+
+
+## How far plate k of ring ri turns on shift n, in radians: a whole plate's width on its ring's clicks, else none.
+func turn_of(ri: int, _k: int, n: int) -> float:
+	# Stillstone holds the near ring still, and so does the geomancer's Hold for a turn.
+	if ri == 0 and (w.run.has_effect("still_ring") or hold_near):
 		return 0.0
 	var ring := rings[ri]
-	return float(ring["turn"]) + float(ring["sway"]) * sin(TAU * n / float(ring["periods"][k]) + float(ring["phases"][k]))
+	return float(ring["step"]) if n % int(ring["click_every"]) == 0 else 0.0
 
 
-# --- Planning a shift ------------------------------------------------------------
+# --- Seams and their pressure -------------------------------------------------------
 
-## What shift n will do, worked out from the seams as they are (nothing changes). Per ring:
-## {turns: per plate, seams: the new seams, results: per seam {kind ("subduct", "collide", "rift",
-## "quiet" or "held"), degrees (how far it closes or opens), lead, trail (the edges of the plates either
-## side after turning: the plate behind's leading edge and the plate ahead's trailing edge)}}.
-func plan(n: int) -> Array:
-	var out: Array = []
-	var quiet := deg_to_rad(float(def["quiet_degrees"]))
-	var min_width := deg_to_rad(float(def["min_plate_degrees"]))
-	for ri in rings.size():
-		var ring := rings[ri]
-		var seams: Array = ring["seams"]
-		var count := seams.size()
-		var turns: Array = []
-		for k in count:
-			turns.append(turn_of(ri, k, n))
-		var new_seams: Array = []
-		var results: Array = []
-		for k in count:
-			var behind := posmod(k - 1, count)
-			var lead := float(seams[k]) + float(turns[behind])
-			var trail := float(seams[k]) + float(turns[k])
-			var close := float(turns[behind]) - float(turns[k])
-			var kind := "quiet"
-			var at := (lead + trail) / 2.0
-			if close >= quiet:
-				kind = ring["kinds"][k]
-				if kind == "subduct":
-					at = trail if int(ring["divers"][k]) == 0 else lead
-			elif close <= -quiet:
-				kind = "rift"
-			new_seams.append(at)
-			results.append({"kind": kind, "degrees": rad_to_deg(absf(close)), "lead": lead, "trail": trail})
-		# A plate squeezed too thin stops shrinking: the closing seams either side wait at its own edges.
-		for k in count:
-			var ahead := (k + 1) % count
-			if fposmod(float(new_seams[ahead]) - float(new_seams[k]), TAU) >= min_width:
-				continue
-			for s in [k, ahead]:
-				var res: Dictionary = results[s]
-				if res["kind"] in ["subduct", "collide", "quiet"]:
-					res["kind"] = "held"
-					new_seams[s] = float(seams[s]) + float(turns[k])
-		out.append({"turns": turns, "seams": new_seams, "results": results})
-	return out
-
-
-func _next_plan() -> Array:
-	if _plan_for != shifts:
-		_plan_cache = {"plan": plan(shifts + 1)}
-		_plan_for = shifts
-	return _plan_cache["plan"]
-
-
-## Where a point on a plate goes in a shift: {to: new position, fate: "ride", "swallowed" or "pushed",
-## seam: the seam it was stopped at (-1 when it rides freely)}. Points on the still ground stay.
-func _carry(p: Vector2, plans: Array) -> Dictionary:
-	var ri := ring_at(p)
-	if ri < 0:
-		return {"to": p, "fate": "ride", "seam": -1, "ring": -1}
-	var ring := rings[ri]
-	var pl: Dictionary = plans[ri]
-	var k := plate_at(ri, p.angle())
-	var count: int = ring["seams"].size()
-	var a := p.angle() + float(pl["turns"][k])
-	var s0 := float(pl["seams"][k])
-	var s1 := float(pl["seams"][(k + 1) % count])
-	if _in_span(a, s0, s1):
-		return {"to": Vector2.from_angle(a) * p.length(), "fate": "ride", "seam": -1, "ring": ri}
-	# Past one of its plate's new edges: it ran into a closing seam.
-	var past_lead := fposmod(a - s1, TAU)
-	var before_trail := fposmod(s0 - a, TAU)
-	var seam := (k + 1) % count if past_lead < before_trail else k
-	var res: Dictionary = pl["results"][seam]
-	# At the seam ahead this plate is the one behind it (diver 0); at the seam behind, the one ahead (diver 1).
-	var mine := 0 if seam == (k + 1) % count else 1
-	var edge := s1 if seam == (k + 1) % count else s0
-	var inward := -1.0 if mine == 0 else 1.0
-	var margin := _margin(p.length())
-	if res["kind"] == "subduct" and int(ring["divers"][seam]) == mine:
-		# Swallowed: what is left of it comes up on the far side of the seam.
-		return {"to": Vector2.from_angle(edge - inward * margin) * p.length(), "fate": "swallowed", "seam": seam, "ring": ri}
-	return {"to": Vector2.from_angle(edge + inward * margin) * p.length(), "fate": "pushed", "seam": seam, "ring": ri}
-
-
-## How far (radians) things are kept off a seam at radius r, clear of any ridge on it.
-func _margin(r: float) -> float:
-	return (float(def["ridge_half_width"]) + 8.0) / maxf(r, 1.0)
-
-
-## The next shift, seam by seam, for the map: [{ring, seam, angle (where it is now), kind, degrees}].
-func forecast() -> Array:
+## Every seam as it is now, for the map and hover: [{ring, seam, angle, kind, pressure, full}].
+func seams() -> Array:
 	var out: Array = []
 	if not enabled():
 		return out
-	var plans := _next_plan()
+	var full := int(def["pressure"]["full"])
 	for ri in rings.size():
 		for k in rings[ri]["seams"].size():
-			var res: Dictionary = plans[ri]["results"][k]
-			out.append({"ring": ri, "seam": k, "angle": float(rings[ri]["seams"][k]), "kind": res["kind"],
-				"degrees": float(res["degrees"])})
+			var marks := int(rings[ri]["pressure"][k])
+			out.append({"ring": ri, "seam": k, "angle": float(rings[ri]["seams"][k]), "kind": rings[ri]["kinds"][k],
+				"pressure": marks, "full": marks >= full})
 	return out
 
 
-## The seam within reach world units of p, as a forecast entry, or {}.
+## The seams that wake at the next turn (full of pressure).
+func full_seams() -> Array:
+	return seams().filter(func(s: Dictionary) -> bool: return s["full"])
+
+
+## The seam within reach world units of p, as a seams() entry, or {}.
 func seam_near(p: Vector2, reach: float) -> Dictionary:
 	var ri := ring_at(p)
 	if ri < 0 or not enabled():
 		return {}
-	for entry: Dictionary in forecast():
+	for entry: Dictionary in seams():
 		if int(entry["ring"]) == ri and absf(angle_difference(float(entry["angle"]), p.angle())) * p.length() <= reach:
 			return entry
 	return {}
 
 
-## True if the next shift will swallow whatever stands at p (at a closing seam, or by the seam that wakes).
+## True if a full seam's wake will swallow whatever stands at p at the next turn (it shows cracks). The rings
+## turn as one, so where p sits against the seam now is where it will sit then.
 func doomed(p: Vector2) -> bool:
 	if not enabled():
 		return false
-	var plans := _next_plan()
-	var c := _carry(p, plans)
-	return c["fate"] == "swallowed" or _under_wake(c["to"], _woken(plans))
+	if _doomers_for != [shifts, turned, changes]:
+		_doomers = full_seams().filter(func(s: Dictionary) -> bool: return s["kind"] == "subduct")
+		_doomers_for = [shifts, turned, changes]
+	for entry: Dictionary in _doomers:
+		if _under_wake(p, entry):
+			return true
+	return false
+
+
+## The seam with the most pressure (nearest ring first on a tie), as a seams() entry, or {} when none has any.
+func fullest_seam() -> Dictionary:
+	var best := {}
+	for entry: Dictionary in seams():
+		if int(entry["pressure"]) > int(best.get("pressure", 0)):
+			best = entry
+	return best
 
 
 ## How far plate land at p turns in the next shift (radians; 0 on the still ground).
@@ -250,16 +247,15 @@ func next_turn(p: Vector2) -> float:
 	var ri := ring_at(p)
 	if not enabled() or ri < 0:
 		return 0.0
-	return float(_next_plan()[ri]["turns"][plate_at(ri, p.angle())])
+	return turn_of(ri, plate_at(ri, p.angle()), shifts + 1)
 
 
-## How far the land at p turned in the last shift (radians), for the map's slide.
+## How far the land at p turned in the last turn (radians), for the map's slide.
 func last_turn(p: Vector2) -> float:
 	var ri := ring_at(p)
 	if ri < 0 or last_turns.is_empty():
 		return 0.0
-	var turns: Array = last_turns[ri]
-	return float(turns[plate_at(ri, p.angle())])
+	return float(last_turns[ri])
 
 
 ## The squares the ridges hold right now (for drawing).
@@ -272,47 +268,91 @@ func is_ridge(i: int) -> bool:
 	return _ridge_cells.has(i)
 
 
-## True if p is on a rift's raw ground.
-func raw_at(p: Vector2) -> bool:
-	var ri := ring_at(p)
-	return ri >= 0 and _in_raw(ri, p.angle())
-
-
 # --- The shift ---------------------------------------------------------------
 
-## Turns the earth once. Called as a new round begins (never in the first round).
+## Turns the earth once. Called as a new round begins (never in the first round): the rings click, full seams
+## wake, and fresh pressure fills a few seams.
 func shift() -> void:
 	if not enabled():
 		return
 	var n := shifts + 1
-	var plans := plan(n)
 	var rng := SeededRng.stream(w.run.run_seed, "earth_shift", n)
-	last = {"shift": n, "swallowed": {}, "dens_swallowed": 0, "ridges": 0, "raised": {}, "rifts": 0, "grown": {},
-		"roads_refunded": 0, "woke": "", "woke_ring": -1, "omen": "", "finds": {}}
+	last = {"shift": n, "swallowed": {}, "dens_swallowed": 0, "ridges": 0, "raised": {}, "grown": {},
+		"roads_refunded": 0, "woke": "", "woke_ring": -1, "wakes": 0, "held": hold_near, "finds": {}}
 	events = []
-	woke = _woken(plans)
-	var roads_before := _count_roads()
-	_clear_slow_ground()
-	_move_ground(plans)
-	_move_things(plans)
+	var turns: Array = []
 	for ri in rings.size():
-		rings[ri]["seams"] = plans[ri]["seams"]
-	_grow_ridges(plans)
-	_carry_raised_ridges(plans)
-	_open_rifts(plans, rng)
-	_wake(rng)
-	_raise_upthrust(rng)
-	_stamp_ground()
-	_off_ridges()
-	_refund_roads(roads_before)
-	last_turns = plans.map(func(pl: Dictionary) -> Array: return pl["turns"])
+		turns.append(turn_of(ri, 0, n))
+	hold_near = false
+	var roads_before := _count_roads()
+	_turn_rings(turns)
+	for ridge in raised_ridges:
+		ridge["lasts"] = int(ridge["lasts"]) - 1
+	raised_ridges = raised_ridges.filter(func(r: Dictionary) -> bool: return int(r["lasts"]) > 0)
+	_wear_ridges()
+	_wake_full(rng)
+	_add_pressure(rng)
+	_settle(roads_before)
 	shifts = n
+	w.market.outposts_ridden()
 	_tell()
 
 
+## The town feeds the earth: pays the stone (RunState.feed_earth) and the near ring turns one more plate now.
+func feed() -> void:
+	if not enabled():
+		return
+	var turns: Array = []
+	for ri in rings.size():
+		turns.append(float(rings[0]["step"]) if ri == 0 else 0.0)
+	var roads_before := _count_roads()
+	events = []
+	_turn_rings(turns)
+	_settle(roads_before)
+	fed += 1
+	fed_round = w.run.round_number
+	changes += 1
+
+
+## What a feeding costs now: more each time.
+func feed_cost() -> Dictionary:
+	var fd: Dictionary = def["feed"]
+	var stone := float(int(fd["cost"]) + int(fd["step"]) * fed)
+	# A geomancer knows where the earth is hungriest.
+	for type: String in w.content.buildings:
+		if w.content.buildings[type].get("spells", false) and w.count_buildings(type) > 0:
+			stone *= float(fd["geomancer_share"])
+			break
+	return {"stone": maxi(1, roundi(stone))}
+
+
+## Turns each ring by its turn (radians): the ground, everything on it, its seams and the raised ridges ride.
+func _turn_rings(turns: Array) -> void:
+	var plans: Array = []
+	for ri in rings.size():
+		var t := float(turns[ri])
+		plans.append({"turns": rings[ri]["seams"].map(func(_s: float) -> float: return t),
+			"seams": rings[ri]["seams"].map(func(s: float) -> float: return s + t)})
+	_clear_slow_ground()
+	_move_ground(plans)
+	_move_things(turns)
+	for ri in rings.size():
+		rings[ri]["seams"] = plans[ri]["seams"]
+	for ridge in raised_ridges:
+		ridge["a"] = float(ridge["a"]) + float(turns[0])
+	last_turns = turns.duplicate()
+	turned += 1
+
+
+## After the land has moved: ground laid again, nothing left on a ridge, lost paving paid back.
+func _settle(roads_before: Dictionary) -> void:
+	_stamp_ground()
+	_off_ridges()
+	_refund_roads(roads_before)
+
+
 ## Trails, worn paths and roads out on the plates ride them square by square (each square looks back to
-## where its ground came from); thickets and raw rifts are stamped again afterwards. Ground in a rift's
-## new strip starts plain.
+## where its ground came from); thickets are stamped again afterwards.
 func _move_ground(plans: Array) -> void:
 	var p := w.pathing
 	_index_cells()
@@ -324,8 +364,10 @@ func _move_ground(plans: Array) -> void:
 		if old[i] < Pathing.TRAIL:
 			continue
 		var ri := _cell_ring[j]
-		var k := plate_at(ri, _cell_a[j])
-		var c := p.cell_of(Vector2.from_angle(_cell_a[j] + float(plans[ri]["turns"][k])) * _cell_r[j])
+		var t := float(plans[ri]["turns"][0])
+		if t == 0.0:
+			continue
+		var c := p.cell_of(Vector2.from_angle(_cell_a[j] + t) * _cell_r[j])
 		for dy in range(-1, 2):
 			for dx in range(-1, 2):
 				var cc := c + Vector2i(dx, dy)
@@ -338,15 +380,11 @@ func _move_ground(plans: Array) -> void:
 		if j < 0:
 			continue
 		var ri := _cell_ring[j]
-		var a := _cell_a[j]
-		var pl: Dictionary = plans[ri]
-		var k := plate_at(ri, a, pl["seams"])
-		var from_angle := a - float(pl["turns"][k])
-		var seams: Array = rings[ri]["seams"]
-		if not _in_span(from_angle, seams[k], seams[(k + 1) % seams.size()]):
+		var t := float(plans[ri]["turns"][0])
+		if t == 0.0:
 			continue
-		var src := p.index_of(Vector2.from_angle(from_angle) * _cell_r[j])
-		if old[src] >= Pathing.TRAIL and _j_of[src] >= 0:
+		var src := p.index_of(Vector2.from_angle(_cell_a[j] - t) * _cell_r[j])
+		if old[src] >= Pathing.TRAIL and _j_of[src] >= 0 and _cell_ring[_j_of[src]] == ri:
 			p.set_ground(i, old[src])
 			p.traffic[i] = old_traffic[src]
 
@@ -409,7 +447,7 @@ func _near_seam(ri: int, a: float, half: float) -> PackedInt32Array:
 	return _arc(ri, a - spread, a + spread)
 
 
-## Before a shift: thickets, raw rifts and ridges come up (they are laid again where they end up).
+## Before a turn: thickets and ridges come up (they are laid again where they end up).
 func _clear_slow_ground() -> void:
 	var p := w.pathing
 	_index_cells()
@@ -420,46 +458,179 @@ func _clear_slow_ground() -> void:
 		for i in p.cells_in_circle(thicket["pos"], float(thicket["radius"])):
 			if p.ground[i] == Pathing.THICKET:
 				p.set_ground(i, Pathing.PLAIN)
-	for strip in raw:
-		for j in _arc(int(strip["ring"]), strip["a0"], strip["a1"]):
-			if p.ground[_cells[j]] == Pathing.THICKET:
-				p.set_ground(_cells[j], Pathing.PLAIN)
 
 
-func _move_things(plans: Array) -> void:
+## Where a point goes when the rings turn by `turns` (radians per ring). Points on the still ground stay.
+func _carried(p: Vector2, turns: Array) -> Vector2:
+	var ri := ring_at(p)
+	return p if ri < 0 else p.rotated(float(turns[ri]))
+
+
+func _move_things(turns: Array) -> void:
 	for node in w.nodes:
-		if node.get("gone", false):
-			continue
-		var c := _carry(node["pos"], plans)
-		node["pos"] = c["to"]
-		if c["fate"] == "swallowed":
-			_swallow_node(node)
-	var drowned: Array[int] = []
-	for di in w.dens.size():
-		var den := w.dens[di]
-		var c := _carry(den["pos"], plans)
-		den["turned"] = rad_to_deg(angle_difference(Vector2(den["pos"]).angle(), Vector2(c["to"]).angle()))
-		den["pos"] = c["to"]
-		# The war camp is men in tents: they move off the seam, they don't go under.
-		if c["fate"] == "swallowed" and not den.get("camp", false):
-			drowned.append(di)
-	drowned.reverse()
-	for di in drowned:
-		_swallow_den(di)
-	var kept: Array[Dictionary] = []
+		if not node.get("gone", false):
+			node["pos"] = _carried(node["pos"], turns)
+	for den in w.dens:
+		var to := _carried(den["pos"], turns)
+		den["turned"] = rad_to_deg(angle_difference(Vector2(den["pos"]).angle(), to.angle()))
+		den["pos"] = to
 	for thicket in w.town.thickets:
-		var c := _carry(thicket["pos"], plans)
-		thicket["pos"] = c["to"]
-		if c["fate"] != "swallowed":
-			kept.append(thicket)
-	w.town.thickets = kept
+		thicket["pos"] = _carried(thicket["pos"], turns)
 	for u: Unit in w.folk + w.run.heroes + w.enemies:
 		if not u.alive:
 			continue
-		u.pos = _carry(u.pos, plans)["to"]
-		u.wander_goal = _carry(u.wander_goal, plans)["to"]
+		u.pos = _carried(u.pos, turns)
+		u.wander_goal = _carried(u.wander_goal, turns)
 		u.path_version = -1
 		u.path = PackedVector2Array()
+
+
+## Each turn a ridge wears one turn closer to gone.
+func _wear_ridges() -> void:
+	for ring in rings:
+		for k in ring["ridges"].size():
+			ring["ridges"][k] = maxi(0, int(ring["ridges"][k]) - 1)
+
+
+## Every full seam wakes and empties.
+func _wake_full(rng: SeededRng) -> void:
+	woke = {}
+	woken = []
+	var full := int(def["pressure"]["full"])
+	for ri in rings.size():
+		for k in rings[ri]["seams"].size():
+			if int(rings[ri]["pressure"][k]) < full:
+				continue
+			_wake(ri, k, rng)
+			rings[ri]["pressure"][k] = 0
+
+
+## Fresh pressure: per_turn marks, each on a seam picked by weight (its ring's wake_weight and its kind's weight),
+## never one already full or one that has just woken. Ridgeheart fills colliding seams twice as fast, Rift Seed rifts,
+## and a Wellspring (data/card_mods.json) draws the waking to the ring nearest the town.
+func _add_pressure(rng: SeededRng) -> void:
+	var pd: Dictionary = def["pressure"]
+	var full := int(pd["full"])
+	var just_woke := {}
+	for entry in woken:
+		just_woke["%d:%d" % [entry["ring"], entry["seam"]]] = true
+	for mark in int(pd["per_turn"]):
+		var weights := {}
+		for ri in rings.size():
+			var rd: Dictionary = def["rings"][ri]
+			for k in rings[ri]["seams"].size():
+				var key := "%d:%d" % [ri, k]
+				if int(rings[ri]["pressure"][k]) >= full or just_woke.has(key):
+					continue
+				var kind: String = rings[ri]["kinds"][k]
+				var weight := float(rd.get("wake_weight", 1.0)) * float(pd["weights"][kind])
+				if kind == "collide" and w.run.has_effect("collide_pressure"):
+					weight *= 2.0
+				if kind == "rift" and w.run.has_effect("rift_pressure"):
+					weight *= 2.0
+				if ri == 0:
+					weight *= 1.0 + w.run.mod("near_wake")
+				# Keys sort as text, so pad them for a stable order past ten seams.
+				weights["%02d:%02d" % [ri, k]] = weight
+		var pick := rng.weighted(weights)
+		if pick == "":
+			return
+		var ri := int(pick.get_slice(":", 0))
+		var k := int(pick.get_slice(":", 1))
+		rings[ri]["pressure"][k] = int(rings[ri]["pressure"][k]) + 1
+
+
+## Seam k of ring ri wakes and does something big: a subducting seam swallows everything on its diving side within
+## swallow_band of it, a colliding one raises a ridge and breaks open a rich upthrust node, a rift opens a valley of
+## fresh nodes. Returns a line for the story.
+func _wake(ri: int, k: int, rng: SeededRng) -> String:
+	var wd: Dictionary = def["wake"]
+	var ring := rings[ri]
+	var a := float(ring["seams"][k])
+	var kind: String = ring["kinds"][k]
+	var entry := {"ring": ri, "seam": k, "kind": kind, "angle": a}
+	woken.append(entry)
+	if woke.is_empty():
+		woke = entry
+		last["woke"] = kind
+		last["woke_ring"] = ri
+	last["wakes"] = int(last.get("wakes", 0)) + 1
+	var where := World.compass(a)
+	match kind:
+		"subduct":
+			for node in w.nodes:
+				if not node.get("gone", false) and _under_wake(node["pos"], entry):
+					_swallow_node(node, true)
+			# The ground on the lip goes under too: trails, worn paths and paving (paid back by _settle).
+			_index_cells()
+			var band := float(def["wake"]["swallow_band"])
+			for j in _near_seam(ri, a, band):
+				var i := _cells[j]
+				if w.pathing.ground[i] >= Pathing.TRAIL and _under_wake(w.pathing.center(i), entry):
+					w.pathing.set_ground(i, Pathing.PLAIN)
+					w.pathing.traffic[i] = 0.0
+			for di in range(w.dens.size() - 1, -1, -1):
+				if not w.dens[di].get("camp", false) and _under_wake(w.dens[di]["pos"], entry):
+					_swallow_den(di, true)
+			return "a seam to the %s swallows its lip" % where
+		"collide":
+			ring["ridges"][k] = int(def["ridge_turns"]) + int(w.run.mod("ridge_longer"))
+			last["ridges"] = int(last.get("ridges", 0)) + 1
+			var type: String = def["upthrust"].get(w.run.age, "")
+			var r := (float(ring["r0"]) + float(ring["r1"])) / 2.0
+			var side := 1.0 if rng.randf() < 0.5 else -1.0
+			if type != "":
+				ring["upthrust"][k] = _raise(type, Vector2.from_angle(a + side * _margin(r)) * r, float(wd["rich"]), true)
+			# Starstone comes up with it, on the other side of the seam.
+			_leave_find("starstone", Vector2.from_angle(a - side * _margin(r)) * r, true)
+			return "a ridge heaves up to the %s and breaks open rare stone" % where
+		_:
+			var count := int(wd["rift_nodes"]) + int(w.run.mod("rift_more"))
+			var spread := 90.0 / maxf(float(ring["r0"]), 1.0)
+			for i in count:
+				var at := a + (i - (count - 1) / 2.0) * spread
+				var types := _grows_at(ri, at)
+				if types.is_empty():
+					continue
+				var r := rng.randf_range(float(ring["r0"]) + 20.0, float(ring["r1"]) - 20.0)
+				_grow(rng.pick(types), Vector2.from_angle(at) * r, float(wd["rift_share"]), true)
+			return "the ground splits open to the %s into a green valley" % where
+
+
+## What fresh ground grows at angle a in ring ri: the near plate's kind's, else the ring's rift_nodes.
+func _grows_at(ri: int, a: float) -> Array:
+	if ri == 0:
+		return kind_def(kind_at_angle(a)).get("grows", [])
+	return def["rings"][ri]["rift_nodes"]
+
+
+## True if p goes under a waking subducting seam (a seams() entry): on its diving side, within swallow_band
+## of it. The plate behind a seam lies at smaller angles; diver 0 is that one.
+func _under_wake(p: Vector2, entry: Dictionary) -> bool:
+	if entry.is_empty() or entry["kind"] != "subduct" or ring_at(p) != int(entry["ring"]):
+		return false
+	var side := -1.0 if int(rings[int(entry["ring"])]["divers"][int(entry["seam"])]) == 0 else 1.0
+	var off := angle_difference(float(entry["angle"]), p.angle())
+	return signf(off) == side and absf(off) * p.length() <= float(def["wake"]["swallow_band"])
+
+
+## How far (radians) things are kept off a seam at radius r, clear of any ridge on it.
+func _margin(r: float) -> float:
+	return (float(def["ridge_half_width"]) + 8.0) / maxf(r, 1.0)
+
+
+# --- Each dawn ----------------------------------------------------------------------
+
+## Plants on a near plate whose kind regrows them (the Greenwood) regrow a share of their full size.
+func dawn() -> void:
+	if not enabled():
+		return
+	for node in w.nodes:
+		if node.get("gone", false) or not w.regrows(node) or not w.content.has_tag("node", node["type"], "plant"):
+			continue
+		var share := float(kind_def(kind_at(node["pos"])).get("regrow", 0.0))
+		if share > 0.0:
+			node["amount"] = mini(int(node["max"]), int(node["amount"]) + maxi(1, roundi(int(node["max"]) * share)))
 
 
 func _swallow_node(node: Dictionary, great := false) -> void:
@@ -520,169 +691,50 @@ func _feed_the_deep(shells: int, item: bool) -> void:
 		w.hero_ai.give_item(rng.pick(heroes), Loot.roll(w.content, rng, w.run.round_number, w.run.age))
 
 
-## Closing colliding seams push their ridge up a step; every other seam's ridge wears down a step
-func _grow_ridges(plans: Array) -> void:
-	for ri in rings.size():
-		var ring := rings[ri]
-		for k in ring["seams"].size():
-			if plans[ri]["results"][k]["kind"] == "collide":
-				ring["ridges"][k] = int(ring["ridges"][k]) + 1
-				last["ridges"] = int(last["ridges"]) + 1
-			else:
-				ring["ridges"][k] = maxi(0, int(ring["ridges"][k]) - 1)
-
-
-func _open_rifts(plans: Array, rng: SeededRng) -> void:
-	raw = []
-	for ri in rings.size():
-		var ring := rings[ri]
-		var rd: Dictionary = def["rings"][ri]
-		for k in ring["seams"].size():
-			var res: Dictionary = plans[ri]["results"][k]
-			if res["kind"] != "rift":
-				continue
-			raw.append({"ring": ri, "a0": float(res["lead"]), "a1": float(res["trail"])})
-			last["rifts"] = int(last["rifts"]) + 1
-			# Rift Seed: every wide rift grows something.
-			var chance := 1.0 if w.run.has_effect("rift_growth") else float(def["rift_node_chance"])
-			if rd["rift_nodes"].is_empty() or float(res["degrees"]) < float(def["rift_min_degrees"]) \
-					or rng.randf() >= chance:
-				continue
-			var type: String = rng.pick(rd["rift_nodes"])
-			var ndef: Dictionary = w.content.world["nodes"][type]
-			var living := w.nodes.filter(func(n: Dictionary) -> bool: return n["type"] == type and not n.get("gone", false)).size()
-			if living >= int(ndef["count"]) * float(def["rift_node_cap"]):
-				continue
-			var r := rng.randf_range(float(ring["r0"]) + 20.0, float(ring["r1"]) - 20.0)
-			var at := Vector2.from_angle((float(res["lead"]) + float(res["trail"])) / 2.0) * r
-			_grow(type, at, float(def["rift_node_share"]), false)
-			if w.run.has_effect("rift_growth"):
-				w.run.relic_fired("rift_growth")
-
-
-## The seam that wakes this shift (see "wake" in data/plates.json): the one that closes or opens furthest,
-## weighted by its ring's wake_weight (the nearest ring's raised by near_wake) and its kind's weight; a rift only where its ring grows something. {} when none moves.
-func _woken(plans: Array) -> Dictionary:
-	var best := {}
-	var best_score := 0.0
-	for ri in rings.size():
-		var rd: Dictionary = def["rings"][ri]
-		for k in rings[ri]["seams"].size():
-			var res: Dictionary = plans[ri]["results"][k]
-			if not res["kind"] in ["subduct", "collide", "rift"] or (res["kind"] == "rift" and rd["rift_nodes"].is_empty()):
-				continue
-			var score := float(res["degrees"]) * float(rd.get("wake_weight", 1.0)) * float(def["wake"]["weights"][res["kind"]])
-			# A Wellspring (data/card_mods.json) draws the waking to the ring nearest the town.
-			if ri == 0:
-				score *= 1.0 + w.run.mod("near_wake")
-			if score > best_score:
-				best_score = score
-				best = {"ring": ri, "seam": k, "kind": res["kind"], "angle": float(plans[ri]["seams"][k])}
-	return best
-
-
-## The seam that woke does something big: a subducting seam swallows everything on its diving side within
-## swallow_band of it, a colliding one breaks open a rich upthrust node at once, a rift opens a valley of fresh nodes.
-func _wake(rng: SeededRng) -> void:
-	if woke.is_empty():
-		return
-	var wd: Dictionary = def["wake"]
-	var ri := int(woke["ring"])
-	var k := int(woke["seam"])
-	var ring := rings[ri]
-	var a := float(woke["angle"])
-	last["woke"] = woke["kind"]
-	last["woke_ring"] = ri
-	match woke["kind"]:
-		"subduct":
-			for node in w.nodes:
-				if not node.get("gone", false) and _under_wake(node["pos"], woke):
-					_swallow_node(node, true)
-			for di in range(w.dens.size() - 1, -1, -1):
-				if not w.dens[di].get("camp", false) and _under_wake(w.dens[di]["pos"], woke):
-					_swallow_den(di, true)
-		"collide":
-			ring["ridges"][k] = maxi(int(ring["ridges"][k]), int(def["upthrust_height"]))
-			var type: String = def["upthrust"].get(w.run.age, "")
-			var held := int(ring["upthrust"][k])
-			if type != "" and (held < 0 or w.nodes[held].get("gone", false)):
-				var r := (float(ring["r0"]) + float(ring["r1"])) / 2.0
-				var side := 1.0 if rng.randf() < 0.5 else -1.0
-				ring["upthrust"][k] = _raise(type, Vector2.from_angle(a + side * _margin(r)) * r, float(wd["rich"]), true)
-				# Starstone comes up with it, on the other side of the seam.
-				_leave_find("starstone", Vector2.from_angle(a - side * _margin(r)) * r, true)
-		"rift":
-			var types: Array = def["rings"][ri]["rift_nodes"]
-			var strip := {"a0": a, "a1": a}
-			for each in raw:
-				if int(each["ring"]) == ri and _in_span(a, each["a0"], each["a1"]):
-					strip = each
-			var width := fposmod(float(strip["a1"]) - float(strip["a0"]), TAU)
-			for i in int(wd["rift_nodes"]):
-				var at := float(strip["a0"]) + width * (i + 0.5) / float(wd["rift_nodes"])
-				var r := rng.randf_range(float(ring["r0"]) + 20.0, float(ring["r1"]) - 20.0)
-				_grow(rng.pick(types), Vector2.from_angle(at) * r, float(wd["rift_share"]), true)
-
-
 # --- The geomancer's spells (data/plates.json spells; cast through RunState.cast_spell) ----------
-
-## Each turn a raised ridge rides its near-ring plate and wears one turn closer to gone.
-func _carry_raised_ridges(plans: Array) -> void:
-	var kept: Array[Dictionary] = []
-	for ridge in raised_ridges:
-		ridge["a"] = float(ridge["a"]) + float(plans[0]["turns"][plate_at(0, float(ridge["a"]))])
-		ridge["lasts"] = int(ridge["lasts"]) - 1
-		if int(ridge["lasts"]) > 0:
-			kept.append(ridge)
-	raised_ridges = kept
-
 
 ## A spell finishes: does what it does to the land now. Returns a line for the story. What it did is in
 ## spell_done ({grown, raised, dens_swallowed, finds}) and events; the last shift's report is left as it was.
 func finish_spell(id: String, rng: SeededRng, extra_lasts := 0) -> String:
 	var shift_report := last
-	last = {"swallowed": {}, "dens_swallowed": 0, "raised": {}, "grown": {}, "finds": {}}
+	var shift_woke := woke
+	var shift_woken := woken
+	last = {"swallowed": {}, "dens_swallowed": 0, "raised": {}, "grown": {}, "finds": {}, "ridges": 0, "wakes": 0}
+	woke = {}
+	woken = []
 	events = []
 	var line := ""
 	match id:
-		"quicken":
-			line = _quicken(rng)
+		"hold":
+			hold_near = true
+			line = "the near ring will hold still at the next turn of the earth"
+		"wake":
+			line = _wake_fullest(rng)
 		"ridge":
 			line = _raise_near_ridge(rng, extra_lasts)
 		"sink_den":
 			line = _sink_a_den()
 	spell_done = last
 	last = shift_report
+	woke = shift_woke
+	woken = shift_woken
 	changes += 1
 	return line
 
 
-## A distant seam bears fruit: a middle-ring seam opens a valley of fresh patches; a far one breaks open a rich
-## vein of the age's stone with starstone beside it.
-func _quicken(rng: SeededRng) -> String:
-	var sd: Dictionary = def["spells"]["quicken"]
-	var choices: Array = []
-	for ri: int in sd["rings"]:
-		for k in rings[ri]["seams"].size():
-			choices.append([ri, k])
-	var pick: Array = rng.pick(choices)
-	var ri: int = pick[0]
-	var ring := rings[ri]
-	var a := float(ring["seams"][int(pick[1])])
-	var r := (float(ring["r0"]) + float(ring["r1"])) / 2.0
-	var where := World.compass(a)
-	var types: Array = def["rings"][ri]["rift_nodes"]
-	if not types.is_empty():
-		var n := int(sd["valley_nodes"])
-		for i in n:
-			var at := a + (i - (n - 1) / 2.0) * _margin(r) * 2.0
-			_grow(rng.pick(types), Vector2.from_angle(at) * rng.randf_range(float(ring["r0"]) + 20.0, float(ring["r1"]) - 20.0), 1.0, true)
-		return "a seam to the %s opens into a green valley" % where
-	var type: String = def["upthrust"].get(w.run.age, "")
-	if type != "":
-		_raise(type, Vector2.from_angle(a + _margin(r)) * r, float(sd["rich"]), true)
-	_leave_find("starstone", Vector2.from_angle(a - _margin(r)) * r, true)
-	return "a far seam to the %s breaks open a rich vein, with starstone beside it" % where
+## The seam with the most pressure wakes now and empties.
+func _wake_fullest(rng: SeededRng) -> String:
+	var entry := fullest_seam()
+	if entry.is_empty():
+		return "the earth stirs, but no seam has any pressure to give"
+	var ri := int(entry["ring"])
+	var k := int(entry["seam"])
+	var roads_before := _count_roads()
+	_clear_slow_ground()
+	var line := _wake(ri, k, rng)
+	rings[ri]["pressure"][k] = 0
+	_settle(roads_before)
+	return line
 
 
 ## A short ridge just past the town, facing this round's first warned side, with stone and plants sprouting
@@ -720,43 +772,6 @@ func _sink_a_den() -> String:
 	return "the earth opens under the %s" % name
 
 
-## True if p (where the shift carried it) goes under a waking subducting seam: on its diving side, within
-## swallow_band of it. The plate behind a seam lies at smaller angles; diver 0 is that one.
-func _under_wake(p: Vector2, wake: Dictionary) -> bool:
-	if wake.is_empty() or wake["kind"] != "subduct" or ring_at(p) != int(wake["ring"]):
-		return false
-	var side := -1.0 if int(rings[int(wake["ring"])]["divers"][int(wake["seam"])]) == 0 else 1.0
-	var off := angle_difference(float(wake["angle"]), p.angle())
-	return signf(off) == side and absf(off) * p.length() <= float(def["wake"]["swallow_band"])
-
-
-## A ridge tall enough raises one upthrust node of the town's age beside its pass.
-func _raise_upthrust(rng: SeededRng) -> void:
-	var type: String = def["upthrust"].get(w.run.age, "")
-	if type == "":
-		return
-	var standing := 0
-	for ring in rings:
-		for held: int in ring["upthrust"]:
-			if held >= 0 and not w.nodes[held].get("gone", false):
-				standing += 1
-	# Ridgeheart: a step lower, and more of them.
-	var height := maxi(1, int(def["upthrust_height"]) - int(w.run.mod("upthrust_ease")))
-	var cap := int(def["upthrust_cap"]) + int(w.run.mod("upthrust_more"))
-	for ri in rings.size():
-		var ring := rings[ri]
-		for k in ring["seams"].size():
-			if int(ring["ridges"][k]) < height or standing >= cap:
-				continue
-			var held := int(ring["upthrust"][k])
-			if held >= 0 and not w.nodes[held].get("gone", false) and w.nodes[held]["type"] == type:
-				continue
-			standing += 1
-			var r := (float(ring["r0"]) + float(ring["r1"])) / 2.0
-			var side := 1.0 if rng.randf() < 0.5 else -1.0
-			ring["upthrust"][k] = _raise(type, Vector2.from_angle(float(ring["seams"][k]) + side * _margin(r)) * r, 1.0, false)
-
-
 ## An earth find (data/plates.json finds) that heroes dig out for an item.
 func _leave_find(kind: String, at: Vector2, great: bool) -> void:
 	var type: String = def["finds"][kind]
@@ -766,7 +781,7 @@ func _leave_find(kind: String, at: Vector2, great: bool) -> void:
 	_add(type, at, 1.0)
 
 
-## A fresh node in a rift.
+## A fresh node in a valley.
 func _grow(type: String, at: Vector2, share: float, great: bool) -> int:
 	last["grown"][type] = int(last["grown"].get(type, 0)) + 1
 	events.append({"kind": "grew", "type": type, "pos": at, "worked": false, "great": great})
@@ -790,7 +805,7 @@ func _add(type: String, at: Vector2, share: float) -> int:
 	return w.nodes.size() - 1
 
 
-## Thickets and raw rifts slow walkers; ridges are solid. Laid fresh after every shift.
+## Thickets slow walkers; ridges are solid. Laid fresh after every turn.
 func _stamp_ground() -> void:
 	var p := w.pathing
 	_index_cells()
@@ -798,10 +813,6 @@ func _stamp_ground() -> void:
 		for i in p.cells_in_circle(thicket["pos"], float(thicket["radius"])):
 			if p.ground[i] < Pathing.TRAIL:
 				p.set_ground(i, Pathing.THICKET)
-	for strip in raw:
-		for j in _arc(int(strip["ring"]), strip["a0"], strip["a1"]):
-			if p.ground[_cells[j]] < Pathing.TRAIL:
-				p.set_ground(_cells[j], Pathing.THICKET)
 	var half := float(def["ridge_half_width"])
 	var pass_half := float(def["pass_width"]) / 2.0
 	for ri in rings.size():
@@ -831,13 +842,6 @@ func _stamp_raised_ridges() -> void:
 			if absf(_cell_r[j] - r) <= half:
 				_ridge_cells.append(_cells[j])
 				w.pathing.set_solid(_cells[j], true)
-
-
-func _in_raw(ri: int, a: float) -> bool:
-	for strip in raw:
-		if int(strip["ring"]) == ri and _in_span(a, strip["a0"], strip["a1"]):
-			return true
-	return false
 
 
 ## Nothing is left standing on a ridge: it steps off to the side of the seam it was on.
@@ -893,7 +897,7 @@ func _refund_roads(before: Dictionary) -> void:
 		var gone := int(before[kind]) - int(after.get(kind, 0))
 		if gone > 0:
 			lost[kind] = gone
-			last["roads_refunded"] = int(last["roads_refunded"]) + gone
+			last["roads_refunded"] = int(last.get("roads_refunded", 0)) + gone
 	w.town.refund_roads(lost)
 
 
@@ -903,16 +907,18 @@ func _tell() -> void:
 	for t: String in last["swallowed"]:
 		swallowed += int(last["swallowed"][t])
 	if swallowed > 0:
-		parts.append("%d resource%s sink%s at the seams" % [swallowed, "" if swallowed == 1 else "s", "s" if swallowed == 1 else ""])
+		parts.append("%d resource%s sink%s at a waking seam" % [swallowed, "" if swallowed == 1 else "s", "s" if swallowed == 1 else ""])
 	if int(last["ridges"]) > 0:
-		parts.append("ridges push up where plates collide")
+		parts.append("a ridge heaves up where plates collide")
 	var grown := 0
 	for t: String in last["grown"]:
 		grown += int(last["grown"][t])
 	if grown > 0:
-		parts.append("%d fresh patch%s grow%s in the rifts" % [grown, "" if grown == 1 else "es", "s" if grown == 1 else ""])
+		parts.append("%d fresh patch%s grow%s in a valley" % [grown, "" if grown == 1 else "es", "s" if grown == 1 else ""])
 	for t: String in last["raised"]:
 		parts.append("a ridge breaks open: %s" % w.content.world["nodes"][t]["name"].to_lower())
+	if bool(last.get("held", false)):
+		parts.append("the near ring holds still")
 	var line := "The earth turns."
 	if not parts.is_empty():
 		line = "The earth turns: %s." % "; ".join(parts)

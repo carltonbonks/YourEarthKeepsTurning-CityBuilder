@@ -172,7 +172,7 @@ def main(raw_folder, out_folder):
                 **{"band_end_" + k: rd.get("bands_end", {}).get(k, 0) if "bands_end" in rd else "" for k in LEANINGS},
                 **{"leaning_end_" + k: rd.get("leanings_end", {}).get(k, 0) if "leanings_end" in rd else "" for k in LEANINGS},
                 "tended_total": sum(rd.get("tended", {}).values()) if "tended" in rd else "",
-                **({"earth_" + k: (sum(rd["shift"][k].values()) if isinstance(rd["shift"][k], dict) else rd["shift"][k])
+                **({"earth_" + k: (sum(rd["shift"].get(k, {}).values()) if isinstance(rd["shift"].get(k, ""), dict) else rd["shift"].get(k, ""))
                     for k in ["swallowed", "dens_swallowed", "ridges", "raised", "rifts", "grown", "roads_refunded"]}
                    if "shift" in rd else {"earth_" + k: "" for k in ["swallowed", "dens_swallowed", "ridges", "raised",
                                                                     "rifts", "grown", "roads_refunded"]}),
@@ -180,6 +180,12 @@ def main(raw_folder, out_folder):
                 "earth_woke_ring": rd["shift"].get("woke_ring", "") if "shift" in rd else "",
                 "earth_omen": rd["shift"].get("omen", "") if "shift" in rd else "",
                 "earth_finds": sum(rd["shift"].get("finds", {}).values()) if "shift" in rd else "",
+                "earth_wakes": rd["shift"].get("wakes", "") if "shift" in rd else "",
+                "earth_held": rd["shift"].get("held", "") if "shift" in rd else "",
+                "earth_crossing": "|".join(rd.get("crossing", [])),
+                "earth_fed": sum(1 for a in rd.get("actions", []) if a.get("kind") == "feed_earth") if "crossing" in rd else "",
+                "earth_risen": sum(rd.get("earth_risen", {}).values()) if "crossing" in rd else "",
+                "grave_goods": rd.get("grave_goods", 0) if "crossing" in rd else "",
                 "spells_cast": "|".join(e["cast"] for e in rd.get("spells", []) if "cast" in e) if "spells" in rd else "",
                 "spells_finished": "|".join(e["finished"] for e in rd.get("spells", []) if "finished" in e)
                 if "spells" in rd else "",

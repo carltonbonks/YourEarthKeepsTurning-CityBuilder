@@ -663,6 +663,9 @@ func plan_trip(unit: Unit) -> int:
 		var score := float(need[good]) * take / (walk * 2.0 + gather)
 		if leans_to(unit, good):
 			score *= float(w.content.townsfolk[unit.type_id].get("leaning_weight", 1.0))
+		# Ground a full seam will swallow at the next turn shows cracks: strip it while it lasts.
+		if w.earth.doomed(node["pos"]):
+			score *= float(w.content.plates["pressure"]["crack_gather"])
 		if score > best_score:
 			best_score = score
 			best = i

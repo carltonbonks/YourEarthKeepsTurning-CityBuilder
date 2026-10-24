@@ -654,6 +654,9 @@ func find_for(hero: Unit, wilds: float) -> int:
 		if Vector2(node["pos"]).length() > reach:
 			continue
 		var d := hero.pos.distance_to(node["pos"])
+		# A find on cracking ground goes back under at the next turn: dig it out first.
+		if w.earth.doomed(node["pos"]):
+			d /= float(w.content.plates["pressure"]["crack_gather"])
 		if d < best_d:
 			best_d = d
 			best = i

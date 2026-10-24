@@ -244,7 +244,7 @@ func make_enemy(type_id: String, at: Vector2, spawn_time: float, scale := 1.0) -
 func towers_tick() -> void:
 	w.hearth_cooldown_left -= w.dt
 	if w.hearth_cooldown_left <= 0.0:
-		var target := w.nearest_enemy(Vector2.ZERO, w.content.num("hearth_range"))
+		var target := sighted(Vector2.ZERO, w.content.num("hearth_range"))
 		if target != null:
 			w.hearth_cooldown_left = w.content.num("hearth_cooldown")
 			w.shots.append({"from": Vector2.ZERO, "to": target.pos, "ranged": true, "tower": true, "time": w.time})
@@ -258,7 +258,7 @@ func towers_tick() -> void:
 			continue
 		if def.has("tower_hp") and float(b["hp"]) <= 0.0:
 			continue
-		var target := w.nearest_enemy(b["pos"], float(def["range"]))
+		var target := sighted(b["pos"], float(def["range"]))
 		if target != null:
 			b["cooldown_left"] = float(def["cooldown"])
 			w.shots.append({"from": b["pos"], "to": target.pos, "ranged": true, "tower": true, "time": w.time})
@@ -271,6 +271,23 @@ func towers_tick() -> void:
 				target.target = null
 				target.target_tower = w.buildings.find(b)
 				target.grudge_until = w.time + w.content.num("tower_grudge_seconds")
+
+
+## The nearest raider the hearth or a tower at `from` can see with this range: the near plate a raider stands on
+## stretches or shortens how far off it is seen (Earth.sight_at: open Stonefield, Greenwood cover).
+func sighted(from: Vector2, reach: float) -> Unit:
+	var sights: Array = [1.0]
+	for kind: String in w.content.plates["near_kinds"]:
+		var s := float(w.content.plates["near_kinds"][kind].get("sight", 1.0))
+		if not sights.has(s):
+			sights.append(s)
+	sights.sort()
+	sights.reverse()
+	for s: float in sights:
+		var target := w.nearest_enemy(from, reach * s)
+		if target != null and from.distance_to(target.pos) <= reach * w.earth.sight_at(target.pos):
+			return target
+	return null
 
 
 ## True if building b is a tower that still stands (not broken).

@@ -311,6 +311,8 @@ static func node(run: RunState, n: Dictionary) -> Dictionary:
 		t["lines"].append("Regrows %d each dawn" % run.world.node_regrowth(n))
 	else:
 		t["lines"].append("Never grows back")
+	if run.world.earth.doomed(n["pos"]):
+		t["warnings"].append("Cracking: a full seam swallows it at the next turn of the earth. Gatherers strip it first.")
 	t["tags"] = tag_notes(run, "node", n["type"])
 	return t
 
@@ -322,6 +324,8 @@ static func den(run: RunState, d: Dictionary) -> Dictionary:
 	var t := enemy(run, d["spawns"])
 	var spawn_name: String = t["title"]
 	t["title"] = c.world["dens"][d["type"]]["name"]
+	if run.world.earth.doomed(d["pos"]):
+		t["warnings"].append("Cracking: a full seam swallows this den at the next turn of the earth, leaving its hoard.")
 	t["lines"].insert(0, "Sends out %s. Hero territory: heroes hunt here for loot and XP." % spawn_name.to_lower())
 	return t
 
@@ -334,7 +338,7 @@ static func earth(run: RunState, kind: String) -> Dictionary:
 	return t
 
 
-## A seam between two earth plates (an Earth.forecast entry): what kind it is and its ridge, not what comes next.
+## A seam between two earth plates (an Earth.seams entry): what kind it is, how full of pressure, and its ridge.
 static func seam(run: RunState, entry: Dictionary) -> Dictionary:
 	var earth := run.world.earth
 	var ring: Dictionary = earth.rings[int(entry["ring"])]
@@ -342,9 +346,24 @@ static func seam(run: RunState, entry: Dictionary) -> Dictionary:
 	var text: Dictionary = run.content.plates["texts"][kind]
 	var t := new_tip("%s (%s ring)" % [text["name"], String(ring["name"]).to_lower()])
 	t["lines"].append(text["text"])
+	var full := int(run.content.plates["pressure"]["full"])
+	var marks := int(ring["pressure"][int(entry["seam"])])
+	t["lines"].append("Pressure %d of %d. %s" % [marks, full, run.content.plates["texts"]["pressure"]["text"]])
+	if marks >= full:
+		t["warnings"].append("Full: it wakes at the next turn of the earth.")
 	var ridge := int(ring["ridges"][int(entry["seam"])])
 	if ridge > 0:
-		t["lines"].append("Its ridge stands %d high." % ridge)
+		t["lines"].append("Its ridge stands %d more turn%s." % [ridge, "" if ridge == 1 else "s"])
+	return t
+
+
+## A near plate: its kind, and what that does to an attack crossing it.
+static func plate(run: RunState, kind: String) -> Dictionary:
+	var kd: Dictionary = run.world.earth.kind_def(kind)
+	var t := new_tip("%s (near ring)" % kd["name"])
+	t["lines"].append("Gives: %s" % kd["gives"])
+	t["lines"].append("Takes: %s" % kd["takes"])
+	t["lines"].append("The near ring turns a plate each round, so the ground the attack crosses changes. Feed the earth in the build to turn it one more.")
 	return t
 
 

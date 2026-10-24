@@ -291,9 +291,23 @@ func outposts_tick() -> void:
 		var foe := w.nearest_enemy(b["pos"], float(post["raid_radius"]))
 		if foe != null:
 			b["work_left"] = float(w.content.buildings[b["type"]]["work"]) * float(post["rebuild_share"])
+			b["ridden"] = 0
 			w.run.record.note_count("outposts_wrecked", 1, b["type"])
 			w.run.tell("A %s wrecks the %s out by the %s." % [foe.display_name.to_lower(),
 				w.content.buildings[b["type"]]["name"].to_lower(), w.content.world["nodes"][w.nodes[int(b["node"])]["type"]]["name"].to_lower()])
+
+
+## After each turn of the earth: every standing outpost out on the plates has ridden one more turn.
+func outposts_ridden() -> void:
+	for b in w.buildings:
+		if b.has("node") and float(b["work_left"]) <= 0.0 and int(b["node"]) >= 0 and w.earth.ring_at(b["pos"]) >= 0:
+			b["ridden"] = int(b.get("ridden", 0)) + 1
+
+
+## How much more an outpost brings in each dawn for the turns of the earth it has stood through.
+func ride_bonus(b: Dictionary) -> int:
+	var rd: Dictionary = w.content.plates["outpost_ride"]
+	return mini(int(b.get("ridden", 0)), int(rd["cap"])) * int(rd["bonus"])
 
 
 ## At dawn each standing outpost brings in goods from its node. One whose node the earth took (or that was
@@ -314,6 +328,7 @@ func outposts_dawn() -> void:
 			b["node"] = next
 			b["pos"] = _outpost_pos(next)
 			b["work_left"] = float(w.content.buildings[b["type"]]["work"])
+			b["ridden"] = 0
 			w.run.record.note_count("outposts_moved", 1, b["type"])
 			w.run.tell("The %s's %s is gone; it must be raised again by another." % [name.to_lower(),
 				w.content.world["nodes"][node["type"]]["name"].to_lower()])
@@ -321,7 +336,7 @@ func outposts_dawn() -> void:
 		if float(b["work_left"]) > 0.0:
 			continue
 		var post: Dictionary = w.content.buildings[b["type"]]["outpost"]
-		var got := mini(int(post["take"]), int(node["amount"]))
+		var got := mini(int(post["take"]) + ride_bonus(b), int(node["amount"]))
 		node["amount"] = int(node["amount"]) - got
 		var good: String = post["gives"]
 		w.run.stock[good] = int(w.run.stock.get(good, 0)) + got
