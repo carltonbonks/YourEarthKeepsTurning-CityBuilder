@@ -70,7 +70,7 @@ func test_dawn_deals_roll_townsfolk_cards_without_changing_which_cards_are_dealt
 		for card in rolled.pick_offer:
 			if card.has("roll"):
 				rolls += 1
-				check(card["kind"] == "folk" or card.get("legend", false), "only townsfolk cards and legends roll")
+				check(card["kind"] != "promote", "promotions don't roll")
 	check(rolls > 0, "some cards rolled over 40 dawns (%d)" % rolls)
 
 
@@ -197,3 +197,137 @@ func test_ember_born_burn_fuel_at_night() -> void:
 	var u := run.world.folk_ai.add_folk("craftsperson")
 	u.boons.append("ember_born")
 	check(run.fuel_needed_tonight() >= before + 1, "a fuel more")
+
+
+# --- Slice 2: hero, spell, family, venture and trade cards --------------------------------
+
+func test_every_dawn_card_kind_can_roll() -> void:
+	var c := Content.load_default()
+	var rng := SeededRng.new(9)
+	var kinds := {"hero": {"weapon": true}, "spell": {"spell": "ridge", "nights": 2}, "family": {}, "venture": {}, "trade": {"give": true, "get": true}}
+	for kind: String in kinds:
+		var seen := {}
+		for i in 6000:
+			var card := {}
+			CardRoll.roll_card(c, rng, card, kind, kinds[kind], 14)
+			if card.has("roll"):
+				seen[card["roll"]] = true
+				for id: String in card["boons"]:
+					check(CardRoll.fits_card(c.card_mods[id], kind, kinds[kind]), "%s fits a %s card" % [id, kind])
+				if card["roll"] == "orange":
+					check_eq(card["boons"].size(), 1, "orange is one")
+				elif card["roll"] == "yellow":
+					check(card["boons"].size() >= 2, "yellow is a powerful one and a blue one")
+		check(seen.has("blue") and seen.has("yellow") and seen.has("orange"), "%s cards roll every rarity (%s)" % [kind, seen.keys()])
+
+
+func test_modifiers_only_fit_cards_that_can_use_them() -> void:
+	var c := Content.load_default()
+	check(not CardRoll.fits_card(c.card_mods["well_armed"], "hero", {"weapon": false}), "no better weapon without a weapon")
+	check(not CardRoll.fits_card(c.card_mods["hastened"], "spell", {"spell": "quicken", "nights": 1}), "a one-night spell can't be sooner")
+	check(not CardRoll.fits_card(c.card_mods["deep_working"], "spell", {"spell": "sink_den", "nights": 3}), "only a ridge lasts longer")
+	check(not CardRoll.fits_card(c.card_mods["bulk"], "trade", {"give": true, "get": false}), "no bulk on a service")
+	check(not CardRoll.fits_card(c.card_mods["exile"], "family", {}), "exiles are given, never dealt")
+
+
+func test_a_rolled_hero_card_shows_the_hero_as_they_arrive() -> void:
+	var run := _run()
+	var hero := run.people.make_hero(true)
+	var level := hero.level
+	var card := {"kind": "hero", "role": "hero", "cost": 25, "hero": hero, "roll": "yellow", "boons": ["war_tested", "cheap_hire"]}
+	run.people._shape_hero(card, SeededRng.new(1))
+	check_eq(hero.level, level + 2, "two levels up")
+	check_eq(card["cost"], 15, "10 shells cheaper")
+	var dog := run.people.make_hero(true)
+	var dog_card := {"kind": "hero", "role": "hero", "cost": 25, "hero": dog, "roll": "blue", "boons": ["houndmaster"]}
+	run.people._shape_hero(dog_card, SeededRng.new(1))
+	check(dog.hound, "arrives with a hound")
+
+
+func test_a_hastened_spell_is_done_a_night_sooner_and_an_echo_rests_the_geomancer() -> void:
+	var run := _run()
+	run.world.add_building("geomancer")
+	run.world.buildings[-1]["work_left"] = 0.0
+	run.cast_spell("ridge", {"roll": "blue", "boons": ["hastened"]})
+	check_eq(int(run.spell["nights_left"]), 1, "one night instead of two")
+	run.spell = {}
+	run.cast_spell("quicken", {"roll": "orange", "boons": ["echoing"]})
+	run._work_spell()
+	check(run.spell.is_empty(), "done")
+	check_eq(run.record.entry["card_mods_fired"], {"echoing": 1}, "it echoed")
+	check(not run.can_cast(), "the geomancer is spent")
+	run.round_number += 3
+	check(run.can_cast(), "and casts again after two rounds")
+
+
+func test_a_rolled_family_brings_more_and_marks() -> void:
+	var run := _run()
+	run.stock["wood"] = 0
+	var card := {"kind": "family", "role": "family", "cost": 0, "roles": ["tribesperson", "warrior"], "roll": "yellow",
+		"boons": ["gifted_kin", "big_family", "dowry"]}
+	check_eq(run.people.card_people(card), 3, "one more")
+	var before := run.world.folk.size()
+	check_eq(run.people.settle_family(card), 3, "three arrive")
+	var arrived := run.world.folk.slice(before)
+	check(arrived.all(func(u: Unit) -> bool: return u.mark != ""), "every one with a mark")
+	check_eq(int(run.stock["wood"]), 10, "and a dowry")
+	var exiles := {"kind": "family", "role": "family", "cost": 0, "roles": ["tribesperson"], "roll": "orange", "boons": ["exiles"]}
+	before = run.world.folk.size()
+	run.people.settle_family(exiles)
+	check_eq(run.world.folk.size() - before, 4, "exiles: three more")
+	check(run.world.folk.slice(before).all(func(u: Unit) -> bool: return u.boons.has("exile")), "who all eat more")
+
+
+func test_rolled_ventures_bring_more_or_lose_everyone() -> void:
+	var run := _run()
+	var id: String = run.content.ventures.keys()[0]
+	var plain := run.people.venture_terms(id)
+	var rich := run.people.venture_terms(id, {"roll": "blue", "boons": ["rich_find"]})
+	var good: String = plain["goods"].keys()[0]
+	check(int(rich["goods"][good]) > int(plain["goods"][good]), "a rich find brings more")
+	var cursed := run.people.venture_terms(id, {"roll": "orange", "boons": ["cursed_road"]})
+	check_eq(cursed["lose"], [cursed["send"], cursed["send"]], "nobody comes home from a cursed road")
+	check(int(cursed["goods"][good]) >= 3 * int(plain["goods"][good]) - 1, "but it brings three times as much")
+
+
+func test_rolled_trade_deals_change_price_and_goods() -> void:
+	var run := _run()
+	var c := run.caravan
+	check_eq(c.gives("timber_load", {"roll": "blue", "boons": ["bargain"]}), {"shells": 32}, "a fifth off 40")
+	check_eq(int(c.gets("timber_load", {"roll": "blue", "boons": ["bulk"]})["wood"]), int(c.gets("timber_load")["wood"] * 1.5),
+		"half again the wood")
+	check_eq(c.gives("timber_load", {"roll": "orange", "boons": ["cursed_gold"]}), {"shells": 0}, "cursed gold is free")
+	check_eq(c.folk_count("timber_load", {"roll": "yellow", "boons": ["escorted", "bulk"]}), 1, "an escort stays on")
+
+
+func test_a_smugglers_hoard_grows_the_attack_and_cursed_gold_turns_a_hero() -> void:
+	var run := _run()
+	run.caravan.offers = [{"deal": "timber_load", "need": "", "taken": false, "roll": "orange", "boons": ["smugglers_hoard"]},
+		{"deal": "dressed_stone", "need": "", "taken": false, "roll": "orange", "boons": ["cursed_gold"]}]
+	run.stock["shells"] = 100
+	run.phase = RunState.Phase.BUILD
+	var wave := run.next_wave.size()
+	check(wave > 0, "an attack is planned")
+	check(run.caravan.take(0), "take the hoard")
+	check(run.next_wave.size() > wave, "the attack grew (%d -> %d)" % [wave, run.next_wave.size()])
+	for h in run.living_heroes():
+		h.trait_id = "brave"
+	check(run.caravan.take(1), "take the cursed gold")
+	check(run.living_heroes().any(func(h: Unit) -> bool: return h.trait_id == "greedy"), "a hero turned greedy")
+	check_eq(run.record.entry["deals"][0]["mods"], ["smugglers_hoard"], "the record keeps the deal's modifiers")
+
+
+func test_a_lingering_deal_waits_one_round() -> void:
+	var run := _run()
+	run.world.add_building(run.content.trades["needs"])
+	run.world.buildings[-1]["work_left"] = 0.0
+	run.caravan.offers = [{"deal": "timber_load", "need": "", "taken": false, "roll": "blue", "boons": ["lingering"]}]
+	run.round_number += 1
+	run.caravan.lay_out()
+	check(run.caravan.offers.any(func(o: Dictionary) -> bool: return o["deal"] == "timber_load" and o.get("lingered", false)),
+		"still on offer")
+	check_eq(run.caravan.offers.filter(func(o: Dictionary) -> bool: return o["deal"] == "timber_load").size(), 1, "once")
+	run.round_number += 1
+	run.caravan.lay_out()
+	check(not run.caravan.offers.any(func(o: Dictionary) -> bool: return o["deal"] == "timber_load" and o.get("lingered", false)),
+		"only for one round")

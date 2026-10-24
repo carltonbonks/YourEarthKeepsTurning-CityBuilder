@@ -84,18 +84,14 @@ func test_a_legend_hero_card_comes_levelled_with_a_mythic_item() -> void:
 	run.begin_round()
 	run.round_number = 12
 	var hero := run.people.make_hero(true)
-	var card := {"kind": "hero", "role": "hero", "cost": 10, "hero": hero}
-	var found := false
-	for i in 400:
-		run.people._maybe_legend(card, SeededRng.stream(5, "legend", i))
-		if card.get("legend", false):
-			found = true
-			break
-	check(found, "a hero card sometimes comes up a legend")
+	# A legend is the orange roll of a hero card (sim/card_roll.gd).
+	var card := {"kind": "hero", "role": "hero", "cost": 10, "hero": hero, "roll": "orange", "boons": ["legend"]}
+	run.people._shape_hero(card, SeededRng.stream(5, "legend", 0))
+	check(card.get("legend", false), "the orange hero roll is a legend")
 	check_eq(hero.level, 1 + run.content.int_num("legend_levels"), "a legend is a few levels up")
 	check_eq(int(card["cost"]), 10 + run.content.int_num("legend_cost"), "and costs more")
 	check(hero.items.values().any(func(it: Dictionary) -> bool: return Loot.rarity(run.content, it) == "orange"), "and carries a mythic item")
-	check_eq(run.people.card_rarity(card), "orange", "its card is orange")
+	check_eq(CardRoll.roll_of(card), "orange", "its card is orange")
 
 
 func test_relic_offers_draw_rarer_relics_less_often() -> void:

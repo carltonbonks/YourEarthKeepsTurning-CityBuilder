@@ -636,7 +636,7 @@ func _carry_raised_ridges(plans: Array) -> void:
 
 ## A spell finishes: does what it does to the land now. Returns a line for the story. What it did is in
 ## spell_done ({grown, raised, dens_swallowed, finds}) and events; the last shift's report is left as it was.
-func finish_spell(id: String, rng: SeededRng) -> String:
+func finish_spell(id: String, rng: SeededRng, extra_lasts := 0) -> String:
 	var shift_report := last
 	last = {"swallowed": {}, "dens_swallowed": 0, "raised": {}, "grown": {}, "finds": {}}
 	events = []
@@ -645,7 +645,7 @@ func finish_spell(id: String, rng: SeededRng) -> String:
 		"quicken":
 			line = _quicken(rng)
 		"ridge":
-			line = _raise_near_ridge(rng)
+			line = _raise_near_ridge(rng, extra_lasts)
 		"sink_den":
 			line = _sink_a_den()
 	spell_done = last
@@ -684,11 +684,11 @@ func _quicken(rng: SeededRng) -> String:
 
 ## A short ridge just past the town, facing this round's first warned side, with stone and plants sprouting
 ## on the town's side of it.
-func _raise_near_ridge(rng: SeededRng) -> String:
+func _raise_near_ridge(rng: SeededRng, extra_lasts := 0) -> String:
 	var sd: Dictionary = def["spells"]["ridge"]
 	var a: float = w.wave_sides[0] if not w.wave_sides.is_empty() else rng.randf() * TAU
 	var r := float(sd["r"])
-	raised_ridges.append({"a": a, "r": r, "length": float(sd["length"]), "lasts": int(sd["lasts"])})
+	raised_ridges.append({"a": a, "r": r, "length": float(sd["length"]), "lasts": int(sd["lasts"]) + extra_lasts})
 	_index_cells()
 	_stamp_raised_ridges()
 	_off_ridges()

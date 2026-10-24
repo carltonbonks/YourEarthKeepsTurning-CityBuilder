@@ -61,38 +61,63 @@ func offer_picks() -> void:
 		var card: Dictionary = rng.pick_by(pool, func(c: Dictionary) -> float:
 			return content.rarity_odds(card_rarity(c), run.round_number))
 		pool.erase(card)
-		if card["kind"] == "hero":
-			_maybe_legend(card, rng)
-		elif card["kind"] == "folk":
-			CardRoll.roll_folk(content, roll_rng, card, run.round_number)
+		_roll_dawn_card(card, roll_rng)
 		run.pick_offer.append(card)
 	if not promote.is_empty():
 		run.pick_offer.append(promote)
 	if not venture.is_empty():
+		_roll_dawn_card(venture, roll_rng)
 		run.pick_offer.append(venture)
 	# A free geomancer offers its spells beside the newcomers; taking one is instead of a newcomer.
 	if run.can_cast():
 		for id: String in content.plates["spells"]:
-			run.pick_offer.append({"kind": "spell", "role": "spell", "cost": 0, "spell": id})
+			var spell := {"kind": "spell", "role": "spell", "cost": 0, "spell": id}
+			_roll_dawn_card(spell, roll_rng)
+			run.pick_offer.append(spell)
 	run.picks_left = 1 + int(run.mod("extra_picks"))
 	run.phase = RunState.Phase.PICK
 
 
-## Now and then a hero card is a legend (orange): a few levels up, carrying a mythic item, costing more.
-func _maybe_legend(card: Dictionary, rng: SeededRng) -> void:
+## Rolls a dawn card's own rarity and modifiers (CardRoll); a hero card's take hold of its hero at once, so the
+## card shows the hero as they will arrive. Promotions don't roll.
+func _roll_dawn_card(card: Dictionary, rng: SeededRng) -> void:
 	var content := run.content
-	if rng.randf() >= content.num("legend_share") * content.rarity_odds(content.rarest(), run.round_number):
+	match card["kind"]:
+		"folk":
+			CardRoll.roll_folk(content, rng, card, run.round_number)
+		"hero":
+			var hero: Unit = card["hero"]
+			CardRoll.roll_card(content, rng, card, "hero", {"weapon": hero.items.has("weapon")}, run.round_number)
+			_shape_hero(card, rng)
+		"spell":
+			CardRoll.roll_card(content, rng, card, "spell", {"spell": card["spell"],
+				"nights": int(content.plates["spells"][card["spell"]]["nights"])}, run.round_number)
+		"family", "venture":
+			CardRoll.roll_card(content, rng, card, card["kind"], {}, run.round_number)
+
+
+## A rolled hero card's modifiers: levels, a hound, a better weapon, a price; the orange roll is a legend, a few levels
+## up and carrying a mythic item, costing more.
+func _shape_hero(card: Dictionary, rng: SeededRng) -> void:
+	var content := run.content
+	if not card.has("roll"):
 		return
 	var hero: Unit = card["hero"]
-	var item := Loot.mythic(content, rng, run.round_number, run.age, str(content.traits[hero.trait_id].get("prefers", "")))
-	if not item.is_empty():
-		hero.items[Loot.slot(content, item)] = item
-	hero.level += content.int_num("legend_levels")
+	hero.level += int(CardRoll.card_sum(content, card, "levels"))
+	if CardRoll.card_sum(content, card, "hound") > 0.0:
+		hero.hound = true
+	if hero.items.has("weapon"):
+		hero.items["weapon"]["tier"] = int(hero.items["weapon"]["tier"]) + int(CardRoll.card_sum(content, card, "weapon_tiers"))
+	card["cost"] = maxi(0, int(card["cost"]) + int(CardRoll.card_sum(content, card, "cost_shells")))
+	if CardRoll.card_has(content, card, "legend"):
+		var item := Loot.mythic(content, rng, run.round_number, run.age, str(content.traits[hero.trait_id].get("prefers", "")))
+		if not item.is_empty():
+			hero.items[Loot.slot(content, item)] = item
+		hero.level += content.int_num("legend_levels")
+		card["legend"] = true
+		card["cost"] = int(card["cost"]) + content.int_num("legend_cost")
 	run.world.hero_ai.apply_hero_stats(hero)
 	hero.hp = hero.max_hp
-	card["legend"] = true
-	card["roll"] = content.rarest()
-	card["cost"] = int(card["cost"]) + content.int_num("legend_cost")
 
 
 ## The leanings a role's dawn cards can come with in the town's age, sorted.
@@ -117,7 +142,7 @@ func card_people(card: Dictionary) -> int:
 		"promote", "venture", "spell":
 			return 0
 		"family":
-			return card["roles"].size()
+			return card["roles"].size() + CardRoll.extra_people(run.content, card)
 	return 1 + CardRoll.extra_people(run.content, card)
 
 
@@ -126,7 +151,7 @@ func card_rarity(card: Dictionary) -> String:
 	var content := run.content
 	match card["kind"]:
 		"hero":
-			return content.rarest() if card.get("legend", false) else content.rarity_of("hero", card["hero"].type_id)
+			return content.rarity_of("hero", card["hero"].type_id)
 		"promote":
 			return str(content.promotions[card["role"]].get("rarity", "white"))
 		"venture":
@@ -151,6 +176,37 @@ func card_label(card: Dictionary) -> String:
 
 
 # --- Rolled townsfolk (data/card_mods.json) -----------------------------------
+
+## A family card's people move in, with what its roll brings: more of them, marks, goods, a modifier on everyone.
+## Returns how many arrived.
+func settle_family(card: Dictionary) -> int:
+	var content := run.content
+	var roles: Array = card["roles"].duplicate()
+	var extra := CardRoll.card_goods(content, card, "extra_folk")
+	var keys := extra.keys()
+	keys.sort()
+	for role: String in keys:
+		for i in int(extra[role]):
+			roles.append(role)
+	var marks := int(CardRoll.card_sum(content, card, "mark_members"))
+	var boon := ""
+	for id: String in card.get("boons", []):
+		boon = str(content.card_mods[id].get("member_boon", boon))
+	var rng := SeededRng.stream(run.run_seed, "family_marks", run.round_number * 10 + run.world.day_index())
+	for role: String in roles:
+		var u := run.world.folk_ai.add_folk(role)
+		if marks > 0:
+			u.mark = CardRoll._pick_mark(content, rng, role)
+			marks -= 1
+		if boon != "":
+			u.boons.append(boon)
+		if u.mark != "" or boon != "":
+			run.world.folk_ai.apply_folk_stats(u)
+			u.hp = u.max_hp
+	var goods := CardRoll.card_goods(content, card, "goods")
+	for good: String in goods:
+		run.stock[good] = int(run.stock.get(good, 0)) + int(goods[good])
+	return roles.size()
 
 ## A mother of many (kin_chance) may bring a plain tribesperson in free at dawn, while there is room.
 func _kin_join() -> void:
@@ -194,22 +250,30 @@ func _venture_card() -> Dictionary:
 
 
 ## What a venture risks and brings, with relics counted: send, lose (lowest and highest) and goods.
-func venture_terms(id: String) -> Dictionary:
+## A rolled venture card (card) adds its modifiers: more goods, fewer lost, or nobody back (data/card_mods.json).
+func venture_terms(id: String, card := {}) -> Dictionary:
 	var v: Dictionary = run.content.ventures[id]
-	var safety := int(run.mod("venture_safety"))
+	var safety := int(run.mod("venture_safety")) + int(CardRoll.card_sum(run.content, card, "safety"))
 	var grow := 1.0 + run.content.num("venture_growth_per_round") * (run.round_number - 1)
-	grow *= 1.0 + run.mod("venture_bonus")
+	grow *= 1.0 + run.mod("venture_bonus") + CardRoll.card_sum(run.content, card, "gain_mult")
+	if CardRoll.card_sum(run.content, card, "lose_all") > 0.0:
+		return {"send": int(v["send"]), "lose": [int(v["send"]), int(v["send"])], "goods": _venture_goods(v, grow)}
+	return {"send": int(v["send"]), "lose": [maxi(0, int(v["lose"][0]) - safety), maxi(0, int(v["lose"][1]) - safety)],
+		"goods": _venture_goods(v, grow)}
+
+
+func _venture_goods(v: Dictionary, grow: float) -> Dictionary:
 	var goods := {}
 	for good: String in v["gain"]:
 		goods[good] = int(ceil(float(v["gain"][good]) * grow))
-	return {"send": int(v["send"]), "lose": [maxi(0, int(v["lose"][0]) - safety), maxi(0, int(v["lose"][1]) - safety)], "goods": goods}
+	return goods
 
 
 ## Sends the tribespeople out: some never come back (chosen at random), the goods come home.
 ## Returns {venture, send, lost, goods}.
 func go_venturing(card: Dictionary) -> Dictionary:
 	var id: String = card["venture"]
-	var terms := venture_terms(id)
+	var terms := venture_terms(id, card)
 	var rng := SeededRng.stream(run.run_seed, "venture_lost", run.round_number * 10 + run.world.day_index())
 	var lost := rng.randi_range(terms["lose"][0], terms["lose"][1])
 	var tribe: Array = run.world.folk.filter(func(u: Unit) -> bool: return u.type_id == "tribesperson" and u.alive)

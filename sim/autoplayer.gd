@@ -306,10 +306,13 @@ func _bronze(run: RunState) -> void:
 ## dealer, while it keeps trade_reserve shells after paying.
 func _buy_goods(run: RunState) -> void:
 	for i in run.caravan.offers.size():
-		var id: String = run.caravan.offers[i]["deal"]
+		var offer: Dictionary = run.caravan.offers[i]
+		var id: String = offer["deal"]
 		var def := run.caravan.deal(id)
-		var give: Dictionary = def["give"]
-		var wanted: bool = run.caravan.offers[i]["need"] != "" or def.has("folk") or def.has("smith") or def.has("relic")
+		var give := run.caravan.gives(id, offer)
+		# A rolled deal (a bargain, a bigger lot) is worth taking too.
+		var wanted: bool = offer["need"] != "" or def.has("folk") or def.has("smith") or def.has("relic") or (offer.has("roll") \
+			and not CardRoll.card_has(run.content, offer, "wave_share"))
 		if wanted and int(run.stock["shells"]) - int(give.get("shells", 0)) >= trade_reserve:
 			run.caravan.take(i)
 
@@ -405,8 +408,10 @@ func roll_value(run: RunState, card: Dictionary) -> float:
 		match id:
 			"hollow_seer":
 				value += 0.5
-			"bloodsworn", "ember_born":
+			"bloodsworn", "ember_born", "exiles", "echoing":
 				value += 1.0
+			"legend":
+				value += 2.0
 			"many_mother":
 				value += 2.0
 			_:
@@ -416,7 +421,7 @@ func roll_value(run: RunState, card: Dictionary) -> float:
 
 ## A venture is worth it when it brings one of the two goods the town is shortest of and plenty of tribespeople stay home.
 func venture_score(run: RunState, card: Dictionary) -> float:
-	var terms := run.people.venture_terms(card["venture"])
+	var terms := run.people.venture_terms(card["venture"], card)
 	var short := run.needed_resources().slice(0, 2)
 	var helps: bool = terms["goods"].keys().any(func(g: String) -> bool: return short.has(g))
 	if not helps or run.count_role("tribesperson") - int(terms["lose"][1]) < 8:

@@ -3,16 +3,18 @@ extends RefCounted
 ## Rolled rarity on dealt cards (Yusuf, 2026-10-23): each card dealt rolls its own rarity (roll in data/rarity.json),
 ## apart from how often its kind is offered, and a rolled card carries modifiers. Blue: one mark (data/marks.json).
 ## Yellow: a mark and one or two powerful modifiers (data/card_mods.json). Orange: one transmutation, a trade-off
-## that bends a rule. Townsfolk dawn cards roll today; the card keeps "roll", "mark" and "boons".
+## that bends a rule. Every dawn card (townsfolk, heroes, families, ventures, spells) and the caravan's trade cards
+## roll; the card keeps "roll", "mark" (townsfolk only) and "boons" (card modifier ids). A legend is the orange roll
+## of a hero card.
 
 
 ## The rarity a dealt card rolls this round: each rolled rarity's chance climbs evenly from its first to its last
 ## round number (roll in data/rarity.json); white is what is left.
-static func roll_rarity(content: Content, rng: SeededRng, round_number: int) -> String:
+static func roll_rarity(content: Content, rng: SeededRng, round_number: int, odds_mult := 1.0) -> String:
 	var r := rng.randf()
 	var order: Array = content.rarity["order"]
 	for i in range(order.size() - 1, 0, -1):
-		var chance := roll_chance(content, order[i], round_number)
+		var chance := roll_chance(content, order[i], round_number) * odds_mult
 		if r < chance:
 			return order[i]
 		r -= chance
@@ -33,16 +35,16 @@ static func roll_folk(content: Content, rng: SeededRng, card: Dictionary, round_
 	var rarity := roll_rarity(content, rng, round_number)
 	if rarity == "white":
 		return
-	var role: String = card["role"]
+	var fits := {"role": card["role"], "leaning": card.has("leaning")}
 	var boons: Array[String] = []
 	var mark := ""
 	if rarity == "orange":
-		boons = _pick_boons(content, rng, "orange", role, card.has("leaning"), 1)
+		boons = _pick_boons(content, rng, "orange", "folk", fits, 1)
 	else:
-		mark = _pick_mark(content, rng, role)
+		mark = _pick_mark(content, rng, card["role"])
 		if rarity == "yellow":
 			var count := 2 if rng.randf() < content.num("card_mod_second_chance") else 1
-			boons = _pick_boons(content, rng, "yellow", role, card.has("leaning"), count)
+			boons = _pick_boons(content, rng, "yellow", "folk", fits, count)
 	if mark == "" and boons.is_empty():
 		return
 	card["roll"] = rarity
@@ -50,6 +52,30 @@ static func roll_folk(content: Content, rng: SeededRng, card: Dictionary, round_
 		card["mark"] = mark
 	if not boons.is_empty():
 		card["boons"] = boons
+
+
+## Rolls any other card's rarity and modifiers into it (card kind: hero, spell, family, venture, trade). fits says what
+## the card is, for modifiers that need it (data/card_mods.json needs_*). Blue: one blue modifier. Yellow: a yellow
+## one and a blue one, sometimes two. Orange: one orange. odds_mult makes rolls above white likelier (trades).
+static func roll_card(content: Content, rng: SeededRng, card: Dictionary, kind: String, fits: Dictionary, round_number: int,
+		odds_mult := 1.0) -> void:
+	var rarity := roll_rarity(content, rng, round_number, odds_mult)
+	if rarity == "white":
+		return
+	var boons: Array[String] = []
+	if rarity == "orange":
+		boons = _pick_boons(content, rng, "orange", kind, fits, 1)
+	else:
+		if rarity == "yellow":
+			boons = _pick_boons(content, rng, "yellow", kind, fits, 1)
+		var blues := 1 if rarity == "blue" else (2 if rng.randf() < content.num("card_mod_second_chance") else 1)
+		if rarity == "yellow" and boons.is_empty():
+			blues = 2
+		boons.append_array(_pick_boons(content, rng, "blue", kind, fits, blues))
+	if boons.is_empty():
+		return
+	card["roll"] = rarity
+	card["boons"] = boons
 
 
 ## A mark that can come on a role's card (data/marks.json roles, if given), or "".
@@ -60,12 +86,28 @@ static func _pick_mark(content: Content, rng: SeededRng, role: String) -> String
 	return rng.pick(ids) if not ids.is_empty() else ""
 
 
-## Up to count different modifiers of a rarity that fit a townsfolk card of this role.
-static func _pick_boons(content: Content, rng: SeededRng, rarity: String, role: String, leaning: bool, count: int) -> Array[String]:
+## True when a card modifier can come on a card of this kind as fits describes it: its roles, a leaning, a hero's
+## weapon, a spell of enough nights or of the listed spells, a deal's payment or goods.
+static func fits_card(m: Dictionary, kind: String, fits: Dictionary) -> bool:
+	if not m.get("cards", []).has(kind):
+		return false
+	if m.has("roles") and not m["roles"].has(fits.get("role", "")):
+		return false
+	if m.has("spells") and not m["spells"].has(fits.get("spell", "")):
+		return false
+	if int(fits.get("nights", 99)) < int(m.get("min_nights", 0)):
+		return false
+	for need: String in ["leaning", "weapon", "give", "get"]:
+		if m.get("needs_" + need, false) and not fits.get(need, false):
+			return false
+	return true
+
+
+## Up to count different modifiers of a rarity that fit a card of this kind.
+static func _pick_boons(content: Content, rng: SeededRng, rarity: String, kind: String, fits: Dictionary, count: int) -> Array[String]:
 	var ids: Array = content.card_mods.keys().filter(func(id: String) -> bool:
 		var m: Dictionary = content.card_mods[id]
-		return m.get("rarity", "") == rarity and m.get("cards", []).has("folk") \
-			and m.get("roles", [role]).has(role) and (leaning or not m.get("needs_leaning", false)))
+		return m.get("rarity", "") == rarity and fits_card(m, kind, fits))
 	ids.sort()
 	var out: Array[String] = []
 	while out.size() < count and not ids.is_empty():
@@ -73,6 +115,35 @@ static func _pick_boons(content: Content, rng: SeededRng, rarity: String, role: 
 		ids.erase(id)
 		out.append(id)
 	return out
+
+
+## One number summed over a card's modifiers (data/card_mods.json), e.g. a deal's price_mult.
+static func card_sum(content: Content, card: Dictionary, key: String) -> float:
+	var total := 0.0
+	for id: String in card.get("boons", []):
+		total += float(content.card_mods[id].get(key, 0.0))
+	return total
+
+
+## Goods or people summed over a card's modifiers for a key whose values are {id: amount}, e.g. goods, extra_folk.
+static func card_goods(content: Content, card: Dictionary, key: String) -> Dictionary:
+	var out := {}
+	for id: String in card.get("boons", []):
+		var add: Dictionary = content.card_mods[id].get(key, {})
+		for g: String in add:
+			out[g] = int(out.get(g, 0)) + int(add[g])
+	return out
+
+
+## True when one of a card's modifiers has this key.
+static func card_has(content: Content, card: Dictionary, key: String) -> bool:
+	return card.get("boons", []).any(func(id: String) -> bool: return content.card_mods[id].has(key))
+
+
+## Counts the modifiers on a card taken (not a townsperson's: apply_to counts those) in the round record.
+static func note_taken(run: RunState, card: Dictionary) -> void:
+	for id: String in card.get("boons", []):
+		run.record.note_count("card_mods_taken", 1, id)
 
 
 ## The card's rolled rarity ("white" when it rolled nothing).
@@ -104,11 +175,11 @@ static func lines(content: Content, card: Dictionary) -> Array[String]:
 	return out
 
 
-## People a rolled card brings beyond the usual one (Twins).
+## People a rolled card brings beyond the usual (Twins, a bigger family, an escort).
 static func extra_people(content: Content, card: Dictionary) -> int:
-	var extra := 0
-	for id: String in card.get("boons", []):
-		extra += int(content.card_mods[id].get("twin", 0))
+	var extra := int(card_sum(content, card, "twin"))
+	for n: int in card_goods(content, card, "extra_folk").values():
+		extra += n
 	return extra
 
 
