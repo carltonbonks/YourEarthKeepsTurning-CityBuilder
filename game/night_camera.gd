@@ -2,7 +2,8 @@ class_name NightCamera
 extends RefCounted
 ## Brings each night's fighting close. Over the last seconds of the day the map eases in on the town
 ## until it fills most of the view, and once the night is over it eases back to wherever the player
-## had it. View only, like ArenaView: it reads the clock and the town, never the rules.
+## had it. On the attack's night the view also takes in the way the attack comes, out to where bold
+## heroes meet it in pitched battle (Yusuf, 2026-10-25: the old close-up missed that fight). View only, like ArenaView: it reads the clock and the town, never the rules.
 ## The player can take the camera back at any time (wheel, drag, or clicking a hero); it then stays
 ## where they put it until the next night. It never changes the game's speed (Yusuf, 2026-10-21).
 
@@ -14,6 +15,10 @@ const RETURN_SECONDS := 1.4
 const FILL := 0.9
 ## Room left round the outermost building, so raiders at the walls are in view, in world units.
 const MARGIN := 70.0
+## How much wider than the town's reach the view stays, so fights just outside the walls are in it.
+const LOOSE := 1.2
+## Room round the spot where heroes meet the attack (meet_attack_at), in world units.
+const FIGHT_MARGIN := 60.0
 
 ## 0 is the player's camera, 1 is closed in on the town.
 var weight := 0.0
@@ -40,6 +45,23 @@ static func town_radius(run: RunState) -> float:
 	return far + float(run.content.town["ring_depth"]) / 2.0 + MARGIN
 
 
+## What the camera frames at night: [centre, radius] of a circle on the ground. Usually the town with a
+## little room; on the attack's day the circle stretches out the way it comes in (one way: the view slides
+## toward it; several: it widens round the hearth).
+static func frame(run: RunState) -> Array:
+	var town := town_radius(run) * LOOSE
+	var w := run.world
+	if w.wave_sides.is_empty() or w.day_index() != run.content.int_num("days_per_round") - 1:
+		return [Vector2.ZERO, town]
+	var far := run.content.num("meet_attack_at") + FIGHT_MARGIN
+	if far <= town:
+		return [Vector2.ZERO, town]
+	if w.wave_sides.size() > 1:
+		return [Vector2.ZERO, far]
+	# The smallest circle holding both the town and the fight on its one way in.
+	return [Vector2.from_angle(w.wave_sides[0]) * (far - town) / 2.0, (far + town) / 2.0]
+
+
 ## The player moved the camera: leave it where they put it until the next night.
 func release() -> void:
 	_released = true
@@ -59,8 +81,9 @@ func update(view: ArenaView, delta: float) -> void:
 	weight = target if target >= weight else move_toward(weight, target, delta / RETURN_SECONDS)
 	if not _released:
 		var t := smoothstep(0.0, 1.0, weight)
-		var close := maxf(_from_zoom, view.zoom_to_fit(town_radius(view.run), FILL))
+		var aim := frame(view.run)
+		var close := maxf(_from_zoom, view.zoom_to_fit(aim[1], FILL))
 		view.zoom = lerpf(_from_zoom, close, t)
-		view.pan = _from_pan.lerp(Vector2.ZERO, t)
+		view.pan = _from_pan.lerp(aim[0], t)
 	if weight <= 0.0:
 		_active = false
