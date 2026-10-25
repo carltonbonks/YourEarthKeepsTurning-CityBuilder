@@ -16,7 +16,9 @@ extends Button
 
 enum Size { LARGE, MEDIUM, SMALL }
 
-const WIDTH := {Size.LARGE: 196.0, Size.MEDIUM: 166.0, Size.SMALL: 136.0}
+## Every card of a size has the same shape, so cards read as one set wherever they appear: large and medium are
+## 3:4, small (the build hand) squatter so the hand stays low over the map. Text that doesn't fit is in the hover panel.
+const SHAPE := {Size.LARGE: Vector2(186, 248), Size.MEDIUM: Vector2(156, 208), Size.SMALL: Vector2(136, 140)}
 ## What kind of card: the band's colour and icon. Muted, and never one of the four rarity colours.
 const FAMILIES := {
 	"folk": {"color": "#c39a7a", "icon": "folk"},
@@ -57,6 +59,10 @@ var _plaques: VBoxContainer
 var _body: Label
 var _footer: Label
 var _selected := false
+## How many lines the body may take when there is room (set_body_lines), and whether it has text to show.
+var _body_lines := 2
+var _body_wanted := false
+var _fitting := false
 
 
 func _init(sz := Size.LARGE, fam := "folk", kind := "", title := "") -> void:
@@ -66,13 +72,14 @@ func _init(sz := Size.LARGE, fam := "folk", kind := "", title := "") -> void:
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	# Space pauses the game, so a card clicked a moment ago must not take it.
 	focus_mode = Control.FOCUS_NONE
-	custom_minimum_size = Vector2(WIDTH[sz], 0)
+	custom_minimum_size = SHAPE[sz]
 	_box = VBoxContainer.new()
 	_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_box.add_theme_constant_override("separation", 0)
 	add_child(_box)
 	_box.minimum_size_changed.connect(_fit)
+	resized.connect(_fit)
 	_band = PanelContainer.new()
 	_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var tint := family_color()
@@ -170,9 +177,24 @@ func family_color() -> Color:
 	return Color(FAMILIES.get(family, FAMILIES["folk"])["color"])
 
 
-## The card grows to fit what is on it; a row of cards then takes the tallest one's height.
+## The card keeps its shape: when what is on it runs too tall, the body gives up lines, then goes (the hover panel
+## has it all). Only a card that still doesn't fit grows. Judged once the card has its width: before that every
+## label measures tall.
 func _fit() -> void:
-	custom_minimum_size.y = _box.get_combined_minimum_size().y
+	if _fitting or size.x < SHAPE[card_size].x - 0.5:
+		return
+	_fitting = true
+	var lines := _body_lines
+	_body.max_lines_visible = lines
+	_body.visible = _body_wanted
+	while _body.visible and _box.get_combined_minimum_size().y > SHAPE[card_size].y:
+		lines -= 1
+		if lines <= 0:
+			_body.visible = false
+		else:
+			_body.max_lines_visible = lines
+	custom_minimum_size.y = maxf(SHAPE[card_size].y, _box.get_combined_minimum_size().y)
+	_fitting = false
 
 
 func _label(parent: Control, text: String, font_size: int, tint: Color) -> Label:
@@ -235,7 +257,7 @@ func add_chip(text: String, icon := "", tint := TEXT, icon_tint := Color(0, 0, 0
 		var l := _chip_label(row, text, tint, 11)
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.custom_minimum_size.x = minf(l.get_theme_font("font").get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 1.0,
-			WIDTH[card_size] - 34.0)
+			SHAPE[card_size].x - 34.0)
 	_gives.add_child(chip)
 	return chip
 
@@ -285,13 +307,17 @@ func add_control(c: Control) -> void:
 func set_body(text: String, tint := DIM) -> CardView:
 	_body.text = text
 	_body.add_theme_color_override("font_color", tint)
-	_body.visible = text != "" and card_size != Size.SMALL
+	_body_wanted = text != "" and card_size != Size.SMALL
+	_body.visible = _body_wanted
+	_fit()
 	return self
 
 
 ## Lets the body run to as many lines as it needs (a relic's text is the whole card).
 func set_body_lines(lines: int) -> CardView:
+	_body_lines = lines
 	_body.max_lines_visible = lines
+	_fit()
 	return self
 
 
@@ -411,7 +437,7 @@ func _plaque(id: String) -> Control:
 	# The few words go beside the name when both fit the card, else on a line of their own under it.
 	var short := str(m.get("short", ""))
 	var font := name_l.get_theme_font("font")
-	var room: float = WIDTH[card_size] - 32.0
+	var room: float = SHAPE[card_size].x - 32.0
 	var both := font.get_string_size(m["name"] + "  " + short, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + (13.0 if content.marks.has(id) else 0.0)
 	var short_l := _chip_label(row if both <= room else col, short, TEXT, 11)
 	short_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
