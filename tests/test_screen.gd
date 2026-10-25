@@ -307,3 +307,33 @@ func test_a_pedlar_round_opens_on_the_pedlar_choice_after_the_relic() -> void:
 		"an alert says where the pedlar camped")
 	run.dispose()
 	screen.free()
+
+
+func test_pick_screens_wait_for_the_earth_to_turn() -> void:
+	# Playtest 2026-10-25: the draft and pedlar pop-ups hid the earth turning. They wait until its beat has played
+	# or Space skipped it.
+	var screen: Control = load("res://game/main.tscn").instantiate()
+	screen.set("save_runs", false)
+	screen.call("_ready")
+	screen.call("_new_run", 4821)
+	var run: RunState = screen.get("run")
+	run.choose_traditions([])
+	var arena: ArenaView = screen.get("_arena")
+	arena.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	arena.size = Vector2(1280, 720)
+	arena.call("_watch_shift")
+	run.round_number = int(run.content.pedlars["every"]) - 1
+	run.phase = RunState.Phase.RELIC
+	screen.call("_pick_relic", "")
+	var overlays: Overlays = screen.get("_overlays")
+	check(run.awaiting_pedlar(), "the new round is a pedlar round")
+	check(arena.turn_pending(), "the earth has turned and its beat is still to play")
+	check(not overlays.visible, "the pedlar choice waits for the earth")
+	screen.call("_refresh")
+	check(not overlays.visible, "a refresh doesn't bring up a pick screen meanwhile")
+	arena.call("_watch_shift")
+	arena.skip_turn()
+	screen.call("_process", 0.0)
+	check(overlays.visible, "once the beat is skipped the pedlar choice shows")
+	run.dispose()
+	screen.free()

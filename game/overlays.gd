@@ -183,7 +183,7 @@ func show_traditions(chosen: Array = []) -> void:
 		var picked := chosen.has(id)
 		var btn := CardView.new(CardView.Size.LARGE, "tradition", "Chosen" if picked else "Tradition", t["name"])
 		btn.custom_minimum_size.x = 210
-		btn.set_selected(picked).set_body(t["text"], CardView.TEXT).set_body_lines(5)
+		btn.set_selected(picked).set_body(t["text"], CardView.TEXT)
 		var start: Dictionary = t.get("start", {})
 		if not start.is_empty():
 			btn.add_goods(start)
@@ -267,7 +267,7 @@ func show_pedlars() -> void:
 		btn.add_chip("sells " + sells)
 		btn.add_chip("tier %d" % run.world.pedlar.ware_tier(id))
 		btn.add_chip(where.to_lower(), "map", CardView.TEXT, btn.family_color())
-		btn.set_body(d["text"]).set_body_lines(3).set_footer(footer)
+		btn.set_body(d["text"]).set_footer(footer)
 		btn.tooltip_text = "%s\nSells %s, about tier %d.\n%s.\n%s" % [d["text"], sells, run.world.pedlar.ware_tier(id), where, footer]
 		btn.pressed.connect(func() -> void: pedlar_chosen.emit(id))
 		row.add_child(btn)
@@ -318,6 +318,7 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 			btn.add_title_dot(Color(c["color"]))
 			btn.set_price(run.stock, {"shells": card["cost"]})
 			btn.add_chip("Lv %d" % hero.level)
+			btn.add_chip("You have %d" % run.living_heroes().size())
 			btn.add_chip(content.traits[hero.trait_id]["name"])
 			btn.set_body(legend if legend != "" else _wilds_line(hero.trait_id))
 			btn.set_footer("Sleeps in " + beds)
@@ -359,6 +360,7 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 					btn.set_advice("Forms a band" if level == 0 else "Band grows stronger")
 				btn.set_price(run.stock, {})
 				btn.add_people(roles)
+				_have_chip(btn, card["role"])
 				for good: String in lean["goods"].slice(0, 2):
 					btn.add_good_label(good)
 				btn.set_body(lean["text"]).set_footer(eats)
@@ -369,9 +371,15 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 				btn = CardView.new(sz, "folk", "Townsperson", def["name"])
 				btn.set_price(run.stock, {})
 				btn.add_people(roles)
+				_have_chip(btn, card["role"])
 				btn.set_body(def["text"]).set_footer(eats)
 				btn.tooltip_text = "%s\n%s." % [def["text"], eats]
 	return btn
+
+
+## How many of this role the town has now, so a dawn pick reads as "a fourth warrior" rather than "a warrior".
+func _have_chip(btn: CardView, role: String) -> void:
+	btn.add_chip("You have %d" % run.count_role(role))
 
 
 ## A venture: send tribespeople out, some never come back, the rest bring goods home.
@@ -441,6 +449,7 @@ func _promote_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 			var knight: String = content.hero_classes[content.promotions["champion"]["becomes"]]["name"]
 			btn = CardView.new(sz, "promote", "Knight a champion", hero.display_name)
 			btn.add_chip("Lv %d" % hero.level)
+			btn.add_chip("You have %d" % run.living_heroes().size())
 			btn.add_chip("→ " + knight.to_lower(), "", CardView.GOOD)
 			btn.tooltip_text = "%s, a level %d champion, is knighted and becomes a %s." % [hero.display_name, hero.level, knight.to_lower()]
 		_:
@@ -450,7 +459,7 @@ func _promote_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 			var effects := Tooltips.master_effects(content, card["trait"], card["workshop"])
 			btn = CardView.new(sz, "promote", "Promote a craftsperson", card["name"])
 			btn.add_chip("%s master of the %s" % [t["name"], shop], "", CardView.GOOD)
-			btn.set_body(", ".join(Tooltips.master_effects(content, card["trait"], card["workshop"], true)) + ".", CardView.TEXT).set_body_lines(4)
+			btn.set_body(", ".join(Tooltips.master_effects(content, card["trait"], card["workshop"], true)) + ".", CardView.TEXT)
 			btn.tooltip_text = "A craftsperson who made %d goods at the %s becomes %s, master of the %s.\n%s: %s\n%s.\nA master goes to their own bench before any other." % [
 				int(u.made[card["workshop"]]), shop, card["name"], shop, t["name"], t["text"], ".\n".join(effects)]
 	btn.set_price(run.stock, {"shells": card["cost"]})
@@ -544,27 +553,44 @@ func _relic_card(id: String) -> CardView:
 	var btn := CardView.new(CardView.Size.LARGE, "spoils" if is_spoils else "relic", kind, r["name"])
 	btn.custom_minimum_size.x = 206
 	btn.set_roll(content, content.rarity_of("relic", id), "white", [])
-	# A relic's text is the whole card, so it gets room instead of being cut short.
-	btn.set_body(text, CardView.TEXT).set_body_lines(5)
+	btn.set_body(text, CardView.TEXT)
 	for key: String in RunState.TAG_EFFECTS:
 		for tag: String in r.get("effects", {}).get(key, {}):
 			btn.add_chip(tag.replace("_", " "), "spark", CardView.TEXT, btn.family_color())
 	var footer := _relic_footer(r)
 	if is_spoils:
 		var now := run.spoils_now()
-		btn.add_goods(now["goods"])
+		btn.add_goods(now["goods"], true, CardView.GOOD, true)
 		var roles: Array = []
 		for role: String in now["folk"]:
 			for i in int(now["folk"][role]):
 				roles.append(role)
 		if not roles.is_empty():
 			btn.add_people(roles)
-		footer = "%d of them came. Instead of a relic." % int(run.spoils["foes"])
+		# The total is the card's headline, so nobody has to multiply "per foe" by how many came.
+		var line := spoils_line(content, now["goods"], int(run.spoils["foes"]), str(run.spoils["kind"]))
+		if line != "":
+			text = line + ("" if r.get("effects", {}).is_empty() else "\n" + text)
+			btn.set_body(text, CardView.TEXT)
+		footer = "Instead of a relic."
 	btn.set_footer(footer)
 	var tags := Tooltips.tag_notes(run, "relic", id)
 	btn.tooltip_text = text + ("\n" + footer if footer != "" else "") + ("\nTags: " + "\n".join(tags) if not tags.is_empty() else "")
 	btn.pressed.connect(func() -> void: relic_picked.emit(id))
 	return btn
+
+
+## The spoils' goods as one sentence with the totals ("You get 16 food now, from the 8 beasts that came."), or "".
+## kind is the enemy tag the spoils are of.
+static func spoils_line(content: Content, goods: Dictionary, foes: int, kind: String) -> String:
+	var parts: Array[String] = []
+	for good: String in goods:
+		parts.append("%d %s" % [int(goods[good]), good.replace("_", " ")])
+	if parts.is_empty():
+		return ""
+	var listed := parts[0] if parts.size() == 1 else ", ".join(parts.slice(0, -1)) + " and " + parts[-1]
+	var names: Array = content.balance.get("spoils_foes", {}).get(kind, [kind, kind])
+	return "You get %s now, from the %d %s that came." % [listed, foes, names[0] if foes == 1 else names[1]]
 
 
 ## What a tag-keyed relic would act on in this town now ("Your heroes carry 3 bone items"), or "".

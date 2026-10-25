@@ -19,7 +19,7 @@
 	"hearth_heal_rate": 4,
 
 	"start_stock": {"food": 12, "fuel": 10, "wood": 14, "stone": 6, "shells": 20},
-	"start_people": {"tribesperson": 3, "warrior": 1},
+	"start_people": {"tribesperson": 2, "craftsperson": 1, "warrior": 1},
 	"start_heroes": 2,
 	"base_housing": 8,
 
@@ -112,8 +112,9 @@
 	"tradition_random_bonus": {"food": 5, "stone": 5, "fuel": 5},
 	"tradition_card_weight": 3,
 	"tradition_band_ease": 1,
-	"_spoils_note": "After each round the relic offer gains one card of spoils (relics tagged spoils, data/relics.json) from the kind of enemy the attack was made of; spoils_kinds names each kind on the card (enemy tag -> what the band of them is called).",
+	"_spoils_note": "After each round the relic offer gains one card of spoils (relics tagged spoils, data/relics.json) from the kind of enemy the attack was made of; spoils_kinds names each kind on the card (enemy tag -> what the band of them is called); spoils_foes names one of them and many of them, for the card's total (\"You get 16 food now, from the 8 beasts that came.\").",
 	"spoils_kinds": {"human": "warband", "beast": "pack", "undead": "barrow-dead", "siege": "siege train"},
+	"spoils_foes": {"human": ["raider", "raiders"], "beast": ["beast", "beasts"], "undead": ["dead one", "dead"], "siege": ["siege engine", "siege engines"]},
 
 	"_energy_note": "Hero energy: drains per second while awake (faster out in the wilds) and per attack, comes back while resting at a lodging (energy_rest x the lodging's rest, x home bonus in a preferred lodging, x rest_rough when sleeping by the hearth). Heroes get up once they reach wake_at. At 0 energy a hero is exhausted and hits for exhausted_attack of normal.",
 	"hero_energy_max": 100,

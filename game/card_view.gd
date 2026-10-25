@@ -9,7 +9,8 @@ extends Button
 ## - the gives row is what lands, as icons and numbers;
 ## - each rolled modifier is a plaque with its name and a few words (`short` in data/card_mods.json, data/marks.json),
 ##   an orange one split into its gift and its price;
-## - the body is two lines at most and the footer is what the card costs to keep.
+## - the body takes what room the card has left (playtest 2026-10-25: cut-off text read as broken cards) and the footer
+##   is what the card costs to keep.
 ## Advice sits on a bone ribbon over the band; a blocker on a red strip over the footer (UiKit.fade_if_disabled).
 ## The rarity colours appear nowhere else on screen. The rest is in the hover panel, built when the mouse rests on
 ## the card from tooltip_text and the card's modifiers. Small cards (the build hand) show no body or plaques.
@@ -60,7 +61,7 @@ var _body: Label
 var _footer: Label
 var _selected := false
 ## How many lines the body may take when there is room (set_body_lines), and whether it has text to show.
-var _body_lines := 2
+var _body_lines := 8
 var _body_wanted := false
 var _fitting := false
 
@@ -138,7 +139,7 @@ func _init(sz := Size.LARGE, fam := "folk", kind := "", title := "") -> void:
 	_plaques.add_theme_constant_override("separation", 3)
 	col.add_child(_plaques)
 	_body = _label(col, "", 11, DIM)
-	_body.max_lines_visible = 2
+	_body.max_lines_visible = _body_lines
 	_body.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_body.visible = false
 	# Pushes the footer to the bottom, so footers line up along a row of cards.
@@ -262,12 +263,40 @@ func add_chip(text: String, icon := "", tint := TEXT, icon_tint := Color(0, 0, 0
 	return chip
 
 
+## One plain line of a trade, above the gives row: a word, then each good named with its icon and amount
+## ("Pay  30 shells", "Get  5 tin"), red where the town is short (stock given) or in the line's own tint.
+## extra adds words after the goods in red (a cursed deal's real price: "a hero turns greedy").
+func add_ledger_line(word: String, goods: Dictionary, tint: Color, stock := {}, extra: Array[String] = []) -> HFlowContainer:
+	var line := HFlowContainer.new()
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	line.add_theme_constant_override("h_separation", 4)
+	var col := _gives.get_parent()
+	col.add_child(line)
+	col.move_child(line, _gives.get_index())
+	var w := _chip_label(line, word, DIM, 11)
+	w.custom_minimum_size.x = 24.0
+	if goods.is_empty() and extra.is_empty():
+		_chip_label(line, "nothing", tint, 12)
+	for good: String in goods:
+		var pair := HBoxContainer.new()
+		pair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pair.add_theme_constant_override("separation", 2)
+		line.add_child(pair)
+		pair.add_child(CardIcon.good(good, 12.0))
+		var short := not stock.is_empty() and int(stock.get(good, 0)) < int(goods[good])
+		_chip_label(pair, "%d %s" % [int(goods[good]), good.replace("_", " ")], DANGER if short else tint, 12)
+	for words: String in extra:
+		var l := _label(line, words, 11, DANGER)
+		l.custom_minimum_size.x = SHAPE[card_size].x - 46.0
+	return line
+
+
 ## Goods as chips: "+51" with the wood icon. A good with no icon of its own is named. The chip remembers the good
 ## and the amount (meta "good", "amount") for anyone reading the card.
-func add_goods(goods: Dictionary, plus := true, tint := GOOD) -> void:
+func add_goods(goods: Dictionary, plus := true, tint := GOOD, named := false) -> void:
 	for good: String in goods:
 		var n := int(goods[good])
-		var chip := add_chip(("+" if plus else "") + str(n) + ("" if CardIcon.has_shape(good) else " " + good.replace("_", " ")), "", tint)
+		var chip := add_chip(("+" if plus else "") + str(n) + ("" if CardIcon.has_shape(good) and not named else " " + good.replace("_", " ")), "", tint)
 		var row := chip.get_child(0)
 		var icon := CardIcon.good(good, 12.0)
 		row.add_child(icon)
@@ -303,7 +332,7 @@ func add_control(c: Control) -> void:
 	_gives.add_child(c)
 
 
-## Two lines at most; the whole text belongs in tooltip_text. Small cards keep it for the hover panel only.
+## As many lines as fit; the whole text belongs in tooltip_text too. Small cards keep it for the hover panel only.
 func set_body(text: String, tint := DIM) -> CardView:
 	_body.text = text
 	_body.add_theme_color_override("font_color", tint)
