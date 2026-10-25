@@ -19,12 +19,14 @@ extends SceneTree
 ## rolled=1 (with pick=1) deals rolled townsfolk cards: a magic warrior, a powerful forager and a mythic tribesperson;
 ## rolled=2 a magic family, a mythic venture and a powerful hero.
 ## drafted=1 skips the round's blueprint draft, so the build hand shows without the draft over it.
+## won=1 plays to the end of the run (or calls it won where the bot falls) and shows the victory partway through
+## (won_ms= how far in, default 3500).
 ## size=<W>x<H> sets the window size (default 1600x1000), to check the screen layout at other sizes.
 ## screen=title|welcome|settings shows the title screen, how a round works or Settings; tips=1 shows the
 ## one-time tip due at that moment (off otherwise, so pictures stay clear); seen=<id,id> marks tips as seen. The player's settings are never saved.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": ""}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -180,6 +182,26 @@ func _init() -> void:
 	main._arena.iso = args["flat"] != "1"
 	if args["night"] != "1":
 		main._arena.zoom = float(args["zoom"])
+	if args["won"] == "1":
+		while not run.is_over():
+			match run.phase:
+				RunState.Phase.BUILD:
+					bot.build(run)
+					run.begin_round()
+				RunState.Phase.PICK:
+					run.choose_pick(bot.pick(run))
+				RunState.Phase.SIM:
+					run.step()
+				RunState.Phase.RELIC:
+					run.choose_relic(run.relic_offer[0] if not run.relic_offer.is_empty() else "")
+		run.phase = RunState.Phase.WON
+		main._overlays.hide()
+		main._overlays.showing_draft = false
+		main._arena.zoom = 1.2
+		main._on_pause()
+		main._arena.victory.born = Time.get_ticks_msec() - float(args["won_ms"])
+		if main._arena.victory.born + Victory.SHOW_MS <= Time.get_ticks_msec():
+			main._arena.skip_victory()
 	match args["screen"]:
 		"title":
 			main._show_title()

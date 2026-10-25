@@ -97,6 +97,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif _title_screen.visible or _overlays.visible:
 		return
+	elif event.is_action_pressed("pause") and _arena.victory_playing():
+		_arena.skip_victory()
+		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("pause") and _arena.turn_playing():
 		_arena.skip_turn()
 		get_viewport().set_input_as_handled()
@@ -185,6 +188,10 @@ func _skip_ahead() -> void:
 func _on_pause() -> void:
 	_save()
 	_refresh()
+	# A win plays out on the map first; the end screen opens when it is done (victory_done).
+	if run.phase == RunState.Phase.WON and not _arena.victory.active():
+		_arena.start_victory()
+		return
 	_overlays.show_for_phase()
 
 
@@ -387,6 +394,7 @@ func _build_ui() -> void:
 	_arena.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_arena.clip_contents = true
 	map_box.add_child(_arena)
+	_arena.victory_done.connect(func() -> void: _overlays.show_for_phase())
 	_corner = VBoxContainer.new()
 	_corner.position = Vector2(10, 8)
 	_corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
