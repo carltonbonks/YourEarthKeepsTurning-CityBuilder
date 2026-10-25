@@ -1,6 +1,6 @@
 extends SceneTree
 ## Headless balance report: plays many seeded runs with a scripted player.
-## Usage: godot --headless --path . -s res://tools/balance_run.gd [-- runs=50 style=balanced out=runs.jsonl label=pr5 gates=2 gate_round=3 gardens=3 upkeep=0 traditions=0 geomancer=0 pedlar=0 rows=0 runners=0 feed=0]
+## Usage: godot --headless --path . -s res://tools/balance_run.gd [-- runs=50 style=balanced out=runs.jsonl label=pr5 gates=2 gate_round=3 gardens=3 upkeep=0 traditions=0 pedlar=0 rows=0 runners=0]
 ## out= also writes every run's record (same format as the game's Run history) for run_report.gd
 ## and tools/export_csv.py. label= names the build being tested (it becomes the runs' game_version).
 
@@ -14,11 +14,9 @@ func _init() -> void:
 	var garden_days := -1.0
 	var upkeep := true
 	var traditions := true
-	var geomancer := true
 	var pedlar := true
 	var rows := true
 	var runners := true
-	var feed := true
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("runs="):
 			runs = int(arg.trim_prefix("runs="))
@@ -38,14 +36,10 @@ func _init() -> void:
 			upkeep = arg.trim_prefix("upkeep=") != "0"
 		elif arg.begins_with("traditions="):
 			traditions = arg.trim_prefix("traditions=") != "0"
-		elif arg.begins_with("geomancer="):
-			geomancer = arg.trim_prefix("geomancer=") != "0"
 		elif arg.begins_with("rows="):
 			rows = arg.trim_prefix("rows=") != "0"
 		elif arg.begins_with("runners="):
 			runners = arg.trim_prefix("runners=") != "0"
-		elif arg.begins_with("feed="):
-			feed = arg.trim_prefix("feed=") != "0"
 		elif arg.begins_with("pedlar="):
 			pedlar = arg.trim_prefix("pedlar=") != "0"
 	var out_file: FileAccess = FileAccess.open(out_path, FileAccess.WRITE) if out_path != "" else null
@@ -68,11 +62,9 @@ func _init() -> void:
 			bot.gate_round = gate_round
 		bot.upkeep = upkeep
 		bot.traditions = traditions
-		bot.geomancer = geomancer
 		bot.pedlar = pedlar
 		bot.rows = rows
 		bot.runners = runners
-		bot.feed = feed
 		bot.play_run(run)
 		if out_file != null:
 			var record := run.to_record()

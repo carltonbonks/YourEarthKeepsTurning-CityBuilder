@@ -1,6 +1,6 @@
 extends TestCase
 ## Outposts (data/buildings.json "outpost"): buildings out in the wilds by a far node, with big yields,
-## that enemies wreck and the shifting earth can take.
+## that enemies wreck.
 
 
 func _run() -> RunState:
@@ -76,29 +76,3 @@ func test_one_outpost_per_node() -> void:
 	var taken: int = run.world.buildings[-1]["node"]
 	check(run.world.market.outpost_node("woodcutters_camp") != taken, "another camp would use another grove")
 
-
-func test_an_outpost_brings_more_for_each_turn_of_the_earth_it_rides() -> void:
-	var run := _run()
-	var b := _camp(run)
-	var node: Dictionary = run.world.nodes[int(b["node"])]
-	node["amount"] = 99
-	node["max"] = 99
-	check(run.world.earth.ring_at(b["pos"]) >= 0, "it stands out on the plates")
-	var rd: Dictionary = run.content.plates["outpost_ride"]
-	for n in int(rd["cap"]) + 2:
-		run.world.earth.shift()
-	check_eq(run.world.market.ride_bonus(b), int(rd["cap"]) * int(rd["bonus"]), "more for each turn it stood, up to a cap")
-	var wood := int(run.stock["wood"])
-	run.world.market.outposts_dawn()
-	check_eq(int(run.stock["wood"]) - wood, 5 + run.world.market.ride_bonus(b), "brought in at dawn")
-	run.world.market.outposts_tick()
-	var wolf := Unit.new()
-	wolf.team = Unit.Team.ENEMY
-	wolf.type_id = "wolf"
-	wolf.display_name = "Wolf"
-	wolf.spawned = true
-	wolf.pos = b["pos"] + Vector2(10, 0)
-	run.world.enemies.append(wolf)
-	run.world._enemy_grid_ok = false
-	run.world.market.outposts_tick()
-	check_eq(run.world.market.ride_bonus(b), 0, "a wrecked outpost starts again")

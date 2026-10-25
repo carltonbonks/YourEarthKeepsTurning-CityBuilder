@@ -52,8 +52,7 @@ static func value(content: Content, item: Dictionary) -> int:
 		+ int(content.items["value_per_affix"]) * item["affixes"].size()
 
 
-## An item's rarity (data/rarity.json): by how many affixes it has, raised by any affix with a rarity of its own
-## (earthborn finds are orange).
+## An item's rarity (data/rarity.json): by how many affixes it has, raised by any affix with a rarity of its own.
 static func rarity(content: Content, item: Dictionary) -> String:
 	var by: Array = content.items["rarity_by_affixes"]
 	var best: String = by[mini(item["affixes"].size(), by.size() - 1)]
@@ -86,17 +85,6 @@ static func score(content: Content, item: Dictionary, likes: Dictionary, bonus :
 	return s
 
 
-## An item dug out of an earth find: an ordinary drop find_tier_bonus tiers higher (past the usual cap),
-## always with the earthborn affix.
-static func earth_find(content: Content, rng: SeededRng, round_number: int, age := "") -> Dictionary:
-	var item := roll(content, rng, round_number, age)
-	item["tier"] = int(item["tier"]) + content.int_num("find_tier_bonus")
-	for a: String in content.items["affixes"]:
-		if content.items["affixes"][a].get("earth_only", false) and not item["affixes"].has(a):
-			item["affixes"].append(a)
-	return item
-
-
 ## A random dropped item. Tier grows with the round; its rarity (rolled first) sets its affixes or makes it a unique.
 ## Bases from a later age only drop once the town has reached it. slot ("" for any) limits the bases;
 ## min_affixes tops the affixes up (a pedlar's wares).
@@ -113,8 +101,7 @@ static func roll(content: Content, rng: SeededRng, round_number: int, age := "",
 	var rarity: String = rng.pick_by(rarities, func(r: String) -> float: return content.rarity_odds(r, round_number))
 	if rarity == content.rarest() and not by.has(rarity):
 		return make(rng.pick(uniques), tier)
-	var affix_ids: Array = content.items["affixes"].keys().filter(func(a: String) -> bool:
-		return not content.items["affixes"][a].get("earth_only", false))
+	var affix_ids: Array = content.items["affixes"].keys()
 	affix_ids.sort()
 	var affixes := []
 	while affixes.size() < mini(maxi(by.find(rarity), min_affixes), affix_ids.size()):

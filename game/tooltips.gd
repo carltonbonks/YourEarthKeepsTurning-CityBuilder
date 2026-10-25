@@ -311,8 +311,6 @@ static func node(run: RunState, n: Dictionary) -> Dictionary:
 		t["lines"].append("Regrows %d each dawn" % run.world.node_regrowth(n))
 	else:
 		t["lines"].append("Never grows back")
-	if run.world.earth.doomed(n["pos"]):
-		t["warnings"].append("Cracking: a full seam swallows it at the next turn of the earth. Gatherers strip it first.")
 	t["tags"] = tag_notes(run, "node", n["type"])
 	return t
 
@@ -324,36 +322,7 @@ static func den(run: RunState, d: Dictionary) -> Dictionary:
 	var t := enemy(run, d["spawns"])
 	var spawn_name: String = t["title"]
 	t["title"] = c.world["dens"][d["type"]]["name"]
-	if run.world.earth.doomed(d["pos"]):
-		t["warnings"].append("Cracking: a full seam swallows this den at the next turn of the earth, leaving its hoard.")
 	t["lines"].insert(0, "Sends out %s. Hero territory: heroes hunt here for loot and XP." % spawn_name.to_lower())
-	return t
-
-
-## Ridges and raw rift ground (kind "ridge" or "raw", see "texts" in data/plates.json).
-static func earth(run: RunState, kind: String) -> Dictionary:
-	var text: Dictionary = run.content.plates["texts"][kind]
-	var t := new_tip(text["name"])
-	t["lines"].append(text["text"])
-	return t
-
-
-## A seam between two earth plates (an Earth.seams entry): what kind it is, how full of pressure, and its ridge.
-static func seam(run: RunState, entry: Dictionary) -> Dictionary:
-	var earth := run.world.earth
-	var ring: Dictionary = earth.rings[int(entry["ring"])]
-	var kind: String = ring["kinds"][int(entry["seam"])]
-	var text: Dictionary = run.content.plates["texts"][kind]
-	var t := new_tip("%s (%s ring)" % [text["name"], String(ring["name"]).to_lower()])
-	t["lines"].append(text["text"])
-	var full := int(run.content.plates["pressure"]["full"])
-	var marks := int(ring["pressure"][int(entry["seam"])])
-	t["lines"].append("Pressure %d of %d. %s" % [marks, full, run.content.plates["texts"]["pressure"]["text"]])
-	if marks >= full:
-		t["warnings"].append("Full: it wakes at the next turn of the earth.")
-	var ridge := int(ring["ridges"][int(entry["seam"])])
-	if ridge > 0:
-		t["lines"].append("Its ridge stands %d more turn%s." % [ridge, "" if ridge == 1 else "s"])
 	return t
 
 
@@ -373,7 +342,7 @@ static func plate(run: RunState, kind: String) -> Dictionary:
 			by.append(bd["name"])
 	if not by.is_empty():
 		t["lines"].append("Changed by your %s." % ", ".join(by))
-	t["lines"].append("The near ring turns a plate each round, so the ground the attack crosses changes. Feed the earth in the build to turn it one more.")
+	t["lines"].append("The near ring turns a plate between rounds, so the ground the attack crosses changes.")
 	return t
 
 

@@ -41,8 +41,6 @@ var upgrades: Array[String] = []
 var traditions_settled := false
 ## The spoils in this round's relic offer: {id, kind (enemy tag), foes (how many of that kind came)}, or {}.
 var spoils := {}
-## An echoing spell leaves the geomancer spent: no spell cards until this round has passed (0 = never spent).
-var geomancer_rests_until := 0
 ## Max hearth HP the town has earned for good (Ancestor Bones).
 var bonus_hearth_hp := 0.0
 ## Dawn cards still to take this dawn (Twin Fires gives two), and townsfolk cards taken this run (Hearth-mother's Doll).
@@ -79,9 +77,7 @@ var departed: Array[Unit] = []
 var hunger_turned_away := ""
 ## The venture taken at the last dawn pick ({} if none): {venture, send, lost, goods}, so the screen can show who never came home.
 var last_venture := {}
-## The geomancer's spell under way ({} for none): {id (from "spells" in data/plates.json), nights_left}. Chosen
-## from a dawn card once a building with "spells" stands; it happens at the dawn its nights run out.
-var spell := {}
+
 ## Pedlar rounds (data/pedlars.json): the pedlars offered while building, each {id, pos} (where it would camp),
 ## the one invited ("" for none), and whether the choice is made (an unmade one invites nobody when the round begins).
 var pedlar_offer: Array[Dictionary] = []
@@ -384,60 +380,6 @@ func build_row(id: String) -> bool:
 	return true
 
 
-# --- The geomancer -------------------------------------------------------------
-
-## True once a building that works the earth (a Geomancer's lodge) stands and no spell is under way, so dawn
-## offers spell cards.
-func can_cast() -> bool:
-	if not spell.is_empty() or round_number <= geomancer_rests_until:
-		return false
-	for type: String in content.buildings:
-		if content.buildings[type].get("spells", false) and world.count_buildings(type) > 0:
-			return true
-	return false
-
-
-## Sets the geomancer to work on a spell (an id from "spells" in data/plates.json).
-func cast_spell(id: String, card := {}) -> void:
-	if not can_cast() or not content.plates["spells"].has(id):
-		return
-	var nights := maxi(1, int(content.plates["spells"][id]["nights"]) + int(CardRoll.card_sum(content, card, "nights")))
-	spell = {"id": id, "nights_left": nights}
-	if card.has("boons"):
-		spell["boons"] = card["boons"].duplicate()
-	tell("The geomancer begins to %s (%d night%s)." % [String(content.plates["spells"][id]["name"]).to_lower(), nights, "" if nights == 1 else "s"])
-	record.note_list("spells", {"day": world.day_index() + 1, "cast": id})
-
-
-## Each dawn the geomancer's spell comes one night nearer; when none are left it happens.
-func _work_spell() -> void:
-	if spell.is_empty():
-		return
-	spell["nights_left"] = int(spell["nights_left"]) - 1
-	if int(spell["nights_left"]) > 0:
-		return
-	var id: String = spell["id"]
-	var worked := {"boons": spell.get("boons", [])}
-	spell = {}
-	var rng := SeededRng.stream(run_seed, "spell", round_number * 10 + world.day_index())
-	var line := world.earth.finish_spell(id, rng, int(CardRoll.card_sum(content, worked, "lasts")))
-	tell("The geomancer's spell is done: %s." % line)
-	record.note_list("spells", {"day": world.day_index() + 1, "finished": id, "did": world.earth.spell_done.duplicate(true)})
-	# A rolled spell card's modifiers (data/card_mods.json): it echoes, leaves goods, spends the geomancer.
-	if CardRoll.card_sum(content, worked, "echo") > 0.0:
-		tell("The spell echoes: %s." % world.earth.finish_spell(id, rng, int(CardRoll.card_sum(content, worked, "lasts"))))
-		record.note_count("card_mods_fired", 1, "echoing")
-	var goods := CardRoll.card_goods(content, worked, "goods")
-	for good: String in goods:
-		stock[good] = int(stock.get(good, 0)) + int(goods[good])
-	if not goods.is_empty():
-		tell("The worked earth leaves %s." % ", ".join(goods.keys().map(func(g: String) -> String: return "%d %s" % [goods[g], g])))
-	var rest := int(CardRoll.card_sum(content, worked, "rest_rounds"))
-	if rest > 0:
-		geomancer_rests_until = round_number + rest
-		tell("The geomancer is spent and will cast nothing for %d rounds." % rest)
-
-
 ## True while building on a pedlar round until the player invites a pedlar or none (after the traditions).
 func awaiting_pedlar() -> bool:
 	return phase == Phase.BUILD and not pedlar_settled and not awaiting_traditions()
@@ -503,7 +445,6 @@ func begin_round() -> void:
 	world.start_round()
 	if pedlar != "":
 		world.pedlar.open(pedlar_choice())
-	_work_spell()
 	people.offer_picks()
 
 
@@ -572,30 +513,6 @@ func buy_tools(id: String) -> bool:
 	return true
 
 
-## True while building when the town can Feed the earth: once a round, for its stone (Earth.feed_cost).
-func can_feed_earth() -> bool:
-	var earth := world.earth
-	return phase == Phase.BUILD and earth.enabled() and not has_effect("still_ring") and earth.fed_round != round_number \
-		and can_afford(earth.feed_cost())
-
-
-## Feeds the earth: stone into the near seam, and the near ring turns one more plate now, so the night's attack
-## crosses the next plate along.
-func feed_earth() -> bool:
-	if not can_feed_earth():
-		return false
-	var cost := world.earth.feed_cost()
-	var before := world.wave_sides.map(func(a: float) -> String: return world.earth.crossing(a))
-	for r: String in cost:
-		stock[r] = int(stock[r]) - int(cost[r])
-	world.earth.feed()
-	var after := world.wave_sides.map(func(a: float) -> String: return world.earth.crossing(a))
-	record.note_action({"kind": "feed_earth", "cost": cost, "from": before, "to": after})
-	var names := after.map(func(k: String) -> String: return String(world.earth.kind_def(k).get("name", "open ground")))
-	tell("The town feeds the earth %d stone. The near ring turns: the attack will cross the %s." % [int(cost.get("stone", 0)), " and the ".join(names)])
-	return true
-
-
 ## Sum of one tool-set bonus for a townsfolk role (0 if none).
 func tool_bonus(role: String, key: String) -> float:
 	var total := 0.0
@@ -625,7 +542,7 @@ func can_take_pick(index: int) -> bool:
 	if phase != Phase.PICK or index < 0 or index >= pick_offer.size():
 		return false
 	var card := pick_offer[index]
-	return (card["kind"] in ["promote", "venture", "spell"] or population() + people.card_people(card) <= housing()) and int(stock["shells"]) >= int(card["cost"])
+	return (card["kind"] in ["promote", "venture"] or population() + people.card_people(card) <= housing()) and int(stock["shells"]) >= int(card["cost"])
 
 
 ## Takes a dawn card (-1 skips), then lets the day begin.
@@ -647,9 +564,6 @@ func choose_pick(index: int) -> void:
 			tell("%s arrives and sleeps in %s." % [describe(hero), world.hero_ai.bed_name(hero.lodging)])
 		elif card["kind"] == "promote":
 			people.promote(card)
-			taken = people.card_label(card)
-		elif card["kind"] == "spell":
-			cast_spell(card["spell"], card)
 			taken = people.card_label(card)
 		elif card["kind"] == "venture":
 			venture = people.go_venturing(card)
@@ -703,10 +617,6 @@ func choose_pick(index: int) -> void:
 	# Twin Fires: another newcomer from the cards left, unless the player skipped.
 	if took and picks_left > 0 and pick_offer.size() > 1:
 		pick_offer.remove_at(index)
-		# A spell taken leaves the geomancer busy, so its other spell cards go.
-		for i in range(pick_offer.size() - 1, -1, -1):
-			if not spell.is_empty() and pick_offer[i]["kind"] == "spell":
-				pick_offer.remove_at(i)
 		if not pick_offer.is_empty():
 			relic_fired("extra_picks")
 			return
@@ -736,7 +646,6 @@ func step() -> void:
 			people.bury_heroes()
 			people.update_moods()
 			_close_night()
-			_work_spell()
 			people.offer_picks()
 		World.Pause.ROUND_OVER:
 			_finish_round()
@@ -973,12 +882,14 @@ func choose_relic(relic_id: String) -> void:
 			relic_fired("interest", interest)
 			tell("Shells lent out come back with %d more." % interest)
 	world.earth.shift()
-	for i in int(mod("earth_turns")):
-		world.earth.shift()
+	if has_effect("earth_turns"):
 		relic_fired("earth_turns")
 	_enter_build()
 	if not world.earth.last.is_empty():
 		record.note_value("shift", world.earth.last.duplicate(true))
+		var ground := world.wave_sides.map(func(a: float) -> String: return String(world.earth.kind_def(world.earth.crossing(a)).get("name", "")))
+		if not ground.has("") and not has_effect("still_ring"):
+			tell("The earth turns. This round the attack crosses the %s." % " and the ".join(ground))
 
 
 func _enter_build() -> void:

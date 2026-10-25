@@ -99,13 +99,6 @@ func hero_tick(hero: Unit) -> void:
 		if w.walk_toward(hero, w.pedlar.camp["pos"], PedlarCamp.CAMP_RADIUS + 6.0):
 			w.pedlar.trade(hero)
 		return
-	if not w.is_dusk() and float(t["greed"]) + wilds >= w.content.num("find_appetite"):
-		var find := find_for(hero, wilds)
-		if find >= 0:
-			hero.intent = "digging out the %s" % w.content.world["nodes"][w.nodes[find]["type"]]["name"].to_lower()
-			if w.walk_toward(hero, w.nodes[find]["pos"], 10.0):
-				dig_find(hero, find)
-			return
 	if not w.is_dusk() and wilds > 0.5 and not w.dens.is_empty():
 		var outcrop := outcrop_for(hero)
 		if outcrop >= 0:
@@ -651,40 +644,6 @@ func on_supplied(hero: Unit, effect: String) -> void:
 		if hero.hp_fraction() >= retreat_at + 0.1:
 			hero.retreating = false
 			w.run.tell("%s is patched up and turns back to the hunt." % hero.display_name)
-
-
-## The nearest earth find (a sunk den's hoard, starstone by a ridge) within this hero's reach, or -1.
-## Reach grows with how keen they are on the wilds, as for hunting.
-func find_for(hero: Unit, wilds: float) -> int:
-	var reach := wilds * (w.content.num("den_max_distance") + w.content.num("find_reach"))
-	var best := -1
-	var best_d := INF
-	for i in w.nodes.size():
-		var node := w.nodes[i]
-		if node.get("gone", false) or int(node["amount"]) <= 0 or not w.content.world["nodes"][node["type"]].get("find", false):
-			continue
-		if Vector2(node["pos"]).length() > reach:
-			continue
-		var d := hero.pos.distance_to(node["pos"])
-		# A find on cracking ground goes back under at the next turn: dig it out first.
-		if w.earth.doomed(node["pos"]):
-			d /= float(w.content.plates["pressure"]["crack_gather"])
-		if d < best_d:
-			best_d = d
-			best = i
-	return best
-
-
-## A hero digs out an earth find: an item a tier above an ordinary drop, earthborn. The find is gone.
-func dig_find(hero: Unit, index: int) -> void:
-	var node := w.nodes[index]
-	node["amount"] = 0
-	node["gone"] = true
-	var rng := SeededRng.stream(w.run.run_seed, "earth_find", index)
-	var item := Loot.earth_find(w.content, rng, w.run.round_number, w.run.age)
-	w.run.tell("%s digs %s out of the %s." % [hero.display_name, "something old and strange", w.content.world["nodes"][node["type"]]["name"].to_lower()])
-	w.run.record.note_count("finds_dug", 1, node["type"])
-	give_item(hero, item)
 
 
 ## A node out in the wilds near a hero worth fetching from (obsidian, cassiterite), or -1.

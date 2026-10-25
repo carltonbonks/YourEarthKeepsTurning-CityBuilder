@@ -275,21 +275,10 @@ func add_people(roles: Array) -> void:
 	_gives.add_child(row)
 
 
-## Anything else for the gives row (the venture's figures, the spell's nights).
+## Anything else for the gives row (the venture's figures).
 func add_control(c: Control) -> void:
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_gives.add_child(c)
-
-
-## Nights to cast, as moons: filled for each night it takes, out of three.
-func add_nights(nights: int) -> void:
-	var row := HBoxContainer.new()
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 3)
-	for i in maxi(3, nights):
-		row.add_child(CardIcon.make("moon" if i < nights else "moon_empty", family_color(), 12.0))
-	_chip_label(row, "%d night%s to cast" % [nights, "" if nights == 1 else "s"], DIM, 11)
-	_gives.add_child(row)
 
 
 ## Two lines at most; the whole text belongs in tooltip_text. Small cards keep it for the hover panel only.

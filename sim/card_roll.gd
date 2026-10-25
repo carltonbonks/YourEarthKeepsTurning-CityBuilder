@@ -3,7 +3,7 @@ extends RefCounted
 ## Rolled rarity on dealt cards (Yusuf, 2026-10-23): each card dealt rolls its own rarity (roll in data/rarity.json),
 ## apart from how often its kind is offered, and a rolled card carries modifiers. Blue: one mark (data/marks.json).
 ## Yellow: a mark and one or two powerful modifiers (data/card_mods.json). Orange: one transmutation, a trade-off
-## that bends a rule. Every dawn card (townsfolk, heroes, families, ventures, spells) and the caravan's trade cards
+## that bends a rule. Every dawn card (townsfolk, heroes, families, ventures) and the caravan's trade cards
 ## roll, and so do blueprint and upgrade offers in the build draft; the card keeps "roll", "mark" (townsfolk only) and
 ## "boons" (card modifier ids). A legend is the orange roll of a hero card. A drafted blueprint or upgrade writes its
 ## modifiers into the building's numbers for the rest of the run (`apply_to_building`).
@@ -55,7 +55,7 @@ static func roll_folk(content: Content, rng: SeededRng, card: Dictionary, round_
 		card["boons"] = boons
 
 
-## Rolls any other card's rarity and modifiers into it (card kind: hero, spell, family, venture, trade). fits says what
+## Rolls any other card's rarity and modifiers into it (card kind: hero, family, venture, trade). fits says what
 ## the card is, for modifiers that need it (data/card_mods.json needs_*). Blue: one blue modifier. Yellow: a yellow
 ## one and a blue one, sometimes two. Orange: one orange. odds_mult makes rolls above white likelier (trades).
 static func roll_card(content: Content, rng: SeededRng, card: Dictionary, kind: String, fits: Dictionary, round_number: int,
@@ -88,15 +88,11 @@ static func _pick_mark(content: Content, rng: SeededRng, role: String) -> String
 
 
 ## True when a card modifier can come on a card of this kind as fits describes it: its roles, a leaning, a hero's
-## weapon, a spell of enough nights or of the listed spells, a deal's payment or goods.
+## weapon, a deal's payment or goods.
 static func fits_card(m: Dictionary, kind: String, fits: Dictionary) -> bool:
 	if not m.get("cards", []).has(kind):
 		return false
 	if m.has("roles") and not m["roles"].has(fits.get("role", "")):
-		return false
-	if m.has("spells") and not m["spells"].has(fits.get("spell", "")):
-		return false
-	if int(fits.get("nights", 99)) < int(m.get("min_nights", 0)):
 		return false
 	for need: String in ["leaning", "weapon", "give", "get"]:
 		if m.get("needs_" + need, false) and not fits.get(need, false):

@@ -144,11 +144,11 @@ func test_light_eaters_and_mothers_shift_the_food_need() -> void:
 func test_a_seer_adds_a_dawn_card_and_never_works() -> void:
 	var run := _run()
 	run.people.offer_picks()
-	var usual := run.pick_offer.filter(func(c: Dictionary) -> bool: return c["kind"] != "spell").size()
+	var usual := run.pick_offer.size()
 	var seer := run.world.folk_ai.add_folk("tribesperson")
 	seer.boons.append("hollow_seer")
 	run.people.offer_picks()
-	check_eq(run.pick_offer.filter(func(c: Dictionary) -> bool: return c["kind"] != "spell").size(), usual + 1, "one more card")
+	check_eq(run.pick_offer.size(), usual + 1, "one more card")
 	run.choose_pick(-1)
 	seer.pos = Vector2(150, 0)
 	for i in 60:
@@ -199,12 +199,12 @@ func test_ember_born_burn_fuel_at_night() -> void:
 	check(run.fuel_needed_tonight() >= before + 1, "a fuel more")
 
 
-# --- Slice 2: hero, spell, family, venture and trade cards --------------------------------
+# --- Slice 2: hero, family, venture and trade cards --------------------------------
 
 func test_every_dawn_card_kind_can_roll() -> void:
 	var c := Content.load_default()
 	var rng := SeededRng.new(9)
-	var kinds := {"hero": {"weapon": true}, "spell": {"spell": "ridge", "nights": 2}, "family": {}, "venture": {}, "trade": {"give": true, "get": true}}
+	var kinds := {"hero": {"weapon": true}, "family": {}, "venture": {}, "trade": {"give": true, "get": true}}
 	for kind: String in kinds:
 		var seen := {}
 		for i in 6000:
@@ -224,8 +224,6 @@ func test_every_dawn_card_kind_can_roll() -> void:
 func test_modifiers_only_fit_cards_that_can_use_them() -> void:
 	var c := Content.load_default()
 	check(not CardRoll.fits_card(c.card_mods["well_armed"], "hero", {"weapon": false}), "no better weapon without a weapon")
-	check(not CardRoll.fits_card(c.card_mods["hastened"], "spell", {"spell": "wake", "nights": 1}), "a one-night spell can't be sooner")
-	check(not CardRoll.fits_card(c.card_mods["deep_working"], "spell", {"spell": "sink_den", "nights": 3}), "only a ridge lasts longer")
 	check(not CardRoll.fits_card(c.card_mods["bulk"], "trade", {"give": true, "get": false}), "no bulk on a service")
 	check(not CardRoll.fits_card(c.card_mods["exile"], "family", {}), "exiles are given, never dealt")
 
@@ -242,22 +240,6 @@ func test_a_rolled_hero_card_shows_the_hero_as_they_arrive() -> void:
 	var dog_card := {"kind": "hero", "role": "hero", "cost": 25, "hero": dog, "roll": "blue", "boons": ["houndmaster"]}
 	run.people._shape_hero(dog_card, SeededRng.new(1))
 	check(dog.hound, "arrives with a hound")
-
-
-func test_a_hastened_spell_is_done_a_night_sooner_and_an_echo_rests_the_geomancer() -> void:
-	var run := _run()
-	run.world.add_building("geomancer")
-	run.world.buildings[-1]["work_left"] = 0.0
-	run.cast_spell("ridge", {"roll": "blue", "boons": ["hastened"]})
-	check_eq(int(run.spell["nights_left"]), 1, "one night instead of two")
-	run.spell = {}
-	run.cast_spell("wake", {"roll": "orange", "boons": ["echoing"]})
-	run._work_spell()
-	check(run.spell.is_empty(), "done")
-	check_eq(run.record.entry["card_mods_fired"], {"echoing": 1}, "it echoed")
-	check(not run.can_cast(), "the geomancer is spent")
-	run.round_number += 3
-	check(run.can_cast(), "and casts again after two rounds")
 
 
 func test_a_rolled_family_brings_more_and_marks() -> void:
@@ -365,9 +347,6 @@ func test_a_drafted_roll_changes_the_building_for_the_run() -> void:
 	check(is_equal_approx(float(b["watch_post"]["tower_hp"]), 84.0), "40% sturdier")
 	check(is_equal_approx(float(b["watch_post"]["hearth_hp"]), 15.0), "hearthstone is granted")
 	check(not b["watch_post"].has("gate_hp"), "sturdy adds no gate to a post")
-	CardRoll.apply_to_building(run, "shrine", {"roll": "orange", "boons": ["wellspring"]})
-	check_eq(b["shrine"]["cost"], {"wood": 0, "stone": 0}, "a wellspring costs nothing")
-	check(is_equal_approx(float(b["shrine"]["effects"]["near_wake"]), 3.0), "and draws the earth's waking")
 	CardRoll.apply_to_building(run, "longhouse", {"roll": "blue", "boons": ["roomy"]})
 	check_eq(int(b["longhouse"]["lodging"]["beds"]), 4, "a bed more")
 	check_eq(int(b["longhouse"]["housing"]), 3, "and room for one more")

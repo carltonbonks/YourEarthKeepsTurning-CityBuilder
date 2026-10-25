@@ -130,7 +130,11 @@ extends RefCounted
 ##     per round "earth_risen" (enemy type -> raiders who got up again on a Barrow) and "grave_goods" (items heroes dug
 ##     up there), each only when it happened. The quicken spell is gone; "hold" and "wake" are new spell ids.
 ## 49: a round's "shift" may have "camp_swallowed" (true when a waking trench took the war camp).
-const RECORD_FORMAT := 49
+## 50: the earth as this round's weather (Yusuf, 2026-10-25): only the near ring turns, so a round's "shift" is just
+##     {"shift", "roads_refunded"}; seams, wakes, finds, spells and feeding the earth are gone, so "spells",
+##     "finds_dug", "feed_earth" actions and "spell:<id>" picks no longer appear. "crossing", "earth_risen" and
+##     "grave_goods" stay.
+const RECORD_FORMAT := 50
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -210,7 +214,7 @@ func begin_round() -> void:
 		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {}, "idle_seconds": {}, "trips_bumped": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
 		"camps_cleared": 0, "camp_spoils": 0, "hearty_meals": 0,
-		"build_hands": [run.hand.hand_entry()], "blueprints": [], "impact": {}, "spells": [],
+		"build_hands": [run.hand.hand_entry()], "blueprints": [], "impact": {},
 		"deals_offered": run.caravan.labels(), "deals_rolls": run.caravan.offers.map(CardRoll.roll_of), "deals": []}
 
 
