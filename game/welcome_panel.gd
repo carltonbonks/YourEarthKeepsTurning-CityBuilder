@@ -43,11 +43,12 @@ static func fill(box: VBoxContainer, content: Content, settings: GameSettings, g
 		UiKit.note(col, step["text"], 14, BODY).custom_minimum_size.x = 250
 
 	var rounds := content.int_num("rounds_to_win")
-	var line := HBoxContainer.new()
-	box.add_child(line)
-	var goal := UiKit.note(line, str(w["rounds_line"]) % rounds, 14, Color("#ece5d8"))
-	goal.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UiKit.note(line, w["earth_line"], 14, UiKit.HINT_COLOR).autowrap_mode = TextServer.AUTOWRAP_OFF
+	# One line under the other, each wrapping across the full width: side by side, a long line squeezed the other.
+	var lines := VBoxContainer.new()
+	lines.add_theme_constant_override("separation", 2)
+	box.add_child(lines)
+	UiKit.note(lines, str(w["rounds_line"]) % rounds, 14, Color("#ece5d8"))
+	UiKit.note(lines, w["earth_line"], 14, UiKit.HINT_COLOR)
 	var strip := HBoxContainer.new()
 	strip.add_theme_constant_override("separation", 4)
 	box.add_child(strip)
