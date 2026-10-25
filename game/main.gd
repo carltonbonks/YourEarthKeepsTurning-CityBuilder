@@ -146,6 +146,13 @@ func _found(ids: Array) -> void:
 	_overlays.show_for_phase()
 
 
+func _found_by_chance() -> void:
+	run.choose_random_tradition()
+	_overlays.hide()
+	_refresh()
+	_overlays.show_for_phase()
+
+
 func _invite_pedlar(id: String) -> void:
 	run.choose_pedlar(id)
 	_overlays.hide()
@@ -419,6 +426,7 @@ func _build_ui() -> void:
 	_overlays.pick_taken.connect(_take_pick)
 	_overlays.relic_picked.connect(_pick_relic)
 	_overlays.traditions_chosen.connect(_found)
+	_overlays.random_tradition_chosen.connect(_found_by_chance)
 	_overlays.pedlar_chosen.connect(_invite_pedlar)
 	_overlays.new_run_requested.connect(_restart)
 	_overlays.seed_run_requested.connect(_new_run)

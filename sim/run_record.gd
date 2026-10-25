@@ -134,7 +134,9 @@ extends RefCounted
 ##     {"shift", "roads_refunded"}; seams, wakes, finds, spells and feeding the earth are gone, so "spells",
 ##     "finds_dug", "feed_earth" actions and "spell:<id>" picks no longer appear. "crossing", "earth_risen" and
 ##     "grave_goods" stay.
-const RECORD_FORMAT := 50
+## 51: one founding tradition (Yusuf, 2026-10-25): "traditions" holds at most one id; "tradition_random" is true
+##     when the player left it to chance for tradition_random_bonus goods.
+const RECORD_FORMAT := 51
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -181,6 +183,7 @@ func to_record() -> Dictionary:
 		"upgrades": run.upgrades.duplicate(),
 		"pool": run.hand.pool().duplicate(),
 		"traditions": run.traditions.duplicate(),
+		"tradition_random": run.tradition_random,
 		"prices": run.prices.duplicate(),
 		"age": run.age,
 		"age_up_round": run.age_up_round,
