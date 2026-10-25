@@ -86,3 +86,20 @@ func test_family_colours_never_borrow_a_rarity_colour() -> void:
 			var gap := absf(tint.h - rc.h) * 2.0 + absf(tint.s - rc.s) + absf(tint.v - rc.v)
 			check(gap > 0.25, "the %s band is not %s" % [fam, r])
 	check(UiKit.RECOMMEND_COLOR.s < 0.2, "advice is bone, not gold")
+
+
+## Cards measure their text only on screen, so how a crowded card gives up body lines is checked in the screenshots.
+func test_cards_of_a_size_share_one_shape() -> void:
+	var c := Content.load_default()
+	for sz: int in CardView.SHAPE:
+		var card := CardView.new(sz, "folk", "Tribesperson", "A much longer name than most")
+		var mods: Array[String] = ["nimble", "twins"]
+		card.set_roll(c, "yellow", "white", mods)
+		card.set_body("A body long enough to wrap over several lines on any card, and then a little more.")
+		check_eq(card.custom_minimum_size, CardView.SHAPE[sz], "size %d starts at its shape" % sz)
+		card.free()
+	for sz: int in [CardView.Size.LARGE, CardView.Size.MEDIUM]:
+		var shape: Vector2 = CardView.SHAPE[sz]
+		check(is_equal_approx(shape.x / shape.y, 0.75), "size %d is 3:4" % sz)
+	check(CardView.SHAPE[CardView.Size.SMALL].y < CardView.SHAPE[CardView.Size.SMALL].x / 0.75, "small cards are squatter")
+	check_eq(BuildHandView.HAND_HEIGHT, CardView.SHAPE[CardView.Size.SMALL].y, "the hand keeps room for exactly one small card")

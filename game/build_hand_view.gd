@@ -19,8 +19,8 @@ signal changed
 signal previewing(type: String)
 signal begin_pressed
 
-## The height the hand keeps for its small cards (CardView), so the strip doesn't jump as cards change.
-const HAND_HEIGHT := 140.0
+## The height the hand keeps for its small cards (their fixed shape, CardView), so the strip doesn't jump as cards change.
+const HAND_HEIGHT: float = CardView.SHAPE[CardView.Size.SMALL].y
 ## The row's height at full size: the cards plus each section's heading and edges.
 const ROW_HEIGHT := HAND_HEIGHT + 40.0
 ## The row shrinks no further than this; past it the last cards are cut off at the screen's edge.
@@ -337,11 +337,8 @@ func _card(type: String, need: String, kind: String, offer := {}) -> CardView:
 			btn.add_chip(hint.replace("Opens a row: ", "Opens "), "house", CardView.TEXT, btn.family_color())
 		if "outpost" in tags:
 			btn.add_chip("can be lost", "", CardView.DANGER)
-	# The band already says "Rule-breaker" or "Outpost", so the body skips saying it again. A draft offer keeps
-	# its body to one line so the draft window leaves the attack card room beside it.
+	# The band already says "Rule-breaker" or "Outpost", so the body skips saying it again.
 	btn.set_body(text.trim_prefix("Rule-breaker. ").trim_prefix("Outpost. "))
-	if drafting:
-		btn.set_body_lines(1)
 	if not drafting and owned > 0:
 		btn.set_footer("You have %d" % owned)
 	# The frame shows the offer's own roll (CardRoll); the band's gem how rare this blueprint is.
@@ -387,7 +384,7 @@ func _upgrade_card(offer: Dictionary) -> CardView:
 	var building: String = run.content.buildings[up["building"]]["name"]
 	var btn := CardView.new(CardView.Size.MEDIUM, "building", "Upgrade", up["name"]).set_band_icon("hammer")
 	btn.add_chip("for your " + building.to_lower(), "house", CardView.TEXT, btn.family_color())
-	btn.set_body(up["text"]).set_body_lines(1).set_footer("Instead of a new blueprint")
+	btn.set_body(up["text"]).set_footer("Instead of a new blueprint")
 	btn.tooltip_text = "Draft it: every %s, built or still to come, is changed for the rest of the run.\n%s" % [building.to_lower(), up["text"]]
 	btn.set_roll(run.content, CardRoll.roll_of(offer), up.get("rarity", "white"), CardRoll.mods_of(offer))
 	btn.disabled = not run.hand.can_draft_upgrade(id)
@@ -407,7 +404,7 @@ func _row_card(id: String, need: String, drafting: bool) -> CardView:
 	btn.set_advice(why)
 	btn.set_price(run.stock, cost)
 	btn.add_chip("%s + %s" % [a, b], "house", CardView.TEXT, btn.family_color())
-	btn.set_body("%s %s" % [row_offer_line(run, id), row["text"]] if drafting else row["text"]).set_body_lines(1 if drafting else 2)
+	btn.set_body("%s %s" % [row_offer_line(run, id), row["text"]] if drafting else row["text"])
 	btn.tooltip_text = "%s and %s go up together in one cluster, a fifth cheaper than ordering both.\n%s\nOnly buildings ordered as a row make this bonus." % [
 		a, b, row["text"]]
 	if drafting:
@@ -431,7 +428,7 @@ func _ring_card() -> CardView:
 	var btn := CardView.new(CardView.Size.MEDIUM, "building", "Clear a ring", "Clear a new ring").set_band_icon("ring")
 	btn.set_advice("Room to grow: %d%% full" % full)
 	btn.set_price(run.stock, cost)
-	btn.set_body("Opens the next ring of plots round the town for good. A bigger town has a longer edge to hold.").set_body_lines(1)
+	btn.set_body("Opens the next ring of plots round the town for good. A bigger town has a longer edge to hold.")
 	btn.set_footer("Ring %d of %d" % [run.rings_open + 1, run.content.town["rings"].size()])
 	btn.tooltip_text = "Takes this draft instead of a new building: pay to clear the next ring, and buildings can stand there from now on.\nAgeing up also opens a ring, for free."
 	btn.disabled = not run.hand.can_clear_ring()
