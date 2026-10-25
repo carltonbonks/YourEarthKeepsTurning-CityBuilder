@@ -93,3 +93,15 @@ func test_a_big_roster_narrows_the_hero_portraits() -> void:
 	check((parts[0][5] as Control).custom_minimum_size.x < HeroStrip.CHIP_WIDTH, "each one is narrower than at full size")
 	strip.free()
 	run.dispose()
+
+
+func test_a_hero_portrait_shows_health_lost_in_red_above_what_is_left() -> void:
+	var holder := HBoxContainer.new()
+	var bar := HeroStrip.health_bar(holder)
+	HeroStrip.set_health(bar, 0.25)
+	var fill := bar.get_child(0) as ColorRect
+	check_eq(bar.color, HeroStrip.LOST_COLOR, "the bar behind is the red of health lost")
+	check(is_equal_approx(fill.anchor_top, 0.75), "a quarter left fills the bottom quarter (%.2f)" % fill.anchor_top)
+	check_eq(fill.color, HeroStrip.LOW_HEALTH_COLOR, "low health turns amber")
+	check(bar.custom_minimum_size.y > bar.custom_minimum_size.x, "the bar stands upright")
+	holder.free()
