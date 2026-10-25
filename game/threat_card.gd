@@ -4,7 +4,7 @@ extends VBoxContainer
 ## power against the attack's as one bar with a plain verdict, and a gold banner when the warband holds
 ## raiders back (catch-up). The enemy list is in the hover card. Each way in names the near plate it
 ## crosses this round (EarthReport.ways), the earth's one line.
-## When the room left between the draft window and the building hand is short, `fit` folds the extras
+## When the room left above the building hand is short, `fit` folds the extras
 ## (the ways, the warband banner) into the hover card, so the card never runs into the hand.
 
 const WIDTH := 280.0

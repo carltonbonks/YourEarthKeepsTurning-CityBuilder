@@ -1,6 +1,6 @@
 extends TestCase
 ## The panels over the map keep out of each other's way (HudLayout): the edge columns take the room the
-## draft window and the hand leave, and fold what doesn't fit into hover cards rather than overlap.
+## hand and other panels leave, and fold what doesn't fit into hover cards rather than overlap.
 
 
 func test_a_column_takes_the_tallest_free_stretch_beside_the_draft() -> void:

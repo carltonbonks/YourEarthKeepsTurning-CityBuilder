@@ -93,11 +93,12 @@ func test_every_kind_of_card_shows() -> void:
 	screen.free()
 
 
-func test_the_draft_opens_in_its_own_window_and_the_hand_has_sections() -> void:
+func test_the_draft_is_a_pick_to_answer_before_building() -> void:
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
+	run.choose_traditions([])
 	var bot := AutoPlayer.new()
 	while run.phase != RunState.Phase.BUILD or run.hand.picks <= 0 or run.hand.cards.is_empty():
 		match run.phase:
@@ -111,26 +112,26 @@ func test_the_draft_opens_in_its_own_window_and_the_hand_has_sections() -> void:
 			RunState.Phase.RELIC:
 				run.choose_relic(run.relic_offer[0] if not run.relic_offer.is_empty() else "")
 	screen.call("_refresh")
-	var draft: DraftPopup = screen.get("_draft")
+	var overlays: Overlays = screen.get("_overlays")
 	var hand: BuildHandView = screen.get("_hand_view")
-	check(draft.visible and not draft.is_collapsed(), "the round's draft opens in its window")
+	check(overlays.visible and overlays.showing_draft, "the round's draft opens as a pick screen")
 	var offer: String = run.content.buildings[run.hand.cards[0]["building"]]["name"]
-	var in_draft := draft.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
-	var in_hand := hand.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
-	check(in_draft.has(offer), "the offers are in the window")
-	check(not in_hand.has(offer) or run.hand.blueprints.has(run.hand.cards[0]["building"]), "the offers are not in the hand")
+	var on_screen := overlays.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	check(on_screen.has(offer), "the offers are on the pick screen")
 	var heads := " ".join(PackedStringArray(hand.find_children("*", "RichTextLabel", true, false).map(func(l: RichTextLabel) -> String: return l.text)))
 	check("CORE" in heads and "YOUR BLUEPRINTS" in heads, "the hand is split into labelled sections")
-	draft.set_collapsed(true)
-	screen.call("_refresh")
-	check(draft.is_collapsed(), "a hidden draft stays hidden while the player orders")
-	run.hand.draft(run.hand.cards[0]["building"])
-	screen.call("_refresh")
-	if run.hand.picks <= 0:
-		check(not draft.visible, "the window goes once the draft is taken")
-	run.begin_round()
-	screen.call("_refresh")
-	check(not draft.visible, "the window is gone outside the build phase")
+	# Nothing gets past it: closing the menu brings it back, and the round can't begin.
+	overlays.show_menu(true)
+	screen.call("_close_menu")
+	check(overlays.visible and overlays.showing_draft, "closing the menu goes back to the draft")
+	screen.call("_begin_round")
+	check_eq(run.phase, RunState.Phase.BUILD, "the round can't begin before the draft is taken")
+	while run.hand.picks > 0 and not run.hand.cards.is_empty():
+		run.hand.draft(run.hand.cards[0]["building"])
+		screen.call("_refresh")
+	check(not overlays.visible, "the pick screen goes once the draft is taken, and building can start")
+	screen.call("_begin_round")
+	check(run.phase != RunState.Phase.BUILD, "then the round begins")
 	run.dispose()
 	screen.free()
 
