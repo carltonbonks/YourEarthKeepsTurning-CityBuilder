@@ -18,6 +18,7 @@ extends SceneTree
 ## drafts=<type:roll:mod,...> lays out those blueprint offers in the draft; upgrade.<id>:roll:mod offers an upgrade.
 ## rolled=1 (with pick=1) deals rolled townsfolk cards: a magic warrior, a powerful forager and a mythic tribesperson;
 ## rolled=2 a magic family, a mythic venture and a powerful hero.
+## drafted=1 skips the round's blueprint draft, so the build hand shows without the draft over it.
 ## won=1 plays to the end of the run (or calls it won where the bot falls) and shows the victory partway through
 ## (won_ms= how far in, default 3500).
 ## size=<W>x<H> sets the window size (default 1600x1000), to check the screen layout at other sizes.
@@ -25,7 +26,7 @@ extends SceneTree
 ## one-time tip due at that moment (off otherwise, so pictures stay clear); seen=<id,id> marks tips as seen. The player's settings are never saved.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -146,6 +147,8 @@ func _init() -> void:
 				run.hand.upgrade_offers.append(offer)
 			else:
 				run.hand.cards.append(offer)
+	if args["drafted"] == "1" and run.phase == RunState.Phase.BUILD:
+		run.hand.picks = 0
 	main._refresh()
 	main._arena.celebrations.update(run, Time.get_ticks_msec())
 	if args["ageup"] == "1":

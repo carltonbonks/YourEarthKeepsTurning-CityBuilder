@@ -859,6 +859,14 @@ func turn_playing() -> bool:
 	return turn.playing()
 
 
+## True from the moment the earth turns until its beat has played (or been skipped), so pop-ups can wait for it.
+func turn_pending() -> bool:
+	if turn.playing():
+		return true
+	var w := run.world if run != null else null
+	return w != null and _shift_seen[1] == w and w.earth.turned > int(_shift_seen[0])
+
+
 ## Ends the turn's beat at once: the plates are in place and the camera is back where the player had it.
 func skip_turn() -> void:
 	turn.skip(self)

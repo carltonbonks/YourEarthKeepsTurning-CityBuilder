@@ -24,6 +24,8 @@ var _play_speed := 2
 var _tick_acc := 0.0
 var _live_acc := 0.0
 var _menu_open := false
+## A pick screen (blueprint draft, pedlars) waits while the earth's turn plays, so the player sees the land move.
+var _held_for_turn := false
 ## Id of this run's file in Run history.
 var _run_id := ""
 ## Off in tests, so they never write runs to disk.
@@ -59,6 +61,10 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _held_for_turn and not _arena.turn_pending():
+		_held_for_turn = false
+		_refresh()
+		_overlays.show_for_phase()
 	if run.phase != RunState.Phase.SIM or _overlays.visible or _title_screen.visible:
 		return
 	_live_acc += delta
@@ -122,6 +128,7 @@ func _new_run(seed_value: int) -> void:
 	_alerts.reset()
 	_story.refresh()
 	_menu_open = false
+	_held_for_turn = false
 	_title_screen.hide()
 	_overlays.welcome_pending = true
 	_set_speed(settings.start_speed)
@@ -205,7 +212,12 @@ func _pick_relic(relic_id: String) -> void:
 	run.choose_relic(relic_id)
 	_save()
 	_refresh()
-	# The next round's build phase may open on a choice of its own (a pedlar round).
+	# The next round's build phase may open on a choice of its own (a pedlar round), but first the
+	# earth turns: its pick screens wait until the beat has played or Space skipped it.
+	if _arena.turn_pending():
+		_held_for_turn = true
+		_overlays.hide()
+		return
 	_overlays.show_for_phase()
 
 
@@ -237,6 +249,9 @@ func _close_menu() -> void:
 		_overlays.hide()
 		return
 	_refresh()
+	if _held_for_turn:
+		_overlays.hide()
+		return
 	_overlays.show_for_phase()
 
 
@@ -256,7 +271,7 @@ func _refresh() -> void:
 ## once it is taken the screen goes and the hand is free. Left alone while a menu, the title screen or
 ## another pick (traditions, pedlar) is up.
 func _show_draft() -> void:
-	if _menu_open or _title_screen.visible or run.awaiting_traditions() or run.awaiting_pedlar():
+	if _menu_open or _held_for_turn or _title_screen.visible or run.awaiting_traditions() or run.awaiting_pedlar():
 		return
 	if _hand_view.draft_pending():
 		_overlays.show_draft(_hand_view)

@@ -103,3 +103,28 @@ func test_cards_of_a_size_share_one_shape() -> void:
 		check(is_equal_approx(shape.x / shape.y, 0.75), "size %d is 3:4" % sz)
 	check(CardView.SHAPE[CardView.Size.SMALL].y < CardView.SHAPE[CardView.Size.SMALL].x / 0.75, "small cards are squatter")
 	check_eq(BuildHandView.HAND_HEIGHT, CardView.SHAPE[CardView.Size.SMALL].y, "the hand keeps room for exactly one small card")
+
+
+func test_spoils_say_their_total_not_a_rate() -> void:
+	# Playtest 2026-10-25: "2 food per beast" and "8 came" made the player multiply.
+	var c := Content.load_default()
+	check_eq(Overlays.spoils_line(c, {"food": 16}, 8, "beast"), "You get 16 food now, from the 8 beasts that came.", "one good")
+	check_eq(Overlays.spoils_line(c, {"shells": 28, "wood": 7}, 1, "human"), "You get 28 shells and 7 wood now, from the 1 raider that came.",
+		"two goods, one foe")
+	check_eq(Overlays.spoils_line(c, {}, 3, "human"), "", "spoils that bring no goods say nothing")
+
+
+func test_a_trade_card_reads_pay_then_get() -> void:
+	var card := CardView.new(CardView.Size.SMALL, "trade", "Caravan", "Bundle of tin")
+	card.add_ledger_line("Pay", {"shells": 30}, CardView.TEXT, {"shells": 10})
+	card.add_ledger_line("Get", {"tin": 5}, CardView.GOOD)
+	var texts := _texts(card)
+	check(texts.has("Pay") and texts.has("30 shells") and texts.has("Get") and texts.has("5 tin"), "both sides are named in words")
+	var labels := card.find_children("*", "Label", true, false)
+	var price: Label = labels.filter(func(l: Label) -> bool: return l.text == "30 shells")[0]
+	check_eq(price.get_theme_color("font_color"), CardView.DANGER, "a price the town can't pay is red")
+	var cursed := CardView.new(CardView.Size.SMALL, "trade", "Caravan", "Tin by the cartload")
+	cursed.add_ledger_line("Pay", {}, CardView.TEXT, {}, ["a hero turns greedy for good"] as Array[String])
+	check(_texts(cursed).has("a hero turns greedy for good") and not _texts(cursed).has("nothing"), "a free but cursed deal names its real price")
+	card.free()
+	cursed.free()

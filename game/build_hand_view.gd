@@ -470,9 +470,21 @@ func _deal_card(index: int) -> CardView:
 	var give := run.caravan.gives(id, offer)
 	var btn := CardView.new(CardView.Size.SMALL, "trade", "Caravan", def["name"])
 	btn.set_advice(offer["need"])
-	btn.set_price(run.stock, give)
-	btn.add_chip("you get", "", CardView.DIM)
-	btn.add_goods(run.caravan.gets(id, offer))
+	# Plain words, as a ledger: what you hand over, then what you get.
+	# A free deal shows no "0 shells"; a cursed one names its real price.
+	var paid := {}
+	for good: String in give:
+		if int(give[good]) > 0:
+			paid[good] = give[good]
+	var also: Array[String] = []
+	for mod_id: String in CardRoll.mods_of(offer):
+		var price := CardView.split_price(str(content.card_mods.get(mod_id, {}).get("text", "")))[1]
+		if price != "":
+			also.append(price)
+	btn.add_ledger_line("Pay", paid, CardView.TEXT, run.stock, also)
+	var got := run.caravan.gets(id, offer)
+	if not got.is_empty():
+		btn.add_ledger_line("Get", got, CardView.GOOD)
 	var folk := run.caravan.folk_of(id, offer)
 	for role: String in folk:
 		var roles: Array = []
@@ -483,7 +495,7 @@ func _deal_card(index: int) -> CardView:
 		btn.add_chip("weapons +%d tier%s" % [def["smith"], "s" if int(def["smith"]) > 1 else ""], "", CardView.GOOD)
 	if int(def.get("relic", 0)) > 0:
 		btn.add_chip("a relic", "relic", CardView.GOOD)
-	var pays := ", ".join(PackedStringArray(give.keys().map(func(g: String) -> String: return "%d %s" % [give[g], g])))
+	var pays := ", ".join(PackedStringArray(paid.keys().map(func(g: String) -> String: return "%d %s" % [paid[g], g])) + PackedStringArray(also))
 	btn.tooltip_text = "A deal from the %s.\n%s\nYou pay: %s.\nYou get: %s.\nOnce this round." % [
 		content.trades["name"].to_lower(), def["text"], pays if pays != "" else "nothing", deal_brings(run, id, offer)]
 	btn.set_roll(content, CardRoll.roll_of(offer), content.rarity_of("deal", id), CardRoll.mods_of(offer))
