@@ -154,14 +154,11 @@ static func build(parent: Control, run: RunState, impact: Dictionary) -> void:
 		UiKit.note(parent, "Nothing to show yet: this fills in as the round plays.", 13)
 		return
 	var dealt_all := maxi(1, total(impact, "dealt"))
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(820, 420)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	parent.add_child(scroll)
+	# No scrolling: the table takes the room it needs, and the pop-up shrinks to fit the screen (Overlays).
 	var box := VBoxContainer.new()
-	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.custom_minimum_size.x = 820
 	box.add_theme_constant_override("separation", 6)
-	scroll.add_child(box)
+	parent.add_child(box)
 	for group: String in GROUPS:
 		var keys := sorted_rows(impact, group)
 		if keys.is_empty():

@@ -11,8 +11,9 @@ extends PanelContainer
 ## ("Need 3 more wood"). Costs show red where the town is short. Shown only while building.
 ## Every choice goes through run.hand; `changed` asks the screen to refresh. Hovering a building
 ## card sends `previewing` with its type (and "" on leaving), so the map can blink the plot it would take.
-## The Begin round button sits at the hand's right end, outside the scrolling cards, so it is always in
-## the same place and never covered.
+## The Begin round button sits at the hand's right end, so it is always in the same place and never
+## covered. The hand never scrolls: when the cards are wider than the screen, the section hints go and
+## the whole row shrinks to fit (`_fit`), and the strip gets shorter with it.
 
 signal changed
 signal previewing(type: String)
@@ -20,6 +21,10 @@ signal begin_pressed
 
 ## The height the hand keeps for its small cards (CardView), so the strip doesn't jump as cards change.
 const HAND_HEIGHT := 140.0
+## The row's height at full size: the cards plus each section's heading and edges.
+const ROW_HEIGHT := HAND_HEIGHT + 40.0
+## The row shrinks no further than this; past it the last cards are cut off at the screen's edge.
+const MIN_SCALE := 0.55
 ## The sections share one plain look: the cards' own bands say what kind each is, and the rarity colours stay
 ## for the cards' frames.
 const SECTION_COLOR := Color("#d8d4c8")
@@ -28,6 +33,10 @@ var run: RunState
 ## The window the blueprint offers go in; main.gd places it over the map.
 var draft: DraftPopup
 var _row: HBoxContainer
+## Holds the row and clips it; the row is scaled to its width.
+var _shelf: Control
+## Each section's hint ("Always on offer"), hidden first when the cards don't fit.
+var _hints: Array[Label] = []
 var _begin: Button
 ## The round whose draft was last shown, so a hidden draft stays hidden until the next round's.
 var _draft_round := -1
@@ -43,16 +52,18 @@ func _init() -> void:
 	var line := HBoxContainer.new()
 	line.add_theme_constant_override("separation", 10)
 	add_child(line)
-	var scroll := ScrollContainer.new()
-	# SHOW_NEVER, not DISABLED: the strip keeps its own height instead of taking the cards' (a new card measures
-	# itself tall for a frame before its width is known, CardView).
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
-	scroll.custom_minimum_size.y = HAND_HEIGHT + 40
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	line.add_child(scroll)
+	# A plain Control, not a container: the strip keeps its own height instead of taking the cards' (a new
+	# card measures itself tall for a frame before its width is known, CardView), and the row can be scaled.
+	_shelf = Control.new()
+	_shelf.clip_contents = true
+	_shelf.custom_minimum_size.y = ROW_HEIGHT
+	_shelf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_shelf.resized.connect(_fit)
+	line.add_child(_shelf)
 	_row = HBoxContainer.new()
 	_row.add_theme_constant_override("separation", 14)
-	scroll.add_child(_row)
+	_row.minimum_size_changed.connect(_fit, CONNECT_DEFERRED)
+	_shelf.add_child(_row)
 	_begin = UiKit.primary(UiKit.button(line, "", func() -> void: begin_pressed.emit()), 18)
 	_begin.custom_minimum_size = Vector2(150, 72)
 	_begin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -63,7 +74,9 @@ func refresh() -> void:
 	previewing.emit("")
 	_begin.text = "Begin round %d" % run.round_number
 	for child in _row.get_children():
+		_row.remove_child(child)
 		child.queue_free()
+	_hints.clear()
 	_draft_cards()
 	var core := _section("Core", "Always on offer")
 	for type: String in run.hand.basics():
@@ -87,6 +100,7 @@ func refresh() -> void:
 	var trading := _section("Trading", "The caravan's deals, once each this round")
 	_caravan_cards(trading)
 	_drop_if_empty(trading)
+	_fit.call_deferred()
 
 
 ## A labelled block of cards with a plain edge, so where one kind of card ends and the next begins is plain
@@ -117,12 +131,45 @@ func _section(title: String, hint: String) -> HBoxContainer:
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	head.add_theme_font_size_override("normal_font_size", 12)
 	head.add_theme_font_size_override("bold_font_size", 14)
-	head.text = "[b][color=#%s]%s[/color][/b]  [color=#%s]%s[/color]" % [color.to_html(false), title.to_upper(), UiKit.HINT_COLOR.to_html(false), hint]
-	box.add_child(head)
+	head.text = "[b][color=#%s]%s[/color][/b]" % [color.to_html(false), title.to_upper()]
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 8)
+	box.add_child(top)
+	top.add_child(head)
+	var hint_label := UiKit.note(top, hint, 12)
+	hint_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	hint_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_hints.append(hint_label)
 	var cards := HBoxContainer.new()
 	cards.add_theme_constant_override("separation", 6)
 	box.add_child(cards)
 	return cards
+
+
+## Shrinks the row to the strip's width: the section hints go first, then the whole row scales down
+## (to MIN_SCALE at most), and the strip's height follows, giving the map back the room.
+func _fit() -> void:
+	var avail := _shelf.size.x
+	if avail <= 0.0:
+		return
+	_hints.assign(_hints.filter(func(h: Label) -> bool: return is_instance_valid(h) and not h.is_queued_for_deletion()))
+	for hint in _hints:
+		hint.visible = true
+	var width := _row.get_combined_minimum_size().x
+	if width > avail:
+		for hint in _hints:
+			hint.visible = false
+		width = _row.get_combined_minimum_size().x
+	var s := clampf(avail / maxf(1.0, width), MIN_SCALE, 1.0)
+	_row.scale = Vector2(s, s)
+	_row.position = Vector2.ZERO
+	_row.size = Vector2(width, ROW_HEIGHT)
+	_shelf.custom_minimum_size.y = ceilf(ROW_HEIGHT * s)
+
+
+## How much the row is shrunk to fit (1 at full size).
+func row_scale() -> float:
+	return _row.scale.x
 
 
 func _drop_if_empty(cards: HBoxContainer) -> void:

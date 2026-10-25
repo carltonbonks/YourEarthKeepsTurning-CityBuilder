@@ -2,7 +2,8 @@ class_name Overlays
 extends PanelContainer
 ## The dimmed pop-ups over the screen: the dawn pick and the relic pick (as cards, detail on hover),
 ## the end of a run, the menu (Esc), the full story log, Run history and the dev tuning panel. Choices go back to the screen
-## as signals; nothing here changes the run directly.
+## as signals; nothing here changes the run directly. A pop-up taller or wider than the screen shrinks
+## to fit (`_fit_panel`) rather than running off it.
 
 signal pick_taken(index: int)
 signal relic_picked(relic_id: String)
@@ -21,11 +22,16 @@ signal settings_changed
 ## Back to the title screen (from the menu).
 signal title_requested
 
+## The gap kept round a pop-up, and the most it shrinks to fit the screen.
+const EDGE := 12.0
+const MIN_SCALE := 0.6
+
 var run: RunState
 var settings: GameSettings
 ## A new run opens on "how a round works" before the traditions pick (every run, Yusuf 2026-10-24).
 var welcome_pending := false
 var _box: VBoxContainer
+var _panel: PanelContainer
 
 
 func _init() -> void:
@@ -33,9 +39,15 @@ func _init() -> void:
 	var dim := StyleBoxFlat.new()
 	dim.bg_color = Color(0, 0, 0, 0.45)
 	add_theme_stylebox_override("panel", dim)
-	var center := CenterContainer.new()
+	# Placed by hand, not by a CenterContainer, so it can be scaled down to fit (containers reset scale).
+	var center := Control.new()
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.resized.connect(_fit_panel)
+	visibility_changed.connect(_fit_panel)
 	add_child(center)
 	var panel := PanelContainer.new()
+	_panel = panel
+	panel.minimum_size_changed.connect(_fit_panel, CONNECT_DEFERRED)
 	var box_style := StyleBoxFlat.new()
 	box_style.bg_color = Color("#23262d")
 	box_style.border_color = UiKit.HEADING_COLOR
@@ -51,6 +63,18 @@ func _init() -> void:
 	_box.add_theme_constant_override("separation", 8)
 	margin.add_child(_box)
 	hide()
+
+
+## Centres the pop-up, shrinking it to fit the screen when it is too big (never below MIN_SCALE).
+func _fit_panel() -> void:
+	var area := (_panel.get_parent() as Control).size
+	if area.x <= 0.0:
+		return
+	_panel.reset_size()
+	var want := _panel.size
+	var s := clampf(minf((area.x - 2.0 * EDGE) / want.x, (area.y - 2.0 * EDGE) / want.y), MIN_SCALE, 1.0)
+	_panel.scale = Vector2(s, s)
+	_panel.position = ((area - want * s) * 0.5).floor()
 
 
 ## Shows whatever the run is waiting on (a pick, a relic, the end), or hides.
