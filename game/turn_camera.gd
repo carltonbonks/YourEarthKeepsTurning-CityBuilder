@@ -1,14 +1,14 @@
 class_name TurnCamera
 extends RefCounted
 ## Makes each turn of the earth a moment. When the plates have just clicked round, the map eases out
-## until every ring is in view, holds while the land slides into place, then eases back to wherever the
+## until the whole ring of plates is in view (if the player was zoomed in closer), holds while the land slides into place, then eases back to wherever the
 ## player had it. View only, like NightCamera. Space (or a wheel or drag) ends it at once.
 
 ## The whole beat, in real milliseconds: out, hold while the plates slide, back.
 const BEAT_MS := 2400.0
 const OUT_MS := 450.0
 const BACK_MS := 550.0
-## How much of the view the outermost ring fills at the widest point.
+## How much of the view the ring of plates fills at the widest point.
 const FILL := 0.95
 
 var _from_ms := -1.0

@@ -2,11 +2,10 @@ class_name ThreatCard
 extends VBoxContainer
 ## The round's attack as a small card in the map's top-right corner: where it comes from, your town's
 ## power against the attack's as one bar with a plain verdict, and a gold banner when the warband holds
-## raiders back (catch-up). The enemy list is in the hover card. While building, what the earth's
-## last turn did (EarthReport) sits under it.
+## raiders back (catch-up). The enemy list is in the hover card. Each way in names the near plate it
+## crosses this round (EarthReport.ways), the earth's one line.
 ## When the room left between the draft window and the building hand is short, `fit` folds the extras
-## (the earth's details, the ways, the warband banner) into the hover cards, so the card never runs
-## into the hand.
+## (the ways, the warband banner) into the hover card, so the card never runs into the hand.
 
 const WIDTH := 280.0
 ## Attack power over town power above this reads as outmatched (bots lose about 1 round in 5 there).
@@ -16,10 +15,6 @@ const EVEN := 0.9
 var run: RunState
 var _title: RichTextLabel
 var _ways: Label
-var _earth_box: VBoxContainer
-var _earth_title: Label
-var _earth_lines: Label
-var _spell: Label
 var _bar: ColorRect
 var _numbers: Label
 var _verdict: Label
@@ -64,25 +59,11 @@ func _init() -> void:
 	gold.set_content_margin_all(4)
 	_eased.add_theme_stylebox_override("normal", gold)
 	box.add_child(_eased)
-	# What the earth's last turn did: a hover of its own, so the attack's hover stays about the attack.
-	var earth_chip := TipChip.new()
-	earth_chip.tip = func() -> Dictionary: return _earth_tip_with_folded() if run != null else {}
-	add_child(earth_chip)
-	_earth_box = VBoxContainer.new()
-	_earth_box.add_theme_constant_override("separation", 2)
-	earth_chip.add_child(_earth_box)
-	_earth_title = UiKit.note(_earth_box, "", 13, Color("#d8c08a"))
-	_earth_title.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_earth_lines = UiKit.note(_earth_box, "", 11)
-	_earth_lines.autowrap_mode = TextServer.AUTOWRAP_WORD
-	# What the geomancer is working on (spells are chosen on dawn cards).
-	_spell = UiKit.note(self, "", 12, Color("#c8a8e0"))
-	_spell.autowrap_mode = TextServer.AUTOWRAP_WORD
 	# Shown when fit folded something away.
 	_more = UiKit.note(self, "More on hover", 10)
 	_more.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	# The ways (which den, across which near plate) fold last: they are what a Feed changes.
-	_foldable = [_earth_lines, _eased, _earth_box.get_parent(), _spell, _ways]
+	# The ways (which den, across which near plate) fold last.
+	_foldable = [_eased, _ways]
 
 
 func refresh() -> void:
@@ -107,16 +88,6 @@ func refresh() -> void:
 		" %d make a war camp in the wilds." % run.camp_joined if run.camp_joined > 0 else ""]
 	_ways.text = "\n".join(EarthReport.ways(run))
 	_wanted[_ways] = building or not w.wave_spawned
-	var headline := EarthReport.headline(run)
-	_wanted[_earth_box.get_parent()] = building and headline != ""
-	_wanted[_spell] = not run.spell.is_empty()
-	if _wanted[_spell]:
-		var nights := int(run.spell["nights_left"])
-		_spell.text = "The geomancer works on %s: done in %d night%s." % [
-			String(content.plates["spells"][run.spell["id"]]["name"]).to_lower(), nights, "" if nights == 1 else "s"]
-	_earth_title.text = headline
-	_earth_lines.text = "\n".join(EarthReport.lines(run))
-	_wanted[_earth_lines] = _earth_lines.text != ""
 	fit(_max_height)
 
 
@@ -155,18 +126,6 @@ func _tip_with_folded() -> Dictionary:
 		t["lines"].append_array(EarthReport.ways(run))
 	if _is_folded(_eased):
 		t["lines"].append(_eased.text)
-	if _is_folded(_spell):
-		t["lines"].append(_spell.text)
-	if _is_folded(_earth_box.get_parent()):
-		t["lines"].append(_earth_title.text)
-		t["lines"].append_array(EarthReport.lines(run))
-	return t
-
-
-func _earth_tip_with_folded() -> Dictionary:
-	var t := earth_tip(run)
-	if _is_folded(_earth_lines):
-		t["lines"].append_array(EarthReport.lines(run))
 	return t
 
 
@@ -181,19 +140,9 @@ static func tip(r: RunState) -> Dictionary:
 		t["lines"].append("%s x%d" % [content.enemies[id]["name"], counts[id]])
 	t["lines"].append("Power counts heroes, warriors, the hearth and towers against every raider coming.")
 	t["lines"].append("Earlier nights bring only wanderers and small probes.")
-	t["lines"].append("The warband comes by a den's way and crosses one near plate on its way in. Each round the rings click round, so the den and the ground it crosses change; Feed the earth turns the near ring one more plate.")
+	t["lines"].append("The warband comes by a den's way and crosses one near plate on its way in. Between rounds that ring clicks round a plate, so the ground it crosses changes: hover a plate on the map to see what it does.")
 	if r.wave_eased > 0:
 		t["lines"].append("Catch-up: the warband holds back raiders when your town has fallen far behind. A strong town never faces more for being strong.")
 		t["lines"].append("Held-back raiders make a war camp out in the wilds: it blocks gathering nearby until heroes clear it, and clearing it pays.")
 	return t
 
-
-## The earth report's hover card: how the earth works, in short.
-static func earth_tip(r: RunState) -> Dictionary:
-	var t := Tooltips.new_tip("The shifting earth")
-	t["lines"].append("Between rounds the rings of land past the town click round, a whole plate at a time; the town itself never moves.")
-	t["lines"].append("The near ring's four plates are Fen, Greenwood, Stonefield and Barrow. The attack crosses one of them, and each kind helps you and hurts you: hover a plate to see how.")
-	t["lines"].append("Feed the earth (in the build hand) turns the near ring one more plate, for stone that rises each time.")
-	t["lines"].append("Each turn fills a few seams with pressure (the dots on each seam). A full seam glows and wakes at the next turn: a trench swallows its lip, a ridge breaks open rare stone, a rift grows a valley. What a trench will take shows cracks, and gatherers strip it first.")
-	t["lines"].append("A Geomancer's lodge offers spells on dawn cards (hold the near ring, wake the fullest seam, raise a ridge, sink a den) and halves the stone the earth asks. Bold and greedy heroes dig out what the earth leaves: a sunk den's hoard, starstone by a ridge.")
-	return t

@@ -24,9 +24,6 @@ const BUILDING_HEIGHT := 14.0
 const TOWER_HEIGHT := 32.0
 ## How long the land takes to slide into place after the earth turns, in milliseconds (view only).
 const SLIDE_MS := 1800.0
-## After a shift, the places the earth changed pulse this long (sank red, grew green, rich stone gold).
-const PULSE_MS := 8000.0
-const PULSE_COLORS := {"sank": Color("#e06048"), "den_sank": Color("#e06048"), "grew": Color("#8fd070"), "raised": Color("#ffd28a"), "find": Color("#c8c0f0")}
 ## The controls hint shows for this many rounds.
 const HELP_ROUNDS := 2
 ## What each kind of standing thing is, for the back-to-front pass.
@@ -46,9 +43,8 @@ var _ground_seen := [-1, null]
 ## Square index -> world time it was paved (or re-laid), for the glow.
 var _paved_at := {}
 ## The earth's last shift as seen here ([shift count, world]) and when the slide that shows it began.
-var _shift_seen := [-1, null, 0]
+var _shift_seen := [-1, null]
 var _slide_from_ms := -1.0
-var _pulse_from_ms := -1.0
 var night := NightCamera.new()
 var turn := TurnCamera.new()
 ## Off in Settings: the map stays where the player put it at night.
@@ -285,7 +281,6 @@ func _draw() -> void:
 	var dark := Lighting.darkness(run)
 	if dark > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.12, dark))
-	_draw_earth_pulses()
 	celebrations.draw_highlights(self, size, Time.get_ticks_msec(), _to_screen, main_color)
 
 
@@ -628,11 +623,6 @@ func hovered(at: Vector2) -> Dictionary:
 		if w.node_active(node) and _near(node["pos"], at, maxf(3.0, 14.0 * _scale() * 1.6)):
 			return Tooltips.node(run, node)
 	var square := w.pathing.index_of(_to_world(at))
-	if w.earth.is_ridge(square):
-		return Tooltips.earth(run, "ridge")
-	var seam: Dictionary = w.earth.seam_near(_to_world(at), 6.0 / _scale())
-	if not seam.is_empty():
-		return Tooltips.seam(run, seam)
 	if w.pathing.ground[square] != Pathing.PLAIN :
 		return Tooltips.ground(run, square)
 	var kind := w.earth.kind_at(_to_world(at))
@@ -749,9 +739,7 @@ func _draw_preview() -> void:
 	draw_polyline(_closed(shape), Color(1.0, 0.9, 0.5, 0.55 + 0.45 * pulse), 2.5)
 
 
-## The earth plates: the near plates tinted faintly by kind, ridges, faint lines for the ring edges and seams,
-## each seam's pressure marks (a full one glows), and cracks under what a full trench will swallow. The map shows
-## the land as it is (Yusuf, 2026-10-20); a full seam's cracks are its one warning, drawn on the thing itself.
+## The near plates, tinted faintly by kind with the kind's name across each, and faint lines at their edges.
 func _draw_earth() -> void:
 	var earth := run.world.earth
 	if not earth.enabled():
@@ -774,37 +762,12 @@ func _draw_earth() -> void:
 		var at := _to_screen(Vector2.from_angle(mid) * (float(near["r0"]) + float(near["r1"])) / 2.0)
 		var width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
 		draw_string(font, at - Vector2(width / 2.0, -4.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(colors.get(kind, "#888888")).lightened(0.45))
-	var cell := run.world.pathing.cell
-	for i in earth.ridge_cells():
-		_ground_square(run.world.pathing.center(i), cell * 0.55, Color(colors["ridge"]))
-	var faint := Color(colors["seam"], 0.3)
-	var full := int(run.content.plates["pressure"]["full"])
-	for ri in earth.rings.size():
-		var ring: Dictionary = earth.rings[ri]
-		var r0 := float(ring["r0"])
-		var r1 := float(ring["r1"])
-		draw_polyline(_closed(_ground_ring(Vector2.ZERO, r0, 96)), faint, 1.0)
-		var turn := _slide_angle(ri)
-		for k in ring["seams"].size():
-			var dir := Vector2.from_angle(float(ring["seams"][k]) + turn)
-			var marks := int(ring["pressure"][k])
-			var line := Color(colors["full"], 0.75) if marks >= full else faint
-			draw_line(_to_screen(dir * r0), _to_screen(dir * r1), line, 2.0 if marks >= full else 1.0)
-			# Pressure marks: one dot each, a hollow one for each still to fill, at the seam's outer end.
-			for m in full:
-				var at := _to_screen(dir * (r1 - 14.0 - m * 12.0))
-				if m < marks:
-					draw_circle(at, 3.0, Color(colors["full"]) if marks >= full else Color(colors["mark"], 0.8))
-				else:
-					draw_arc(at, 3.0, 0, TAU, 10, Color(colors["mark"], 0.35), 1.0)
-	# Cracks under what a full trench will swallow at the next turn.
-	var crack := Color(colors["crack"], 0.85)
-	var under: Array = run.world.nodes.filter(func(n: Dictionary) -> bool: return run.world.node_active(n)).map(func(n: Dictionary) -> Vector2: return n["pos"])
-	under.append_array(run.world.dens.map(func(d: Dictionary) -> Vector2: return d["pos"]))
-	for at: Vector2 in under:
-		if earth.doomed(at):
-			var c := _to_screen(_slid(at))
-			draw_polyline(PackedVector2Array([c + Vector2(-9, -3), c + Vector2(-4, 2), c + Vector2(0, -2), c + Vector2(5, 3), c + Vector2(9, -1)]), crack, 1.5)
+	var edge := Color(colors["edge"], 0.3)
+	draw_polyline(_closed(_ground_ring(Vector2.ZERO, float(near["r0"]), 96)), edge, 1.0)
+	draw_polyline(_closed(_ground_ring(Vector2.ZERO, float(near["r1"]), 96)), edge, 1.0)
+	for k in near_seams.size():
+		var dir := Vector2.from_angle(float(near_seams[k]) + slide)
+		draw_line(_to_screen(dir * float(near["r0"])), _to_screen(dir * float(near["r1"])), edge, 1.0)
 
 
 ## How far ring ri is still drawn short of where it lies while the land slides into place after a turn.
@@ -828,19 +791,15 @@ func _sector(r0: float, r1: float, a0: float, a1: float) -> PackedVector2Array:
 	return points
 
 
-## Starts the slide when the earth has just turned (not when a run is first shown), and the pulses when a
-## geomancer's spell has just changed the land.
+## Starts the slide when the earth has just turned (not when a run is first shown).
 func _watch_shift() -> void:
 	var w := run.world
-	var seen := [w.earth.turned, w, w.earth.changes]
+	var seen := [w.earth.turned, w]
 	if seen == _shift_seen:
 		return
 	if _shift_seen[1] == w and w.earth.turned > int(_shift_seen[0]):
 		_slide_from_ms = Time.get_ticks_msec()
-		_pulse_from_ms = _slide_from_ms
 		turn.start(self)
-	elif _shift_seen[1] == w and w.earth.changes > int(_shift_seen[2]):
-		_pulse_from_ms = Time.get_ticks_msec()
 	_shift_seen = seen
 
 
@@ -854,23 +813,6 @@ func skip_turn() -> void:
 	turn.skip(self)
 	if _slide_from_ms >= 0.0:
 		_slide_from_ms = Time.get_ticks_msec() - SLIDE_MS
-
-
-## Rings that swell out from each place the last shift changed, for a few seconds after it.
-func _draw_earth_pulses() -> void:
-	if _pulse_from_ms < 0.0:
-		return
-	var t := Time.get_ticks_msec() - _pulse_from_ms
-	if t >= PULSE_MS:
-		_pulse_from_ms = -1.0
-		return
-	var fade := 1.0 - t / PULSE_MS
-	var phase := fmod(t, 1200.0) / 1200.0
-	for ev: Dictionary in run.world.earth.events:
-		var col: Color = PULSE_COLORS.get(ev["kind"], Color.WHITE)
-		col.a = fade * (1.0 - phase)
-		var p := _to_screen(_slid(ev["pos"]))
-		draw_arc(p, 8.0 + phase * (40.0 if ev["great"] else 24.0), 0, TAU, 32, col, 3.0 if ev["great"] else 2.0)
 
 
 ## Where a thing on the plates is drawn while the land slides into place after a shift.

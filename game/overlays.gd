@@ -117,24 +117,9 @@ func show_pick() -> void:
 	row.add_theme_constant_override("separation", 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_box.add_child(row)
-	# Newcomers first, then the geomancer's spells past a divider in the same row: the band and the footer
-	# ("Instead of a newcomer") tell them apart. A crowded dawn uses medium cards so the row fits the screen.
+	# A crowded dawn uses medium cards so the row fits the screen.
 	var sz := CardView.Size.LARGE if run.pick_offer.size() <= 4 else CardView.Size.MEDIUM
-	var order: Array[int] = []
 	for i in run.pick_offer.size():
-		if run.pick_offer[i]["kind"] != "spell":
-			order.append(i)
-	for i in run.pick_offer.size():
-		if run.pick_offer[i]["kind"] == "spell":
-			if not order.is_empty() and run.pick_offer[order[-1]]["kind"] != "spell":
-				order.append(-1)
-			order.append(i)
-	for i in order:
-		if i < 0:
-			var sep := VSeparator.new()
-			sep.add_theme_constant_override("separation", 12)
-			row.add_child(sep)
-			continue
 		var card := run.pick_offer[i]
 		var btn := _pick_card(card, sz)
 		btn.set_roll(run.content, CardRoll.roll_of(card), run.people.card_rarity(card), CardRoll.mods_of(card))
@@ -258,7 +243,7 @@ func show_pedlars() -> void:
 
 ## What stops the town taking a dawn card: no room, or not enough shells.
 func _why_not_pick(card: Dictionary) -> String:
-	if not card["kind"] in ["promote", "venture", "spell"] and run.population() + run.people.card_people(card) > run.housing():
+	if not card["kind"] in ["promote", "venture"] and run.population() + run.people.card_people(card) > run.housing():
 		return "No room: build homes"
 	return UiKit.shortfall(run.stock, {"shells": card["cost"]})
 
@@ -324,8 +309,6 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 			btn = _promote_card(card, sz)
 		"venture":
 			btn = _venture_card(card, sz)
-		"spell":
-			btn = _spell_card(card, sz)
 		_:
 			var def: Dictionary = content.townsfolk[card["role"]]
 			var roles: Array = [card["role"]]
@@ -373,17 +356,6 @@ func _venture_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 	btn.set_footer("Instead of a newcomer")
 	btn.tooltip_text = "%s\nSend %d tribespeople (you have %d). %s of them never come home; the rest bring %s.\nInstead of a newcomer today.\nA bold red X is a sure death, a faint one may or may not come home." % [
 		v["text"], terms["send"], run.count_role("tribesperson"), losing, brings]
-	return btn
-
-
-## A geomancy spell: how many nights it takes and what it does when done.
-func _spell_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
-	var sd: Dictionary = run.content.plates["spells"][card["spell"]]
-	var nights := maxi(1, int(sd["nights"]) + int(CardRoll.card_sum(run.content, card, "nights")))
-	var btn := CardView.new(sz, "earth", "Geomancy", sd["name"])
-	btn.add_nights(nights)
-	btn.set_body(sd["text"]).set_body_lines(3).set_footer("Instead of a newcomer")
-	btn.tooltip_text = "%s\nThe geomancer works on one spell at a time; when it is done, dawn offers spells again." % sd["text"]
 	return btn
 
 

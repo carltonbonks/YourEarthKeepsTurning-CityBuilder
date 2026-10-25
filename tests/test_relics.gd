@@ -159,12 +159,15 @@ func test_hollow_drum_no_probes_bigger_wave() -> void:
 	run.dispose()
 
 
-func test_lodestone_wheel_turns_the_earth_twice() -> void:
+func test_lodestone_wheel_turns_the_near_ring_two_plates() -> void:
 	var run := _run()
+	var earth := run.world.earth
+	var seam := float(earth.rings[0]["seams"][0])
 	_give(run, "lodestone_wheel")
 	_to_relic(run)
 	run.choose_relic("")
-	check_eq(run.world.earth.shifts, 2, "two shifts after the first round")
+	check_eq(earth.shifts, 1, "one shift after the first round")
+	check(is_equal_approx(absf(angle_difference(seam, float(earth.rings[0]["seams"][0]))), absf(float(earth.rings[0]["step"])) * 2.0), "two plates round")
 	run.dispose()
 
 
@@ -407,57 +410,10 @@ func test_beacon_pyre_one_side() -> void:
 func test_stillstone_holds_the_near_ring() -> void:
 	var run := _run()
 	var earth := run.world.earth
-	check(earth.turn_of(0, 0, 1) != 0.0, "the near ring turns")
+	check(earth.turn_of(0, 1) != 0.0, "the near ring turns")
 	_give(run, "stillstone")
-	check_eq(earth.turn_of(0, 0, 1), 0.0, "and then it doesn't")
-	check(earth.turn_of(2, 0, 1) != 0.0, "the others still do")
+	check_eq(earth.turn_of(0, 1), 0.0, "and then it doesn't")
 	run.dispose()
-
-
-func test_hungry_deep_pays_for_what_sinks() -> void:
-	var run := _run()
-	_give(run, "hungry_deep_idol")
-	var shells := int(run.stock["shells"])
-	run.world.earth.last = {"swallowed": {}, "dens_swallowed": 0}
-	var node: Dictionary = run.world.nodes.filter(func(n: Dictionary) -> bool: return n["type"] != "embers")[0]
-	run.world.earth._swallow_node(node)
-	check_eq(int(run.stock["shells"]), shells + 6, "paid for a node")
-	var items := run.heroes.map(func(h: Unit) -> int: return h.items.size() + h.spares.size())
-	run.world.earth._swallow_den(0)
-	check_eq(int(run.stock["shells"]), shells + 46, "paid for a den")
-	check(run.heroes.map(func(h: Unit) -> int: return h.items.size() + h.spares.size()) != items, "a hero gets an item")
-	run.dispose()
-
-
-## Seams of `kind` that woke over a run's turns, over a few seeds.
-func _wakes_over_runs(relic: String, kind: String) -> int:
-	var total := 0
-	for seed_value in [61823, 4821, 777, 9001]:
-		var run := _run(seed_value)
-		if relic != "":
-			_give(run, relic)
-		for i in 13:
-			run.world.earth.shift()
-			total += run.world.earth.woken.filter(func(s: Dictionary) -> bool: return s["kind"] == kind).size()
-		run.dispose()
-	return total
-
-
-func test_rift_seed_fills_rifts_faster_and_grows_more() -> void:
-	check(_wakes_over_runs("rift_seed", "rift") > _wakes_over_runs("", "rift"), "more rifts wake over a run")
-	var run := _run()
-	_give(run, "rift_seed")
-	var earth := run.world.earth
-	earth.rings[0]["kinds"][0] = "rift"
-	earth.rings[0]["pressure"][0] = int(run.content.plates["pressure"]["full"])
-	earth.shift()
-	check_eq(earth.events.filter(func(e: Dictionary) -> bool: return e["kind"] == "grew").size(),
-		int(run.content.plates["wake"]["rift_nodes"]) + 1, "a valley grows one more patch")
-	run.dispose()
-
-
-func test_ridgeheart_fills_colliding_seams_faster() -> void:
-	check(_wakes_over_runs("ridgeheart", "collide") > _wakes_over_runs("", "collide"), "more ridges heave up over a run")
 
 
 # --- Economy ----------------------------------------------------------------------------

@@ -20,7 +20,7 @@ extends RefCounted
 ## Every style builds the stone-layers' yard from round 5 so craftspeople pave the busiest paths,
 ## invites the pedlar its heroes would gain most from (see _pedlar),
 ## orders the runners' hut once it sells provisions to two heroes (see `runners`),
-## orders the forester and charcoal pit when they are needed (see _upkeep), the geomancer from round 3 (see spell_score),
+## orders the forester and charcoal pit when they are needed (see _upkeep),
 ## and orders up to `gates` gates from `gate_round` (see below), and a garden when food runs short.
 ## "balanced" and "heroes" also open the arms and hide chains (market, knapper, hide rack, two stalls) from round 3,
 ## since the market is now the only place heroes can buy gear.
@@ -41,8 +41,6 @@ const TRADITIONS := {"balanced": ["hunters", "stoneworkers"], "workers": ["stone
 var garden_days := 3.0
 ## Orders the forester and charcoal pit when the cards recommend them. balance_run.gd: upkeep=0 turns it off.
 var upkeep := true
-## Orders the Geomancer's lodge from round 3 (not the workers style) and takes a spell card at dawn (spell_score). balance_run.gd: geomancer=0 turns it off.
-var geomancer := true
 ## Invites a pedlar on pedlar rounds (_pedlar). balance_run.gd: pedlar=0 never invites one.
 var pedlar := true
 ## Takes a row card when it holds a building it was about to order (_order), except the workers style: its extra
@@ -51,12 +49,6 @@ var rows := true
 ## Orders the runners' hut once the provisions stall and smoke hut stand and it has two heroes (the styles that build
 ## them: market, bronze, medieval). balance_run.gd: runners=0 never does.
 var runners := true
-## Feeds the earth when one more click of the near ring puts the night's attack on better ground (FEED_GROUND),
-## keeping feed_reserve stone after paying, and never while saving for its age-up. balance_run.gd: feed=0 never does.
-var feed := true
-var feed_reserve := 10
-## How much it likes the attack to cross each near plate's kind: wading raiders under the towers best, cover worst.
-const FEED_GROUND := {"fen": 2, "stonefield": 1, "barrow": 0, "greenwood": -1}
 ## Rerolls the blueprint offers once a round when it has at least this many shells and no offer is wanted.
 var redraw_above := 40
 ## Buildings it tried to order this build phase without a blueprint for them, most wanted first.
@@ -95,24 +87,6 @@ func build(run: RunState) -> void:
 			run.hand.redraw()
 		_draft(run)
 		_build_pass(run)
-	_feed_earth(run)
-
-
-## Feeds the earth when the next plate along is enough better ground for the night's attack to cross.
-func _feed_earth(run: RunState) -> void:
-	if not feed or not run.can_feed_earth():
-		return
-	var saving_for := "stone_keep" if style == "medieval" else ("bronze_moot" if style in ["bronze", "medieval"] else "")
-	if saving_for != "" and run.world.count_buildings(saving_for, false) == 0 and run.hand.offers(saving_for):
-		return
-	var earth := run.world.earth
-	var now := 0
-	var then := 0
-	for a: float in run.world.wave_sides:
-		now += int(FEED_GROUND.get(earth.crossing(a), 0))
-		then += int(FEED_GROUND.get(earth.crossing(a, 1), 0))
-	if then - now >= 2 and int(run.stock["stone"]) - int(earth.feed_cost()["stone"]) >= feed_reserve:
-		run.feed_earth()
 
 
 ## The first building it wished for that is on offer ("" if none).
@@ -264,9 +238,6 @@ func _build_pass(run: RunState) -> void:
 		_order(run, "drying_rack")
 	if run.round_number >= 2:
 		_order(run, "watch_post")
-	# A town with no heroes gets little from it: the lodge's wood cost the workers style about 8 points.
-	if geomancer and style != "workers" and run.round_number >= 3:
-		_order(run, "geomancer")
 	# Incentive and hero-shaping buildings it drafted, from round 3.
 	if run.round_number >= 3:
 		for type: String in _shaping_list():
@@ -403,8 +374,6 @@ func pick(run: RunState) -> int:
 				score = 6.0
 			"venture":
 				score = venture_score(run, card)
-			"spell":
-				score = spell_score(run, card)
 			"family":
 				score = 8.0 if style == "medieval" else 3.5
 			"hero":
@@ -463,33 +432,15 @@ func venture_score(run: RunState, card: Dictionary) -> float:
 	return 4.5
 
 
-## One spell a dawn is worth a newcomer: a ridge on the round's first dawn when the attack looks even or worse (it rises
-## before night 3), else sinking the den the attack comes by from round 4 (done by the next round's first dawn), else
-## holding the near ring when the attack crosses good ground (FEED_GROUND), else waking the fullest seam.
-func spell_score(run: RunState, card: Dictionary) -> float:
-	var ratio := Power.wave(run.content, run.next_wave) / maxf(1.0, float(Power.town(run.world)["total"]))
-	var want := "wake"
-	var ground := 0
-	for a: float in run.world.wave_sides:
-		ground += int(FEED_GROUND.get(run.world.earth.crossing(a), 0))
-	if run.world.day_index() == 0 and ratio > 0.9:
-		want = "ridge"
-	elif run.round_number >= 4 and run.world.dens.any(func(d: Dictionary) -> bool: return not d.get("camp", false)):
-		want = "sink_den"
-	elif ground >= 2 and not run.world.earth.hold_near:
-		want = "hold"
-	return 4.5 if card["spell"] == want else -10.0
-
-
 ## Relics it likes most first, ranked by how often bot runs that held them won (40 runs x 3 styles,
 ## blind picks, 2026-10-20). Anything not listed ranks after these; ties keep the offer's order.
 const RELIC_RANK := ["sun_disc", "starfall_idol", "antler_crown", "ancestors_horn", "first_hearth_ember", "lone_wolf_pelt", "horde_drum", "broken_crown", "levy_horn", "ram_thorn_stakes", "tithe_bowl",
 	"grave_salt", "smith_gods_hammer", "blood_mark", "kinslayers_brand", "ancestor_mask", "owl_eyes", "sacred_spring", "witchs_thread", "chieftains_torc", "elders_tale",
 	"turncoats_torc", "fire_arrows", "bone_flute", "moneylenders_knot", "hollow_drum", "bear_tooth_charm",
-	"blood_brother_knot", "wanderers_fire", "ember_stone", "oxhide_sledges", "seed_cache", "ridgeheart",
+	"blood_brother_knot", "wanderers_fire", "ember_stone", "oxhide_sledges", "seed_cache",
 	"green_mothers_bough", "quarry_spirit", "ore_singer", "tanners_blessing", "knappers_spirit", "bone_readers_rite",
 	"spirit_knot", "skinning_knife", "ossuary_pit",
-	# Plate-kind relics only pay when the attack crosses their kind, and the bot doesn't aim the earth by them.
+	# Plate-kind relics only pay when the attack crosses their kind.
 	"barrow_kings_lamp", "bog_drowners_stake", "cairn_wardens_cord", "thorn_witchs_veil",
 	# Spoils last: taking a pack-train's goods over a relic cost the bots 8-20 win-rate points (40 seeds).
 	"raiders_spears", "wolfskin_cloaks", "bone_ward", "splintered_ram", "pack_train", "ram_timbers", "smoked_haunches", "grave_goods"]

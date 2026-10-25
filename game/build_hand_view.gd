@@ -81,8 +81,6 @@ func refresh() -> void:
 	var core := _section("Core", "Always on offer")
 	for type: String in run.hand.basics():
 		core.add_child(_card(type, run.hand.need(type), "basic"))
-	if run.world.earth.enabled() and not run.has_effect("still_ring"):
-		core.add_child(_feed_card())
 	var mine := _section("Your blueprints", "Drafted this run")
 	for type: String in run.hand.blueprints:
 		if run.world.count_buildings(type, false) < run.building_max(type):
@@ -218,7 +216,7 @@ func _draft_cards() -> void:
 
 
 ## What a building adds to the dawn picks once it stands ("" if nothing): heroes it lodges or draws,
-## craftspeople it can make masters, the geomancer's spells.
+## craftspeople it can make masters.
 static func dawn_line(r: RunState, type: String) -> String:
 	var content := r.content
 	var def: Dictionary = content.buildings[type]
@@ -227,8 +225,6 @@ static func dawn_line(r: RunState, type: String) -> String:
 			return "Dawn: %ss can arrive" % content.hero_classes[id]["name"].to_lower()
 	if def.has("lodging"):
 		return "Dawn: heroes can arrive" if r.world.hero_ai.count_lodgings() == 0 else "Dawn: beds for %d more heroes" % int(def["lodging"]["beds"])
-	if def.get("spells", false):
-		return "Dawn: spell cards"
 	if int(def.get("effects", {}).get("pick_bonus", 0)) > 0:
 		return "Dawn: %d more card to pick from" % int(def["effects"]["pick_bonus"])
 	if def.has("hounds"):
@@ -441,34 +437,6 @@ func _ring_card() -> CardView:
 	btn.disabled = not run.hand.can_clear_ring()
 	UiKit.fade_if_disabled(btn, UiKit.shortfall(run.stock, cost))
 	btn.pressed.connect(_act.bind(run.hand.clear_ring))
-	return btn
-
-
-## Feed the earth: stone into the near seam, and the near ring turns one more plate before the night. The card
-## says what the attack would cross instead, before it is taken.
-func _feed_card() -> CardView:
-	var earth := run.world.earth
-	var fd: Dictionary = run.content.plates["feed"]
-	var cost := earth.feed_cost()
-	var btn := CardView.new(CardView.Size.SMALL, "earth", "The earth", fd["name"])
-	btn.set_price(run.stock, cost)
-	var now: Array[String] = []
-	var then: Array[String] = []
-	for a: float in run.world.wave_sides:
-		now.append(String(earth.kind_def(earth.crossing(a)).get("name", "open ground")))
-		then.append(String(earth.kind_def(earth.crossing(a, 1)).get("name", "open ground")))
-	var shown := " and the ".join(then)
-	btn.add_chip("→ %s" % shown, "earth", CardView.TEXT, CardView.FAMILIES["earth"]["color"])
-	var lines: Array[String] = [fd["text"], "Tonight's attack crosses the %s. One more plate and it crosses the %s instead." % [" and the ".join(now), shown]]
-	for a: float in run.world.wave_sides:
-		var kd := earth.kind_def(earth.crossing(a, 1))
-		if not kd.is_empty():
-			lines.append("%s gives: %s\n%s takes: %s" % [kd["name"], kd["gives"], kd["name"], kd["takes"]])
-	lines.append("Everything on the near ring turns with it: your gatherers' ground and any outpost there. Once a round; each feeding asks more stone.")
-	btn.tooltip_text = "\n".join(lines)
-	btn.disabled = not run.can_feed_earth()
-	UiKit.fade_if_disabled(btn, "Fed this round" if earth.fed_round == run.round_number else UiKit.shortfall(run.stock, cost))
-	btn.pressed.connect(_act.bind(run.feed_earth))
 	return btn
 
 

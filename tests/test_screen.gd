@@ -199,7 +199,7 @@ func test_the_earth_turning_pulls_the_camera_out_and_can_be_skipped() -> void:
 	arena.size = Vector2(1280, 720)
 	arena.call("_watch_shift")
 	check(not arena.turn_playing(), "showing a run for the first time is not a turn")
-	arena.zoom = 2.0
+	arena.zoom = 3.0
 	arena.pan = Vector2(150, 80)
 	run.world.earth.shift()
 	arena.call("_watch_shift")
@@ -208,13 +208,13 @@ func test_the_earth_turning_pulls_the_camera_out_and_can_be_skipped() -> void:
 	check_eq(TurnCamera.weight_at(TurnCamera.BEAT_MS / 2.0), 1.0, "mid-beat every ring is in view")
 	check_eq(TurnCamera.weight_at(TurnCamera.BEAT_MS), 0.0, "the beat ends on the player's camera")
 	var rings: Array = run.content.plates["rings"]
-	check(arena.zoom_to_fit(float(rings[-1]["r1"]), TurnCamera.FILL) < 2.0, "the widest view is wider than the player's")
+	check(arena.zoom_to_fit(float(rings[-1]["r1"]), TurnCamera.FILL) < 3.0, "zoomed in, the widest view is wider than the player's")
 	arena.zoom = 0.9
 	arena.pan = Vector2.ZERO
 	# The pause key calls this while the beat plays (main.gd), so Space skips it.
 	arena.skip_turn()
 	check(not arena.turn_playing(), "skipping ends the beat")
-	check_eq(arena.zoom, 2.0, "skipping gives the zoom back")
+	check_eq(arena.zoom, 3.0, "skipping gives the zoom back")
 	check_eq(arena.pan, Vector2(150, 80), "skipping gives the camera back")
 	run.dispose()
 	screen.free()

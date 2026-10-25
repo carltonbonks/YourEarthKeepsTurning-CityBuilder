@@ -11,13 +11,6 @@ func test_item_rarity_follows_its_affixes() -> void:
 	check_eq(Loot.rarity(c, Loot.make("flint_blade", 1)), "white", "no affix is base")
 	check_eq(Loot.rarity(c, Loot.make("flint_blade", 1, ["keen"])), "blue", "one affix is magic")
 	check_eq(Loot.rarity(c, Loot.make("flint_blade", 1, ["keen", "sturdy"])), "yellow", "two affixes are powerful")
-	check_eq(Loot.rarity(c, Loot.make("flint_blade", 1, ["earthborn"])), "orange", "earthborn finds are mythic")
-
-
-func test_earth_finds_are_mythic() -> void:
-	var c := _content()
-	var item := Loot.earth_find(c, SeededRng.stream(7, "find", 1), 6)
-	check_eq(Loot.rarity(c, item), "orange", "an earth find is orange")
 
 
 func test_pacts_are_mythic_and_every_relic_rarity_is_known() -> void:
@@ -36,7 +29,6 @@ func test_dawn_cards_take_their_rarity_from_their_data() -> void:
 	check_eq(people.card_rarity({"kind": "folk", "role": "tribesperson", "leaning": "forager", "cost": 0}), "white", "a tribesperson is white")
 	check_eq(people.card_rarity({"kind": "family", "role": "family", "cost": 0, "roles": []}), "blue", "a family is blue")
 	check_eq(people.card_rarity({"kind": "promote", "role": "champion", "cost": 0}), "orange", "knighting is orange")
-	check_eq(people.card_rarity({"kind": "spell", "role": "spell", "cost": 0, "spell": "sink_den"}), "orange", "sinking a den is orange")
 	var hero := people.make_hero(true)
 	check_eq(people.card_rarity({"kind": "hero", "role": "hero", "cost": 0, "hero": hero}), run.content.rarity_of("hero", hero.type_id), "a hero card is its class's rarity")
 

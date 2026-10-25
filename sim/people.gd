@@ -68,12 +68,6 @@ func offer_picks() -> void:
 	if not venture.is_empty():
 		_roll_dawn_card(venture, roll_rng)
 		run.pick_offer.append(venture)
-	# A free geomancer offers its spells beside the newcomers; taking one is instead of a newcomer.
-	if run.can_cast():
-		for id: String in content.plates["spells"]:
-			var spell := {"kind": "spell", "role": "spell", "cost": 0, "spell": id}
-			_roll_dawn_card(spell, roll_rng)
-			run.pick_offer.append(spell)
 	run.picks_left = 1 + int(run.mod("extra_picks"))
 	run.phase = RunState.Phase.PICK
 
@@ -89,9 +83,6 @@ func _roll_dawn_card(card: Dictionary, rng: SeededRng) -> void:
 			var hero: Unit = card["hero"]
 			CardRoll.roll_card(content, rng, card, "hero", {"weapon": hero.items.has("weapon")}, run.round_number)
 			_shape_hero(card, rng)
-		"spell":
-			CardRoll.roll_card(content, rng, card, "spell", {"spell": card["spell"],
-				"nights": int(content.plates["spells"][card["spell"]]["nights"])}, run.round_number)
 		"family", "venture":
 			CardRoll.roll_card(content, rng, card, card["kind"], {}, run.round_number)
 
@@ -136,10 +127,10 @@ func hero_card_cost(class_id: String) -> int:
 	return int(run.content.hero_classes[class_id].get("card_cost", run.content.int_num("hero_card_cost")))
 
 
-## How many people a dawn card brings into town (0 for a promotion, a venture or a spell).
+## How many people a dawn card brings into town (0 for a promotion or a venture).
 func card_people(card: Dictionary) -> int:
 	match card["kind"]:
-		"promote", "venture", "spell":
+		"promote", "venture":
 			return 0
 		"family":
 			return card["roles"].size() + CardRoll.extra_people(run.content, card)
@@ -156,8 +147,6 @@ func card_rarity(card: Dictionary) -> String:
 			return str(content.promotions[card["role"]].get("rarity", "white"))
 		"venture":
 			return str(content.ventures[card["venture"]].get("rarity", "white"))
-		"spell":
-			return str(content.plates["spells"][card["spell"]].get("rarity", "white"))
 		"family":
 			return str(content.balance.get("family_rarity", "white"))
 	return content.rarity_of("townsfolk", card["role"])
@@ -168,8 +157,6 @@ func card_label(card: Dictionary) -> String:
 		return "promote:" + card["role"]
 	if card["kind"] == "venture":
 		return "venture:" + card["venture"]
-	if card["kind"] == "spell":
-		return "spell:" + card["spell"]
 	if card["kind"] == "family":
 		return "family"
 	return "hero:" + card["hero"].type_id if card["kind"] == "hero" else card["role"]
