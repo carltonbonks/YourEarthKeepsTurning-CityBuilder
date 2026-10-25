@@ -3,16 +3,18 @@ extends ScrollContainer
 ## The heroes as a row of small portraits under the map: name and level, a health bar, a mood dot and
 ## what they are doing. Gear, bed, today's whim and the rest are in the hover card (Tooltips.hero).
 ## Clicking a portrait points the map at that hero. Heroes no longer in town share one grey chip.
+## A big roster narrows the portraits (to MIN_CHIP_WIDTH) so they all fit without scrolling.
 
 signal hero_pressed(hero: Unit)
 
 const CHIP_WIDTH := 150.0
+const MIN_CHIP_WIDTH := 72.0
 
 var run: RunState
 var _row: HBoxContainer
 ## The heroes the row was built for, so it is only rebuilt when someone joins or leaves.
 var _shown: Array = []
-## Per portrait: [hero, health bar, mood dot, intent label, name label].
+## Per portrait: [hero, health bar, mood dot, intent label, name label, the portrait].
 var _parts: Array = []
 
 
@@ -21,6 +23,7 @@ func _init() -> void:
 	# A big roster still scrolls (wheel or drag), but no bar eats the strip's height.
 	horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	custom_minimum_size.y = 62
+	resized.connect(_fit_chips)
 	_row = HBoxContainer.new()
 	_row.add_theme_constant_override("separation", 6)
 	add_child(_row)
@@ -47,6 +50,7 @@ func refresh() -> void:
 
 func _rebuild(living: Array[Unit]) -> void:
 	for child in _row.get_children():
+		_row.remove_child(child)
 		child.queue_free()
 	_parts.clear()
 	if living.is_empty() and run.fallen.is_empty() and run.departed.is_empty():
@@ -81,7 +85,7 @@ func _rebuild(living: Array[Unit]) -> void:
 		doing.add_theme_color_override("font_color", UiKit.HINT_COLOR)
 		line.add_child(doing)
 		_row.add_child(chip)
-		_parts.append([hero, hp, dot, doing, name])
+		_parts.append([hero, hp, dot, doing, name, chip])
 	var lost := run.fallen.size() + run.departed.size()
 	if lost > 0:
 		var chip := TipChip.new()
@@ -92,6 +96,20 @@ func _rebuild(living: Array[Unit]) -> void:
 		l.add_theme_font_size_override("font_size", 12)
 		chip.add_child(l)
 		_row.add_child(chip)
+	_fit_chips()
+
+
+## Shares the strip's width between the portraits: full width when there's room, narrower for a big roster.
+func _fit_chips() -> void:
+	if _parts.is_empty() or size.x <= 0.0:
+		return
+	var sep := float(_row.get_theme_constant("separation"))
+	var lost := 0.0
+	if _row.get_child_count() > _parts.size():
+		lost = (_row.get_child(-1) as Control).get_combined_minimum_size().x + sep
+	var each := floorf((size.x - lost - sep * (_parts.size() - 1)) / _parts.size()) - 1.0
+	for parts: Array in _parts:
+		(parts[5] as Control).custom_minimum_size.x = clampf(each, MIN_CHIP_WIDTH, CHIP_WIDTH)
 
 
 static func _health_color(share: float) -> Color:

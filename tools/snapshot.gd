@@ -171,12 +171,6 @@ func _init() -> void:
 		hero.xp = run.content.num("xp_per_level") * hero.level
 		run.people.level_up(hero)
 	main._arena.celebrations.update(run, Time.get_ticks_msec())
-	if args["deals"] != "":
-		# Scroll the hand to its end so the Trading section shows.
-		await process_frame
-		for scroll in main.find_children("*", "ScrollContainer", true, false):
-			if (scroll as ScrollContainer).get_parent() is BuildHandView:
-				scroll.scroll_horizontal = 100000
 	if args["relic"] == "1" and run.phase == RunState.Phase.RELIC:
 		main._overlays.show_for_phase()
 	if args["impact"] == "1":
