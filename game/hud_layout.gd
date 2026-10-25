@@ -2,8 +2,8 @@ class_name HudLayout
 extends RefCounted
 ## Keeps the map's heads-up panels off one another. The map is split into regions: the clock and alerts
 ## down the left edge, the attack card down the right, the building hand along the bottom (while
-## building) and the blueprint draft wherever its window is (top middle at first). Each edge column gets
-## the tallest stretch of its edge that the draft window and the hand leave free, and folds what doesn't
+## building). Each edge column gets
+## the tallest stretch of its edge that the hand and any other block leave free, and folds what doesn't
 ## fit there (ThreatCard.fit, Alerts.fit), so however busy the round or small the window, panels sit side
 ## by side or one under another, never on top. Only sums here; main.gd measures the panels and moves them.
 
@@ -12,7 +12,7 @@ const MARGIN := 8.0
 
 
 ## The tallest free stretch [top, bottom] of a column spanning x0..x1 between top and bottom, keeping
-## MARGIN clear of every block (rects on the map, such as the draft window). The higher one wins a tie.
+## MARGIN clear of every block (rects on the map that a panel must keep clear of). The higher one wins a tie.
 ## Vector2(top, top) when blocks cover the whole column.
 static func free_span(x0: float, x1: float, top: float, bottom: float, blocks: Array[Rect2]) -> Vector2:
 	var spans: Array[Vector2] = [Vector2(top, bottom)]

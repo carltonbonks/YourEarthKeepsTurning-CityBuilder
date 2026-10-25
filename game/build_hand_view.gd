@@ -5,8 +5,8 @@ extends PanelContainer
 ## on offer), Your blueprints (buildings and rows drafted this run), Upgrades (the ageing-up card and
 ## tool sets, once there are any) and Trading (the caravan's trade cards, once it comes). While a draft is
 ## left, the blueprint offers (each says what it adds to the dawn picks), the offer to clear the next ring
-## once the town is nearly full, and the reroll sit apart in
-## the DraftPopup window over the map. Every card is a CardView. A card the town needs says why on a bone ribbon at the top
+## once the town is nearly full, and the reroll are a pick screen the player must answer before building,
+## like the dawn pick: Overlays.show_draft lays it out and `fill_draft` makes its cards. Every card is a CardView. A card the town needs says why on a bone ribbon at the top
 ## ("Food runs out in 2 days"); a card the town can't take says why on a red strip at the bottom
 ## ("Need 3 more wood"). Costs show red where the town is short. Shown only while building.
 ## Every choice goes through run.hand; `changed` asks the screen to refresh. Hovering a building
@@ -30,16 +30,12 @@ const MIN_SCALE := 0.55
 const SECTION_COLOR := Color("#d8d4c8")
 
 var run: RunState
-## The window the blueprint offers go in; main.gd places it over the map.
-var draft: DraftPopup
 var _row: HBoxContainer
 ## Holds the row and clips it; the row is scaled to its width.
 var _shelf: Control
 ## Each section's hint ("Always on offer"), hidden first when the cards don't fit.
 var _hints: Array[Label] = []
 var _begin: Button
-## The round whose draft was last shown, so a hidden draft stays hidden until the next round's.
-var _draft_round := -1
 
 
 func _init() -> void:
@@ -77,7 +73,6 @@ func refresh() -> void:
 		_row.remove_child(child)
 		child.queue_free()
 	_hints.clear()
-	_draft_cards()
 	var core := _section("Core", "Always on offer")
 	for type: String in run.hand.basics():
 		core.add_child(_card(type, run.hand.need(type), "basic"))
@@ -88,7 +83,7 @@ func refresh() -> void:
 	for id: String in run.hand.row_blueprints:
 		mine.add_child(_row_card(id, run.hand.row_need(id), false))
 	if mine.get_child_count() == 0:
-		var empty := UiKit.note(mine, "None yet.\nDraft one from\nthe offers above.", 12)
+		var empty := UiKit.note(mine, "None yet.", 12)
 		empty.custom_minimum_size.x = 120
 		empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		empty.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -179,40 +174,40 @@ func _drop_if_empty(cards: HBoxContainer) -> void:
 		panel.queue_free()
 
 
-## The draft goes in its own window over the map, so the run's weightiest build choice stands apart
-## from the cards the town orders from. A new round's draft opens unfolded; within a round the window
-## stays as the player left it.
-func _draft_cards() -> void:
-	if draft == null:
-		return
-	# Taken out at once, not at the end of the frame, so the window shrinks to the new offers.
-	for child in draft.cards.get_children():
-		draft.cards.remove_child(child)
-		child.queue_free()
-	if run.hand.picks <= 0 or (run.hand.cards.is_empty() and run.hand.rows.is_empty() and not run.hand.ring_offer() and run.hand.upgrade_offers.is_empty()):
-		draft.visible = false
-		return
-	draft.set_title("Draft %d blueprints" % run.hand.picks if run.hand.picks > 1 else "Draft a blueprint",
-		"Pick one: it joins Your blueprints below and stays on offer for the whole run.\n" + pool_line(run))
+## Whether the round's draft still waits on the player: a draft left and at least one offer they can take.
+## While it does, the build waits behind the draft screen.
+func draft_pending() -> bool:
+	var h := run.hand
+	if run.phase != RunState.Phase.BUILD or h.picks <= 0:
+		return false
+	return h.cards.any(func(c: Dictionary) -> bool: return h.can_draft(c["building"])) \
+		or h.rows.any(func(c: Dictionary) -> bool: return h.can_draft_row(c["row"])) \
+		or h.can_clear_ring() \
+		or h.upgrade_offers.any(func(c: Dictionary) -> bool: return h.can_draft_upgrade(c["upgrade"]))
+
+
+func draft_title() -> String:
+	return "Draft %d blueprints" % run.hand.picks if run.hand.picks > 1 else "Draft a blueprint"
+
+
+## The draft's offers and the reroll, into the draft screen's row.
+func fill_draft(row: Container) -> void:
 	for card: Dictionary in run.hand.cards:
-		draft.cards.add_child(_card(card["building"], card["need"], "draft", card))
+		row.add_child(_card(card["building"], card["need"], "draft", card))
 	for card: Dictionary in run.hand.rows:
-		draft.cards.add_child(_row_card(card["row"], card["need"], true))
+		row.add_child(_row_card(card["row"], card["need"], true))
 	if run.hand.ring_offer():
-		draft.cards.add_child(_ring_card())
+		row.add_child(_ring_card())
 	for card: Dictionary in run.hand.upgrade_offers:
-		draft.cards.add_child(_upgrade_card(card))
+		row.add_child(_upgrade_card(card))
 	var redraw := UiKit.secondary(Button.new(), 13)
 	redraw.text = "Reroll\n%d shells" % run.hand.redraw_cost() if run.hand.redraws == 0 else "Rerolled\nthis round"
 	redraw.custom_minimum_size = Vector2(86, 120)
+	redraw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	redraw.disabled = not run.hand.can_redraw()
 	redraw.tooltip_text = "Once a round: swap these offers for a fresh draw."
 	redraw.pressed.connect(_act.bind(run.hand.redraw))
-	draft.cards.add_child(redraw)
-	if _draft_round != run.round_number:
-		_draft_round = run.round_number
-		draft.set_collapsed(false)
-	draft.open()
+	row.add_child(redraw)
 
 
 ## What a building adds to the dawn picks once it stands ("" if nothing): heroes it lodges or draws,
@@ -306,7 +301,7 @@ func recommendation(type: String, need: String) -> String:
 
 
 ## offer = the draft offer (with its roll); a drafted blueprint shows the roll it was drafted with.
-## A draft offer is a medium card in the draft window; a card in the hand is a small one (its detail is on hover).
+## A draft offer is a medium card on the draft screen; a card in the hand is a small one (its detail is on hover).
 func _card(type: String, need: String, kind: String, offer := {}) -> CardView:
 	var content := run.content
 	var def: Dictionary = content.buildings[type]

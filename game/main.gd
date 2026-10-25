@@ -6,7 +6,7 @@ extends Control
 ##
 ## This file runs the flow (new run, ticking the sim, pausing for decisions, pause and speed, the Esc
 ## menu) and lays out the screen. The parts live in their own files: TopBar, BuildHandView (the
-## building cards, with the blueprint draft in a DraftPopup), ThreatCard (the attack), Alerts, HeroStrip, StoryLog, Overlays
+## building cards, and the blueprint draft's cards for its pick screen), ThreatCard (the attack), Alerts, HeroStrip, StoryLog, Overlays
 ## (picks, relics, end screen, menu, Run history, dev tuning) and ArenaView (the map). HudLayout keeps
 ## the panels over the map out of each other's way. The game opens on the TitleScreen (skipped when the
 ## page address names a seed), each run opens on how a round works (WelcomePanel) before the traditions,
@@ -31,7 +31,6 @@ var save_runs := true
 
 var _top: TopBar
 var _hand_view: BuildHandView
-var _draft: DraftPopup
 var _threat: ThreatCard
 var _alerts: Alerts
 var _arena: ArenaView
@@ -154,7 +153,7 @@ func _invite_pedlar(id: String) -> void:
 
 
 func _begin_round() -> void:
-	if run.phase != RunState.Phase.BUILD:
+	if run.phase != RunState.Phase.BUILD or _hand_view.draft_pending():
 		return
 	run.begin_round()
 	_tick_acc = 0.0
@@ -231,12 +230,24 @@ func _close_menu() -> void:
 
 func _refresh() -> void:
 	_hand_view.visible = run.phase == RunState.Phase.BUILD
-	_draft.visible = false
 	if _hand_view.visible:
 		_hand_view.refresh()
+		_show_draft()
 	else:
 		_arena.preview_plot = -1
 	_refresh_live()
+
+
+## The blueprint draft is a pick screen the player must answer before building, like the dawn pick;
+## once it is taken the screen goes and the hand is free. Left alone while a menu, the title screen or
+## another pick (traditions, pedlar) is up.
+func _show_draft() -> void:
+	if _menu_open or _title_screen.visible or run.awaiting_traditions() or run.awaiting_pedlar():
+		return
+	if _hand_view.draft_pending():
+		_overlays.show_draft(_hand_view)
+	elif _overlays.showing_draft:
+		_overlays.hide()
 
 
 ## A building card is hovered: the map blinks the plot it would go on ("" clears it).
@@ -273,11 +284,11 @@ func _tip_position(at: String, tip_size: Vector2) -> Vector2:
 	return Vector2(clampf(p.x, 8.0, maxf(8.0, screen.x)), clampf(p.y, 8.0, maxf(8.0, screen.y)))
 
 
-## Gives each panel over the map its own room (HudLayout): the draft window keeps its place, the hand
+## Gives each panel over the map its own room (HudLayout): the hand
 ## its strip along the bottom, and the corner columns take the tallest free stretch of their edge and
 ## fold what doesn't fit there.
 func _layout_hud() -> void:
-	if _draft == null:
+	if _hand_view == null:
 		return  # Still building the screen.
 	var area := _map_box.size
 	if area.x <= 0.0 or area.y <= 0.0:
@@ -287,8 +298,6 @@ func _layout_hud() -> void:
 	if _hand_view.visible:
 		bottom -= maxf(_hand_view.size.y, _hand_view.get_combined_minimum_size().y)
 	var blocks: Array[Rect2] = []
-	if _draft.visible:
-		blocks.append(_draft.shown_rect())
 	var left_x := m + 2.0
 	var left := HudLayout.free_span(left_x, left_x + Alerts.WIDTH, m, bottom, blocks)
 	_corner.position = Vector2(left_x, left.x)
@@ -364,7 +373,7 @@ func _build_ui() -> void:
 	_clock_label = RichTextLabel.new()
 	_clock_label.bbcode_enabled = true
 	_clock_label.fit_content = true
-	# Wraps at the alerts' width, so the corner column stays clear of the draft window.
+	# Wraps at the alerts' width, so the corner column keeps its width.
 	_clock_label.custom_minimum_size.x = Alerts.WIDTH
 	_clock_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_clock_label.scroll_active = false
@@ -385,13 +394,6 @@ func _build_ui() -> void:
 	_hand_view.resized.connect(_layout_hud)
 	_hand_view.begin_pressed.connect(_begin_round)
 	map_box.add_child(_hand_view)
-	# The blueprint draft floats over the map in its own window, above the hand.
-	_draft = DraftPopup.new()
-	_draft.visible = false
-	_draft.moved.connect(_layout_hud)
-	_draft.visibility_changed.connect(_layout_hud)
-	map_box.add_child(_draft)
-	_hand_view.draft = _draft
 
 	# Underneath: the heroes as portraits, and the story's last lines.
 	var bottom := HBoxContainer.new()

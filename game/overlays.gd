@@ -1,6 +1,6 @@
 class_name Overlays
 extends PanelContainer
-## The dimmed pop-ups over the screen: the dawn pick and the relic pick (as cards, detail on hover),
+## The dimmed pop-ups over the screen: the blueprint draft, the dawn pick and the relic pick (as cards, detail on hover),
 ## the end of a run, the menu (Esc), the full story log, Run history and the dev tuning panel. Choices go back to the screen
 ## as signals; nothing here changes the run directly. A pop-up taller or wider than the screen shrinks
 ## to fit (`_fit_panel`) rather than running off it.
@@ -30,6 +30,8 @@ var run: RunState
 var settings: GameSettings
 ## A new run opens on "how a round works" before the traditions pick (every run, Yusuf 2026-10-24).
 var welcome_pending := false
+## The blueprint draft is up (show_draft); it stays through a show_for_phase while building.
+var showing_draft := false
 var _box: VBoxContainer
 var _panel: PanelContainer
 
@@ -96,7 +98,28 @@ func show_for_phase() -> void:
 		RunState.Phase.WON, RunState.Phase.LOST:
 			show_end()
 		_:
-			hide()
+			if not (showing_draft and visible and run.phase == RunState.Phase.BUILD):
+				hide()
+
+
+## The round's blueprint draft as a pick the player must answer before building, like the dawn pick:
+## no way past it but taking an offer (or rerolling first). The cards come from the hand (BuildHandView),
+## so they look and act as they always have; taking one refreshes the screen, which shows the next
+## draft or lets the build begin.
+func show_draft(hand: BuildHandView) -> void:
+	_clear()
+	showing_draft = true
+	_title(hand.draft_title() + " to start building")
+	var sub := UiKit.note(_box, "It joins Your blueprints in the hand and stays on offer for the whole run.", 14)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.tooltip_text = BuildHandView.pool_line(run)
+	sub.mouse_filter = Control.MOUSE_FILTER_PASS
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_box.add_child(row)
+	hand.fill_draft(row)
+	show()
 
 
 func show_pick() -> void:
@@ -781,6 +804,7 @@ func show_impact(whole_run := false) -> void:
 
 
 func _clear() -> void:
+	showing_draft = false
 	for child in _box.get_children():
 		child.queue_free()
 
