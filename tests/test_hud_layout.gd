@@ -52,3 +52,56 @@ func test_alerts_that_dont_fit_wait_their_turn() -> void:
 	check_eq(alerts.fit(one), shown - 1, "room for one shows the first and the rest wait")
 	alerts.free()
 	run.dispose()
+
+
+func test_a_crowded_hand_shrinks_to_fit_instead_of_scrolling() -> void:
+	var screen: Control = load("res://game/main.tscn").instantiate()
+	screen.call("_ready")
+	screen.call("_new_run", 4821)
+	var run: RunState = screen.get("run")
+	for id: String in ["tin_bundle", "sellswords", "relic_dealer"]:
+		run.caravan.offers.append({"deal": id, "need": "", "taken": false})
+	screen.call("_refresh")
+	var hand: BuildHandView = screen.get("_hand_view")
+	check(hand.find_children("*", "ScrollContainer", true, false).is_empty(), "the hand has no scroll bar")
+	var shelf: Control = hand.get("_shelf")
+	shelf.size.x = 4000.0
+	hand.call("_fit")
+	check_eq(hand.row_scale(), 1.0, "with room, the cards keep their size")
+	shelf.size.x = 500.0
+	hand.call("_fit")
+	check(hand.row_scale() < 1.0 and hand.row_scale() >= BuildHandView.MIN_SCALE, "a narrow strip shrinks the row (%.2f)" % hand.row_scale())
+	check(shelf.custom_minimum_size.y < BuildHandView.ROW_HEIGHT, "and the strip gets shorter with it")
+	run.dispose()
+	screen.free()
+
+
+func test_a_big_roster_narrows_the_hero_portraits() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	while run.living_heroes().size() < 6:
+		run.people.add_hero(run.people.make_hero())
+	var strip := HeroStrip.new()
+	strip.run = run
+	strip.size.x = 700.0
+	strip.refresh()
+	var parts: Array = strip.get("_parts")
+	check_eq(parts.size(), run.living_heroes().size(), "every hero has a portrait")
+	var total := 0.0
+	for p: Array in parts:
+		total += (p[5] as Control).custom_minimum_size.x
+	check(total <= 700.0, "the portraits share the strip's width (%.0f)" % total)
+	check((parts[0][5] as Control).custom_minimum_size.x < HeroStrip.CHIP_WIDTH, "each one is narrower than at full size")
+	strip.free()
+	run.dispose()
+
+
+func test_a_hero_portrait_shows_health_lost_in_red_above_what_is_left() -> void:
+	var holder := HBoxContainer.new()
+	var bar := HeroStrip.health_bar(holder)
+	HeroStrip.set_health(bar, 0.25)
+	var fill := bar.get_child(0) as ColorRect
+	check_eq(bar.color, HeroStrip.LOST_COLOR, "the bar behind is the red of health lost")
+	check(is_equal_approx(fill.anchor_top, 0.75), "a quarter left fills the bottom quarter (%.2f)" % fill.anchor_top)
+	check_eq(fill.color, HeroStrip.LOW_HEALTH_COLOR, "low health turns amber")
+	check(bar.custom_minimum_size.y > bar.custom_minimum_size.x, "the bar stands upright")
+	holder.free()
