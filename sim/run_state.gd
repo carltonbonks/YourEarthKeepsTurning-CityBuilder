@@ -39,6 +39,8 @@ var traditions: Array[String] = []
 ## Upgrades taken this run (data/upgrades.json), in order.
 var upgrades: Array[String] = []
 var traditions_settled := false
+## Whether the tradition was left to chance (choose_random_tradition), which brought tradition_random_bonus.
+var tradition_random := false
 ## The spoils in this round's relic offer: {id, kind (enemy tag), foes (how many of that kind came)}, or {}.
 var spoils := {}
 ## Max hearth HP the town has earned for good (Ancestor Bones).
@@ -210,6 +212,19 @@ func choose_traditions(ids: Array) -> void:
 	for h in heroes:
 		world.hero_ai.apply_hero_stats(h)
 	hand.deal()
+
+
+## Founds the town on one tradition drawn from the run's seed, plus tradition_random_bonus goods for leaving it to
+## chance (Yusuf, 2026-10-25).
+func choose_random_tradition() -> void:
+	var ids: Array = content.traditions.keys()
+	ids.sort()
+	var pick: String = SeededRng.stream(run_seed, "tradition").pick(ids)
+	tradition_random = true
+	var bonus: Dictionary = content.balance.get("tradition_random_bonus", {})
+	for good: String in bonus:
+		stock[good] = int(stock.get(good, 0)) + int(bonus[good])
+	choose_traditions([pick])
 
 
 ## The leanings the town's traditions favour.

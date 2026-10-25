@@ -9,15 +9,38 @@ func _run() -> RunState:
 func test_a_new_run_waits_for_its_traditions() -> void:
 	var run := _run()
 	check(run.awaiting_traditions(), "round 1 starts by asking for traditions")
-	run.choose_traditions(["hunters", "traders"])
+	run.choose_traditions(["hunters"])
 	check(not run.awaiting_traditions(), "and stops asking once chosen")
-	check_eq(run.traditions, ["hunters", "traders"] as Array[String], "both are kept")
+	check_eq(run.traditions, ["hunters"] as Array[String], "it is kept")
 
 
-func test_at_most_two_and_no_repeats() -> void:
+func test_only_one_known_tradition() -> void:
 	var run := _run()
-	run.choose_traditions(["hunters", "hunters", "traders", "smiths", "nonsense"])
-	check_eq(run.traditions, ["hunters", "traders"] as Array[String], "two different, known traditions")
+	run.choose_traditions(["nonsense", "hunters", "traders"])
+	check_eq(run.traditions, ["hunters"] as Array[String], "one known tradition (Yusuf, 2026-10-25)")
+
+
+func test_random_tradition_brings_a_bonus() -> void:
+	var run := _run()
+	var before := run.stock.duplicate()
+	run.choose_random_tradition()
+	check(not run.awaiting_traditions(), "leaving it to chance founds the town")
+	check_eq(run.traditions.size(), 1, "on one tradition")
+	check(run.tradition_random, "and remembers it was chance")
+	var start: Dictionary = run.content.traditions[run.traditions[0]].get("start", {})
+	for good: String in ["food", "stone", "fuel"]:
+		check_eq(int(run.stock[good]), int(before[good]) + 5 + int(start.get(good, 0)), "+5 %s on top of its start goods" % good)
+	check_eq(run.to_record()["tradition_random"], true, "the record says so")
+	var again := _run()
+	again.choose_random_tradition()
+	check_eq(again.traditions, run.traditions, "the same seed draws the same tradition")
+	var drawn := {}
+	for s in 30:
+		var r := RunState.new(Content.load_default(), 100 + s)
+		r.choose_random_tradition()
+		drawn[r.traditions[0]] = true
+		r.dispose()
+	check(drawn.size() >= 4, "different seeds draw different traditions (%d of 6)" % drawn.size())
 
 
 func test_starting_the_round_skips_them() -> void:
@@ -30,11 +53,14 @@ func test_starting_the_round_skips_them() -> void:
 func test_start_goods_and_effects() -> void:
 	var run := _run()
 	var shells := int(run.stock["shells"])
-	var wood := int(run.stock["wood"])
-	run.choose_traditions(["traders", "woodfolk"])
+	run.choose_traditions(["traders"])
 	check_eq(int(run.stock["shells"]), shells + 15, "traders bring shells")
-	check_eq(int(run.stock["wood"]), wood + 10, "woodfolk bring wood")
 	check_eq(run.mod("income"), 5.0, "traders' effect counts like a relic's")
+	check(not run.tradition_random, "a chosen tradition is not chance")
+	var wood_run := _run()
+	var wood := int(wood_run.stock["wood"])
+	wood_run.choose_traditions(["woodfolk"])
+	check_eq(int(wood_run.stock["wood"]), wood + 10, "woodfolk bring wood")
 
 
 func test_hunters_make_heroes_hit_harder() -> void:
@@ -87,5 +113,5 @@ func test_tradition_leaning_comes_more_often_and_bands_sooner() -> void:
 
 func test_record_keeps_the_traditions() -> void:
 	var run := _run()
-	run.choose_traditions(["smiths", "firekeepers"])
-	check_eq(run.to_record()["traditions"], ["smiths", "firekeepers"], "the record names them")
+	run.choose_traditions(["smiths"])
+	check_eq(run.to_record()["traditions"], ["smiths"], "the record names it")

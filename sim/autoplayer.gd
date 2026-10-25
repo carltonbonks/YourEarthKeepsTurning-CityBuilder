@@ -34,9 +34,8 @@ var gates := 2
 var gate_round := 3
 ## Whether it founds the town on its style's traditions (TRADITIONS) or on none (balance_run.gd traditions=0).
 var traditions := true
-const TRADITIONS := {"balanced": ["hunters", "stoneworkers"], "workers": ["stoneworkers", "woodfolk"],
-	"heroes": ["hunters", "traders"], "market": ["traders", "smiths"], "bronze": ["smiths", "woodfolk"],
-	"medieval": ["woodfolk", "stoneworkers"]}
+const TRADITIONS := {"balanced": ["hunters"], "workers": ["stoneworkers"], "heroes": ["hunters"],
+	"market": ["traders"], "bronze": ["smiths"], "medieval": ["woodfolk"]}
 ## Gardens: one a round while food in store would last fewer than this many days (0 = never). balance_run.gd: gardens=.
 var garden_days := 3.0
 ## Orders the forester and charcoal pit when the cards recommend them. balance_run.gd: upkeep=0 turns it off.

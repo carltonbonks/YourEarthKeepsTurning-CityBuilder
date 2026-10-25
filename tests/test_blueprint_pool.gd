@@ -35,9 +35,10 @@ func test_the_pool_follows_the_seed() -> void:
 
 func test_traditions_buildings_are_always_in() -> void:
 	for seed_value in [4821, 1001, 61823]:
-		var pool := _run(seed_value, ["hunters", "smiths"] as Array[String]).hand.pool()
-		for type in ["hunting_lodge", "hide_rack", "drying_rack", "smoke_hut", "knapper", "bone_carver", "smelter"]:
-			check(pool.has(type), "%s comes with its tradition (seed %d)" % [type, seed_value])
+		for tradition: String in ["hunters", "smiths"]:
+			var pool := _run(seed_value, [tradition] as Array[String]).hand.pool()
+			for type: String in Content.load_default().traditions[tradition]["buildings"]:
+				check(pool.has(type), "%s comes with its tradition (seed %d)" % [type, seed_value])
 
 
 func test_pooled_buildings_bring_what_they_require() -> void:
