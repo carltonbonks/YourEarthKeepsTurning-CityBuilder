@@ -165,7 +165,9 @@ func test_night_closes_in_on_the_town_and_keeps_the_speed() -> void:
 	check(arena.zoom > 1.5 and arena.pan.length() < 1.0, "at nightfall the camera has closed in on the town")
 	var town := NightCamera.town_radius(run)
 	check(town > float(run.content.town["rings"][0]["radius"]), "the town's reach covers its buildings")
-	check(is_equal_approx(arena.zoom, maxf(1.5, arena.zoom_to_fit(town, NightCamera.FILL))), "the town fills most of the view")
+	var aim := NightCamera.frame(run)
+	check_eq(aim[1], town * NightCamera.LOOSE, "on a quiet night the view keeps a little room round the town")
+	check(is_equal_approx(arena.zoom, maxf(1.5, arena.zoom_to_fit(aim[1], NightCamera.FILL))), "the town fills most of the view")
 	check_eq(screen.get("speed"), 8, "the night keeps the speed the player picked")
 	while run.phase == RunState.Phase.SIM:
 		run.step()
@@ -188,6 +190,88 @@ func test_night_closes_in_on_the_town_and_keeps_the_speed() -> void:
 	check_eq(arena.zoom, 3.0, "a camera the player moved at night stays put")
 	run.dispose()
 	screen.free()
+
+
+func test_the_attack_night_frames_the_way_it_comes_in() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	var w := run.world
+	w.wave_sides = [0.0]
+	w.time = w.day_length() * (run.content.int_num("days_per_round") - 1)
+	var aim := NightCamera.frame(run)
+	var far := run.content.num("meet_attack_at") + NightCamera.FIGHT_MARGIN
+	check(Vector2(aim[0]).x > 0.0 and is_zero_approx(Vector2(aim[0]).y), "the view slides toward the way the attack comes in")
+	check(Vector2(aim[0]).x + float(aim[1]) >= far - 0.01, "it reaches out to where heroes meet the attack")
+	check(Vector2(aim[0]).x - float(aim[1]) <= -NightCamera.town_radius(run) * NightCamera.LOOSE + 0.01, "and still holds the whole town")
+	w.wave_sides = [0.0, PI]
+	aim = NightCamera.frame(run)
+	check(Vector2(aim[0]).is_zero_approx() and is_equal_approx(aim[1], far), "attacks from two ways widen the view round the hearth")
+	w.time = 0.0
+	check(is_equal_approx(NightCamera.frame(run)[1], NightCamera.town_radius(run) * NightCamera.LOOSE), "earlier nights frame just the town")
+	run.dispose()
+
+
+func test_a_won_run_celebrates_round_the_hearth_before_the_end_screen() -> void:
+	var screen: Control = load("res://game/main.tscn").instantiate()
+	screen.call("_ready")
+	screen.call("_new_run", 4821)
+	var run: RunState = screen.get("run")
+	var arena: ArenaView = screen.get("_arena")
+	var overlays: Overlays = screen.get("_overlays")
+	arena.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	arena.size = Vector2(1600, 830)
+	overlays.hide()
+	arena.zoom = 1.2
+	arena.pan = Vector2(150, 0)
+	run.phase = RunState.Phase.WON
+	screen.call("_on_pause")
+	check(arena.victory_playing(), "winning starts the celebration")
+	check(not overlays.visible, "the end screen waits while it plays")
+	var start := arena.victory.born
+	var hero: Unit = run.living_heroes()[0] if not run.living_heroes().is_empty() else null
+	var folk: Unit = run.world.folk[0]
+	check(folk.pos.distance_to(arena.victory.place(folk, start)) < 0.01, "everyone starts where they stood")
+	var home := arena.victory.place(folk, start + Victory.GATHER_MS)
+	check(home.length() >= Victory.FIRST_RING - 0.01 and home.length() < Victory.FIRST_RING + 60.0, "then stands round the hearth")
+	check(arena.victory.hop(folk, start + Victory.GATHER_MS * 0.5) == 0.0, "nobody jumps on the way home")
+	var hops := range(20).map(func(i: int) -> float: return arena.victory.hop(folk, start + Victory.GATHER_MS + 400.0 + i * 50.0))
+	check(hops.max() > 0.5, "once home they jump")
+	if hero != null:
+		check(arena.victory.place(hero, start + Victory.GATHER_MS).length() < home.length() + 0.01, "heroes stand nearest the fire")
+	check(arena.victory.night_left(start + Victory.DAWN_MS) == 0.0, "the night lifts")
+	check(not arena.victory.update(arena, start + 100.0), "the end screen does not open at once")
+	arena.victory.update(arena, start + Victory.CAMERA_MS)
+	check(arena.zoom > 1.2 and arena.pan.is_zero_approx(), "the camera closes in on the hearth")
+	check(arena.victory.update(arena, start + Victory.SHOW_MS), "the end screen opens by itself after a while")
+	check(not arena.victory.update(arena, start + Victory.SHOW_MS + 100.0), "and only once")
+	run.dispose()
+	screen.free()
+
+
+func test_a_click_skips_to_the_end_screen() -> void:
+	var screen: Control = load("res://game/main.tscn").instantiate()
+	screen.call("_ready")
+	screen.call("_new_run", 4821)
+	var run: RunState = screen.get("run")
+	var arena: ArenaView = screen.get("_arena")
+	var overlays: Overlays = screen.get("_overlays")
+	overlays.hide()
+	run.phase = RunState.Phase.WON
+	screen.call("_on_pause")
+	arena.skip_victory()
+	check(overlays.visible and not arena.victory_playing(), "skipping opens the end screen")
+	check(arena.victory.active(), "the party carries on behind it")
+	run.dispose()
+	screen.free()
+
+
+func test_victory_places_everyone_in_rings_round_the_hearth() -> void:
+	var spots := Victory.layout(5, 200)
+	check_eq(spots.size(), 205, "a place for everyone")
+	for i in spots.size():
+		for j in range(i + 1, mini(i + 40, spots.size())):
+			check(spots[i].distance_to(spots[j]) > Victory.FOLK_SPACING * 0.5, "places don't overlap")
+	check(spots[0].length() < spots[204].length(), "heroes first, nearest the fire")
+	check(Victory.layout(0, 0).is_empty(), "nobody, no places")
 
 
 func test_the_earth_turning_pulls_the_camera_out_and_can_be_skipped() -> void:
