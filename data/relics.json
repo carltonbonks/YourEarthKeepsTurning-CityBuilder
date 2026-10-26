@@ -26,7 +26,7 @@
 	"turncoats_torc": {"rarity": "yellow", "name": "Turncoat's Torc", "text": "A human raider brought low may throw down arms and join you as a warrior (1 in 6, at most 2 a night).", "tags": ["horde"], "effects": {"turncoat_chance": 0.17, "turncoat_max": 2}},
 	"bone_flute": {"rarity": "yellow", "name": "Bone Flute", "text": "Each night the first 3 enemies to fall rise as skeletons that fight for the town until dawn.", "tags": ["horde"], "effects": {"risen_per_night": 3}},
 	"levy_horn": {"rarity": "yellow", "name": "Levy Horn", "text": "On the warned night tribespeople take up spears: they fight raiders near the camp and hit as hard as warriors.", "tags": ["horde"], "effects": {"levy": 1}},
-	"hearth_mothers_doll": {"rarity": "yellow", "name": "Hearth-mother's Doll", "text": "Every 3rd townsperson you take at dawn brings a twin.", "tags": ["horde"], "effects": {"twin_every": 3}},
+	"hearth_mothers_doll": {"rarity": "yellow", "name": "Hearth-mother's Doll", "text": "Every 3rd townsfolk card you take at dawn is doubled: twice the people come.", "tags": ["horde"], "effects": {"twin_every": 3}},
 	"carrion_kiln": {"name": "Carrion Kiln", "text": "Every enemy that dies inside the settlement burns for 1 fuel.", "effects": {"kill_fuel": 1}},
 	"lone_wolf_pelt": {"rarity": "yellow", "name": "Lone Wolf's Pelt", "text": "While you have 2 heroes or fewer, they deal double damage and tire half as fast.", "tags": ["hero"], "effects": {"lone_heroes": 2, "lone_damage": 1.0, "lone_tire": 0.5}},
 	"chosen_brand": {"rarity": "yellow", "name": "Chosen One's Brand", "text": "Your highest-level hero gains triple XP. The others gain half.", "tags": ["hero"], "effects": {"chosen_xp": 2.0, "others_xp": -0.5}},

@@ -7,7 +7,8 @@ extends Control
 ## ones. V switches to the flat top-down view. The sim never knows: only the view's projection changes.
 ## Mouse wheel zooms, dragging pans, hovering shows a tooltip (see Tooltips). As each night falls the
 ## camera closes in on the town and afterwards goes back (NightCamera), unless the player moves it.
-## Invaders glow faintly red, more so at night. A won run ends on the map first (Victory).
+## Invaders glow faintly red, more so at night. The night's last kill is held for a moment (LastKill). A won run
+## ends on the map first (Victory).
 ## Light (Lighting) is drawn on a child layer that adds light, and the tooltip on a layer above that.
 
 const HERO_RADIUS := 9.0
@@ -64,6 +65,7 @@ var supplies := SupplyPopups.new()
 var celebrations := Celebrations.new()
 var victory := Victory.new()
 var upgrade_glow := UpgradeGlow.new()
+var last_kill := LastKill.new()
 var light := Lighting.new()
 var _light_layer: Control
 var _top_layer: Control
@@ -77,6 +79,7 @@ func reset_camera() -> void:
 	night = NightCamera.new()
 	turn = TurnCamera.new()
 	victory = Victory.new()
+	last_kill.reset()
 
 
 ## The run is won: the night lifts and everyone gathers round the hearth to celebrate (Victory).
@@ -97,10 +100,20 @@ func skip_victory() -> void:
 		victory_done.emit()
 
 
+func last_kill_playing() -> bool:
+	return last_kill.playing()
+
+
+## Ends the last kill's beat at once (Space).
+func skip_last_kill() -> void:
+	last_kill.skip(self)
+
+
 ## Points the view at a ground point, zooming in a little if the view is wide.
 func look_at_point(p: Vector2) -> void:
 	night.release()
 	turn.release()
+	last_kill.release()
 	pan = p
 	zoom = maxf(zoom, 2.0)
 
@@ -133,7 +146,10 @@ func _layer(draw_with: Callable) -> Control:
 
 func _process(delta: float) -> void:
 	if run != null:
-		if night_camera:
+		# The night camera waits while the last kill is held, and picks up from where the beat leaves it.
+		if last_kill.playing():
+			last_kill.update(self)
+		elif night_camera:
 			night.update(self, delta)
 		turn.update(self)
 		pickups.update(run.world, Time.get_ticks_msec())
@@ -154,6 +170,7 @@ func _gui_input(event: InputEvent) -> void:
 			night.release()
 			turn.release()
 			victory.release()
+			last_kill.release()
 			zoom = clampf(zoom * (1.15 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15), MIN_ZOOM, MAX_ZOOM)
 			pan += before - _to_world(mb.position)
 			accept_event()
@@ -173,6 +190,7 @@ func _gui_input(event: InputEvent) -> void:
 			night.release()
 			turn.release()
 			victory.release()
+			last_kill.release()
 			pan -= _unproject((event as InputEventMouseMotion).relative / _scale())
 
 
@@ -323,6 +341,7 @@ func _draw() -> void:
 	upgrade_glow.draw(self, run, Time.get_ticks_msec(), func(bi: int) -> PackedVector2Array: return _screen_poly(w.town.building_outline(bi)),
 		func(bi: int) -> Vector2: return _to_screen(w.buildings[bi]["pos"]) - Vector2(0.0, _building_lift(bi)))
 	celebrations.draw_highlights(self, size, Time.get_ticks_msec(), _to_screen, main_color)
+	last_kill.draw(self)
 
 
 ## Shots fly at chest height.
@@ -370,6 +389,7 @@ func _draw_lights() -> void:
 			light.draw_glow(_light_layer, _stand(e.pos, r), r * INVADER_GLOW, r * INVADER_GLOW, red)
 	celebrations.draw_lights(_light_layer, light, now, _to_screen, run.heroes, HERO_RADIUS * maxf(1.0, zoom * 0.7))
 	victory.draw_lights(_light_layer, light, _to_screen(Vector2.ZERO), s, now)
+	last_kill.draw_lights(_light_layer, light, self)
 
 
 ## The top layer, over the light: goods carried in, the controls hint and the hover tooltip.
@@ -389,6 +409,7 @@ func _draw_top() -> void:
 		_top_layer.draw_string(font, Vector2(8, size.y - 8), help, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#8a9088"))
 	celebrations.draw_top(_top_layer, size, font, Time.get_ticks_msec(), _to_screen, run.heroes, HERO_RADIUS * maxf(1.0, zoom * 0.7))
 	victory.draw_top(_top_layer, size, font, Time.get_ticks_msec())
+	last_kill.draw_top(_top_layer, self, font)
 	if _mouse.x >= 0.0 and not _dragging:
 		var tip := hovered(_mouse)
 		if not tip.is_empty():

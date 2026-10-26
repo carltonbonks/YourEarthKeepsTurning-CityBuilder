@@ -432,3 +432,62 @@ func test_pick_screens_wait_for_the_earth_to_turn() -> void:
 	check(overlays.visible, "once the beat is skipped the pedlar choice shows")
 	run.dispose()
 	screen.free()
+
+
+func test_the_nights_last_kill_slows_time_and_holds_the_pick() -> void:
+	check_eq(LastKill.speed_at(0.0, 8.0), LastKill.SLOW_SPEED, "time slows when the last raider falls")
+	check_eq(LastKill.speed_at(LastKill.SLOW_UNTIL_MS - 1.0, 4.0), LastKill.SLOW_SPEED, "and stays slow while the kill is held")
+	check(LastKill.speed_at(LastKill.BEAT_MS - 100.0, 8.0) > LastKill.SLOW_SPEED, "then eases back")
+	check_eq(LastKill.speed_at(LastKill.BEAT_MS, 8.0), 8.0, "to the player's speed")
+	check_eq(LastKill.speed_at(500.0, 0.0), 0.0, "a paused game stays paused")
+	check_eq(LastKill.weight_at(0.0), 0.0, "the camera starts where the player had it")
+	check_eq(LastKill.weight_at(LastKill.BEAT_MS / 2.0), 1.0, "leans in on the kill")
+	check_eq(LastKill.weight_at(LastKill.BEAT_MS), 0.0, "and ends where the player had it")
+
+	var screen: Control = load("res://game/main.tscn").instantiate()
+	screen.call("_ready")
+	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	screen.call("_new_run", 4821)
+	var run: RunState = screen.get("run")
+	var arena: ArenaView = screen.get("_arena")
+	var overlays: Overlays = screen.get("_overlays")
+	arena.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	arena.size = Vector2(1280, 720)
+	var bot := AutoPlayer.new()
+	var beats := 0
+	var nights_with_raiders := 0
+	# Play rounds with the bot, watching every step as main.gd does, until a beat holds a pick.
+	while run.round_number <= 3 and run.phase != RunState.Phase.LOST:
+		match run.phase:
+			RunState.Phase.BUILD:
+				bot.build(run)
+				run.begin_round()
+			RunState.Phase.PICK:
+				run.choose_pick(bot.pick(run))
+			RunState.Phase.RELIC:
+				run.choose_relic(bot.pick_relic(run))
+			RunState.Phase.SIM:
+				var was_night := run.world.is_night()
+				run.step()
+				if run.world.is_night() and not was_night:
+					nights_with_raiders += 1
+				if arena.last_kill.watch(arena, run.world):
+					beats += 1
+					check(not run.world.enemies.any(func(e: Unit) -> bool: return e.alive and e.den_index < 0),
+						"the beat starts only once no raider is left")
+					check(arena.last_kill.headline() != "", "it says what happened")
+					if run.phase != RunState.Phase.SIM:
+						overlays.hide()
+						screen.call("_on_pause")
+						check(not overlays.visible, "the pick waits while the last kill is held")
+						# The pause key calls this while the beat plays (main.gd), so Space skips it.
+						arena.skip_last_kill()
+						check(not arena.last_kill_playing(), "skipping ends the beat")
+						screen.call("_process", 0.016)
+						check(overlays.visible, "then the pick opens")
+					arena.last_kill.skip(arena)
+	check(beats > 0, "the night's last kill is held at least once in three rounds")
+	check(beats <= nights_with_raiders, "at most once a night")
+	run.dispose()
+	screen.free()
+

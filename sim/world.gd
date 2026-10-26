@@ -73,6 +73,9 @@ var brought_in := {}
 var supply_drops: Array[Dictionary] = []
 var supplies_delivered := 0
 const SUPPLY_DROPS_KEPT := 8
+## The last enemy to fall: {pos, type, boss, invader (a raider, not a den wanderer), by (who felled it, or ""), time},
+## {} before any. The view reads it to make the night's last kill land (LastKill); no rule does.
+var last_felled := {}
 
 ## Where enemies and friends (townsfolk and heroes) stand, for fast nearest-unit lookups (see UnitGrid).
 ## Rebuilt each step when those units stop moving; a stale grid is never read (the lookups scan the lists instead).
@@ -658,6 +661,8 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 			victim.parcel = {}
 		return
 	night_report["kills"] = int(night_report["kills"]) + 1
+	last_felled = {"pos": victim.pos, "type": victim.type_id, "boss": victim.is_boss, "invader": victim.den_index < 0,
+		"by": _felled_by(attacker, source), "time": time}
 	market.carcass(victim)
 	enemy_ai.on_camper_killed(victim, attacker)
 	_relic_kill(victim)
@@ -686,6 +691,17 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 		run.tell("%s turns up grave goods on the barrow." % attacker.display_name)
 	if victim.is_boss:
 		run.tell("%s slays %s!" % [attacker.display_name, victim.display_name])
+
+
+## Who landed a killing blow, for the view: a hero by name, a townsperson by role ("a warrior"), else the hearth or the tower that shot.
+func _felled_by(attacker: Unit, source: String) -> String:
+	if attacker != null:
+		return attacker.display_name if attacker.is_hero() else "a " + attacker.display_name.to_lower()
+	if source == "hearth":
+		return "the hearth"
+	if content.buildings.has(source):
+		return "the " + String(content.buildings[source]["name"]).to_lower()
+	return ""
 
 
 ## Relics that act when an enemy falls, whoever felled it: shells and fuel for the town, goods for foes of a tag (foe_spoils),
