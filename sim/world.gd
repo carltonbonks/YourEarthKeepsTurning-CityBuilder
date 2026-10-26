@@ -329,7 +329,7 @@ func _dawn() -> void:
 ## their radius regrows a share of its full size, once per such building.
 func _tend_nodes() -> void:
 	for b in buildings:
-		var tends: Dictionary = content.buildings[b["type"]].get("tends", {})
+		var tends := tending(b["type"])
 		if tends.is_empty() or float(b["work_left"]) > 0.0:
 			continue
 		for node in nodes:
@@ -337,6 +337,12 @@ func _tend_nodes() -> void:
 				var before := int(node["amount"])
 				node["amount"] = mini(int(node["max"]), before + maxi(1, roundi(float(node["max"]) * float(tends["share"]))))
 				run.record.note_count("tended", int(node["amount"]) - before, node["gives"])
+
+
+## A building type's "tends" ({} if it has none, or its share is 0 until an upgrade raises it).
+func tending(type: String) -> Dictionary:
+	var tends: Dictionary = content.buildings[type].get("tends", {})
+	return tends if float(tends.get("share", 0.0)) > 0.0 else {}
 
 
 ## Whether a building's "tends" from pos reaches this node.
@@ -351,7 +357,7 @@ func node_regrowth(node: Dictionary) -> int:
 		return 0
 	var total := content.int_num("node_regrow_per_day")
 	for b in buildings:
-		var tends: Dictionary = content.buildings[b["type"]].get("tends", {})
+		var tends := tending(b["type"])
 		if not tends.is_empty() and float(b["work_left"]) <= 0.0 and tends_node(tends, b["pos"], node):
 			total += maxi(1, roundi(float(node["max"]) * float(tends["share"])))
 	return total
@@ -485,24 +491,6 @@ func add_building(type: String) -> bool:
 		"hp": float(content.buildings[type].get("tower_hp", 0.0)),
 		"goods": [], "craft": "", "craft_left": 0.0, "craft_tier": 1, "made": 0})
 	town.occupy(plot, buildings.size() - 1)
-	return true
-
-
-## Places a row card's two buildings side by side (data/combos.json) and links them. False if no cluster has room.
-func add_row(id: String) -> bool:
-	var row: Dictionary = content.combos[id]
-	var at := town.choose_row(row["building"], row["partner"])
-	if at.is_empty():
-		return false
-	var first := buildings.size()
-	for n in 2:
-		var type: String = row["building"] if n == 0 else row["partner"]
-		buildings.append({"type": type, "plot": at[n], "pos": town.plots[at[n]]["pos"],
-			"work_left": float(content.buildings[type]["work"]), "cooldown_left": 0.0,
-			"hp": float(content.buildings[type].get("tower_hp", 0.0)),
-			"goods": [], "craft": "", "craft_left": 0.0, "craft_tier": 1, "made": 0,
-			"row": id, "row_mate": first + 1 - n})
-		town.occupy(at[n], buildings.size() - 1)
 	return true
 
 

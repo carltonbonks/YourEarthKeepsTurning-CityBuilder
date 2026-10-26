@@ -54,8 +54,8 @@ func test_drafts_offer_upgrades_only_for_what_stands() -> void:
 	var seen := false
 	for r in 8:
 		run.hand._fill(SeededRng.stream(r, "t"))
-		check(run.hand.upgrade_offers.size() <= run.content.int_num("upgrade_cards"), "at most upgrade_cards")
-		check(run.hand.cards.size() + run.hand.rows.size() <= run.hand.size(), "upgrades come on top of the building offers")
+		check(run.hand.upgrade_offers.size() <= 1, "at most one upgrade, as the deepening offer")
+		check(run.hand.cards.size() + run.hand.crafts.size() + run.hand.upgrade_offers.size() <= run.hand.size(), "upgrades count among the offers")
 		seen = seen or not run.hand.upgrade_offers.is_empty()
 	check(seen, "upgrades come up once something stands")
 

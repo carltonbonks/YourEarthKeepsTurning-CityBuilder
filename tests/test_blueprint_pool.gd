@@ -66,18 +66,12 @@ func test_offers_come_only_from_the_pool() -> void:
 			check(run.hand.in_pool(c["building"]), "offer %s is in the pool" % c["building"])
 
 
-func test_a_row_needs_the_building_it_adds_in_the_pool() -> void:
+func test_crafts_decide_their_pieces_and_what_they_open() -> void:
 	var run := _run()
-	for id: String in run.content.combos:
-		var row: Dictionary = run.content.combos[id]
-		for pair in [[row["building"], row["partner"]], [row["partner"], row["building"]]]:
-			if run.content.buildings[pair[0]].get("basic", false) or run.hand.in_pool(pair[1]) \
-					or run.content.buildings[pair[1]].get("basic", false):
-				continue
-			run.hand.blueprints = [pair[0]] as Array[String]
-			check(not run.hand._row_draftable(id), "%s is not offered: %s is not in this run's pool" % [id, pair[1]])
-			return
-	check(true, "every row's buildings happen to be in the pool")
+	for id: String in run.content.crafts:
+		var craft: Dictionary = run.content.crafts[id]
+		for type: String in [craft["workshop"], craft["stall"]] + Array(craft["opens"]):
+			check(run.hand.in_pool(type), "%s is always in the pool: whether it comes up is its craft's call" % type)
 
 
 func test_the_record_and_the_hover_name_the_pool() -> void:

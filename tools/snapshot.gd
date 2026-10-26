@@ -15,18 +15,20 @@ extends SceneTree
 ## ageup=1 plays on from that round until the town reaches a new age and shows the celebration (style=bronze or
 ## medieval gets there); levelup=1 levels up the first hero so the halo shows.
 ## deals=<id,id,...> lays out those caravan trade cards (data/trades.json) in the build hand; id:roll:mod:mod rolls one.
-## drafts=<type:roll:mod,...> lays out those blueprint offers in the draft; upgrade.<id>:roll:mod offers an upgrade.
+## drafts=<type:roll:mod,...> lays out those blueprint offers in the draft; upgrade.<id>:roll:mod offers an upgrade (as the deepening offer), craft.<id> a craft.
 ## rolled=1 (with pick=1) deals rolled townsfolk cards: a magic warrior, a powerful forager and a mythic tribesperson;
 ## rolled=2 a magic family, a mythic venture and a powerful hero.
 ## drafted=1 skips the round's blueprint draft, so the build hand shows without the draft over it.
 ## won=1 plays to the end of the run (or calls it won where the bot falls) and shows the victory partway through
 ## (won_ms= how far in, default 3500).
 ## size=<W>x<H> sets the window size (default 1600x1000), to check the screen layout at other sizes.
+## glow=<building id> lights every one of that building as hovering its upgrade card does; sparkle=<building id>
+## shows them sparkling as just after taking an upgrade (with drafted=1, so the draft is out of the way).
 ## screen=title|welcome|settings shows the title screen, how a round works or Settings; tips=1 shows the
 ## one-time tip due at that moment (off otherwise, so pictures stay clear); seen=<id,id> marks tips as seen. The player's settings are never saved.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": ""}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -131,13 +133,15 @@ func _init() -> void:
 	if args["drafts"] != "" and run.phase == RunState.Phase.BUILD:
 		run.hand.cards.clear()
 		run.hand.upgrade_offers.clear()
-		run.hand.rows.clear()
+		run.hand.crafts.clear()
 		run.hand.picks = maxi(1, run.hand.picks)
 		for spec in args["drafts"].split(","):
 			var parts: PackedStringArray = spec.split(":")
 			var offer := {}
 			if parts[0].begins_with("upgrade."):
-				offer = {"upgrade": parts[0].trim_prefix("upgrade.")}
+				offer = {"upgrade": parts[0].trim_prefix("upgrade."), "deep": true}
+			elif parts[0].begins_with("craft."):
+				offer = {"craft": parts[0].trim_prefix("craft."), "need": ""}
 			else:
 				offer = {"building": parts[0], "need": run.hand.need(parts[0])}
 			if parts.size() > 2:
@@ -145,11 +149,28 @@ func _init() -> void:
 				offer["boons"] = Array(parts.slice(2))
 			if offer.has("upgrade"):
 				run.hand.upgrade_offers.append(offer)
+			elif offer.has("craft"):
+				run.hand.crafts.append(offer)
 			else:
 				run.hand.cards.append(offer)
 	if args["drafted"] == "1" and run.phase == RunState.Phase.BUILD:
 		run.hand.picks = 0
 	main._refresh()
+	main._arena.upgrade_glow.hover_type = args["glow"]
+	if args["glow"] != "":
+		var lit := func(node: Node, find: Callable) -> Node:
+			for child in node.get_children():
+				if child.has_meta("lights"):
+					return child
+				var deeper: Node = find.call(child, find)
+				if deeper != null:
+					return deeper
+			return null
+		var card: Node = lit.call(main._overlays, lit)
+		if card != null:
+			main._overlays._peek(card)
+	if args["sparkle"] != "":
+		main._arena.upgrade_glow.sparkle(args["sparkle"], Time.get_ticks_msec() - 300)
 	main._arena.celebrations.update(run, Time.get_ticks_msec())
 	if args["ageup"] == "1":
 		var start_age := run.age

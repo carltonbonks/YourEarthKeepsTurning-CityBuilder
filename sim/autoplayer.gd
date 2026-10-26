@@ -42,9 +42,6 @@ var garden_days := 3.0
 var upkeep := true
 ## Invites a pedlar on pedlar rounds (_pedlar). balance_run.gd: pedlar=0 never invites one.
 var pedlar := true
-## Takes a row card when it holds a building it was about to order (_order), except the workers style: its extra
-## garden or drying rack ate the wood a town of gatherers needs (73% without rows, 62% with). balance_run.gd: rows=0 never does.
-var rows := true
 ## Orders the runners' hut once the provisions stall and smoke hut stand and it has two heroes (the styles that build
 ## them: market, bronze, medieval). balance_run.gd: runners=0 never does.
 var runners := true
@@ -76,7 +73,7 @@ func build(run: RunState) -> void:
 		run.choose_pedlar(_pedlar(run) if pedlar else "")
 	_wishes = []
 	_build_pass(run)
-	while run.hand.picks > 0 and not run.hand.cards.is_empty():
+	while run.hand.picks > 0 and run.hand.has_offers():
 		# A town nearly out of room clears the next ring before drafting anything new.
 		if run.hand.can_clear_ring():
 			run.hand.clear_ring()
@@ -88,12 +85,29 @@ func build(run: RunState) -> void:
 		_build_pass(run)
 
 
-## The first building it wished for that is on offer ("" if none).
+## The offer holding the building it wished for most ("" if none): a building's type, or "craft:<id>" for a craft
+## that brings it (the market comes with a craft, so for the market the craft whose other pieces it wished for most).
 func _wanted_offer(run: RunState) -> String:
-	for type in _wishes:
-		if run.hand.can_draft(type):
-			return type
-	return ""
+	var best := ""
+	var best_at := _wishes.size()
+	for c in run.hand.cards:
+		var at := _wishes.find(c["building"])
+		if at >= 0 and at < best_at and run.hand.can_draft(c["building"]):
+			best = c["building"]
+			best_at = at
+	for c in run.hand.crafts:
+		var adds := run.hand.craft_adds(c["craft"])
+		var at := _wishes.size()
+		for type in adds:
+			if type != "market" and _wishes.has(type):
+				at = mini(at, _wishes.find(type))
+		# The market alone, with no other piece wished for: any craft brings it.
+		if at == _wishes.size() and adds.has("market") and _wishes.has("market"):
+			at = _wishes.size() - 1
+		if at < best_at and run.hand.can_draft_craft(c["craft"]):
+			best = "craft:" + c["craft"]
+			best_at = at
+	return best
 
 
 ## The offers with rolled ones first, each part in its dealt order.
@@ -104,20 +118,13 @@ static func _rolled_first(offers: Array[Dictionary]) -> Array[Dictionary]:
 	return out
 
 
-## Drafts a row holding a wished-for building (not the workers style, see `rows`), else the most wished-for
-## offer, else one the town needs, else the first offered.
+## Drafts the offer holding the most wished-for building, else a shaping building, else an upgrade to something
+## it already has, else a building the town needs, else any building, else a craft.
 func _draft(run: RunState) -> void:
-	if rows and style != "workers":
-		for c in run.hand.rows:
-			var row: Dictionary = run.content.combos[c["row"]]
-			# A row adds the building it lacks: worth a draft when that is wished for, or for its bonus alone once
-			# a workshop row's two buildings both stand.
-			var both_stand: bool = not run.content.buildings[row["building"]].get("basic", false) \
-				and run.world.count_buildings(row["building"], false) > 0 and run.world.count_buildings(row["partner"], false) > 0
-			if both_stand or _wishes.has(row["building"]) or _wishes.has(row["partner"]):
-				run.hand.draft_row(c["row"])
-				return
 	var pick := _wanted_offer(run)
+	if pick.begins_with("craft:"):
+		run.hand.draft_craft(pick.trim_prefix("craft:"))
+		return
 	if pick == "":
 		for type: String in _shaping_list():
 			if run.hand.can_draft(type):
@@ -138,6 +145,8 @@ func _draft(run: RunState) -> void:
 		pick = offers[0]["building"]
 	if pick != "":
 		run.hand.draft(pick)
+	elif not run.hand.crafts.is_empty():
+		run.hand.draft_craft(run.hand.crafts[0]["craft"])
 
 
 ## The pedlar whose wares would most improve the heroes who would walk out to it: for each hero who would go
@@ -167,18 +176,24 @@ func _pedlar(run: RunState) -> String:
 	return best if best != "" else String(run.pedlar_offer[0]["id"])
 
 
-## Orders a building it has a blueprint for; a drafted row with it in is taken first (both buildings, for less).
-## A building it has no blueprint for goes on its wish list for the draft.
+## Orders a building it has a blueprint for. A building it has no blueprint for goes on its wish list for the
+## draft (a craft's piece too, while a craft could still bring it).
 func _order(run: RunState, type: String) -> bool:
 	if not run.hand.offers(type):
-		if not _wishes.has(type) and run.hand.draftable(type):
+		if not _wishes.has(type) and (run.hand.draftable(type) or _craft_could_bring(run, type)):
 			_wishes.append(type)
 		return false
-	if rows and style != "workers":
-		var row := run.hand.row_with(type)
-		if row != "" and run.hand.order_row(row):
-			return true
 	return run.hand.order(type)
+
+
+## True if a craft not taken yet would bring this building: its workshop or stall, or the market.
+func _craft_could_bring(run: RunState, type: String) -> bool:
+	if not run.hand.is_piece(type) or run.hand.has_building(type):
+		return false
+	var id := run.hand.craft_of(type)
+	if id != "":
+		return run.hand.craft_draftable(id)
+	return run.content.crafts.keys().any(func(c: String) -> bool: return run.hand.craft_draftable(c))
 
 
 ## Incentive and hero-shaping buildings the bot drafts when offered (after what it wished for) and raises

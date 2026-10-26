@@ -63,6 +63,7 @@ var pickups := PickupPopups.new()
 var supplies := SupplyPopups.new()
 var celebrations := Celebrations.new()
 var victory := Victory.new()
+var upgrade_glow := UpgradeGlow.new()
 var light := Lighting.new()
 var _light_layer: Control
 var _top_layer: Control
@@ -319,6 +320,8 @@ func _draw() -> void:
 	var dark := Lighting.darkness(run) * victory.night_left(now)
 	if dark > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.12, dark))
+	upgrade_glow.draw(self, run, Time.get_ticks_msec(), func(bi: int) -> PackedVector2Array: return _screen_poly(w.town.building_outline(bi)),
+		func(bi: int) -> Vector2: return _to_screen(w.buildings[bi]["pos"]) - Vector2(0.0, _building_lift(bi)))
 	celebrations.draw_highlights(self, size, Time.get_ticks_msec(), _to_screen, main_color)
 
 

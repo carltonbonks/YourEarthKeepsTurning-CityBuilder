@@ -13,7 +13,7 @@ func _types(run: RunState) -> Array:
 func test_offers_are_dealt_without_repeats() -> void:
 	var run := _run()
 	var types := _types(run)
-	check_eq(types.size() + run.hand.rows.size(), run.content.int_num("blueprint_offers"), "a full draft is offered")
+	check_eq(types.size() + run.hand.crafts.size() + run.hand.upgrade_offers.size(), run.content.int_num("blueprint_offers"), "a full draft is offered")
 	for t: String in types:
 		check_eq(types.count(t), 1, "%s is offered once" % t)
 		check(run.hand.draftable(t), "%s could be drafted now" % t)
@@ -69,7 +69,8 @@ func test_the_age_up_need_is_always_offered() -> void:
 		var run := _run(s)
 		run.round_number = 2
 		run.hand.deal()
-		check(_types(run).has("market"), "the market, which the moot needs, is offered (seed %d)" % s)
+		check(run.hand.crafts.any(func(c: Dictionary) -> bool: return run.hand.craft_adds(c["craft"]).has("market")),
+			"the market, which the moot needs, is offered with a craft (seed %d)" % s)
 		check_eq(run.hand.need("market"), "ageing", "and marked as needed to age up")
 
 

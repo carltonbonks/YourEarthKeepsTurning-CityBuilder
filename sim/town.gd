@@ -286,58 +286,6 @@ func cluster_plots(k: int) -> Array[int]:
 	return out
 
 
-## The row (data/combos.json) building i is part of now, as a one-item list: it was ordered on a row card as the
-## row's main building, and it and its partner both stand finished.
-func combos_of(i: int) -> Array[String]:
-	var out: Array[String] = []
-	var b := w.buildings[i]
-	var id: String = b.get("row", "")
-	if id == "" or w.content.combos[id]["building"] != b["type"] or float(b["work_left"]) > 0.0:
-		return out
-	var mate := int(b.get("row_mate", -1))
-	if mate >= 0 and float(w.buildings[mate]["work_left"]) <= 0.0:
-		out.append(id)
-	return out
-
-
-## The sum of one effect key over the rows building i is part of.
-func combo_effect(i: int, key: String) -> float:
-	var total := 0.0
-	for id in combos_of(i):
-		total += float(w.content.combos[id]["effect"].get(key, 0.0))
-	return total
-
-
-## Where a row card's two buildings go: [plot for a, plot for b] in one cluster, or [] if no cluster has room.
-## Building a takes the best plot (by its own wants) whose cluster has another free plot, and b the free plot
-## there that suits it best; neither may wall off the hearth.
-func choose_row(a: String, b: String) -> Array[int]:
-	var order: Array = []
-	for k in plots.size():
-		if plot_free(k) and not plots[k]["lane"]:
-			order.append([_plot_score(a, k) + (1000.0 if _paved_in(k) > 0 else 0.0), k])
-	order.sort()
-	for pair: Array in order:
-		var k: int = pair[1]
-		var best := -1
-		var best_score := INF
-		for p in cluster_plots(k):
-			if p == k or not plot_free(p) or plots[p]["lane"]:
-				continue
-			var score := _plot_score(b, p)
-			if score < best_score:
-				best_score = score
-				best = p
-		if best < 0 or not _keeps_town_open(k):
-			continue
-		_set_plot_solid(k, true)
-		var open := _keeps_town_open(best)
-		_set_plot_solid(k, false)
-		if open:
-			return [k, best]
-	return []
-
-
 ## How many sides of plot k (0 to 2) have something standing on them.
 func _sides_closed(k: int) -> int:
 	var n := 0

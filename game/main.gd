@@ -26,6 +26,8 @@ var _live_acc := 0.0
 var _menu_open := false
 ## A pick screen (blueprint draft, pedlars) waits while the earth's turn plays, so the player sees the land move.
 var _held_for_turn := false
+## True while a taken upgrade sparkles on the map (UpgradeGlow): the next draft waits until it is done.
+var _held_for_sparkle := false
 ## Id of this run's file in Run history.
 var _run_id := ""
 ## Off in tests, so they never write runs to disk.
@@ -65,6 +67,9 @@ func _process(delta: float) -> void:
 		_held_for_turn = false
 		_refresh()
 		_overlays.show_for_phase()
+	if _held_for_sparkle and not _arena.upgrade_glow.playing(Time.get_ticks_msec()):
+		_held_for_sparkle = false
+		_refresh()
 	if run.phase != RunState.Phase.SIM or _overlays.visible or _title_screen.visible:
 		return
 	_live_acc += delta
@@ -273,6 +278,9 @@ func _refresh() -> void:
 func _show_draft() -> void:
 	if _menu_open or _held_for_turn or _title_screen.visible or run.awaiting_traditions() or run.awaiting_pedlar():
 		return
+	if _held_for_sparkle:
+		_overlays.hide()
+		return
 	if _hand_view.draft_pending():
 		_overlays.show_draft(_hand_view)
 	elif _overlays.showing_draft:
@@ -421,6 +429,11 @@ func _build_ui() -> void:
 	_hand_view.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_hand_view.changed.connect(_refresh)
 	_hand_view.previewing.connect(_preview_building)
+	_hand_view.highlighting.connect(func(type: String) -> void: _arena.upgrade_glow.hover_type = type)
+	_hand_view.upgraded.connect(func(type: String) -> void:
+		_arena.upgrade_glow.hover_type = ""
+		_arena.upgrade_glow.sparkle(type, Time.get_ticks_msec())
+		_held_for_sparkle = true)
 	_hand_view.resized.connect(_layout_hud)
 	_hand_view.begin_pressed.connect(_begin_round)
 	map_box.add_child(_hand_view)
