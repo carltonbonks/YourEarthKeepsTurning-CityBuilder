@@ -7,6 +7,7 @@ extends Control
 ## ones. V switches to the flat top-down view. The sim never knows: only the view's projection changes.
 ## Mouse wheel zooms, dragging pans, hovering shows a tooltip (see Tooltips). As each night falls the
 ## camera closes in on the town and afterwards goes back (NightCamera), unless the player moves it.
+## Invaders glow faintly red, more so at night. A won run ends on the map first (Victory).
 ## Light (Lighting) is drawn on a child layer that adds light, and the tooltip on a layer above that.
 
 const HERO_RADIUS := 9.0
@@ -26,8 +27,17 @@ const TOWER_HEIGHT := 32.0
 const SLIDE_MS := 1800.0
 ## The controls hint shows for this many rounds.
 const HELP_ROUNDS := 2
+## The faint red glow round invaders (raiders, not den wanderers): its size in their radii, and its
+## strength by day and at full night.
+const INVADER_GLOW := 2.6
+const INVADER_GLOW_DAY := 0.08
+const INVADER_GLOW_NIGHT := 0.3
+const INVADER_RED := Color(1.0, 0.18, 0.12)
 ## What each kind of standing thing is, for the back-to-front pass.
 enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO, PEDLAR }
+
+## A won run's ending has played out (or was clicked past): the end screen can open.
+signal victory_done
 
 var run: RunState
 var iso := true  ## Tilted (isometric) view; false is the flat top-down view.
@@ -52,6 +62,7 @@ var night_camera := true
 var pickups := PickupPopups.new()
 var supplies := SupplyPopups.new()
 var celebrations := Celebrations.new()
+var victory := Victory.new()
 var light := Lighting.new()
 var _light_layer: Control
 var _top_layer: Control
@@ -64,6 +75,25 @@ func reset_camera() -> void:
 	pan = Vector2.ZERO
 	night = NightCamera.new()
 	turn = TurnCamera.new()
+	victory = Victory.new()
+
+
+## The run is won: the night lifts and everyone gathers round the hearth to celebrate (Victory).
+func start_victory() -> void:
+	night.release()
+	turn.release()
+	victory.start(run, self, Time.get_ticks_msec())
+
+
+func victory_playing() -> bool:
+	return victory.playing()
+
+
+## Opens the end screen without waiting for the ending to play out.
+func skip_victory() -> void:
+	if victory.playing():
+		victory.skip()
+		victory_done.emit()
 
 
 ## Points the view at a ground point, zooming in a little if the view is wide.
@@ -108,6 +138,8 @@ func _process(delta: float) -> void:
 		pickups.update(run.world, Time.get_ticks_msec())
 		supplies.update(run.world, Time.get_ticks_msec())
 		celebrations.update(run, Time.get_ticks_msec())
+		if victory.update(self, Time.get_ticks_msec()):
+			victory_done.emit()
 	queue_redraw()
 	_light_layer.queue_redraw()
 	_top_layer.queue_redraw()
@@ -120,8 +152,12 @@ func _gui_input(event: InputEvent) -> void:
 			var before := _to_world(mb.position)
 			night.release()
 			turn.release()
+			victory.release()
 			zoom = clampf(zoom * (1.15 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15), MIN_ZOOM, MAX_ZOOM)
 			pan += before - _to_world(mb.position)
+			accept_event()
+		elif mb.pressed and victory.playing() and (mb.button_index == MOUSE_BUTTON_LEFT or mb.button_index == MOUSE_BUTTON_RIGHT):
+			skip_victory()
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_LEFT or mb.button_index == MOUSE_BUTTON_RIGHT:
 			_dragging = mb.pressed
@@ -135,6 +171,7 @@ func _gui_input(event: InputEvent) -> void:
 		if _dragging and _moved:
 			night.release()
 			turn.release()
+			victory.release()
 			pan -= _unproject((event as InputEventMouseMotion).relative / _scale())
 
 
@@ -238,15 +275,16 @@ func _draw() -> void:
 	if w.pedlar.is_open():
 		_queue(things, keys, Kind.PEDLAR, null, w.pedlar.camp["pos"])
 	_queue(things, keys, Kind.HEARTH, null, Vector2.ZERO)
+	var now := float(Time.get_ticks_msec())
 	for u in w.folk:
 		if u.alive:
-			_queue(things, keys, Kind.FOLK, u, u.pos)
+			_queue(things, keys, Kind.FOLK, u, victory.place(u, now))
 	for e in w.enemies:
 		if e.alive and e.spawned:
 			_queue(things, keys, Kind.ENEMY, e, e.pos)
 	for hero in run.heroes:
 		if hero.alive:
-			_queue(things, keys, Kind.HERO, hero, hero.pos)
+			_queue(things, keys, Kind.HERO, hero, victory.place(hero, now))
 	keys.sort()
 	for key in keys:
 		var thing: Array = things[key & 0xFFFF]
@@ -277,8 +315,8 @@ func _draw() -> void:
 			c = Color("#ffa040")
 		draw_line(_to_screen(shot["from"]) + chest, _to_screen(shot["to"]) + chest, Color(c, 0.6), 1.5 if shot["ranged"] else 2.5)
 
-	# Night falls over everything.
-	var dark := Lighting.darkness(run)
+	# Night falls over everything (and lifts when the run is won).
+	var dark := Lighting.darkness(run) * victory.night_left(now)
 	if dark > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.12, dark))
 	celebrations.draw_highlights(self, size, Time.get_ticks_msec(), _to_screen, main_color)
@@ -297,7 +335,7 @@ func _draw_lights() -> void:
 	var s := _scale()
 	var now := float(Time.get_ticks_msec())
 	_light_layer.draw_rect(Rect2(Vector2.ZERO, size), Lighting.sun(run))
-	var night_share := Lighting.darkness(run) / Lighting.NIGHT
+	var night_share := Lighting.darkness(run) * victory.night_left(now) / Lighting.NIGHT
 	if not w.cold_tonight:
 		var reach := World.HEARTH_RADIUS * s * lerpf(Lighting.HEARTH_REACH_DAY, Lighting.HEARTH_REACH_NIGHT, night_share)
 		var squash := ISO_SQUASH if iso else 1.0
@@ -320,7 +358,15 @@ func _draw_lights() -> void:
 			var to := _to_screen(shot["to"]) + chest
 			light.draw_glow(_light_layer, (from + to) / 2.0, r * 0.6, r * 0.6, Lighting.dim(c, 0.6))
 			light.draw_glow(_light_layer, to, r, r, c)
+	# Invaders glow faintly red, so the night's attack reads at a glance even from afar.
+	var grow := maxf(1.0, zoom * 0.7)
+	var red := Lighting.dim(INVADER_RED, lerpf(INVADER_GLOW_DAY, INVADER_GLOW_NIGHT, night_share))
+	for e in w.enemies:
+		if e.alive and e.spawned and e.den_index < 0:
+			var r := (BOSS_RADIUS if e.is_boss else ENEMY_RADIUS) * grow
+			light.draw_glow(_light_layer, _stand(e.pos, r), r * INVADER_GLOW, r * INVADER_GLOW, red)
 	celebrations.draw_lights(_light_layer, light, now, _to_screen, run.heroes, HERO_RADIUS * maxf(1.0, zoom * 0.7))
+	victory.draw_lights(_light_layer, light, _to_screen(Vector2.ZERO), s, now)
 
 
 ## The top layer, over the light: goods carried in, the controls hint and the hover tooltip.
@@ -339,6 +385,7 @@ func _draw_top() -> void:
 		var help := "Mouse wheel to zoom, drag to look around, V for %s view, point at anything for details" % ("flat" if iso else "tilted")
 		_top_layer.draw_string(font, Vector2(8, size.y - 8), help, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#8a9088"))
 	celebrations.draw_top(_top_layer, size, font, Time.get_ticks_msec(), _to_screen, run.heroes, HERO_RADIUS * maxf(1.0, zoom * 0.7))
+	victory.draw_top(_top_layer, size, font, Time.get_ticks_msec())
 	if _mouse.x >= 0.0 and not _dragging:
 		var tip := hovered(_mouse)
 		if not tip.is_empty():
@@ -521,8 +568,10 @@ func _draw_hearth() -> void:
 
 func _draw_folk(u: Unit) -> void:
 	var r := FOLK_RADIUS * maxf(1.0, zoom * 0.7)
-	var p := _stand(u.pos, r)
-	_shadow(u.pos, r)
+	var now := float(Time.get_ticks_msec())
+	var at := victory.place(u, now)
+	var p := _stand(at, r) - Vector2(0.0, victory.hop(u, now) * r)
+	_shadow(at, r)
 	draw_circle(p, r, Color(run.content.townsfolk[u.type_id]["color"]))
 	_draw_marker(u, p + Vector2(0.0, r), r * 0.55)
 	if u.carry_amount > 0:
@@ -699,11 +748,13 @@ func main_color(resource: String) -> String:
 
 func _draw_hero(hero: Unit, font: Font) -> void:
 	var r := HERO_RADIUS * maxf(1.0, zoom * 0.7)
-	var p := _stand(hero.pos, r)
-	_shadow(hero.pos, r)
+	var now := float(Time.get_ticks_msec())
+	var at := victory.place(hero, now)
+	var p := _stand(at, r) - Vector2(0.0, victory.hop(hero, now) * r)
+	_shadow(at, r)
 	var color := Color(run.content.hero_classes[hero.type_id]["color"])
-	if hero.resting:
-		# Sleepers are drawn dimmer, with a "z".
+	if hero.resting and not victory.active():
+		# Sleepers are drawn dimmer, with a "z" (but everyone is up to celebrate a win).
 		draw_circle(p, r * 0.8, Color(color, 0.55))
 		draw_string(font, p + Vector2(r * 0.6, -r * 0.6), "z", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#cfe0ff"))
 	else:
@@ -806,6 +857,14 @@ func _watch_shift() -> void:
 ## True while the map is pulled out to show the earth turning.
 func turn_playing() -> bool:
 	return turn.playing()
+
+
+## True from the moment the earth turns until its beat has played (or been skipped), so pop-ups can wait for it.
+func turn_pending() -> bool:
+	if turn.playing():
+		return true
+	var w := run.world if run != null else null
+	return w != null and _shift_seen[1] == w and w.earth.turned > int(_shift_seen[0])
 
 
 ## Ends the turn's beat at once: the plates are in place and the camera is back where the player had it.
