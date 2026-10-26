@@ -111,6 +111,7 @@ func test_the_venture_card_shows_its_reward_unclipped() -> void:
 	# The reward used to be the card's clipped blurb, squeezed off the face when the name wrapped.
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
+	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	var overlays: Overlays = screen.get("_overlays")

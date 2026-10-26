@@ -139,7 +139,10 @@ extends RefCounted
 ## 52: crafts (Yusuf, 2026-10-26): top-level "crafts" (ids from data/crafts.json, in the order drafted); a "blueprint"
 ##     action may be {"kind": "blueprint", "craft"}; "build_hands" may list "craft:<id>" offers. Rows are gone, so
 ##     "combos_end" is always empty and no "row:<id>" offers or "row" actions appear.
-const RECORD_FORMAT := 52
+## 53: first-run intro (Yusuf, 2026-10-26): a tradition's blueprint is drafted as the town is founded, logged as a
+##     "tradition_blueprint" action ("building" or "craft") and in "blueprints"; top-level "gentle" is true for a
+##     player's first run (its first dawn offers only a few tribespeople, round 1's draft has no reroll).
+const RECORD_FORMAT := 53
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -188,6 +191,7 @@ func to_record() -> Dictionary:
 		"pool": run.hand.pool().duplicate(),
 		"traditions": run.traditions.duplicate(),
 		"tradition_random": run.tradition_random,
+		"gentle": run.gentle,
 		"prices": run.prices.duplicate(),
 		"age": run.age,
 		"age_up_round": run.age_up_round,

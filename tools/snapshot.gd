@@ -24,11 +24,13 @@ extends SceneTree
 ## size=<W>x<H> sets the window size (default 1600x1000), to check the screen layout at other sizes.
 ## glow=<building id> lights every one of that building as hovering its upgrade card does; sparkle=<building id>
 ## shows them sparkling as just after taking an upgrade (with drafted=1, so the draft is out of the way).
+## intro=1 plays the first-run camera tour and shows it intro_ms= in (default 3000); gentle=1 makes the run a
+## gentle first run (with pick=1, the first dawn's few tribespeople).
 ## screen=title|welcome|settings shows the title screen, how a round works or Settings; tips=1 shows the
 ## one-time tip due at that moment (off otherwise, so pictures stay clear); seen=<id,id> marks tips as seen. The player's settings are never saved.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": ""}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -41,8 +43,20 @@ func _init() -> void:
 	main.settings.persist = false
 	main.settings.tips = args["tips"] == "1"
 	main.settings.tips_seen = Array(args["seen"].split(",", false))
+	main.settings.intro_seen = true
+	if args["intro"] == "1":
+		main.settings.intro_seen = false
+		main._new_run(int(args["seed"]))
+		var until := Time.get_ticks_msec() + int(args["intro_ms"])
+		while Time.get_ticks_msec() < until:
+			await process_frame
+		root.get_texture().get_image().save_png(args["out"])
+		print("Saved %s (tour, %s ms in)" % [args["out"], args["intro_ms"]])
+		quit()
+		return
 	main._new_run(int(args["seed"]))
 	var run: RunState = main.run
+	run.gentle = args["gentle"] == "1"
 	if args["give"] != "":
 		run.relics.append(args["give"])
 		run.relic_acquired_round[args["give"]] = run.round_number

@@ -23,6 +23,8 @@ signal closed
 signal settings_changed
 ## Back to the title screen (from the menu).
 signal title_requested
+## How to play on the title screen: play the first-run intro again (the tour, the highlights, a gentle start).
+signal intro_requested
 
 ## The gap kept round a pop-up, and the most it shrinks to fit the screen.
 const EDGE := 12.0
@@ -32,6 +34,8 @@ var run: RunState
 var settings: GameSettings
 ## A new run opens on "how a round works" before the traditions pick (every run, Yusuf 2026-10-24).
 var welcome_pending := false
+## How a round works is up (show_welcome).
+var showing_welcome := false
 ## The blueprint draft is up (show_draft); it stays through a show_for_phase while building.
 var showing_draft := false
 var _box: VBoxContainer
@@ -67,6 +71,11 @@ func _init() -> void:
 	_box.add_theme_constant_override("separation", 8)
 	margin.add_child(_box)
 	hide()
+
+
+## Where the pop-up is on screen, or an empty rect when none is up.
+func panel_rect() -> Rect2:
+	return _panel.get_global_rect() if visible else Rect2()
 
 
 ## Centres the pop-up, shrinking it to fit the screen when it is too big (never below MIN_SCALE).
@@ -189,7 +198,7 @@ func show_traditions(chosen: Array = []) -> void:
 	_clear()
 	_title("Who are your people? Choose a tradition" if to_pick == 1 else "Who are your people? Choose %d traditions" % to_pick)
 	var note := Label.new()
-	note.text = "Each tilts the run: which buildings you are dealt, which tribespeople come and band together, and one lasting gift."
+	note.text = "Each brings its first blueprint and tilts the run: which buildings you are dealt, which tribespeople come and band together, and one lasting gift."
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	note.custom_minimum_size.x = 640
@@ -212,6 +221,8 @@ func show_traditions(chosen: Array = []) -> void:
 		var start: Dictionary = t.get("start", {})
 		if not start.is_empty():
 			btn.add_goods(start)
+		if t.has("blueprint"):
+			btn.add_chip("Brings: " + BuildHand.gift_name(content, t["blueprint"]), "house", CardView.TEXT, btn.family_color())
 		btn.tooltip_text = t["text"]
 		btn.disabled = not picked and chosen.size() >= to_pick and to_pick > 1
 		btn.pressed.connect(func() -> void:
@@ -242,14 +253,19 @@ func show_traditions(chosen: Array = []) -> void:
 
 ## How a round works (WelcomePanel). Before a run it moves on to the traditions pick; from the title
 ## screen or the menu it just closes.
-func show_welcome(before_run: bool) -> void:
+func show_welcome(before_run: bool, from_title := false) -> void:
 	_clear()
+	showing_welcome = true
 	if before_run:
 		WelcomePanel.fill(_box, run.content, settings, "Choose your founding tradition", func() -> void:
 			welcome_pending = false
 			show_traditions())
 	else:
 		WelcomePanel.fill(_box, run.content, settings, "Back", func() -> void: closed.emit())
+		if from_title:
+			var again := UiKit.button(_box, "Play the first-run intro again", func() -> void: intro_requested.emit())
+			again.tooltip_text = "A new run that opens on the camera tour, with the highlights and a gentle first dawn."
+			again.size_flags_horizontal = Control.SIZE_SHRINK_END
 	show()
 
 
@@ -867,6 +883,7 @@ func show_impact(whole_run := false) -> void:
 
 func _clear() -> void:
 	showing_draft = false
+	showing_welcome = false
 	_peek(null)
 	for child in _box.get_children():
 		child.queue_free()

@@ -45,6 +45,17 @@ func offer_picks() -> void:
 			and not content.balance["family_roles"].has(run.hunger_turned_away):
 		pool.append({"kind": "family", "role": "family", "cost": 0, "roles": content.balance["family_roles"].duplicate()})
 	run.pick_offer = []
+	# A first run's first dawn (RunState.gentle) offers a few tribespeople and nothing else.
+	if run.gentle and run.round_number == 1 and world.day_index() == 0:
+		pool = pool.filter(func(c: Dictionary) -> bool: return c["role"] == "tribesperson")
+		var roll_first := SeededRng.stream(run.run_seed, "card_roll", run.round_number * 10)
+		while run.pick_offer.size() < content.int_num("gentle_first_dawn") and not pool.is_empty():
+			var first: Dictionary = pool.pop_at(rng.randi_range(0, pool.size() - 1))
+			_roll_dawn_card(first, roll_first)
+			run.pick_offer.append(first)
+		run.picks_left = 1
+		run.phase = RunState.Phase.PICK
+		return
 	_kin_join()
 	var promote := _promotion_card(rng)
 	var venture := _venture_card()

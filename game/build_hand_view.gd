@@ -40,6 +40,8 @@ var _shelf: Control
 ## Each section's hint ("Always on offer"), hidden first when the cards don't fit.
 var _hints: Array[Label] = []
 var _begin: Button
+## Each section's panel by its title ("Core", "Your blueprints", ...), for highlights (FirstTips).
+var _sections := {}
 
 
 func _init() -> void:
@@ -77,6 +79,7 @@ func refresh() -> void:
 		_row.remove_child(child)
 		child.queue_free()
 	_hints.clear()
+	_sections.clear()
 	var core := _section("Core", "Always on offer")
 	for type: String in run.hand.basics():
 		core.add_child(_card(type, run.hand.need(type), "basic"))
@@ -117,6 +120,7 @@ func _section(title: String, hint: String) -> HBoxContainer:
 	style.content_margin_bottom = 6
 	panel.add_theme_stylebox_override("panel", style)
 	_row.add_child(panel)
+	_sections[title] = panel
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
 	panel.add_child(box)
@@ -162,6 +166,17 @@ func _fit() -> void:
 	_row.position = Vector2.ZERO
 	_row.size = Vector2(width, ROW_HEIGHT)
 	_shelf.custom_minimum_size.y = ceilf(ROW_HEIGHT * s)
+
+
+## Where a section of the hand is on screen ("Core", "Upgrades"), or an empty rect if it isn't showing.
+func section_rect(title: String) -> Rect2:
+	var panel: Control = _sections.get(title)
+	return panel.get_global_rect() if visible and is_instance_valid(panel) and panel.is_inside_tree() else Rect2()
+
+
+## Where the Begin round button is on screen.
+func begin_rect() -> Rect2:
+	return _begin.get_global_rect() if visible else Rect2()
 
 
 ## How much the row is shrunk to fit (1 at full size).

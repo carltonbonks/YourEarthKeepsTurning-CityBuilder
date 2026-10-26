@@ -68,7 +68,7 @@ func deal() -> void:
 ## Rerolls the offers, once a round while a draft is left, for shells.
 func can_redraw() -> bool:
 	return run.phase == RunState.Phase.BUILD and picks > 0 and redraws == 0 and int(run.stock["shells"]) >= redraw_cost() \
-		and not run.has_effect("no_redraw")
+		and not run.has_effect("no_redraw") and not (run.gentle and run.round_number == 1)
 
 
 func redraw() -> bool:
@@ -160,6 +160,32 @@ func clear_ring() -> bool:
 func ring_offer() -> bool:
 	return run.phase == RunState.Phase.BUILD and picks > 0 and run.ring_closed() \
 		and run.world.town.fullness() >= float(run.content.town["clear_when_full"])
+
+
+## Drafts a founding tradition's blueprint for the town (`blueprint` in data/traditions.json: a building type, or
+## craft:<id> for a craft with the market if the town has none), in place of one of the drafts left (Yusuf, 2026-10-26).
+func gift(key: String) -> void:
+	if key.begins_with("craft:"):
+		var id := key.trim_prefix("craft:")
+		if crafts_taken.has(id):
+			return
+		crafts_taken.append(id)
+		for type in craft_adds(id):
+			_take(type)
+		run.record.note_action({"kind": "tradition_blueprint", "craft": id})
+	else:
+		if blueprints.has(key):
+			return
+		_take(key)
+		run.record.note_action({"kind": "tradition_blueprint", "building": key})
+	picks = maxi(0, picks - 1)
+
+
+## The name of what a tradition's blueprint key brings: a building's name, or a craft's.
+static func gift_name(content: Content, key: String) -> String:
+	if key.begins_with("craft:"):
+		return content.crafts[key.trim_prefix("craft:")]["name"]
+	return content.buildings[key]["name"]
 
 
 ## Adds a blueprint; a rolled offer's modifiers change the building for the rest of the run, and Twin-built raises

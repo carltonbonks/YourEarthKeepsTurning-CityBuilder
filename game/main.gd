@@ -9,8 +9,10 @@ extends Control
 ## building cards, and the blueprint draft's cards for its pick screen), ThreatCard (the attack), Alerts, HeroStrip, StoryLog, Overlays
 ## (picks, relics, end screen, menu, Run history, dev tuning) and ArenaView (the map). HudLayout keeps
 ## the panels over the map out of each other's way. The game opens on the TitleScreen (skipped when the
-## page address names a seed), each run opens on how a round works (WelcomePanel) before the traditions,
-## and FirstTips points out each thing the first time it happens. GameSettings holds the player's settings.
+## page address names a seed). A player's first run opens on the IntroTour (a camera tour of a prologue of
+## the same seed) and starts gently (RunState.gentle); every later run opens on how a round works
+## (WelcomePanel) before the traditions. FirstTips highlights each thing the first time it happens.
+## GameSettings holds the player's settings.
 
 ## How often the live panels are rebuilt while the sim runs (the map redraws every frame).
 const LIVE_REFRESH_SECONDS := 0.1
@@ -47,6 +49,9 @@ var _story: StoryLog
 var _overlays: Overlays
 var _title_screen: TitleScreen
 var _tips: FirstTips
+var _tour: IntroTour
+## The row under the map (heroes, story).
+var _bottom: HBoxContainer
 
 
 func _ready() -> void:
@@ -56,13 +61,15 @@ func _ready() -> void:
 	settings.apply(get_window() if is_inside_tree() else null)
 	_build_ui()
 	var url_seed := _url_seed()
-	_new_run(url_seed if url_seed >= 0 else _random_seed())
-	# A playtest link with ?seed= goes straight into that run.
+	# A playtest link with ?seed= goes straight into that run (and its tour, the first time).
+	_new_run(url_seed if url_seed >= 0 else _random_seed(), url_seed >= 0)
 	if url_seed < 0:
 		_show_title()
 
 
 func _process(delta: float) -> void:
+	if _tour.playing():
+		return
 	if _held_for_turn and not _arena.turn_pending():
 		_held_for_turn = false
 		_refresh()
@@ -94,7 +101,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:
 		return
-	if event.is_action_pressed("menu"):
+	if _tour.playing() and (event.is_action_pressed("menu") or event.is_action_pressed("pause")):
+		_tour.finish()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu"):
 		if _title_screen.visible:
 			_overlays.hide()
 		else:
@@ -121,10 +131,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # --- Flow ------------------------------------------------------------------
 
-func _new_run(seed_value: int) -> void:
+## Starts a run. A player's first (until the tour has played) opens on the tour when `tour` is on, and starts gently.
+func _new_run(seed_value: int, tour := true) -> void:
 	if run != null:
 		run.dispose()
 	run = RunState.new(content, seed_value)
+	run.gentle = not settings.intro_seen
 	_run_id = RunHistory.new_run_id(seed_value)
 	_arena.run = run
 	_arena.reset_camera()
@@ -135,8 +147,34 @@ func _new_run(seed_value: int) -> void:
 	_menu_open = false
 	_held_for_turn = false
 	_title_screen.hide()
-	_overlays.welcome_pending = true
+	# The first run's tour shows what the round screen tells; every later run opens on that screen.
+	_overlays.welcome_pending = settings.intro_seen
 	_set_speed(settings.start_speed)
+	if tour and not settings.intro_seen:
+		_start_tour()
+		return
+	_refresh()
+	_overlays.show_for_phase()
+
+
+## Plays the first-run tour over the whole screen, with the HUD out of the way.
+func _start_tour() -> void:
+	_overlays.hide()
+	_tips.hide()
+	for part: Control in [_top, _bottom, _corner, _threat, _hand_view]:
+		part.visible = false
+	_tour.start(content, run.run_seed, _arena)
+
+
+## The tour ended or was skipped: back to the run, which waits on its founding tradition.
+func _tour_done() -> void:
+	settings.intro_seen = true
+	settings.save()
+	_arena.run = run
+	_arena.reset_camera()
+	_arena.night_camera = settings.night_camera
+	for part: Control in [_top, _bottom, _corner, _threat]:
+		part.visible = true
 	_refresh()
 	_overlays.show_for_phase()
 
@@ -276,7 +314,7 @@ func _refresh() -> void:
 ## once it is taken the screen goes and the hand is free. Left alone while a menu, the title screen or
 ## another pick (traditions, pedlar) is up.
 func _show_draft() -> void:
-	if _menu_open or _held_for_turn or _title_screen.visible or run.awaiting_traditions() or run.awaiting_pedlar():
+	if _menu_open or _held_for_turn or _title_screen.visible or _tour.playing() or run.awaiting_traditions() or run.awaiting_pedlar():
 		return
 	if _held_for_sparkle:
 		_overlays.hide()
@@ -302,23 +340,31 @@ func _refresh_live() -> void:
 	_story.refresh()
 	_layout_hud()
 	if _tips != null:
-		_tips.check(run, _menu_open or _title_screen.visible)
+		_tips.check(run, _menu_open or _title_screen.visible or _tour.playing() or (_overlays.visible and _overlays.showing_welcome))
 
 
-## Where a one-time tip sits: by the part of the screen it is about, kept on screen.
-func _tip_position(at: String, tip_size: Vector2) -> Vector2:
-	var map := _map_box.get_global_rect()
-	var p := Vector2(map.get_center().x - tip_size.x * 0.5, map.position.y + 12.0)
-	match at:
-		"hand":
-			p = Vector2(map.position.x + 24.0, _hand_view.get_global_rect().position.y - tip_size.y - 12.0)
+## Where a highlight's target is on screen (FirstTips): the pop-up, parts of the hand, the attack card or a chip.
+func _tip_target(name: String) -> Rect2:
+	match name:
+		"panel":
+			return _overlays.panel_rect()
+		"core":
+			return _hand_view.section_rect("Core")
+		"upgrades":
+			return _hand_view.section_rect("Upgrades")
+		"begin":
+			return _hand_view.begin_rect()
 		"threat":
-			var card := _threat.get_global_rect()
-			p = Vector2(card.position.x - tip_size.x - 12.0, card.position.y)
-		"map":
-			p = Vector2(map.get_center().x - tip_size.x * 0.5, map.position.y + map.size.y * 0.3)
-	var screen := size - tip_size - Vector2(8, 8)
-	return Vector2(clampf(p.x, 8.0, maxf(8.0, screen.x)), clampf(p.y, 8.0, maxf(8.0, screen.y)))
+			return _threat.get_global_rect() if _threat.visible and not _overlays.visible else Rect2()
+		"food":
+			return _top.chip_rect("food")
+	return Rect2()
+
+
+## Where a highlight's note sits when it frames nothing: over the top of the map.
+func _tip_position(note_size: Vector2) -> Vector2:
+	var map := _map_box.get_global_rect()
+	return Vector2(map.get_center().x - note_size.x * 0.5, map.position.y + map.size.y * 0.25)
 
 
 ## Gives each panel over the map its own room (HudLayout): the hand
@@ -442,6 +488,7 @@ func _build_ui() -> void:
 	var bottom := HBoxContainer.new()
 	bottom.add_theme_constant_override("separation", 10)
 	root.add_child(bottom)
+	_bottom = bottom
 	_heroes = HeroStrip.new()
 	_heroes.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_heroes.size_flags_stretch_ratio = 1.5
@@ -469,6 +516,11 @@ func _build_ui() -> void:
 	_overlays.closed.connect(_close_menu)
 	_overlays.settings_changed.connect(_apply_settings)
 	_overlays.title_requested.connect(_show_title)
+	_overlays.intro_requested.connect(func() -> void:
+		settings.intro_seen = false
+		settings.tips_seen = []
+		settings.save()
+		_new_run(_random_seed()))
 	_overlays.settings = settings
 
 	# The title screen covers the game; the menu's screens (Run history, Settings) open over it.
@@ -476,16 +528,22 @@ func _build_ui() -> void:
 	_title_screen.visible = false
 	_title_screen.start_pressed.connect(func(seed_value: int) -> void:
 		_new_run(seed_value if seed_value >= 0 else _random_seed()))
-	_title_screen.how_to_play_pressed.connect(func() -> void: _overlays.show_welcome(false))
+	_title_screen.how_to_play_pressed.connect(func() -> void: _overlays.show_welcome(false, true))
 	_title_screen.history_pressed.connect(func() -> void: _overlays.show_history())
 	_title_screen.settings_pressed.connect(func() -> void: _overlays.show_settings())
 	add_child(_title_screen)
 	add_child(_overlays)
 
-	# One-time tips sit above everything, picks included.
+	# The first-run tour covers the screen while it plays.
+	_tour = IntroTour.new()
+	_tour.finished.connect(_tour_done)
+	add_child(_tour)
+
+	# One-time highlights sit above everything, picks included.
 	_tips = FirstTips.new()
 	_tips.settings = settings
 	_tips.content = content
-	_tips.anchor = _tip_position
+	_tips.target_rect = _tip_target
+	_tips.map_anchor = _tip_position
 	add_child(_tips)
 	_arena.night_camera = settings.night_camera

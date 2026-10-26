@@ -18,6 +18,8 @@ var run: RunState:
 		_shown = -1
 var _text: RichTextLabel
 var _shown := -1
+## The Log and Impact buttons: shown from round 2, once there is a story to read (Yusuf, 2026-10-26).
+var _buttons: Array[Button] = []
 
 
 func _init() -> void:
@@ -41,12 +43,14 @@ func _init() -> void:
 	UiKit.secondary(open, 13)
 	open.pressed.connect(func() -> void: open_pressed.emit())
 	side.add_child(open)
+	_buttons.append(open)
 	var impact := Button.new()
 	impact.text = "Impact"
 	impact.tooltip_text = "Who did what: damage dealt and taken, kills and work, for each hero, kind of townsfolk and the hearth"
 	UiKit.secondary(impact, 13)
 	impact.pressed.connect(func() -> void: impact_pressed.emit())
 	side.add_child(impact)
+	_buttons.append(impact)
 	var version := UiKit.note(side, build_label(), 9)
 	version.autowrap_mode = TextServer.AUTOWRAP_OFF
 	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -55,6 +59,8 @@ func _init() -> void:
 
 
 func refresh() -> void:
+	for b in _buttons:
+		b.visible = run.round_number >= 2
 	if run.story.size() == _shown:
 		return
 	_shown = run.story.size()
