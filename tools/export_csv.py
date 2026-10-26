@@ -89,6 +89,8 @@ def main(raw_folder, out_folder):
             "relics_taken": len(r.get("relics", [])), "upgrades_taken": len(r.get("upgrades", [])), "pool_size": len(r.get("pool", [])), "pool": " ".join(r.get("pool", [])),
             "crafts": " ".join(r.get("crafts", [])),
             "traditions": " ".join(r.get("traditions", [])), "tradition_random": 1 if r.get("tradition_random") else 0,
+            "gentle": 1 if r.get("gentle") else 0,
+            "tradition_blueprint": " ".join(a.get("building", a.get("craft", "")) for rd in rounds for a in rd.get("actions", []) if a.get("kind") == "tradition_blueprint"),
             "buildings_total": len(r.get("buildings", [])),
             "huts": r.get("buildings", []).count("hut"),
             "watch_posts": r.get("buildings", []).count("watch_post"),

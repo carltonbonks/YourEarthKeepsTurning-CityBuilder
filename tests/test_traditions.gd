@@ -77,13 +77,13 @@ func test_tradition_buildings_come_up_more_often() -> void:
 	for s in 40:
 		var a := RunState.new(Content.load_default(), 2000 + s)
 		a.choose_traditions([])
-		plain += a.hand.cards.filter(func(c: Dictionary) -> bool: return c["building"] == "hunting_lodge").size()
+		plain += a.hand.cards.filter(func(c: Dictionary) -> bool: return c["building"] == "drying_rack").size()
 		a.dispose()
 		var b := RunState.new(Content.load_default(), 2000 + s)
 		b.choose_traditions(["hunters"])
-		favoured += b.hand.cards.filter(func(c: Dictionary) -> bool: return c["building"] == "hunting_lodge").size()
+		favoured += b.hand.cards.filter(func(c: Dictionary) -> bool: return c["building"] == "drying_rack").size()
 		b.dispose()
-	check(favoured > plain, "hunters are dealt hunting lodges more often (%d vs %d in 40 hands)" % [favoured, plain])
+	check(favoured > plain, "hunters are dealt drying racks more often (%d vs %d in 40 hands)" % [favoured, plain])
 
 
 func _woodcutter_cards(traditions: Array) -> int:

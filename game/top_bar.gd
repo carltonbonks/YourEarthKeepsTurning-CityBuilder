@@ -61,7 +61,15 @@ func _init(dev_mode: bool) -> void:
 
 func refresh() -> void:
 	for id: String in _chips:
-		(_chips[id] as RichTextLabel).text = StatusText.chip(run, id)
+		var label := _chips[id] as RichTextLabel
+		label.get_parent().visible = StatusText.chip_shown(run, id)
+		label.text = StatusText.chip(run, id)
+
+
+## Where a chip is on screen ("food"), or an empty rect if it is hidden.
+func chip_rect(id: String) -> Rect2:
+	var chip := (_chips[id] as Control).get_parent() as Control
+	return chip.get_global_rect() if visible and chip.visible else Rect2()
 
 
 ## Lights the button for the current speed (0 is paused).

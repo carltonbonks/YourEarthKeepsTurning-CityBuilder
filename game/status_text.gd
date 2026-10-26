@@ -40,13 +40,32 @@ static func chip(run: RunState, id: String) -> String:
 			return "[color=%s]Fuel %d[/color]  %s" % [RESOURCE_COLORS["fuel"], run.stock["fuel"], _lasts(nights, "night")]
 		"goods":
 			var parts := PackedStringArray()
-			for r: String in BAR_GOODS:
+			for r: String in bar_goods(run):
 				parts.append("[color=%s]%s %d[/color]" % [RESOURCE_COLORS[r], r.capitalize(), run.stock[r]])
 			var more := _listed_goods(run).filter(func(r: String) -> bool: return not BAR_GOODS.has(r) and r != "food" and r != "fuel").size()
-			return "  ".join(parts) + ("  [color=#9aa]+%d more[/color]" % more if more > 0 else "")
+			return "  ".join(parts) + ("  [color=#9aa]+%d more[/color]" % more if more > 0 and run.round_number >= 2 else "")
 		"relics":
 			return "Relics %d" % run.relics.size()
 	return ""
+
+
+## Whether a top-bar chip shows yet. The bar grows with the town (Yusuf, 2026-10-26): relics from the first one or
+## round 2 on; everything else from the start.
+static func chip_shown(run: RunState, id: String) -> bool:
+	if id == "relics":
+		return run.round_number >= 2 or not run.relics.is_empty()
+	return true
+
+
+## The goods on the bar: wood and stone always, shells once they matter (round 2 on, a dawn card that costs them, or
+## a draft that can be rerolled for them). The rest are in the hover card, counted as "+N more" from round 2.
+static func bar_goods(run: RunState) -> Array[String]:
+	var out: Array[String] = []
+	for r: String in BAR_GOODS:
+		if r != "shells" or run.round_number >= 2 or run.pick_offer.any(func(c: Dictionary) -> bool: return int(c.get("cost", 0)) > 0) \
+				or (run.phase == RunState.Phase.BUILD and run.hand.picks > 0 and not run.gentle):
+			out.append(r)
+	return out
 
 
 ## The hover card behind one top-bar chip.

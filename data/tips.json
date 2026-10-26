@@ -1,12 +1,24 @@
 {
-	"_note": "What a new player is told (game/welcome_panel.gd, game/first_tips.gd). welcome: the 'how a round works' screen shown before the traditions pick of every run (Yusuf, 2026-10-24): title, intro, steps (when, name, text), rounds_line, earth_line, ages_line and closing (Yusuf's line: try things, a fallen village is another story lost to time; the loss screen shows lost_line). tips: one-time tips, each shown once the first time its moment comes (FirstTips.due says when), in this order when several are due; at says where it sits: hand (above the building hand), threat (beside the attack card), top (under the top bar, over a pick) or map (over the middle of the map).",
+	"_note": "What a new player is told (game/welcome_panel.gd, game/first_tips.gd, game/intro_tour.gd). welcome: the 'how a round works' screen shown before the traditions pick of every run but a player's first (Yusuf, 2026-10-24; the first run opens on the tour instead, 2026-10-26): title, intro, steps (when, name, text), rounds_line, earth_line, ages_line and closing (Yusuf's line: try things, a fallen village is another story lost to time; the loss screen shows lost_line). tour: the camera tour that opens a player's first run (IntroTour), shot by shot: shot (hearth, town, hero, den or map, IntroTour.shot_view says where each looks), seconds and the caption. tips: one-time highlights (Yusuf, 2026-10-26), each shown once the first time its moment comes (FirstTips.due says when), in this order when several are due: a hi-viz frame round the part of the screen it is about with the rest dimmed, and a note beside it. target is what it frames (panel: the pop-up that is up; core, begin or upgrades: those parts of the building hand; threat: the attack card; food: the food chip; map: nothing, the note sits over the map), or a list of them. A highlight closes once its moment passes (the player did the thing); ok: true gives it a Got it button too.",
 	"welcome": {
 		"title": "You rule. You don't command.",
 		"intro": "Your heroes and townsfolk think for themselves. You shape the town around them, then watch what they make of it. Each round goes like this:",
 		"steps": [
-			{"when": "1 · Start of the round", "name": "Build", "text": "Draft one blueprint to keep for the whole run, then build what you can afford. Homes and food are always on offer. Buildings find their own spot."},
-			{"when": "2 · Each of three dawns", "name": "Pick a newcomer", "text": "Choose one card: a tribesperson, a family, a hero. Your buildings decide who turns up. Everyone you take eats."},
-			{"when": "3 · Days and nights", "name": "Watch", "text": "Townsfolk gather and craft, heroes hunt in the wilds. The third night brings the attack the card on the right warns of. Hold, and you pick a relic."}
+			{
+				"when": "1 · Start of the round",
+				"name": "Build",
+				"text": "Draft one blueprint to keep for the whole run, then build what you can afford. Homes and food are always on offer. Buildings find their own spot."
+			},
+			{
+				"when": "2 · Each of three dawns",
+				"name": "Pick a newcomer",
+				"text": "Choose one card: a tribesperson, a family, a hero. Your buildings decide who turns up. Everyone you take eats."
+			},
+			{
+				"when": "3 · Days and nights",
+				"name": "Watch",
+				"text": "Townsfolk gather and craft, heroes hunt in the wilds. The third night brings the attack the card on the right warns of. Hold, and you pick a relic."
+			}
 		],
 		"rounds_line": "Survive %d rounds. Raise the next age when you're ready: it costs a lot, and pays back.",
 		"earth_line": "Between rounds the ring of land past your town clicks round, so each round the attack crosses different ground: the attack card says which.",
@@ -15,13 +27,93 @@
 		"lost_line": "One more human story lost to time. Try something different next run."
 	},
 	"tips": {
-		"first_build": {"title": "First build", "at": "hand", "text": "Draft one blueprint to keep, then build. Homes and food are always here. Press Begin round when you're done."},
-		"first_attack": {"title": "The attack", "at": "threat", "text": "This card shows what comes on the third night and which way it marches. Point at it for more."},
-		"first_dawn": {"title": "First dawn", "at": "top", "text": "Pick one newcomer. Everyone eats, so keep an eye on food in the top bar."},
-		"first_hero": {"title": "A hero", "at": "top", "text": "Heroes cost shells and choose their own fights, gear and beds. You can only tempt them."},
-		"first_night": {"title": "First night", "at": "map", "text": "Space pauses. Point at anyone to see what they're up to."},
-		"first_relic": {"title": "First relic", "at": "top", "text": "Relics last the whole run. Look for ones that suit your town."},
-		"first_earth": {"title": "The earth turned", "at": "threat", "text": "The land past your town clicked round a plate. The attack card says which ground the attack crosses this round. Space skips the turn's view."},
-		"first_age": {"title": "A new age", "at": "hand", "text": "Raising an age costs a lot, but opens a new ring of plots and new buildings."}
-	}
+		"first_tradition": {
+			"title": "Your people",
+			"target": "panel",
+			"text": "Pick your people's way of life. Each brings its first blueprint and tilts which buildings and people come."
+		},
+		"first_draft": {
+			"title": "Blueprints",
+			"target": "panel",
+			"text": "Draft a blueprint. You keep it all run and can build it every round. Point at a card for more."
+		},
+		"first_build": {
+			"title": "First build",
+			"target": "core",
+			"text": "Build a hut. Homes and food are always here, and buildings find their own spot."
+		},
+		"first_begin": {
+			"title": "Begin",
+			"target": "begin",
+			"text": "Build what you can afford, then press Begin round. The days play out by themselves."
+		},
+		"first_dawn": {
+			"title": "First dawn",
+			"target": [
+				"panel",
+				"food"
+			],
+			"text": "Pick a newcomer. Everyone eats, so keep an eye on food."
+		},
+		"first_hero": {
+			"title": "A hero",
+			"target": "panel",
+			"text": "Heroes cost shells and choose their own fights, gear and beds. You can only tempt them."
+		},
+		"first_night": {
+			"title": "First night",
+			"target": "map",
+			"ok": true,
+			"text": "Space pauses. Point at anyone to see what they're up to."
+		},
+		"first_attack": {
+			"title": "The attack",
+			"target": "threat",
+			"ok": true,
+			"text": "Tonight's attack: what comes and which way. Hold, and you pick a relic."
+		},
+		"first_relic": {
+			"title": "First relic",
+			"target": "panel",
+			"text": "Relics last the whole run. Look for ones that suit your town."
+		},
+		"first_earth": {
+			"title": "The earth turned",
+			"target": "threat",
+			"ok": true,
+			"text": "The land past your town clicked round. The attack card says which ground the attack crosses this round."
+		},
+		"first_age": {
+			"title": "A new age",
+			"target": "upgrades",
+			"text": "Raising an age costs a lot, but opens a new ring of plots and new buildings."
+		}
+	},
+	"tour": [
+		{
+			"shot": "hero",
+			"seconds": 5,
+			"text": "Heroes hunt for glory and loot. You can't order them."
+		},
+		{
+			"shot": "hearth",
+			"seconds": 4,
+			"text": "Back home, a handful of people around a fire."
+		},
+		{
+			"shot": "town",
+			"seconds": 5,
+			"text": "They gather, craft and sleep on their own."
+		},
+		{
+			"shot": "den",
+			"seconds": 4,
+			"text": "Every third night, something comes."
+		},
+		{
+			"shot": "map",
+			"seconds": 5,
+			"text": "You shape the town. They do the rest."
+		}
+	]
 }

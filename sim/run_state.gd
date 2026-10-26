@@ -39,6 +39,9 @@ var traditions: Array[String] = []
 ## Upgrades taken this run (data/upgrades.json), in order.
 var upgrades: Array[String] = []
 var traditions_settled := false
+## A gentle start for a player's first run (set by the game before round 1, never by bots): the first dawn offers
+## only gentle_first_dawn tribespeople, and round 1's draft has no reroll.
+var gentle := false
 ## Whether the tradition was left to chance (choose_random_tradition), which brought tradition_random_bonus.
 var tradition_random := false
 ## The spoils in this round's relic offer: {id, kind (enemy tag), foes (how many of that kind came)}, or {}.
@@ -195,7 +198,8 @@ func awaiting_traditions() -> bool:
 
 
 ## Founds the town on up to traditions_to_pick traditions (an empty list founds it on none). Their start goods
-## arrive, their effects apply and round 1's building hand is dealt again with their buildings favoured.
+## arrive, their blueprint is drafted in place of one of round 1's drafts, their effects apply and round 1's
+## building hand is dealt again with their buildings favoured.
 func choose_traditions(ids: Array) -> void:
 	assert(awaiting_traditions())
 	traditions_settled = true
@@ -207,6 +211,10 @@ func choose_traditions(ids: Array) -> void:
 		for good: String in start:
 			stock[good] = int(stock.get(good, 0)) + int(start[good])
 		tell("The people keep the ways of the %s." % content.traditions[id]["name"])
+		var gift := str(content.traditions[id].get("blueprint", ""))
+		if gift != "":
+			hand.gift(gift)
+			tell("Their ways bring a blueprint: %s." % BuildHand.gift_name(content, gift))
 	for u in world.folk:
 		world.folk_ai.apply_folk_stats(u)
 	for h in heroes:
