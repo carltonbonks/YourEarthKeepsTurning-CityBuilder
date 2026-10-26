@@ -502,6 +502,9 @@ func _build_ui() -> void:
 	_story.impact_pressed.connect(func() -> void:
 		_menu_open = true
 		_overlays.show_impact())
+	_story.people_pressed.connect(func() -> void:
+		_menu_open = true
+		_overlays.show_people())
 	bottom.add_child(_story)
 
 	# Overlay for picks, relics, the end screen and the menu: dims the screen, panel in the middle.

@@ -7,6 +7,8 @@ extends HBoxContainer
 signal open_pressed
 ## The Who did what button (Overlays.show_impact).
 signal impact_pressed
+## The People button (Overlays.show_people), while a Reeve's hut stands.
+signal people_pressed
 
 const LINES := 3
 ## Written by CI just before the web export (see .github/workflows/ci.yml); absent in local runs.
@@ -20,6 +22,7 @@ var _text: RichTextLabel
 var _shown := -1
 ## The Log and Impact buttons: shown from round 2, once there is a story to read (Yusuf, 2026-10-26).
 var _buttons: Array[Button] = []
+var _people: Button
 
 
 func _init() -> void:
@@ -51,6 +54,13 @@ func _init() -> void:
 	impact.pressed.connect(func() -> void: impact_pressed.emit())
 	side.add_child(impact)
 	_buttons.append(impact)
+	_people = Button.new()
+	_people.text = "People"
+	_people.tooltip_text = "Your people: how each kind of townsperson spent the round (the Reeve's hut keeps the tally)"
+	UiKit.secondary(_people, 13)
+	_people.pressed.connect(func() -> void: people_pressed.emit())
+	_people.visible = false
+	side.add_child(_people)
 	var version := UiKit.note(side, build_label(), 9)
 	version.autowrap_mode = TextServer.AUTOWRAP_OFF
 	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -61,6 +71,7 @@ func _init() -> void:
 func refresh() -> void:
 	for b in _buttons:
 		b.visible = run.round_number >= 2
+	_people.visible = not run.people.reckoning().is_empty()
 	if run.story.size() == _shown:
 		return
 	_shown = run.story.size()

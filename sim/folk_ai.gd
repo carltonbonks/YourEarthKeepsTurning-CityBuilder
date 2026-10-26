@@ -45,6 +45,8 @@ var _pupils_of := {}
 var _warriors := 0
 ## Role -> daytime seconds spent idle not yet written to the record (it counts whole seconds).
 var _idle_time := {}
+## Role -> time kind -> seconds this round (FolkAI._note_time), written to the record as "folk_time".
+var role_time := {}
 
 
 func _init(world: World) -> void:
@@ -195,7 +197,37 @@ func folk_sum(key: String) -> float:
 	return total
 
 
+## A new round: each townsperson's time and goods this round become last round's (Your people panel).
+func start_round() -> void:
+	role_time = {}
+	for unit in w.folk:
+		unit.time_last = unit.time
+		unit.time = {}
+		unit.brought_last = unit.brought
+		unit.brought = 0
+
+
 func folk_tick(unit: Unit) -> void:
+	unit.activity = ""
+	_folk_act(unit)
+	_note_time(unit)
+
+
+## Counts this step toward the unit's time kind (data/townsfolk.json time_kinds: its activity, else its task).
+## Workers count by day only; warriors day and night, when their work happens.
+func _note_time(unit: Unit) -> void:
+	if unit.type_id != "warrior" and w.is_dusk():
+		return
+	var kind: String = w.content.townsfolk[unit.type_id].get("time_kinds", {}).get(
+		unit.activity if unit.activity != "" else unit.task, "")
+	if kind == "":
+		return
+	unit.time[kind] = float(unit.time.get(kind, 0.0)) + w.dt
+	var row: Dictionary = role_time.get_or_add(unit.type_id, {})
+	row[kind] = float(row.get(kind, 0.0)) + w.dt
+
+
+func _folk_act(unit: Unit) -> void:
 	unit.cooldown_left -= w.dt
 	# Rest at night heals anyone not in a fight.
 	if w.is_night() and w.nearest_enemy(unit.pos, 120.0) == null:
@@ -203,6 +235,7 @@ func folk_tick(unit: Unit) -> void:
 	# A hollow-eyed seer (data/card_mods.json idle) never works: they stay by their home, seeing.
 	if not unit.boons.is_empty() and unit_mod(unit, "idle") > 0.0:
 		unit.intent = "staring into the fire, seeing what is to come"
+		unit.activity = "seer"
 		w.walk_toward(unit, unit.home, 8.0)
 		return
 	if unit.type_id == "warrior" or levied(unit):
@@ -245,6 +278,7 @@ func _warrior_tick(unit: Unit) -> void:
 		unit.retreating = true
 	if unit.retreating:
 		unit.intent = "falling back to heal"
+		unit.activity = "heal"
 		if w.go_heal(unit) and unit.hp_fraction() >= World.HEAL_UNTIL:
 			unit.retreating = false
 		return
@@ -252,23 +286,29 @@ func _warrior_tick(unit: Unit) -> void:
 	var threat := w.nearest_enemy(unit.pos, 220.0, maxf(patrol, float(def["patrol_watch"])) + 60.0)
 	if threat != null:
 		unit.intent = "defending the camp"
+		unit.activity = "fight"
 		w.fight(unit, threat)
 		return
 	var call := w.nearest_alarm(unit.pos)
 	if call != null:
 		unit.intent = "answering a call for help"
+		unit.activity = "fight"
 		w.fight(unit, call)
 		return
 	if unit.drill_with != null and _drill_with(unit):
+		unit.activity = "drill"
 		return
 	if shadow != Vector2.INF:
 		unit.intent = "keeping watch over the gatherers"
+		unit.activity = "shadow"
 		w.walk_toward(unit, shadow - shadow.normalized() * 20.0, 6.0)
 		return
 	if index < 0:  # a levied tribesperson, not one of the warriors: holds the edge where it stands
 		unit.intent = "patrolling"
+		unit.activity = "patrol"
 		w.walk_toward(unit, Vector2.from_angle(unit.pos.angle()) * patrol)
 		return
+	unit.activity = "patrol"
 	var slot := index - _shadowing()
 	var size := patrol_group_size()
 	var groups := ceili(float(maxi(_warrior_list.size() - _shadowing(), slot + 1)) / size)
@@ -385,6 +425,7 @@ func _worker_tick(unit: Unit) -> void:
 	var danger := w.nearest_enemy(unit.pos, World.FLEE_DISTANCE)
 	if danger != null:
 		unit.intent = "fleeing and calling for help"
+		unit.activity = "flee"
 		unit.task = ""
 		if not w.new_alarms.has(danger):
 			w.new_alarms.append(danger)
@@ -403,6 +444,7 @@ func _worker_tick(unit: Unit) -> void:
 		if w.walk_toward(unit, unit.home.limit_length(World.HEARTH_RADIUS + 8.0)):
 			w.bring_in(unit.carrying, unit.carry_amount)
 			w.run.record.note_impact("folk", unit.type_id, "goods", unit.carry_amount, unit.carrying)
+			unit.brought += unit.carry_amount
 			unit.carry_amount = 0
 			unit.task = ""
 		return

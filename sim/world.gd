@@ -150,6 +150,7 @@ func start_round() -> void:
 	deaths = []
 	wave_stats = {"seconds": 0.0, "keep_damage": 0.0, "hero_deaths": [], "retreats": 0, "hearth_hp_before": hearth_hp}
 	reset_night_report()
+	folk_ai.start_round()
 	for den in dens:
 		den["respawn_left"] = 0.0
 	pause = Pause.NONE

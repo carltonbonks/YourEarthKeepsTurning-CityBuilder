@@ -412,7 +412,7 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 				btn.set_body(lean["text"]).set_footer(eats)
 				btn.tooltip_text = "%s\n%s Still fetches anything the town is short of, but picks trips for %s first.\n%s\n%s." % [
 					def["text"], lean["text"], ", ".join(lean["goods"]).replace("_", " "),
-					Tooltips.band_line(run, card["role"], card["leaning"], true), eats]
+					Tooltips.band_line(run, card["role"], card["leaning"], true), eats] + _work_lines(card["role"])
 			else:
 				btn = CardView.new(sz, "folk", "Townsperson", def["name"])
 				btn.set_price(run.stock, {})
@@ -420,7 +420,7 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 				_doll_chip(btn, doll)
 				_have_chip(btn, card["role"])
 				btn.set_body(def["text"]).set_footer(eats)
-				btn.tooltip_text = "%s\n%s." % [def["text"], eats]
+				btn.tooltip_text = "%s\n%s." % [def["text"], eats] + _work_lines(card["role"])
 			var doll_line := _doll_line(roles.size(), doll)
 			if doll_line != "":
 				var relic: Dictionary = content.relics["hearth_mothers_doll"]
@@ -450,6 +450,15 @@ func _doll_line(people: int, doll: bool) -> String:
 ## How many of this role the town has now, so a dawn pick reads as "a fourth warrior" rather than "a warrior".
 func _have_chip(btn: CardView, role: String) -> void:
 	btn.add_chip("You have %d" % run.count_role(role))
+	var word := run.people.busy_word(role)
+	if word != "":
+		btn.add_chip(FolkAtWork.word_name(word), "", FolkAtWork.word_tint(word))
+
+
+## The townsfolk card's hover lines on how that role spent the round (FolkAtWork.card_lines), after a newline, or "".
+func _work_lines(role: String) -> String:
+	var lines := FolkAtWork.card_lines(run, role)
+	return "" if lines.is_empty() else "\n" + "\n".join(lines)
 
 
 ## A venture: send tribespeople out, some never come back, the rest bring goods home.
@@ -906,6 +915,18 @@ func show_impact(whole_run := false) -> void:
 	UiKit.note(_box, "Damage counts only the health a blow took. Percent is each one's share of all damage the town dealt. "
 		+ "Lost is townsfolk who died. Raised counts the buildings each kind finished.", 11)
 	ImpactView.build(_box, run, ImpactView.whole_run(run) if whole_run else shown.get("impact", {}))
+	UiKit.button(_box, "Back", func() -> void: closed.emit())
+	show()
+
+
+## Your people (needs a Reeve's hut): how each kind of townsperson spent the round (FolkAtWork.build).
+func show_people() -> void:
+	_clear()
+	var b := run.people.busy_of("tribesperson")
+	_title("Your people %s" % ("this round" if b["from"] == "this" else "last round"))
+	UiKit.note(_box, "How each kind of townsperson spent the round, and what came of it. Townsfolk count by day; " +
+		"warriors by night too. Stretched: another would earn their keep. Slack: another mostly adds upkeep.", 11)
+	FolkAtWork.build(_box, run)
 	UiKit.button(_box, "Back", func() -> void: closed.emit())
 	show()
 

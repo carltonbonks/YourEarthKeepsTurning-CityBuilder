@@ -34,6 +34,8 @@
 	"income_shells_per_round": 10,
 
 	"pick_choices": 3,
+	"_busy_note": "Townsfolk at work (Yusuf, 2026-10-26): a role's dawn card word (Stretched, Busy, Slack; busy_words in townsfolk.json) reads this round's time once busy_min_seconds person-seconds are counted, else last round's (People.busy_of).",
+	"busy_min_seconds": 30,
 	"hero_card_cost": 30,
 	"lodging_draw_bonus": 2,
 
