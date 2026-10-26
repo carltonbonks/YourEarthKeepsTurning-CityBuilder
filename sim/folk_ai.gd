@@ -29,6 +29,8 @@ var _bumpable := {}
 var _helpers := {}
 ## Building index -> how many craftspeople are working its bench.
 var _crafters := {}
+## Building index -> how many townsfolk are raising it (it is still going up).
+var _builders := {}
 ## How much the town needs the good of the trip plan_trip last chose (gather_need_floor = it has enough).
 var _trip_need := 0.0
 ## Where gatherers out past the houses are this step, farthest first: by day warriors shadow them (_warrior_tick).
@@ -62,6 +64,7 @@ func begin_step() -> void:
 	_bumpable.clear()
 	_helpers.clear()
 	_crafters.clear()
+	_builders.clear()
 	_shadow_spots.clear()
 	_shadowed.clear()
 	_warrior_list.clear()
@@ -92,6 +95,8 @@ func begin_step() -> void:
 				_helpers[unit.task_index] = int(_helpers.get(unit.task_index, 0)) + 1
 			elif unit.task == "craft":
 				_crafters[unit.task_index] = int(_crafters.get(unit.task_index, 0)) + 1
+			elif unit.task == "build":
+				_builders[unit.task_index] = int(_builders.get(unit.task_index, 0)) + 1
 			if unit.carry_amount > 0:
 				_inbound[unit.carrying] = int(_inbound.get(unit.carrying, 0)) + unit.carry_amount
 	_shadowed.sort_custom(func(a: Unit, b: Unit) -> bool: return a.pos.length_squared() > b.pos.length_squared())
@@ -491,7 +496,9 @@ func _worker_tick(unit: Unit) -> void:
 				shop["craft_left"] = float(shop["craft_left"]) - rate * w.dt
 				if float(shop["craft_left"]) <= 0.0:
 					w.market.finish_craft(unit.task_index, unit)
-					# Look again: a new order or another workshop may need these hands more.
+					# Look again: a new order or another workshop may need these hands more. Its own bench is free
+					# again, so it may well stay.
+					_crafters[unit.task_index] = int(_crafters.get(unit.task_index, 0)) - 1
 					unit.task = ""
 		"pave":
 			var square := unit.task_index
@@ -584,15 +591,7 @@ func _note_idle(unit: Unit) -> void:
 
 func _choose_work(unit: Unit) -> void:
 	if unit.type_id == "craftsperson":
-		for i in w.buildings.size():
-			if float(w.buildings[i]["work_left"]) > 0.0:
-				unit.task = "build"
-				unit.task_index = i
-				return
-		var shop := w.market.workshop_needing_hands(unit)
-		if shop >= 0:
-			unit.task = "craft"
-			unit.task_index = shop
+		if _craft_job(unit):
 			return
 		if w.town.can_pave() and w.town.can_afford_paving():
 			var taken := w.folk.filter(func(u: Unit) -> bool: return u != unit and u.task == "pave").map(func(u: Unit) -> int: return u.task_index)
@@ -625,6 +624,81 @@ func _choose_work(unit: Unit) -> void:
 		_bump(best, carry)
 	_claim(best, carry)
 	_note_bumpable(unit, best, gives)
+
+
+## Sends a craftsperson to the open work with the fewest hands: each building going up and each workshop with
+## something to make and a free bench is one task, a building's builders counting build_hand_weight hands each.
+## On a tie a building comes first (oldest order first), then the workshop whose stall is emptiest, so one
+## craftsperson keeps building while the others spread over the benches instead of all crowding the building
+## site. A master has first dibs on a bench of their own workshop. Returns false when there is no such work
+## (the craftsperson then paves or fetches wood).
+func _craft_job(unit: Unit) -> bool:
+	if unit.master_of != "" and _take_own_bench(unit):
+		return true
+	var weight := w.content.num("build_hand_weight")
+	var best := -1
+	var best_load := INF
+	var best_tie := INF
+	for i in w.buildings.size():
+		var b := w.buildings[i]
+		var load := 0.0
+		var tie := 0.0
+		if float(b["work_left"]) > 0.0:
+			load = int(_builders.get(i, 0)) * weight
+			tie = i - 100000.0
+		elif _bench_open(i):
+			load = int(_crafters.get(i, 0))
+			tie = w.market.bench_tie(i)
+		else:
+			continue
+		if load < best_load or (load == best_load and tie < best_tie):
+			best = i
+			best_load = load
+			best_tie = tie
+	if best < 0:
+		return false
+	if float(w.buildings[best]["work_left"]) > 0.0:
+		unit.task = "build"
+		_builders[best] = int(_builders.get(best, 0)) + 1
+	else:
+		unit.task = "craft"
+		_crafters[best] = int(_crafters.get(best, 0)) + 1
+	unit.task_index = best
+	return true
+
+
+## Whether workshop i is standing, has a free bench and has something to make (or something on the go).
+func _bench_open(i: int) -> bool:
+	var b := w.buildings[i]
+	var def: Dictionary = w.content.buildings[b["type"]]
+	if not def.has("workshop") or float(b["work_left"]) > 0.0:
+		return false
+	if int(_crafters.get(i, 0)) >= int(def["workshop"]["slots"]):
+		return false
+	return b["craft"] != "" or w.market.next_recipe(i) != ""
+
+
+## First dibs: sends a master to a bench of their own workshop that has work, taking a free bench or bumping a
+## plain craftsperson off a full one (the work done stays with the building, and the bumped one looks again).
+func _take_own_bench(unit: Unit) -> bool:
+	for i in w.buildings.size():
+		var b := w.buildings[i]
+		if b["type"] != unit.master_of or float(b["work_left"]) > 0.0:
+			continue
+		if b["craft"] == "" and w.market.next_recipe(i) == "":
+			continue
+		if not _bench_open(i):
+			var plain: Array = w.folk.filter(func(u: Unit) -> bool:
+				return u != unit and u.alive and u.task == "craft" and u.task_index == i and u.master_of != b["type"])
+			if plain.is_empty():
+				continue
+			plain[0].task = ""
+			_crafters[i] = int(_crafters.get(i, 0)) - 1
+		unit.task = "craft"
+		unit.task_index = i
+		_crafters[i] = int(_crafters.get(i, 0)) + 1
+		return true
+	return false
 
 
 ## Finds work in town for someone with no trip worth taking: lending a hand at a building that takes help

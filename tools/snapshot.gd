@@ -27,13 +27,15 @@ extends SceneTree
 ## intro=1 plays the first-run camera tour and shows it intro_ms= in (default 3000); gentle=1 makes the run a
 ## gentle first run (with pick=1, the first dawn's few tribespeople).
 ## screen=title|welcome|settings shows the title screen, how a round works or Settings; tips=1 shows the
+## lastkill=1 (with night=1) plays on until a night's last raider falls and shows the beat lastkill_ms= in (default 600);
+## lastkill=2 waits for the kill that breaks the round's attack.
 ## one-time tip due at that moment (off otherwise, so pictures stay clear); seen=<id,id> marks tips as seen. The player's settings are never saved.
 ## doll=1 (with pick=1) gives Hearth-mother's Doll with its twin due on this dawn's townsfolk card.
 ## hover=<card title> shows that card's hover panel beside it, as resting the mouse on it does.
 ## reeve=1 raises a Reeve's hut once the bot has played to the round; people=1 shows the People panel (needs reeve=1).
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "reeve": "0", "people": "0"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -108,6 +110,19 @@ func _init() -> void:
 				if run.world.is_wave_night() and tower_shot.call():
 					main._set_speed(0)  # Hold the shot in the air for the picture.
 					break
+	if args["lastkill"] != "0":
+		var lk: LastKill = main._arena.last_kill
+		while run.phase == RunState.Phase.PICK or run.phase == RunState.Phase.SIM:
+			if run.phase == RunState.Phase.PICK:
+				run.choose_pick(bot.pick(run))
+			run.step()
+			if lk.watch(main._arena, run.world) and (args["lastkill"] == "1" or lk.kill["ends"]):
+				break
+		main._set_speed(0)
+		main._arena.zoom = 1.8
+		main._arena.pan = Vector2.ZERO
+		lk.start(main._arena, lk.kill)
+		lk._from_ms = Time.get_ticks_msec() - float(args["lastkill_ms"])
 	main._overlays.hide()
 	if args["pedlars"] == "1" and run.awaiting_pedlar():
 		main._refresh()
@@ -256,8 +271,10 @@ func _init() -> void:
 			main._overlays.show_settings()
 	main._refresh_live()
 	for i in 4:
+		_hold_last_kill(main, args)
 		await process_frame
 	main._refresh_live()
+	_hold_last_kill(main, args)
 	await process_frame
 	if args["hover"] != "":
 		var cards := root.find_children("*", "Button", true, false).filter(
@@ -278,3 +295,10 @@ func _init() -> void:
 	image.save_png(args["out"])
 	print("Saved %s (round %d)" % [args["out"], run.round_number])
 	quit()
+
+
+## Keeps the last kill's beat at lastkill_ms in while frames are drawn (the first frames can take longer than the beat).
+func _hold_last_kill(main: Control, args: Dictionary) -> void:
+	var lk: LastKill = main._arena.last_kill
+	if args["lastkill"] != "0" and not lk.kill.is_empty():
+		lk._from_ms = Time.get_ticks_msec() - float(args["lastkill_ms"])
