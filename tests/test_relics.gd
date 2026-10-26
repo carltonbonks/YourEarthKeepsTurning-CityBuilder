@@ -255,6 +255,29 @@ func test_hearth_mothers_doll_every_third_brings_a_twin() -> void:
 	run.dispose()
 
 
+func test_the_doll_says_which_card_it_doubles_and_doubles_twins() -> void:
+	var run := _run()
+	check(not run.doll_twin_next() and run.doll_picks_to_twin() == 0, "nothing without the Doll")
+	_give(run, "hearth_mothers_doll")
+	run.content.balance["base_housing"] = 50
+	check_eq(run.doll_picks_to_twin(), 3, "three cards to go")
+	for i in 2:
+		check(not run.doll_twin_next(), "card %d is not doubled" % (i + 1))
+		run.pick_offer = [{"kind": "folk", "role": "tribesperson", "cost": 0}]
+		run.picks_left = 1
+		run.phase = RunState.Phase.PICK
+		run.choose_pick(0)
+	check(run.doll_twin_next() and run.doll_picks_to_twin() == 1, "the third card will")
+	var folk := run.world.folk.size()
+	run.pick_offer = [{"kind": "folk", "role": "tribesperson", "cost": 0, "roll": "yellow", "boons": ["twins"]}]
+	run.picks_left = 1
+	run.phase = RunState.Phase.PICK
+	run.choose_pick(0)
+	check_eq(run.world.folk.size(), folk + 4, "the Doll doubles a Twins card: 2 x 2 = 4")
+	check_eq(run.doll_picks_to_twin(), 3, "and the count starts again")
+	run.dispose()
+
+
 func test_carrion_kiln_burns_enemies_inside_the_settlement() -> void:
 	var run := _run()
 	_give(run, "carrion_kiln")
