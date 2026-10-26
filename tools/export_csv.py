@@ -19,6 +19,7 @@ import sys
 RESOURCES = ["food", "fuel", "wood", "stone", "shells", "flint", "hides", "bone", "obsidian",
              "copper", "cassiterite", "tin", "bronze", "bog_iron", "charcoal", "iron", "steel"]
 ROLES = ["tribesperson", "warrior", "craftsperson"]
+TIME_KINDS = ["work", "fallback", "idle", "down"]
 LEANINGS = ["forager", "woodcutter", "quarrier", "brushcutter", "prospector"]
 MARKS = ["swift", "hardy", "sharp"]
 IMPACT_STATS = ["dealt", "taken", "kills", "lost", "made", "raised", "paved", "patched"]
@@ -200,6 +201,8 @@ def main(raw_folder, out_folder):
                    for k in ["dusk", "emptied", "unsafe", "runner"]},
                 **{"idle_seconds_" + k: rd.get("idle_seconds", {}).get(k, 0) if "idle_seconds" in rd else ""
                    for k in ["tribesperson", "craftsperson"]},
+                **{"time_%s_%s" % (r, k): rd.get("folk_time", {}).get(r, {}).get(k, 0) if "folk_time" in rd else ""
+                   for r in ROLES for k in TIME_KINDS},
                 "trips_bumped": sum(rd.get("trips_bumped", {}).values()) if "trips_bumped" in rd else "",
                 "escort_seconds": rd.get("escort_seconds", 0) if "marks_end" in rd else "",
                 "marks_earned": sum(rd.get("marks_earned", {}).values()) if "marks_end" in rd else "",

@@ -71,6 +71,9 @@ static func folk(run: RunState, u: Unit) -> Dictionary:
 		t["lines"].append("Carrying %d %s" % [u.carry_amount, u.carrying])
 	if u.intent != "":
 		t["lines"].append("Now: %s" % u.intent)
+	var day := FolkAtWork.unit_line(run, u)
+	if day != "":
+		t["lines"].append(day)
 	return t
 
 

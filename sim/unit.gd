@@ -105,6 +105,14 @@ var drill_with: Unit = null
 var drill_seconds := 0.0
 ## Heroes: when they last drilled (World.time), so warriors drilling beside them know they still are.
 var drilled_at := -1.0
+## Townsfolk at work (FolkAI._note_time): what they did this step when their task doesn't say ("flee", "fight",
+## "heal", "patrol", "shadow", "drill"; "" = their task), and seconds this round by time kind (work, fallback, idle,
+## down; townsfolk.json time_kinds) with last round's kept for the Your people panel, plus goods carried home.
+var activity := ""
+var time := {}
+var time_last := {}
+var brought := 0
+var brought_last := 0
 
 # Enemy-only.
 var spawn_time := 0.0

@@ -45,6 +45,10 @@ var pedlar := true
 ## Orders the runners' hut once the provisions stall and smoke hut stand and it has two heroes (the styles that build
 ## them: market, bronze, medieval). balance_run.gd: runners=0 never does.
 var runners := true
+## Reads the dawn card's word (People.busy_word): a Stretched role scores busy_weight more, a Slack one that much
+## less. balance_run.gd: busy=0 ignores it.
+var heed_busy := true
+var busy_weight := 1.0
 ## Rerolls the blueprint offers once a round when it has at least this many shells and no offer is wanted.
 var redraw_above := 40
 ## Buildings it tried to order this build phase without a blueprint for them, most wanted first.
@@ -198,12 +202,12 @@ func _craft_could_bring(run: RunState, type: String) -> bool:
 
 ## Incentive and hero-shaping buildings the bot drafts when offered (after what it wished for) and raises
 ## once drafted, best first, with outposts and a few rule-breakers. The workers style has no heroes to shape:
-## outposts, the brewhouse, the levy hall and the bone pit.
+## outposts, the brewhouse, the levy hall and the bone pit. Every style takes the Reeve's hut last (its dawn tilt).
 func _shaping_list() -> Array[String]:
 	if style == "workers":
-		return ["woodcutters_camp", "quarry_camp", "brewhouse", "levy_hall", "foragers_camp", "bone_pit"] as Array[String]
+		return ["woodcutters_camp", "quarry_camp", "brewhouse", "levy_hall", "foragers_camp", "bone_pit", "reeves_hut"] as Array[String]
 	return ["training_yard", "woodcutters_camp", "trophy_hall", "quarry_camp", "tin_diggings", "kennel", "seer_tent", "oath_stone", "gibbet_post", "duel_ring", "warden_hut",
-		"levy_hall", "brewhouse"] as Array[String]
+		"levy_hall", "brewhouse", "reeves_hut"] as Array[String]
 
 
 func _build_pass(run: RunState) -> void:
@@ -411,6 +415,12 @@ func pick(run: RunState) -> int:
 					return run.content.buildings[b["type"]].has("workshop")).size()
 				score = (4.0 if pending else 1.0) + benches * 1.2 - run.count_role("craftsperson") * 1.5
 		score += roll_value(run, card)
+		if heed_busy and card["kind"] == "folk":
+			match run.people.busy_word(card["role"]):
+				"stretched":
+					score += busy_weight
+				"slack":
+					score -= busy_weight
 		if score > best_score:
 			best_score = score
 			best = i

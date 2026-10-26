@@ -142,7 +142,10 @@ extends RefCounted
 ## 53: first-run intro (Yusuf, 2026-10-26): a tradition's blueprint is drafted as the town is founded, logged as a
 ##     "tradition_blueprint" action ("building" or "craft") and in "blueprints"; top-level "gentle" is true for a
 ##     player's first run (its first dawn offers only a few tribespeople, round 1's draft has no reroll).
-const RECORD_FORMAT := 53
+## 54: townsfolk at work (Yusuf, 2026-10-26): per round "folk_time" = {role: {kind: seconds}}, how each townsfolk
+##     role spent the round (kinds work, fallback, idle, down from data/townsfolk.json time_kinds; workers by day,
+##     warriors day and night), rounded to whole seconds.
+const RECORD_FORMAT := 54
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -168,6 +171,7 @@ func to_record() -> Dictionary:
 	if not run.is_over():
 		var current := entry.duplicate(true)
 		current["impact"] = rounded_impact(current.get("impact", {}))
+		current["folk_time"] = rounded_time(run.world.folk_ai.role_time)
 		all_rounds.append(current)
 	return {
 		"format": RECORD_FORMAT,
@@ -253,6 +257,7 @@ func end_round() -> void:
 	# Rows are gone (format 52), so no building is in one.
 	entry["combos_end"] = {}
 	entry["impact"] = rounded_impact(entry.get("impact", {}))
+	entry["folk_time"] = rounded_time(run.world.folk_ai.role_time)
 	rounds.append(entry)
 	entry = {}
 
@@ -354,6 +359,18 @@ func note_blow(attacker: Unit, victim: Unit, dealt: float, source: String, kille
 	note_impact(key[0], key[1], "taken", dealt)
 	if killed and victim.is_folk() and not victim.risen:
 		note_impact(key[0], key[1], "lost", 1.0)
+
+
+## Role -> time kind -> seconds, rounded to whole seconds (kinds under a second are left out).
+static func rounded_time(role_time: Dictionary) -> Dictionary:
+	var out := {}
+	for role: String in role_time:
+		var row := {}
+		for kind: String in role_time[role]:
+			if roundi(role_time[role][kind]) > 0:
+				row[kind] = roundi(role_time[role][kind])
+		out[role] = row
+	return out
 
 
 ## The round's impact with every number rounded (amounts pile up as fractions while the round plays).

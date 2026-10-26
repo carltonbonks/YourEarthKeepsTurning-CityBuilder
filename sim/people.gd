@@ -70,7 +70,7 @@ func offer_picks() -> void:
 	# Rarer cards are drawn less often, less so as the run goes on (Content.rarity_odds).
 	while run.pick_offer.size() < slots and not pool.is_empty():
 		var card: Dictionary = rng.pick_by(pool, func(c: Dictionary) -> float:
-			return content.rarity_odds(card_rarity(c), run.round_number))
+			return content.rarity_odds(card_rarity(c), run.round_number) * reeve_tilt(c))
 		pool.erase(card)
 		_roll_dawn_card(card, roll_rng)
 		run.pick_offer.append(card)
@@ -81,6 +81,79 @@ func offer_picks() -> void:
 		run.pick_offer.append(venture)
 	run.picks_left = 1 + int(run.mod("extra_picks"))
 	run.phase = RunState.Phase.PICK
+
+
+# --- Townsfolk at work (Yusuf, 2026-10-26) -----------------------------------------------------------------
+
+## How a role spent its time: {"kinds": {kind: seconds}, "total": seconds, "from": "this" or "last" round, or ""}.
+## This round once it has busy_min_seconds counted, else last round's record (always last round's while building).
+func busy_of(role: String) -> Dictionary:
+	var now: Dictionary = run.world.folk_ai.role_time.get(role, {})
+	var total := _sum(now)
+	if total >= run.content.num("busy_min_seconds") and run.phase != RunState.Phase.BUILD:
+		return {"kinds": now.duplicate(), "total": total, "from": "this"}
+	if not run.record.rounds.is_empty():
+		var last: Dictionary = run.record.rounds[-1].get("folk_time", {}).get(role, {})
+		if _sum(last) >= run.content.num("busy_min_seconds"):
+			return {"kinds": last.duplicate(), "total": _sum(last), "from": "last"}
+	return {"kinds": {}, "total": 0.0, "from": ""}
+
+
+static func _sum(kinds: Dictionary) -> float:
+	var total := 0.0
+	for k: String in kinds:
+		total += float(kinds[k])
+	return total
+
+
+## The dawn card word for a role: "stretched" (another would earn their keep), "busy", "slack" (another mostly adds
+## upkeep), or "" with nothing counted yet. From busy_words in data/townsfolk.json.
+func busy_word(role: String) -> String:
+	var rule: Dictionary = run.content.townsfolk.get(role, {}).get("busy_words", {})
+	var b := busy_of(role)
+	if rule.is_empty() or float(b["total"]) <= 0.0:
+		return ""
+	var share := busy_share(role, b)
+	if rule.has("stretched_below"):
+		return "stretched" if share < float(rule["stretched_below"]) else ("slack" if share > float(rule["slack_above"]) else "busy")
+	return "stretched" if share > float(rule["stretched_above"]) else ("slack" if share < float(rule["slack_below"]) else "busy")
+
+
+## The share of a role's counted time in the kinds its busy word reads (idle for workers, fighting and healing for warriors).
+func busy_share(role: String, b := {}) -> float:
+	if b.is_empty():
+		b = busy_of(role)
+	if float(b["total"]) <= 0.0:
+		return 0.0
+	var part := 0.0
+	for kind: String in run.content.townsfolk[role].get("busy_words", {}).get("kinds", []):
+		part += float(b["kinds"].get(kind, 0.0))
+	return part / float(b["total"])
+
+
+## The standing building that keeps the town's tally ("reckons" in data/buildings.json: the Reeve's hut), its
+## numbers or {}. It shows the Your people panel and tilts the dawn picks.
+func reckoning() -> Dictionary:
+	for b in run.world.buildings:
+		var def: Dictionary = run.content.buildings[b["type"]]
+		if def.has("reckons") and float(b["work_left"]) <= 0.0:
+			return def["reckons"]
+	return {}
+
+
+## With a Reeve's hut, a townsfolk card's draw weight: Stretched roles come up more often, Slack ones less.
+func reeve_tilt(card: Dictionary) -> float:
+	if card["kind"] != "folk":
+		return 1.0
+	var tilt := float(reckoning().get("dawn_tilt", 0.0))
+	if tilt <= 0.0:
+		return 1.0
+	match busy_word(card["role"]):
+		"stretched":
+			return 1.0 + tilt
+		"slack":
+			return 1.0 / (1.0 + tilt)
+	return 1.0
 
 
 ## Rolls a dawn card's own rarity and modifiers (CardRoll); a hero card's take hold of its hero at once, so the
