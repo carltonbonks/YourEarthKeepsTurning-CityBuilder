@@ -248,7 +248,8 @@ func _warrior_tick(unit: Unit) -> void:
 		if w.go_heal(unit) and unit.hp_fraction() >= World.HEAL_UNTIL:
 			unit.retreating = false
 		return
-	var threat := w.nearest_enemy(unit.pos, 220.0, patrol + 60.0)
+	# A tight patrol round a young town still goes for foes as far out as patrol_watch (data/townsfolk.json).
+	var threat := w.nearest_enemy(unit.pos, 220.0, maxf(patrol, float(def["patrol_watch"])) + 60.0)
 	if threat != null:
 		unit.intent = "defending the camp"
 		w.fight(unit, threat)
