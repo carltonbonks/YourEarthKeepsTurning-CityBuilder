@@ -30,6 +30,8 @@ var _menu_open := false
 var _held_for_turn := false
 ## True while a taken upgrade sparkles on the map (UpgradeGlow): the next draft waits until it is done.
 var _held_for_sparkle := false
+## True while the night's last kill is held on the map (LastKill): the dawn or relic pick waits until it has played.
+var _held_for_kill := false
 ## Id of this run's file in Run history.
 var _run_id := ""
 ## Off in tests, so they never write runs to disk.
@@ -77,6 +79,9 @@ func _process(delta: float) -> void:
 	if _held_for_sparkle and not _arena.upgrade_glow.playing(Time.get_ticks_msec()):
 		_held_for_sparkle = false
 		_refresh()
+	if _held_for_kill and not _arena.last_kill_playing():
+		_held_for_kill = false
+		_on_pause()
 	if run.phase != RunState.Phase.SIM or _overlays.visible or _title_screen.visible:
 		return
 	_live_acc += delta
@@ -85,11 +90,15 @@ func _process(delta: float) -> void:
 			_live_acc = 0.0
 			_refresh_live()
 		return
-	_tick_acc += delta * speed
+	# Time slows for a moment when the night's last raider falls (LastKill).
+	_tick_acc += delta * _arena.last_kill.sim_speed(speed)
 	var dt := run.world.dt
 	while _tick_acc >= dt and run.phase == RunState.Phase.SIM:
 		_tick_acc -= dt
 		run.step()
+		if _arena.last_kill.watch(_arena, run.world):
+			_tick_acc = 0.0
+			break
 	if run.phase != RunState.Phase.SIM:
 		_on_pause()
 	elif _live_acc >= LIVE_REFRESH_SECONDS:
@@ -114,6 +123,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	elif event.is_action_pressed("pause") and _arena.victory_playing():
 		_arena.skip_victory()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("pause") and _arena.last_kill_playing():
+		_arena.skip_last_kill()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("pause") and _arena.turn_playing():
 		_arena.skip_turn()
@@ -146,6 +158,7 @@ func _new_run(seed_value: int, tour := true) -> void:
 	_story.refresh()
 	_menu_open = false
 	_held_for_turn = false
+	_held_for_kill = false
 	_title_screen.hide()
 	# The first run's tour shows what the round screen tells; every later run opens on that screen.
 	_overlays.welcome_pending = settings.intro_seen
@@ -231,6 +244,10 @@ func _skip_ahead() -> void:
 func _on_pause() -> void:
 	_save()
 	_refresh()
+	# The night's last kill plays out on the map first; the pick opens when it is done (or Space skips it).
+	if _arena.last_kill_playing() and run.phase != RunState.Phase.LOST:
+		_held_for_kill = true
+		return
 	# A win plays out on the map first; the end screen opens when it is done (victory_done).
 	if run.phase == RunState.Phase.WON and not _arena.victory.active():
 		_arena.start_victory()
