@@ -278,7 +278,10 @@ func test_skilled_craftsperson_becomes_a_master() -> void:
 	run.choose_pick(card)
 	check_eq(u.master_of, "knapper", "now master of the knapper")
 	check(u.craft_trait != "" and u.display_name != "Craftsperson", "with a name and a craft trait")
-	check(run.world.market.workshop_needing_hands(u) == knapper or run.world.market.next_recipe(knapper) == "", "a master goes to their own bench")
+	u.task = ""
+	run.world.folk_ai.begin_step()
+	run.world.folk_ai._choose_work(u)
+	check((u.task == "craft" and u.task_index == knapper) or run.world.market.next_recipe(knapper) == "", "a master goes to their own bench")
 
 
 func test_master_trait_shapes_their_goods() -> void:
