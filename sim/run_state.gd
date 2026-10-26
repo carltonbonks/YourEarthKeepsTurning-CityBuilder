@@ -303,7 +303,7 @@ func can_afford(cost: Dictionary) -> bool:
 func can_build(type: String) -> bool:
 	var def: Dictionary = content.buildings[type]
 	var needs: String = def.get("requires", "")
-	return phase == Phase.BUILD and can_afford(def["cost"]) \
+	return phase == Phase.BUILD and can_afford(building_cost(type)) \
 		and world.count_buildings(type, false) < building_max(type) \
 		and (needs == "" or world.count_buildings(needs, false) > 0) \
 		and content.age_reached(age, def.get("age", "")) and population() >= int(def.get("min_people", 0)) \
@@ -321,10 +321,21 @@ func building_max(type: String) -> int:
 	return most
 
 
+## What ordering one more of a building costs now: its cost, and for a building with copy_cost (data/buildings.json)
+## that share more for every one already built or ordered (Yusuf 2026-10-26: everyday buildings can be built again).
+func building_cost(type: String) -> Dictionary:
+	var def: Dictionary = content.buildings[type]
+	var grow := float(def.get("copy_cost", 0.0)) * world.count_buildings(type, false) if world != null else 0.0
+	var cost := {}
+	for r: String in def["cost"]:
+		cost[r] = ceili(float(def["cost"][r]) * (1.0 + grow))
+	return cost
+
+
 func build(type: String) -> bool:
+	var cost := building_cost(type)
 	if not can_build(type) or not world.add_building(type):
 		return false
-	var cost: Dictionary = content.buildings[type]["cost"]
 	for r: String in cost:
 		stock[r] = int(stock[r]) - int(cost[r])
 	record.note_action({"kind": "build", "building": type})
@@ -352,47 +363,6 @@ func take_upgrade(id: String, offer := {}) -> void:
 		action["mods"] = offer["boons"].duplicate()
 	record.note_action(action)
 	tell("%s: %s" % [up["name"], up["text"]])
-
-
-## A row card's price: both buildings' costs, less row_discount (rounded down).
-func row_cost(id: String) -> Dictionary:
-	var row: Dictionary = content.combos[id]
-	var cost := {}
-	for type: String in [row["building"], row["partner"]]:
-		var c: Dictionary = content.buildings[type]["cost"]
-		for r: String in c:
-			cost[r] = int(cost.get(r, 0)) + int(c[r])
-	for r: String in cost:
-		cost[r] = int(float(cost[r]) * (1.0 - content.num("row_discount")))
-	return cost
-
-
-## Whether both of a row's buildings could go up now (each allowed, ignoring each one's own cost), side by side.
-func row_allowed(id: String) -> bool:
-	var row: Dictionary = content.combos[id]
-	for type: String in [row["building"], row["partner"]]:
-		var def: Dictionary = content.buildings[type]
-		var needs: String = def.get("requires", "")
-		if world.count_buildings(type, false) >= building_max(type) or not content.age_reached(age, def.get("age", "")) \
-				or population() < int(def.get("min_people", 0)) \
-				or (needs != "" and needs != row["building"] and needs != row["partner"] and world.count_buildings(needs, false) == 0):
-			return false
-	return not world.town.choose_row(row["building"], row["partner"]).is_empty()
-
-
-func can_build_row(id: String) -> bool:
-	return phase == Phase.BUILD and can_afford(row_cost(id)) and row_allowed(id)
-
-
-## Orders a row: both buildings, side by side, for the row's price.
-func build_row(id: String) -> bool:
-	if not can_build_row(id) or not world.add_row(id):
-		return false
-	var cost := row_cost(id)
-	for r: String in cost:
-		stock[r] = int(stock[r]) - int(cost[r])
-	record.note_action({"kind": "row", "row": id})
-	return true
 
 
 ## True while building on a pedlar round until the player invites a pedlar or none (after the traditions).
@@ -705,9 +675,8 @@ func food_grown_daily() -> int:
 			count = mini(count, count_role(worked["role"]) / int(worked["per"]))
 			each = roundi(each * (1.0 + tool_bonus(worked["role"], "field_mult")))
 		total += count * each
-	# Rows (data/combos.json) that bring extra food, and what helpers earned at food buildings today.
+	# What helpers earned at food buildings today.
 	for i in world.buildings.size():
-		total += int(world.town.combo_effect(i, "daily_food"))
 		total += world.folk_ai.assisted_food(world.buildings[i])
 	return total
 

@@ -1,6 +1,6 @@
 extends SceneTree
 ## Headless balance report: plays many seeded runs with a scripted player.
-## Usage: godot --headless --path . -s res://tools/balance_run.gd [-- runs=50 style=balanced out=runs.jsonl label=pr5 gates=2 gate_round=3 gardens=3 upkeep=0 traditions=0 pedlar=0 rows=0 runners=0]
+## Usage: godot --headless --path . -s res://tools/balance_run.gd [-- runs=50 style=balanced out=runs.jsonl label=pr5 gates=2 gate_round=3 gardens=3 upkeep=0 traditions=0 pedlar=0 runners=0]
 ## out= also writes every run's record (same format as the game's Run history) for run_report.gd
 ## and tools/export_csv.py. label= names the build being tested (it becomes the runs' game_version).
 
@@ -15,7 +15,6 @@ func _init() -> void:
 	var upkeep := true
 	var traditions := true
 	var pedlar := true
-	var rows := true
 	var runners := true
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("runs="):
@@ -36,8 +35,6 @@ func _init() -> void:
 			upkeep = arg.trim_prefix("upkeep=") != "0"
 		elif arg.begins_with("traditions="):
 			traditions = arg.trim_prefix("traditions=") != "0"
-		elif arg.begins_with("rows="):
-			rows = arg.trim_prefix("rows=") != "0"
 		elif arg.begins_with("runners="):
 			runners = arg.trim_prefix("runners=") != "0"
 		elif arg.begins_with("pedlar="):
@@ -63,7 +60,6 @@ func _init() -> void:
 		bot.upkeep = upkeep
 		bot.traditions = traditions
 		bot.pedlar = pedlar
-		bot.rows = rows
 		bot.runners = runners
 		bot.play_run(run)
 		if out_file != null:

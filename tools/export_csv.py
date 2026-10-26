@@ -87,6 +87,7 @@ def main(raw_folder, out_folder):
             "heroes_lost": len(r.get("fallen", [])), "heroes_alive_end": len(r.get("heroes", [])),
             "townsfolk_end": sum(r.get("townsfolk", {}).values()),
             "relics_taken": len(r.get("relics", [])), "upgrades_taken": len(r.get("upgrades", [])), "pool_size": len(r.get("pool", [])), "pool": " ".join(r.get("pool", [])),
+            "crafts": " ".join(r.get("crafts", [])),
             "traditions": " ".join(r.get("traditions", [])), "tradition_random": 1 if r.get("tradition_random") else 0,
             "buildings_total": len(r.get("buildings", [])),
             "huts": r.get("buildings", []).count("hut"),

@@ -121,7 +121,32 @@ func show_draft(hand: BuildHandView) -> void:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_box.add_child(row)
 	hand.fill_draft(row)
+	# Hovering an upgrade lights its buildings on the map (UpgradeGlow); the pop-up turns see-through meanwhile,
+	# all but that card, so the town shows past it.
+	for card in row.get_children():
+		if card.has_meta("lights"):
+			card.mouse_entered.connect(_peek.bind(card))
+			card.mouse_exited.connect(_peek.bind(null))
 	show()
+
+
+## See-through while `keep` (a hovered upgrade card) is hovered: the dimming, the pop-up's box and every other
+## part fade so the map behind shows; null brings them back.
+func _peek(keep: Control) -> void:
+	var faint := keep != null
+	self_modulate.a = 0.0 if faint else 1.0
+	_panel.self_modulate.a = 0.1 if faint else 1.0
+	for child in _box.get_children():
+		if child is Container and keep != null and keep.get_parent() == child:
+			for card in child.get_children():
+				(card as CanvasItem).modulate.a = 1.0 if card == keep else 0.06
+		else:
+			(child as CanvasItem).modulate.a = 0.06 if faint else 1.0
+	if not faint:
+		for child in _box.get_children():
+			for card in child.get_children():
+				if card is CanvasItem:
+					(card as CanvasItem).modulate.a = 1.0
 
 
 func show_pick() -> void:
@@ -842,6 +867,7 @@ func show_impact(whole_run := false) -> void:
 
 func _clear() -> void:
 	showing_draft = false
+	_peek(null)
 	for child in _box.get_children():
 		child.queue_free()
 

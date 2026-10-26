@@ -1,5 +1,5 @@
 {
-	"_note": "Upgrade offers (Yusuf's pick 2026-10-22): a blueprint draft may offer one of these (at most upgrade_cards a draft, data/balance.json) for a building the town has standing. Taking it spends the draft and changes that building for the rest of the run, every one of it, built or still to come. add = numbers added to the building's data in data/buildings.json, by key; a dotted key reaches inside (lodging.beds). Each upgrade can be taken once. rarity = data/rarity.json (offer weight). sim/build_hand.gd (offers, draft_upgrade), RunState.take_upgrade.",
+	"_note": "Upgrade offers (Yusuf's pick 2026-10-22): a blueprint draft may offer one of these as its deepening offer (Yusuf 2026-10-26: one offer a draft builds on what the town has, sim/build_hand.gd) for a building the town has standing. Taking it spends the draft and changes that building for the rest of the run, every one of it, built or still to come. add = numbers added to the building's data in data/buildings.json, by key; a dotted key reaches inside (lodging.beds). Each upgrade can be taken once. rarity = data/rarity.json (offer weight). sim/build_hand.gd (offers, draft_upgrade), RunState.take_upgrade.",
 	"sturdy_huts": {"name": "Sturdy huts", "building": "hut", "rarity": "blue", "text": "Huts hold 4 people instead of 3.", "add": {"housing": 1}},
 	"raised_beds": {"name": "Raised beds", "building": "garden", "rarity": "blue", "text": "Garden patches grow 1 more food every dawn.", "add": {"daily.food": 1}},
 	"fletchers": {"name": "Fletchers' arrows", "building": "watch_post", "text": "Watch posts hit 2 harder.", "add": {"attack": 2}},
@@ -14,5 +14,15 @@
 	"second_kennel": {"name": "Bigger kennel", "building": "kennel", "rarity": "yellow", "text": "The kennel keeps hounds for 2 more heroes.", "add": {"hounds.heroes": 2}},
 	"bright_lamps": {"name": "Seer's lamps", "building": "seer_tent", "rarity": "orange", "text": "Every dawn shows yet another card.", "add": {"effects.pick_bonus": 1}},
 	"deep_kegs": {"name": "Deep kegs", "building": "brewhouse", "rarity": "yellow", "text": "Bands form with 1 more fewer member.", "add": {"effects.band_ease": 1}},
-	"forest_paths": {"name": "Forest paths", "building": "forester", "rarity": "blue", "text": "The forester tends plants half again as far.", "add": {"tends.radius": 120}}
+	"forest_paths": {"name": "Forest paths", "building": "forester", "rarity": "blue", "text": "The forester tends plants half again as far.", "add": {"tends.radius": 120}},
+	"practised_knappers": {"name": "Practised knappers", "building": "knapper", "rarity": "blue", "text": "Knappers work twice as fast.", "add": {"craft_speed": 1.0}},
+	"practised_tanners": {"name": "Practised tanners", "building": "hide_rack", "rarity": "blue", "text": "Hide racks work twice as fast.", "add": {"craft_speed": 1.0}},
+	"practised_carvers": {"name": "Practised carvers", "building": "bone_carver", "rarity": "blue", "text": "Bone carvers work twice as fast.", "add": {"craft_speed": 1.0}},
+	"practised_smokers": {"name": "Practised smokers", "building": "smoke_hut", "rarity": "blue", "text": "Smoke huts work twice as fast.", "add": {"craft_speed": 1.0}},
+	"practised_casters": {"name": "Practised casters", "building": "bronzesmith", "rarity": "blue", "text": "Bronzesmiths work twice as fast.", "add": {"craft_speed": 1.0}},
+	"practised_smiths": {"name": "Practised smiths", "building": "blacksmith", "rarity": "blue", "text": "Blacksmiths work twice as fast.", "add": {"craft_speed": 1.0}},
+	"coppicing": {"name": "Coppicing", "building": "forester", "rarity": "blue", "text": "Foresters cut back and replant: the plants they tend regrow twice as fast.", "add": {"tends.share": 0.15}},
+	"deep_quarry": {"name": "Deep quarry", "building": "stone_yard", "text": "The stone-layers dig the rocks and flint pits round the yard deeper: each dawn they regrow a quarter of their size.", "add": {"tends.share": 0.25}},
+	"game_warden": {"name": "Game warden", "building": "hunting_lodge", "rarity": "blue", "text": "The lodge's warden keeps the wild land round it: brush, groves and berry thickets within reach regrow a tenth of their size each dawn.", "add": {"tends.share": 0.1}},
+	"crop_rotation": {"name": "Crop rotation", "building": "field", "text": "Fields rest in turn and come back richer: 1 more food from each field every dawn.", "add": {"daily.food": 1}}
 }

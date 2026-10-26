@@ -136,7 +136,10 @@ extends RefCounted
 ##     "grave_goods" stay.
 ## 51: one founding tradition (Yusuf, 2026-10-25): "traditions" holds at most one id; "tradition_random" is true
 ##     when the player left it to chance for tradition_random_bonus goods.
-const RECORD_FORMAT := 51
+## 52: crafts (Yusuf, 2026-10-26): top-level "crafts" (ids from data/crafts.json, in the order drafted); a "blueprint"
+##     action may be {"kind": "blueprint", "craft"}; "build_hands" may list "craft:<id>" offers. Rows are gone, so
+##     "combos_end" is always empty and no "row:<id>" offers or "row" actions appear.
+const RECORD_FORMAT := 52
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -181,6 +184,7 @@ func to_record() -> Dictionary:
 		"townsfolk_lost": run.fallen_folk,
 		"relics": run.relics.duplicate(),
 		"upgrades": run.upgrades.duplicate(),
+		"crafts": run.hand.crafts_taken.duplicate(),
 		"pool": run.hand.pool().duplicate(),
 		"traditions": run.traditions.duplicate(),
 		"tradition_random": run.tradition_random,
@@ -242,11 +246,8 @@ func end_round() -> void:
 		if reached > 0:
 			bands[parts[1]] = reached
 	entry["bands_end"] = bands
-	var combos := {}
-	for i in run.world.buildings.size():
-		for id in run.world.town.combos_of(i):
-			combos[id] = int(combos.get(id, 0)) + 1
-	entry["combos_end"] = combos
+	# Rows are gone (format 52), so no building is in one.
+	entry["combos_end"] = {}
 	entry["impact"] = rounded_impact(entry.get("impact", {}))
 	rounds.append(entry)
 	entry = {}

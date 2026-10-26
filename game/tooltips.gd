@@ -203,7 +203,7 @@ static func building(run: RunState, index: int) -> Dictionary:
 	if def.has("gate_hp") and work_left <= 0.0:
 		var whole := run.world.town.gate_health(index)
 		t["lines"].append("Health %d%%. Mended to full each dawn." % roundi(100.0 * whole) if whole > 0.0 else "Broken through! Mended at dawn.")
-	t["lines"].append_array(combo_lines(run, b["type"], index))
+	t["lines"].append_array(upgrade_lines(run, b["type"]))
 	t["warnings"] = warnings(run, b["type"])
 	return t
 
@@ -230,19 +230,13 @@ static func helper_lines(run: RunState, b: Dictionary) -> Array[String]:
 	return out
 
 
-## The rows (data/combos.json) a building type can be part of, marking the one building `index` is part of now.
-## index -1: a building card, so nothing is active yet.
-static func combo_lines(run: RunState, type: String, index := -1) -> Array[String]:
-	var c := run.content
-	var active: Array[String] = run.world.town.combos_of(index) if index >= 0 else ([] as Array[String])
+## The upgrades taken for a building type (data/upgrades.json): "Upgraded: Practised knappers (knappers work twice as fast)".
+static func upgrade_lines(run: RunState, type: String) -> Array[String]:
 	var out: Array[String] = []
-	for id: String in c.combos:
-		var row: Dictionary = c.combos[id]
-		if active.has(id):
-			out.append("Row: %s: %s" % [row["name"], row["text"]])
-		elif row["building"] == type or row["partner"] == type:
-			out.append("Ordered with a %s as a drafted %s row, it would make a bonus: %s" % [
-				c.buildings[row["partner"] if row["building"] == type else row["building"]]["name"].to_lower(), row["name"], row["text"]])
+	for id: String in run.upgrades:
+		var up: Dictionary = run.content.upgrades[id]
+		if up["building"] == type:
+			out.append("Upgraded: %s. %s" % [up["name"], up["text"]])
 	return out
 
 

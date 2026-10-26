@@ -2,7 +2,7 @@ class_name BuildHandView
 extends PanelContainer
 ## The round's building cards (run.hand) as a heads-up hand along the bottom of the map, split into
 ## sections with plain dividers so it's clear where each card comes from: Core (homes and food, always
-## on offer), Your blueprints (buildings and rows drafted this run), Upgrades (the ageing-up card and
+## on offer), Your blueprints (buildings drafted this run), Upgrades (the ageing-up card and
 ## tool sets, once there are any) and Trading (the caravan's trade cards, once it comes). While a draft is
 ## left, the blueprint offers (each says what it adds to the dawn picks), the offer to clear the next ring
 ## once the town is nearly full, and the reroll are a pick screen the player must answer before building,
@@ -10,13 +10,17 @@ extends PanelContainer
 ## ("Food runs out in 2 days"); a card the town can't take says why on a red strip at the bottom
 ## ("Need 3 more wood"). Costs show red where the town is short. Shown only while building.
 ## Every choice goes through run.hand; `changed` asks the screen to refresh. Hovering a building
-## card sends `previewing` with its type (and "" on leaving), so the map can blink the plot it would take.
+## card sends `previewing` with its type (and "" on leaving), so the map can blink the plot it would take; hovering
+## an upgrade sends `highlighting` with the building it changes, so the map can light every one of them, and
+## taking one sends `upgraded`, so they sparkle.
 ## The Begin round button sits at the hand's right end, so it is always in the same place and never
 ## covered. The hand never scrolls: when the cards are wider than the screen, the section hints go and
 ## the whole row shrinks to fit (`_fit`), and the strip gets shorter with it.
 
 signal changed
 signal previewing(type: String)
+signal highlighting(type: String)
+signal upgraded(type: String)
 signal begin_pressed
 
 ## The height the hand keeps for its small cards (their fixed shape, CardView), so the strip doesn't jump as cards change.
@@ -80,8 +84,6 @@ func refresh() -> void:
 	for type: String in run.hand.blueprints:
 		if run.world.count_buildings(type, false) < run.building_max(type):
 			mine.add_child(_card(type, run.hand.need(type), "blueprint"))
-	for id: String in run.hand.row_blueprints:
-		mine.add_child(_row_card(id, run.hand.row_need(id), false))
 	if mine.get_child_count() == 0:
 		var empty := UiKit.note(mine, "None yet.", 12)
 		empty.custom_minimum_size.x = 120
@@ -181,7 +183,7 @@ func draft_pending() -> bool:
 	if run.phase != RunState.Phase.BUILD or h.picks <= 0:
 		return false
 	return h.cards.any(func(c: Dictionary) -> bool: return h.can_draft(c["building"])) \
-		or h.rows.any(func(c: Dictionary) -> bool: return h.can_draft_row(c["row"])) \
+		or h.crafts.any(func(c: Dictionary) -> bool: return h.can_draft_craft(c["craft"])) \
 		or h.can_clear_ring() \
 		or h.upgrade_offers.any(func(c: Dictionary) -> bool: return h.can_draft_upgrade(c["upgrade"]))
 
@@ -190,16 +192,21 @@ func draft_title() -> String:
 	return "Draft %d blueprints" % run.hand.picks if run.hand.picks > 1 else "Draft a blueprint"
 
 
-## The draft's offers and the reroll, into the draft screen's row.
+## The draft's offers and the reroll, into the draft screen's row: the offer that builds on what the town has
+## first, then the crafts and new buildings, the ring offer and any other upgrade.
 func fill_draft(row: Container) -> void:
+	var cards: Array[CardView] = []
+	var deep: Array[CardView] = []
 	for card: Dictionary in run.hand.cards:
-		row.add_child(_card(card["building"], card["need"], "draft", card))
-	for card: Dictionary in run.hand.rows:
-		row.add_child(_row_card(card["row"], card["need"], true))
+		(deep if card.has("deep") else cards).append(_card(card["building"], card["need"], "draft", card))
+	for card: Dictionary in run.hand.crafts:
+		(deep if card.has("deep") else cards).append(_craft_card(card))
 	if run.hand.ring_offer():
-		row.add_child(_ring_card())
+		cards.append(_ring_card())
 	for card: Dictionary in run.hand.upgrade_offers:
-		row.add_child(_upgrade_card(card))
+		(deep if card.has("deep") else cards).append(_upgrade_card(card))
+	for btn in deep + cards:
+		row.add_child(btn)
 	var redraw := UiKit.secondary(Button.new(), 13)
 	redraw.text = "Reroll\n%d shells" % run.hand.redraw_cost() if run.hand.redraws == 0 else "Rerolled\nthis round"
 	redraw.custom_minimum_size = Vector2(86, 120)
@@ -231,7 +238,6 @@ static func dawn_line(r: RunState, type: String) -> String:
 	return ""
 
 
-## What drafting a row gives, from what the town already has: "You have Knapper. Adds Arms stall."
 ## The draft title's hover: which blueprints this run can offer at all.
 static func pool_line(r: RunState) -> String:
 	var all := 0
@@ -245,24 +251,6 @@ static func pool_line(r: RunState) -> String:
 		names.append(r.content.buildings[type]["name"])
 	return "This run's blueprints: %d of %d buildings can come up in the draft. Another run deals a different set.\n%s" \
 		% [pool.size(), all, ", ".join(names)]
-
-
-static func row_offer_line(r: RunState, id: String) -> String:
-	var names := func(types: Array) -> String:
-		return " and ".join(PackedStringArray(types.map(func(t: String) -> String: return r.content.buildings[t]["name"])))
-	var have := r.hand.row_have(id)
-	var adds := r.hand.row_adds(id)
-	if adds.is_empty():
-		return "You have both."
-	return "You have %s. Adds %s." % [names.call([have]), names.call(adds)]
-
-
-## The rows drafting this building would open ("" if none): "Opens a row: Blade row".
-static func row_hint(r: RunState, type: String) -> String:
-	var ids := r.hand.rows_opened_by(type)
-	if ids.is_empty():
-		return ""
-	return "Opens a row: " + ", ".join(PackedStringArray(ids.map(func(id: String) -> String: return r.content.combos[id]["name"])))
 
 
 ## Why the town wants this building, with the numbers ("" if nothing in particular).
@@ -320,22 +308,27 @@ func _card(type: String, need: String, kind: String, offer := {}) -> CardView:
 	elif band == "Outpost":
 		btn.set_band_icon("flag")
 	btn.set_advice(recommendation(type, need))
-	btn.set_price(run.stock, def["cost"])
+	var cost := run.building_cost(type)
+	btn.set_price(run.stock, cost)
 	var dawn := dawn_line(run, type)
-	var hint := row_hint(run, type) if drafting else ""
+	var craft := run.hand.opener(type)
+	var hint: String = "Opened by your " + run.content.crafts[craft]["name"].to_lower() if drafting and offer.has("deep") and craft != "" else ""
 	if drafting:
 		# The sun says "at dawn", so the chip keeps only what comes.
 		if dawn != "":
 			var what := dawn.trim_prefix("Dawn: ")
 			btn.add_chip(what[0].to_upper() + what.substr(1), "sun", CardView.BONE)
 		if hint != "":
-			btn.add_chip(hint.replace("Opens a row: ", "Opens "), "house", CardView.TEXT, btn.family_color())
+			btn.add_chip(hint, "house", CardView.TEXT, btn.family_color())
 		if "outpost" in tags:
 			btn.add_chip("can be lost", "", CardView.DANGER)
 	# The band already says "Rule-breaker" or "Outpost", so the body skips saying it again.
 	btn.set_body(text.trim_prefix("Rule-breaker. ").trim_prefix("Outpost. "))
-	if not drafting and owned > 0:
-		btn.set_footer("You have %d" % owned)
+	if drafting:
+		btn.set_footer(repeat_line(run, type))
+	elif owned > 0:
+		var most := run.building_max(type)
+		btn.set_footer("You have %d of %d" % [owned, most] if most < 99 else "You have %d" % owned)
 	# The frame shows the offer's own roll (CardRoll); the band's gem how rare this blueprint is.
 	var rolled: Dictionary = offer if drafting else run.hand.rolled.get(type, {})
 	var roll := CardRoll.roll_of(rolled)
@@ -348,16 +341,14 @@ func _card(type: String, need: String, kind: String, offer := {}) -> CardView:
 		btn.tooltip_text += "\n" + dawn + "."
 	if drafting:
 		btn.tooltip_text = "Draft it: you can order it, paying its cost, for the rest of the run.\n" + btn.tooltip_text
-		if hint != "":
-			btn.tooltip_text += "\n%s: a later draft can add its partner, side by side for a bonus." % hint
 		btn.disabled = not run.hand.can_draft(type)
 		btn.pressed.connect(_act.bind(run.hand.draft.bind(type)))
 		btn.mouse_entered.connect(func() -> void: previewing.emit(type))
 		btn.mouse_exited.connect(func() -> void: previewing.emit(""))
 		return btn
-	var combos := Tooltips.combo_lines(run, type)
-	if not combos.is_empty():
-		btn.tooltip_text += "\n" + "\n".join(PackedStringArray(combos))
+	var again := repeat_line(run, type)
+	if again != "":
+		btn.tooltip_text += "\n" + again + "."
 	var blocked := build_blocker(run, type)
 	if blocked != "":
 		btn.tooltip_text += "\n" + blocked
@@ -365,7 +356,7 @@ func _card(type: String, need: String, kind: String, offer := {}) -> CardView:
 	if not problems.is_empty():
 		btn.tooltip_text += "\n" + "\n".join(PackedStringArray(problems))
 	btn.disabled = not run.hand.can_order(type)
-	UiKit.fade_if_disabled(btn, _why_not(blocked, def["cost"]))
+	UiKit.fade_if_disabled(btn, _why_not(blocked, cost))
 	btn.pressed.connect(_act.bind(run.hand.order.bind(type)))
 	btn.mouse_entered.connect(func() -> void: previewing.emit(type))
 	btn.mouse_exited.connect(func() -> void: previewing.emit(""))
@@ -378,42 +369,69 @@ func _upgrade_card(offer: Dictionary) -> CardView:
 	var up: Dictionary = run.content.upgrades[id]
 	var building: String = run.content.buildings[up["building"]]["name"]
 	var btn := CardView.new(CardView.Size.MEDIUM, "building", "Upgrade", up["name"]).set_band_icon("hammer")
-	btn.add_chip("for your " + building.to_lower(), "house", CardView.TEXT, btn.family_color())
-	btn.set_body(up["text"]).set_footer("Instead of a new blueprint")
-	btn.tooltip_text = "Draft it: every %s, built or still to come, is changed for the rest of the run.\n%s" % [building.to_lower(), up["text"]]
+	var have := run.world.count_buildings(up["building"])
+	btn.set_advice("Changes your %d %s" % [have, building.to_lower() if have == 1 else plural(building).to_lower()])
+	btn.add_chip("No new building", "", CardView.BONE)
+	btn.set_body(up["text"]).set_footer("Lights up on the map")
+	btn.tooltip_text = "Draft it: every %s, built or still to come, is changed for the rest of the run. Nothing new is built: it improves what you have.\n%s" % [building.to_lower(), up["text"]]
 	btn.set_roll(run.content, CardRoll.roll_of(offer), up.get("rarity", "white"), CardRoll.mods_of(offer))
 	btn.disabled = not run.hand.can_draft_upgrade(id)
-	btn.pressed.connect(_act.bind(run.hand.draft_upgrade.bind(id)))
+	var type: String = up["building"]
+	btn.set_meta("lights", type)
+	btn.pressed.connect(func() -> void:
+		if run.hand.draft_upgrade(id):
+			upgraded.emit(type)
+		changed.emit())
+	btn.mouse_entered.connect(func() -> void: highlighting.emit(type))
+	btn.mouse_exited.connect(func() -> void: highlighting.emit(""))
 	return btn
 
 
-## A row card: two buildings ordered together, side by side, for less, and the bonus they make together.
-func _row_card(id: String, need: String, drafting: bool) -> CardView:
+## A craft offer: a workshop and the stall that sells its goods, drafted together (and the market with the
+## first one), and the buildings it opens for later drafts.
+func _craft_card(offer: Dictionary) -> CardView:
 	var content := run.content
-	var row: Dictionary = content.combos[id]
-	var a: String = content.buildings[row["building"]]["name"]
-	var b: String = content.buildings[row["partner"]]["name"]
-	var why := recommendation(row["building"] if run.hand.need(row["building"]) == need else row["partner"], need)
-	var cost := run.row_cost(id)
-	var btn := CardView.new(CardView.Size.MEDIUM if drafting else CardView.Size.SMALL, "building", "Draft a row" if drafting else "Row", row["name"])
-	btn.set_advice(why)
-	btn.set_price(run.stock, cost)
-	btn.add_chip("%s + %s" % [a, b], "house", CardView.TEXT, btn.family_color())
-	btn.set_body("%s %s" % [row_offer_line(run, id), row["text"]] if drafting else row["text"])
-	btn.tooltip_text = "%s and %s go up together in one cluster, a fifth cheaper than ordering both.\n%s\nOnly buildings ordered as a row make this bonus." % [
-		a, b, row["text"]]
-	if drafting:
-		btn.tooltip_text = "Draft it: you can order this row for the rest of the run. %s\n" % row_offer_line(run, id) + btn.tooltip_text
-		btn.disabled = not run.hand.can_draft_row(id)
-		btn.pressed.connect(_act.bind(run.hand.draft_row.bind(id)))
-		return btn
-	btn.disabled = not run.hand.can_order_row(id)
-	var short := UiKit.shortfall(run.stock, cost)
-	UiKit.fade_if_disabled(btn, short if short != "" else "No room for both")
-	btn.pressed.connect(_act.bind(run.hand.order_row.bind(id)))
-	btn.mouse_entered.connect(func() -> void: previewing.emit(row["building"]))
+	var id: String = offer["craft"]
+	var craft: Dictionary = content.crafts[id]
+	var adds := run.hand.craft_adds(id)
+	var btn := CardView.new(CardView.Size.MEDIUM, "building", "Craft", craft["name"]).set_band_icon("hammer")
+	btn.set_advice(recommendation(craft["workshop"], offer["need"]) if offer["need"] != "ageing" else "Needed to age up")
+	var names := PackedStringArray(adds.map(func(t: String) -> String: return content.buildings[t]["name"]))
+	btn.add_chip(" + ".join(names), "house", CardView.TEXT, btn.family_color())
+	var opens := run.hand.craft_opens(id)
+	if not opens.is_empty():
+		btn.add_chip("Opens " + ", ".join(PackedStringArray(opens.map(func(t: String) -> String: return content.buildings[t]["name"]))),
+			"up", CardView.BONE)
+	btn.set_body(craft["text"])
+	btn.set_footer("Starts your market" if adds.has("market") else "%d blueprints" % adds.size())
+	btn.tooltip_text = "Draft it: %s join Your blueprints, to order for the rest of the run.\n%s" % [" and ".join(names), craft["text"]]
+	if not opens.is_empty():
+		btn.tooltip_text += "\nOnce you have it, later drafts can offer %s, which no other craft brings." % ", ".join(
+			PackedStringArray(opens.map(func(t: String) -> String: return content.buildings[t]["name"].to_lower())))
+	var dawn := dawn_line(run, craft["workshop"])
+	if dawn != "":
+		btn.tooltip_text += "\n" + dawn + "."
+	btn.disabled = not run.hand.can_draft_craft(id)
+	btn.pressed.connect(_act.bind(run.hand.draft_craft.bind(id)))
+	btn.mouse_entered.connect(func() -> void: previewing.emit(craft["workshop"]))
 	btn.mouse_exited.connect(func() -> void: previewing.emit(""))
 	return btn
+
+
+## How many of a building the town may build, for its card: "One only", "Build again: +50% a copy" or "Up to 4".
+static func repeat_line(r: RunState, type: String) -> String:
+	var most := r.building_max(type)
+	var grow := float(r.content.buildings[type].get("copy_cost", 0.0))
+	if most <= 1:
+		return "One only"
+	if grow > 0.0:
+		return "Build again: +%d%% a copy" % roundi(grow * 100.0)
+	return "Up to %d" % most if most < 99 else ""
+
+
+## A building's name for more than one: "Hide racks", "Smoke huts".
+static func plural(name: String) -> String:
+	return name + ("es" if name.ends_with("s") or name.ends_with("sh") or name.ends_with("ch") else "s")
 
 
 ## The offer to clear the next ring of plots, in place of a building, once the open rings are nearly full.
