@@ -63,6 +63,9 @@ var _selected := false
 ## How many lines the body may take when there is room (set_body_lines), and whether it has text to show.
 var _body_lines := 8
 var _body_wanted := false
+## The card's own words (set_body's, and any add_lead adds): the hover panel shows them first and brightest,
+## and the general lines (how drafting works, upkeep) after them, smaller and dimmer.
+var _lead := ""
 var _fitting := false
 
 
@@ -314,15 +317,15 @@ func add_good_label(good: String) -> void:
 	row.move_child(icon, 0)
 
 
-## The people a card brings, one figure each (a warrior's carries a spear), "×N" past five.
+## The people a card brings, one figure each (a warrior's carries a spear), then "×N" when there is more than one.
 func add_people(roles: Array) -> void:
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 1)
 	for i in mini(roles.size(), 5):
 		row.add_child(CardIcon.make("warrior" if roles[i] == "warrior" else "folk", family_color().lightened(0.15), 15.0))
-	if roles.size() > 5:
-		_chip_label(row, "×%d" % roles.size(), TEXT, 11)
+	if roles.size() > 1:
+		_chip_label(row, "×%d" % roles.size(), TEXT, 12 if roles.size() <= 5 else 11)
 	_gives.add_child(row)
 
 
@@ -335,10 +338,17 @@ func add_control(c: Control) -> void:
 ## As many lines as fit; the whole text belongs in tooltip_text too. Small cards keep it for the hover panel only.
 func set_body(text: String, tint := DIM) -> CardView:
 	_body.text = text
+	_lead = text
 	_body.add_theme_color_override("font_color", tint)
 	_body_wanted = text != "" and card_size != Size.SMALL
 	_body.visible = _body_wanted
 	_fit()
+	return self
+
+
+## Adds a line of the card's own for the hover panel to show bright, beside the body's.
+func add_lead(text: String) -> CardView:
+	_lead += "\n" + text
 	return self
 
 
@@ -523,8 +533,8 @@ func _glow(sb: StyleBoxFlat) -> void:
 	tw.tween_property(sb, "shadow_size", 5, 1.6).set_trans(Tween.TRANS_SINE)
 
 
-## The hover panel: the card's name, its roll and how often its kind turns up, every modifier in full (an orange
-## one's price in red), then the card's own detail (tooltip_text).
+## The hover panel: the card's name, its roll and how often its kind turns up, the card's own words (bright),
+## every modifier in full (an orange one's price in red), then the general detail (dim).
 func _make_custom_tooltip(for_text: String) -> Object:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
@@ -532,16 +542,37 @@ func _make_custom_tooltip(for_text: String) -> Object:
 	var rl := roll_line()
 	if rl != "":
 		_tip_line(box, rl[0].to_upper() + rl.substr(1) + ".", 11, Color("#9aa0aa"))
+	var split := tip_parts(for_text, _lead)
+	for line: String in split[0]:
+		_tip_line(box, line, 13, Color("#f4efe2"))
 	for id in mods:
 		var m := CardRoll.mod_def(content, id)
 		var parts := split_price(m["text"]) if roll == "orange" else PackedStringArray([m["text"], ""])
 		_tip_line(box, "%s: %s" % [m["name"], parts[0]], 12, content.rarity_color(roll).lightened(0.3))
 		if parts[1] != "":
 			_tip_line(box, "Price: " + parts[1], 12, Color("#f2a39b"))
-	for line in for_text.split("\n"):
-		if line.strip_edges() != "":
-			_tip_line(box, line, 12, Color("#c8ccc0"))
+	if not split[1].is_empty():
+		box.add_child(HSeparator.new())
+	for line: String in split[1]:
+		_tip_line(box, line, 11, Color("#9ea39a"))
 	return box
+
+
+## Splits hover text into the card's own lines (those holding one of its lead lines; the first line if none do) and the
+## general ones, blank lines dropped: [own, general].
+static func tip_parts(text: String, lead: String) -> Array:
+	var own: Array[String] = []
+	var rest: Array[String] = []
+	for line in text.split("\n"):
+		if line.strip_edges() == "":
+			continue
+		if Array(lead.split("\n")).any(func(l: String) -> bool: return l.strip_edges() != "" and l.strip_edges() in line):
+			own.append(line)
+		else:
+			rest.append(line)
+	if own.is_empty() and not rest.is_empty():
+		own.append(rest.pop_front())
+	return [own, rest]
 
 
 func _tip_line(box: VBoxContainer, text: String, font_size: int, tint: Color) -> void:

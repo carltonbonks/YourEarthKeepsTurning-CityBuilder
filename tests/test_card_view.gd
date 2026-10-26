@@ -128,3 +128,32 @@ func test_a_trade_card_reads_pay_then_get() -> void:
 	check(_texts(cursed).has("a hero turns greedy for good") and not _texts(cursed).has("nothing"), "a free but cursed deal names its real price")
 	card.free()
 	cursed.free()
+
+
+func test_the_hover_panel_puts_the_cards_own_words_first_and_brightest() -> void:
+	var parts := CardView.tip_parts("Draft it: every hunting lodge is changed.\nThe lodge's warden keeps the wild.\n\nDawn: hunters", "The lodge's warden keeps the wild.")
+	check_eq(parts[0], ["The lodge's warden keeps the wild."], "the card's own line leads")
+	check_eq(parts[1], ["Draft it: every hunting lodge is changed.", "Dawn: hunters"], "the general lines follow, blanks dropped")
+	check_eq(CardView.tip_parts("Bram, bold warrior\nHealth 40", "")[0], ["Bram, bold warrior"], "with no body the first line leads")
+	check_eq(CardView.tip_parts("Eats 1 food\nForager.\nDoll: a twin", "Forager.\nDoll: a twin")[0], ["Forager.", "Doll: a twin"], "added lead lines lead too")
+	var card := CardView.new(CardView.Size.MEDIUM, "building", "Upgrade", "Game warden")
+	card.set_body("The lodge's warden keeps the wild.")
+	var tip := card._make_custom_tooltip("Draft it: every hunting lodge is changed.\nThe lodge's warden keeps the wild.") as Control
+	var labels := tip.find_children("*", "Label", true, false)
+	var own: Label = labels.filter(func(l: Label) -> bool: return l.text.begins_with("The lodge"))[0]
+	var general: Label = labels.filter(func(l: Label) -> bool: return l.text.begins_with("Draft it"))[0]
+	check(own.get_index() < general.get_index(), "own words come before the general ones")
+	check(own.get_theme_font_size("font_size") > general.get_theme_font_size("font_size"), "and are larger")
+	tip.free()
+	card.free()
+
+
+func test_people_on_a_card_are_counted_when_more_than_one() -> void:
+	var one := CardView.new(CardView.Size.LARGE, "folk", "Townsperson", "Tribesperson")
+	one.add_people(["tribesperson"])
+	check(not _texts(one).has("×1"), "one person needs no count")
+	var three := CardView.new(CardView.Size.LARGE, "folk", "Townsperson", "Tribesperson")
+	three.add_people(["tribesperson", "tribesperson", "tribesperson"])
+	check(_texts(three).has("×3"), "twins and the Doll's twin read as ×3")
+	one.free()
+	three.free()

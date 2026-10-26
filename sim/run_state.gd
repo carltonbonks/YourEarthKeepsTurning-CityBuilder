@@ -579,9 +579,9 @@ func choose_pick(index: int) -> void:
 			for i in CardRoll.extra_people(content, card):
 				world.folk_ai.add_folk(card["role"], leaning)
 				tell("Twins: a second %s comes too." % folk_name(card["role"], leaning).to_lower())
+			var doll := doll_twin_next()
 			folk_cards_taken += 1
-			var every := int(mod("twin_every"))
-			if every > 0 and folk_cards_taken % every == 0:
+			if doll:
 				world.folk_ai.add_folk(card["role"], leaning)
 				relic_fired("twin_every")
 				tell("The %s brings a twin along." % folk_name(card["role"], leaning).to_lower())
@@ -619,6 +619,18 @@ func choose_pick(index: int) -> void:
 	world.resume()
 	tell("Day %d dawns." % (world.day_index() + 1))
 	world.hero_ai.roll_whims()
+
+
+## Whether the next townsfolk card taken brings Hearth-mother's Doll's twin (every 3rd one does).
+func doll_twin_next() -> bool:
+	var every := int(mod("twin_every"))
+	return every > 0 and (folk_cards_taken + 1) % every == 0
+
+
+## Townsfolk cards still to take before the Doll's next twin (0 without the Doll).
+func doll_picks_to_twin() -> int:
+	var every := int(mod("twin_every"))
+	return every - folk_cards_taken % every if every > 0 else 0
 
 
 ## A master crafter's trait numbers ({} for an ordinary craftsperson).
