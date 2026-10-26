@@ -32,6 +32,10 @@ var _paid := {}
 var _plot_of := PackedInt32Array()  ## Square -> plot index, or -1.
 ## Where the watch post being placed wants to stand (see _guard_point), worked out once per choose_plot.
 var _guard_at := Vector2.ZERO
+## The warriors' patrol outline: a radius per slice of the circle (see patrol_radius), and how many buildings
+## stood when it was worked out (buildings are only ever added, so a new count means a new outline).
+var _patrol_radii := PackedFloat32Array()
+var _patrol_for := -1
 
 
 func _init(world: World) -> void:
@@ -155,6 +159,49 @@ func _set_plot_solid(k: int, solid: bool) -> void:
 func outer_edge() -> float:
 	var last: Dictionary = w.content.town["rings"][-1]
 	return float(last["radius"]) + float(w.content.town["ring_depth"])
+
+
+## How far from the hearth the warriors' patrol runs at this angle: just outside the outermost building (or
+## obstacle) of the town proper there, in the open gap between that ring and the next, so the patrol walks round
+## the town's edge instead of through it. The town proper counts the first two rings, and each further ring only
+## where the ring inside it counts nearby, so a field or forester's hut out past an empty ring stays outside.
+## Outposts (no plot) never count. Worked out per slice (patrol_bins in data/townsfolk.json), each slice also
+## looking at the slices either side, and again only when a building has been added.
+func patrol_radius(angle: float) -> float:
+	if _patrol_for != w.buildings.size():
+		_make_patrol_outline()
+	var bins := _patrol_radii.size()
+	return _patrol_radii[int(floor(fposmod(angle, TAU) / TAU * bins)) % bins]
+
+
+func _make_patrol_outline() -> void:
+	_patrol_for = w.buildings.size()
+	var def: Dictionary = w.content.townsfolk["warrior"]
+	var bins := int(def["patrol_bins"])
+	var rings: Array = w.content.town["rings"]
+	var depth := float(w.content.town["ring_depth"])
+	var taken: Array[PackedByteArray] = []
+	for ring in rings.size():
+		var row := PackedByteArray()
+		row.resize(bins)
+		taken.append(row)
+	for plot in plots:
+		if int(plot["building"]) < 0 and plot["obstacle"] == "":
+			continue
+		for s in 3:
+			var a := lerpf(plot["a0"], plot["a1"], (s + 0.5) / 3.0)
+			taken[int(plot["ring"])][int(floor(fposmod(a, TAU) / TAU * bins)) % bins] = 1
+	_patrol_radii.resize(bins)
+	for b in bins:
+		var reach := 0
+		for ring in rings.size():
+			if ring > 1 and reach < ring - 1:
+				break
+			for d in [-1, 0, 1]:
+				if taken[ring][posmod(b + d, bins)] == 1:
+					reach = ring
+					break
+		_patrol_radii[b] = float(rings[reach]["radius"]) + depth / 2.0 + float(def["patrol_margin"])
 
 
 ## True if, with plot k filled, the hearth can still be reached from the wilds.

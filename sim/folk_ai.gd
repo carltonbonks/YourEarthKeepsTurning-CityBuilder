@@ -229,10 +229,11 @@ func relic_damage(unit: Unit, amount: float) -> float:
 
 ## Warriors: fall back to heal when hurt, fight what comes near, answer calls for help. Otherwise, by day, the first
 ## shadow_share of them each shadow a gatherer out past the houses (farthest first), standing between it and the
-## wilds no farther out than shadow_reach; the rest, and everyone at dusk and night, walk the patrol circle.
+## wilds no farther out than shadow_reach; the rest, and everyone at dusk and night, walk the patrol round the town's
+## edge (Town.patrol_radius), spread evenly round it, alone at first and then in pairs and squads (patrol_group_size).
 func _warrior_tick(unit: Unit) -> void:
 	var def: Dictionary = w.content.townsfolk["warrior"]
-	var patrol := float(def["patrol_radius"])
+	var patrol := w.town.patrol_radius(unit.pos.angle())
 	var index: int = _warrior_slot.get(unit, -1)
 	if index < 0:  # joined since the step began (or ticked outside World.step)
 		index = w.folk.filter(func(u: Unit) -> bool: return u.type_id == "warrior").find(unit)
@@ -247,7 +248,8 @@ func _warrior_tick(unit: Unit) -> void:
 		if w.go_heal(unit) and unit.hp_fraction() >= World.HEAL_UNTIL:
 			unit.retreating = false
 		return
-	var threat := w.nearest_enemy(unit.pos, 220.0, patrol + 60.0)
+	# A tight patrol round a young town still goes for foes as far out as patrol_watch (data/townsfolk.json).
+	var threat := w.nearest_enemy(unit.pos, 220.0, maxf(patrol, float(def["patrol_watch"])) + 60.0)
 	if threat != null:
 		unit.intent = "defending the camp"
 		w.fight(unit, threat)
@@ -263,15 +265,41 @@ func _warrior_tick(unit: Unit) -> void:
 		unit.intent = "keeping watch over the gatherers"
 		w.walk_toward(unit, shadow - shadow.normalized() * 20.0, 6.0)
 		return
-	var angle := w.time * 0.05 + index * 2.4
-	unit.intent = "patrolling"
-	w.walk_toward(unit, Vector2.from_angle(angle) * patrol)
+	if index < 0:  # a levied tribesperson, not one of the warriors: holds the edge where it stands
+		unit.intent = "patrolling"
+		w.walk_toward(unit, Vector2.from_angle(unit.pos.angle()) * patrol)
+		return
+	var slot := index - _shadowing()
+	var size := patrol_group_size()
+	var groups := ceili(float(maxi(_warrior_list.size() - _shadowing(), slot + 1)) / size)
+	var angle := w.time * 0.05 + TAU * floori(float(slot) / size) / groups
+	# Partners walk a few paces apart along the same stretch of the patrol.
+	angle += (slot % size - (size - 1) / 2.0) * float(def["patrol_spacing"]) / w.town.patrol_radius(angle)
+	unit.intent = "patrolling" if size == 1 else ("patrolling in a pair" if size == 2 else "patrolling with a squad")
+	w.walk_toward(unit, Vector2.from_angle(angle) * w.town.patrol_radius(angle))
+
+
+## How many warriors walk the patrol together: alone at first, then in pairs and small squads as more of them patrol
+## (patrol_groups in data/townsfolk.json; the largest tier reached counts).
+func patrol_group_size() -> int:
+	var patrolling := _warriors - _shadowing()
+	var size := 1
+	for tier: Dictionary in w.content.townsfolk["warrior"]["patrol_groups"]:
+		if patrolling >= int(tier["from"]):
+			size = maxi(size, int(tier["size"]))
+	return size
+
+
+## How many warriors shadow gatherers this step: the first slots, by day only (see _shadows).
+func _shadowing() -> int:
+	if w.is_dusk():
+		return 0
+	return mini(int(_warriors * float(w.content.townsfolk["warrior"].get("shadow_share", 0.0))), _shadow_spots.size())
 
 
 ## True when the warrior in this slot shadows a gatherer this step (by day, the first shadow_share of them).
 func _shadows(index: int) -> bool:
-	return not w.is_dusk() and index < int(_warriors * float(w.content.townsfolk["warrior"].get("shadow_share", 0.0))) \
-			and index < _shadow_spots.size()
+	return index < _shadowing()
 
 
 # --- Escorts and drilling (idle warriors on quiet days) ---------------------------
