@@ -92,30 +92,15 @@ func next_recipe(index: int) -> String:
 	return best
 
 
-## A finished workshop with a free bench and something to make, the emptiest stall first. -1 if none.
-func workshop_needing_hands(unit: Unit) -> int:
-	var best := -1
-	var best_load := INF
-	for i in w.buildings.size():
-		var b := w.buildings[i]
-		var def: Dictionary = w.content.buildings[b["type"]]
-		if not def.has("workshop") or float(b["work_left"]) > 0.0:
-			continue
-		var hands := w.folk.filter(func(u: Unit) -> bool: return u != unit and u.task == "craft" and u.task_index == i).size()
-		if hands >= int(def["workshop"]["slots"]):
-			continue
-		var next: String = b["craft"] if b["craft"] != "" else next_recipe(i)
-		if next == "":
-			continue
-		var r: Dictionary = w.content.market["recipes"][next]
-		var held: float = _stall_load(r["stall"]) if r.has("stall") else 0.0
-		# A master goes to their own bench first.
-		if unit.master_of == b["type"]:
-			held -= 100.0
-		if held < best_load:
-			best_load = held
-			best = i
-	return best
+## How full the stall a workshop's next make goes to is (lower = needs it more; smelting counts as empty),
+## so among equally manned workshops craftspeople go where the stall is emptiest.
+func bench_tie(index: int) -> float:
+	var b := w.buildings[index]
+	var next: String = b["craft"] if b["craft"] != "" else next_recipe(index)
+	if next == "":
+		return INF
+	var r: Dictionary = w.content.market["recipes"][next]
+	return float(_stall_load(r["stall"])) if r.has("stall") else 0.0
 
 
 ## Takes the goods for the next recipe from stock and starts work on it.

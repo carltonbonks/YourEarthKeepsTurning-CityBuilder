@@ -158,3 +158,76 @@ func test_heroes_who_stay_home_drill_on_quiet_days() -> void:
 		w.hero_ai.hero_tick(hero)
 	check_eq(hero.intent, "drilling by the hearth", "a dutiful hero drills when nothing is about")
 	check(hero.xp > xp, "and gains a little XP")
+
+
+## A knapper (with the market and its arms stall) that has something to make, plus plenty of every good.
+func _busy_knapper(run: RunState) -> int:
+	for good: String in run.stock:
+		run.stock[good] = 99
+	_standing(run, "market")
+	_standing(run, "arms_stall")
+	var knapper := _standing(run, "knapper")
+	check(run.world.market.next_recipe(knapper) != "", "the knapper has something to make")
+	return knapper
+
+
+func test_craftspeople_share_building_and_benches() -> void:
+	var run := _setup([])
+	var w := run.world
+	var knapper := _busy_knapper(run)
+	check(w.add_building("hut"), "a hut has a plot")
+	var site := w.buildings.size() - 1
+	var a := _folk(run, "craftsperson")
+	var b := _folk(run, "craftsperson")
+	var c := _folk(run, "craftsperson")
+	w.folk_ai.begin_step()
+	w.folk_ai._choose_work(a)
+	w.folk_ai._choose_work(b)
+	w.folk_ai._choose_work(c)
+	check(a.task == "build" and a.task_index == site, "the first goes to raise the hut")
+	check(b.task == "craft" and b.task_index == knapper, "the second works the knapper's bench instead of crowding the site")
+	check(c.task == "build" and c.task_index == site, "with the bench taken, the third builds too")
+
+
+func test_a_crafter_stays_at_a_bench_with_more_to_make() -> void:
+	var run := _setup([])
+	var w := run.world
+	var knapper := _busy_knapper(run)
+	check(w.add_building("hut"), "a hut has a plot")
+	var builder := _folk(run, "craftsperson")
+	builder.task = "build"
+	builder.task_index = w.buildings.size() - 1
+	var u := _folk(run, "craftsperson")
+	u.task = "craft"
+	u.task_index = knapper
+	u.pos = w.buildings[knapper]["pos"]
+	w.folk_ai.begin_step()
+	w.market.start_craft(knapper)
+	w.buildings[knapper]["craft_left"] = 0.0001
+	w.folk_ai._worker_tick(u)
+	w.folk_ai._choose_work(u)
+	check(u.task == "craft" and u.task_index == knapper, "with the hut already being raised, it takes the next make once it finishes one")
+
+
+func test_a_master_takes_their_own_bench_first() -> void:
+	var run := _setup([])
+	var w := run.world
+	var knapper := _busy_knapper(run)
+	var plain := _folk(run, "craftsperson")
+	w.folk_ai.begin_step()
+	w.folk_ai._choose_work(plain)
+	check(plain.task == "craft" and plain.task_index == knapper, "a plain craftsperson works the free bench")
+	var master := _folk(run, "craftsperson")
+	master.master_of = "knapper"
+	w.folk_ai._choose_work(master)
+	check(master.task == "craft" and master.task_index == knapper, "the master takes the bench")
+	check_eq(plain.task, "", "the plain one is bumped and looks for other work")
+
+
+func test_craftspeople_fetch_wood_with_no_work_in_town() -> void:
+	var run := _setup([{"id": "grove", "pos": Vector2(150, 0), "amount": 20}])
+	run.stock["wood"] = 0
+	var u := _folk(run, "craftsperson")
+	run.world.folk_ai.begin_step()
+	run.world.folk_ai._choose_work(u)
+	check_eq(u.task, "gather", "with nothing to build or make, it fetches wood")
