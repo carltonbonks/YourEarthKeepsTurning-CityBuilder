@@ -1,11 +1,12 @@
 extends SceneTree
 ## Headless balance report: plays many seeded runs with a scripted player.
-## Usage: godot --headless --path . -s res://tools/balance_run.gd [-- runs=50 style=balanced out=runs.jsonl label=pr5 gates=2 gate_round=3 gardens=3 upkeep=0 traditions=0 pedlar=0 runners=0]
+## Usage: godot --headless --path . -s res://tools/balance_run.gd [-- runs=50 from=1000 style=balanced out=runs.jsonl label=pr5 gates=2 gate_round=3 gardens=3 upkeep=0 traditions=0 pedlar=0 runners=0]
 ## out= also writes every run's record (same format as the game's Run history) for run_report.gd
 ## and tools/export_csv.py. label= names the build being tested (it becomes the runs' game_version).
 
 func _init() -> void:
 	var runs := 100
+	var first := 1000  # the first seed; from= splits one style's seeds over several processes
 	var style := "balanced"
 	var out_path := ""
 	var label := "dev"
@@ -19,6 +20,8 @@ func _init() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("runs="):
 			runs = int(arg.trim_prefix("runs="))
+		elif arg.begins_with("from="):
+			first = int(arg.trim_prefix("from="))
 		elif arg.begins_with("style="):
 			style = arg.trim_prefix("style=")
 		elif arg.begins_with("out="):
@@ -48,7 +51,7 @@ func _init() -> void:
 	var lost_on := {}
 	var power_by_round := {}  # round -> [runs, town total, wave total, wave/town total]
 	for s in runs:
-		var run := RunState.new(content, 1000 + s)
+		var run := RunState.new(content, first + s)
 		var bot := AutoPlayer.new()
 		bot.style = style
 		if gates >= 0:
@@ -86,7 +89,7 @@ func _init() -> void:
 		deaths_total += run.fallen.size()
 		folk_lost += run.fallen_folk
 		run.dispose()
-	print("Style: %s, %d runs (seeds 1000-%d)" % [style, runs, 999 + runs])
+	print("Style: %s, %d runs (seeds %d-%d)" % [style, runs, first, first + runs - 1])
 	print("Win rate: %d%%" % roundi(100.0 * wins / runs))
 	print("Average round reached: %.1f" % (float(rounds_total) / runs))
 	print("Average heroes lost per run: %.1f" % (float(deaths_total) / runs))

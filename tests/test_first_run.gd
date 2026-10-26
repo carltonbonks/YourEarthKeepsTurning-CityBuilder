@@ -150,10 +150,10 @@ func test_a_tradition_brings_its_blueprint_in_place_of_a_draft() -> void:
 	var run := RunState.new(content, 4821)
 	var picks := run.hand.picks
 	run.choose_traditions(["stoneworkers"])
-	check(run.hand.blueprints.has("stone_yard"), "Stoneworkers start with the stone-layers' yard")
+	check(run.hand.blueprints.has("watch_post"), "Stoneworkers start with the watch post")
 	check_eq(run.hand.picks, picks - 1, "in place of one of round 1's drafts")
-	check(not run.hand.cards.any(func(c: Dictionary) -> bool: return c["building"] == "stone_yard"), "and the draft doesn't offer it again")
-	check(run.record.entry["actions"].any(func(a: Dictionary) -> bool: return a["kind"] == "tradition_blueprint" and a.get("building") == "stone_yard"), "the record says so")
+	check(not run.hand.cards.any(func(c: Dictionary) -> bool: return c["building"] == "watch_post"), "and the draft doesn't offer it again")
+	check(run.record.entry["actions"].any(func(a: Dictionary) -> bool: return a["kind"] == "tradition_blueprint" and a.get("building") == "watch_post"), "the record says so")
 	run.dispose()
 	run = RunState.new(content, 4821)
 	run.choose_traditions(["smiths"])

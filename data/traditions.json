@@ -5,7 +5,7 @@
 	"woodfolk": {"name": "Woodfolk", "text": "People of the deep woods. Foresters, charcoal pits and longhouses come up often, woodcutters band sooner, and you start with 10 more wood.",
 		"buildings": ["forester", "charcoal_pit", "longhouse"], "leaning": "woodcutter", "effects": {}, "start": {"wood": 10}, "blueprint": "forester"},
 	"stoneworkers": {"name": "Stoneworkers", "text": "Wall-builders. Stone-layers' yards, gates and watch posts come up often, quarriers band sooner, and towers shoot 2 harder.",
-		"buildings": ["stone_yard", "gate", "watch_post", "knapper"], "leaning": "quarrier", "effects": {"tower_attack": 2}, "start": {"stone": 4}, "blueprint": "stone_yard"},
+		"buildings": ["stone_yard", "gate", "watch_post", "knapper"], "leaning": "quarrier", "effects": {"tower_attack": 2}, "start": {"stone": 4}, "blueprint": "watch_post"},
 	"firekeepers": {"name": "Firekeepers", "text": "Keepers of the flame. Charcoal pits, spirit shrines and smoke huts come up often, brushcutters band sooner, and the fire burns 1 less fuel a night.",
 		"buildings": ["charcoal_pit", "shrine", "smoke_hut"], "leaning": "brushcutter", "effects": {"fuel_saving": 1}, "start": {"fuel": 6}, "blueprint": "shrine"},
 	"traders": {"name": "Traders", "text": "Shell-counters and hagglers. The market, its stalls and the mead hall come up often, traders leave 5 more shells every round, and the southern caravan lays out 1 more deal.",
