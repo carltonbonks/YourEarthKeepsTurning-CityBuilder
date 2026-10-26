@@ -86,11 +86,11 @@ func offer_picks() -> void:
 # --- Townsfolk at work (Yusuf, 2026-10-26) -----------------------------------------------------------------
 
 ## How a role spent its time: {"kinds": {kind: seconds}, "total": seconds, "from": "this" or "last" round, or ""}.
-## This round once it has busy_min_seconds counted, else last round's record.
+## This round once it has busy_min_seconds counted, else last round's record (always last round's while building).
 func busy_of(role: String) -> Dictionary:
 	var now: Dictionary = run.world.folk_ai.role_time.get(role, {})
 	var total := _sum(now)
-	if total >= run.content.num("busy_min_seconds"):
+	if total >= run.content.num("busy_min_seconds") and run.phase != RunState.Phase.BUILD:
 		return {"kinds": now.duplicate(), "total": total, "from": "this"}
 	if not run.record.rounds.is_empty():
 		var last: Dictionary = run.record.rounds[-1].get("folk_time", {}).get(role, {})

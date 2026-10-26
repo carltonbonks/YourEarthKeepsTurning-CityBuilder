@@ -90,14 +90,15 @@ static func plural(run: RunState, role: String) -> String:
 
 ## The round's impact the time came from ("this" or "last").
 static func impact_for(run: RunState, from: String) -> Dictionary:
-	if from == "this" and not run.record.entry.is_empty():
+	if from == "this":
 		return run.record.entry.get("impact", {})
 	if not run.record.rounds.is_empty():
 		return run.record.rounds[-1].get("impact", {})
 	return {}
 
 
-## What a role brought in per head: "brought home 13 goods each", "made 3, raised 1 each", "2 kills each".
+## What a role did: goods brought home per head, then buildings raised, goods made and kills in all
+## ("brought home 9 goods each, raised 2 buildings").
 static func output_text(run: RunState, role: String, impact: Dictionary) -> String:
 	var row: Dictionary = impact.get("folk", {}).get(role, {})
 	var n := maxf(1.0, float(run.count_role(role)))
@@ -106,32 +107,34 @@ static func output_text(run: RunState, role: String, impact: Dictionary) -> Stri
 	for good: String in row.get("goods", {}):
 		goods += float(row["goods"][good])
 	if goods > 0.0:
-		parts.append("brought home %s goods" % _each(goods / n))
-	if float(row.get("made", 0)) > 0.0:
-		parts.append("made %s" % _each(float(row["made"]) / n))
-	if float(row.get("raised", 0)) > 0.0:
-		parts.append("raised %s buildings" % _each(float(row["raised"]) / n))
-	if float(row.get("kills", 0)) > 0.0:
-		parts.append("%s kills" % _each(float(row["kills"]) / n))
-	if parts.is_empty():
-		return ""
-	return ", ".join(parts) + " each"
+		parts.append("brought home %s goods each" % _each(goods / n))
+	for stat: Array in [["raised", "building", "raised %d %s"], ["made", "good", "made %d %s"], ["kills", "kill", "%d %s"]]:
+		var count := roundi(float(row.get(stat[0], 0)))
+		if count > 0:
+			parts.append(stat[2] % [count, stat[1] if count == 1 else stat[1] + "s"])
+	return ", ".join(parts)
 
 
 static func _each(x: float) -> String:
 	return str(roundi(x)) if x >= 2.0 or is_equal_approx(x, roundf(x)) else "%.1f" % x
 
 
+## Which of a townsperson's tallies holds the round busy_of reads: this round's, or last round's (still in
+## Unit.time while building, since FolkAI.start_round moves it over only as the next round begins).
+static func _holds_this(run: RunState, from: String) -> bool:
+	return from == "this" or run.phase == RunState.Phase.BUILD
+
+
 ## One townsperson's day on the map hover (needs a Reeve's hut), or "".
 static func unit_line(run: RunState, u: Unit) -> String:
 	if run.people.reckoning().is_empty() or not KIND_NAMES.has(u.type_id):
 		return ""
-	var this_round := not u.time.is_empty()
-	var kinds: Dictionary = u.time if this_round else u.time_last
+	var this_round := not u.time.is_empty() and run.phase != RunState.Phase.BUILD
+	var kinds: Dictionary = u.time if this_round or run.phase == RunState.Phase.BUILD else u.time_last
 	if kinds.is_empty():
 		return ""
 	var line := "%s: %s" % ["This round" if this_round else "Last round", split_text(u.type_id, kinds)]
-	var brought := u.brought if this_round else u.brought_last
+	var brought := u.brought if this_round or run.phase == RunState.Phase.BUILD else u.brought_last
 	if brought > 0:
 		line += ", brought home %d" % brought
 	return line + "."
@@ -223,7 +226,7 @@ static func build(parent: Control, run: RunState) -> void:
 		if b["from"] == "":
 			continue
 		any = true
-		var this_round: bool = b["from"] == "this"
+		var this_round := _holds_this(run, b["from"])
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 12)
 		box.add_child(row)

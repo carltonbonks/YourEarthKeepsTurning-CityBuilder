@@ -923,7 +923,7 @@ func show_impact(whole_run := false) -> void:
 func show_people() -> void:
 	_clear()
 	var b := run.people.busy_of("tribesperson")
-	_title("Your people %s" % ("this round" if b["from"] == "this" else "last round"))
+	_title("Your people %s" % ("this round so far" if b["from"] == "this" else "last round"))
 	UiKit.note(_box, "How each kind of townsperson spent the round, and what came of it. Townsfolk count by day; " +
 		"warriors by night too. Stretched: another would earn their keep. Slack: another mostly adds upkeep.", 11)
 	FolkAtWork.build(_box, run)

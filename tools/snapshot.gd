@@ -30,9 +30,10 @@ extends SceneTree
 ## one-time tip due at that moment (off otherwise, so pictures stay clear); seen=<id,id> marks tips as seen. The player's settings are never saved.
 ## doll=1 (with pick=1) gives Hearth-mother's Doll with its twin due on this dawn's townsfolk card.
 ## hover=<card title> shows that card's hover panel beside it, as resting the mouse on it does.
+## reeve=1 raises a Reeve's hut once the bot has played to the round; people=1 shows the People panel (needs reeve=1).
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": ""}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "reeve": "0", "people": "0"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -78,6 +79,8 @@ func _init() -> void:
 				run.run_until_pause()
 			RunState.Phase.RELIC:
 				run.choose_relic(run.relic_offer[0] if not run.relic_offer.is_empty() else "")
+	if args["reeve"] == "1" and run.world.add_building("reeves_hut"):
+		run.world.buildings[-1]["work_left"] = 0.0
 	if args["mid"] == "1" and run.phase == RunState.Phase.BUILD:
 		bot.build(run)
 		run.begin_round()
@@ -217,6 +220,8 @@ func _init() -> void:
 		main._overlays.show_for_phase()
 	if args["impact"] == "1":
 		main._overlays.show_impact(args["relic"] != "1")
+	if args["people"] == "1":
+		main._overlays.show_people()
 	if args["preview"] != "":
 		main._preview_building(args["preview"])
 	main._arena.iso = args["flat"] != "1"
