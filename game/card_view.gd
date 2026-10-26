@@ -66,6 +66,8 @@ var _body_wanted := false
 ## The card's own words (set_body's, and any add_lead adds): the hover panel shows them first and brightest,
 ## and the general lines (how drafting works, upkeep) after them, smaller and dimmer.
 var _lead := ""
+## Names the hover panel shows in their own colour wherever they appear (a relic's name in its rarity's colour).
+var tip_names := {}
 var _fitting := false
 
 
@@ -576,6 +578,22 @@ static func tip_parts(text: String, lead: String) -> Array:
 
 
 func _tip_line(box: VBoxContainer, text: String, font_size: int, tint: Color) -> void:
+	var named: Array = tip_names.keys().filter(func(n: String) -> bool: return n in text)
+	if not named.is_empty():
+		var r := RichTextLabel.new()
+		r.bbcode_enabled = true
+		r.fit_content = true
+		r.scroll_active = false
+		r.autowrap_mode = TextServer.AUTOWRAP_WORD
+		r.custom_minimum_size.x = 340
+		r.add_theme_font_size_override("normal_font_size", font_size)
+		r.add_theme_color_override("default_color", tint)
+		var bb := text.replace("[", "[lb]")
+		for n: String in named:
+			bb = bb.replace(n, "[color=#%s]%s[/color]" % [Color(tip_names[n]).to_html(false), n])
+		r.text = bb
+		box.add_child(r)
+		return
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", font_size)

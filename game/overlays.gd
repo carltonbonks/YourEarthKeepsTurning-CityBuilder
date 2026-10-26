@@ -390,10 +390,10 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 			var roles: Array = [card["role"]]
 			for i in CardRoll.extra_people(content, card):
 				roles.append(card["role"])
-			# Hearth-mother's Doll: the card that brings its twin counts the twin in, and says so.
+			# Hearth-mother's Doll: the card it doubles counts everyone in, and says so.
 			var doll := run.doll_twin_next()
 			if doll:
-				roles.append(card["role"])
+				roles.append_array(roles.duplicate())
 			if card.has("leaning"):
 				var lean: Dictionary = def["leanings"][card["leaning"]]
 				var key: String = card["role"] + "/" + card["leaning"]
@@ -423,16 +423,18 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 				btn.tooltip_text = "%s\n%s." % [def["text"], eats]
 			var doll_line := _doll_line(roles.size(), doll)
 			if doll_line != "":
+				var relic: Dictionary = content.relics["hearth_mothers_doll"]
+				btn.tip_names[relic["name"]] = content.rarity_color(content.rarity_of("relic", "hearth_mothers_doll"))
 				btn.tooltip_text += "\n" + doll_line
 				if doll:
 					btn.add_lead(doll_line)
 	return btn
 
 
-## The Doll's chip on the townsfolk card that will bring its twin.
+## The Doll's chip on the townsfolk card it will double.
 func _doll_chip(btn: CardView, doll: bool) -> void:
 	if doll:
-		btn.add_chip("Doll's twin", "relic", CardView.GOOD)
+		btn.add_chip("Doll: doubled", "relic", CardView.GOOD)
 
 
 ## What Hearth-mother's Doll does on this dawn's townsfolk cards, for the hover panel ("" without the Doll).
@@ -441,8 +443,8 @@ func _doll_line(people: int, doll: bool) -> String:
 	if left == 0:
 		return ""
 	if doll:
-		return "Hearth-mother's Doll: this pick brings a twin, %d people in all." % people
-	return "Hearth-mother's Doll: the %s townsperson you take from now brings a twin." % ["next", "second", "third"][mini(left, 3) - 1]
+		return "Hearth-mother's Doll doubles this pick: %d people in all." % people
+	return "Hearth-mother's Doll doubles the %s townsfolk card you take from now." % ["next", "second", "third"][mini(left, 3) - 1]
 
 
 ## How many of this role the town has now, so a dawn pick reads as "a fourth warrior" rather than "a warrior".

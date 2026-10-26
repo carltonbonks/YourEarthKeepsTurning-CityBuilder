@@ -576,15 +576,18 @@ func choose_pick(index: int) -> void:
 					"; ".join(CardRoll.lines(content, card)).to_lower()])
 			else:
 				tell("A %s joins the settlement." % folk_name(card["role"], leaning).to_lower())
-			for i in CardRoll.extra_people(content, card):
+			var extra := CardRoll.extra_people(content, card)
+			for i in extra:
 				world.folk_ai.add_folk(card["role"], leaning)
 				tell("Twins: a second %s comes too." % folk_name(card["role"], leaning).to_lower())
 			var doll := doll_twin_next()
 			folk_cards_taken += 1
 			if doll:
-				world.folk_ai.add_folk(card["role"], leaning)
+				# Hearth-mother's Doll doubles the whole card: a Twins card brings four.
+				for i in 1 + extra:
+					world.folk_ai.add_folk(card["role"], leaning)
 				relic_fired("twin_every")
-				tell("The %s brings a twin along." % folk_name(card["role"], leaning).to_lower())
+				tell("Hearth-mother's Doll doubles the %s: %d come in all." % [folk_name(card["role"], leaning).to_lower(), 2 * (1 + extra)])
 	var entry := {"day": world.day_index() + 1, "offered": pick_offer.map(people.card_label), "taken": taken}
 	var leanings := pick_offer.map(func(c: Dictionary) -> String: return str(c.get("leaning", "")))
 	if leanings.any(func(l: String) -> bool: return l != ""):
@@ -621,13 +624,13 @@ func choose_pick(index: int) -> void:
 	world.hero_ai.roll_whims()
 
 
-## Whether the next townsfolk card taken brings Hearth-mother's Doll's twin (every 3rd one does).
+## Whether Hearth-mother's Doll doubles the next townsfolk card taken (every 3rd one).
 func doll_twin_next() -> bool:
 	var every := int(mod("twin_every"))
 	return every > 0 and (folk_cards_taken + 1) % every == 0
 
 
-## Townsfolk cards still to take before the Doll's next twin (0 without the Doll).
+## Townsfolk cards still to take before the Doll next doubles one (0 without the Doll).
 func doll_picks_to_twin() -> int:
 	var every := int(mod("twin_every"))
 	return every - folk_cards_taken % every if every > 0 else 0

@@ -154,6 +154,17 @@ func test_people_on_a_card_are_counted_when_more_than_one() -> void:
 	check(not _texts(one).has("×1"), "one person needs no count")
 	var three := CardView.new(CardView.Size.LARGE, "folk", "Townsperson", "Tribesperson")
 	three.add_people(["tribesperson", "tribesperson", "tribesperson"])
-	check(_texts(three).has("×3"), "twins and the Doll's twin read as ×3")
+	check(_texts(three).has("×3"), "more than one person is counted")
 	one.free()
 	three.free()
+
+
+func test_a_named_relic_shows_in_its_colour_in_the_hover_panel() -> void:
+	var card := CardView.new(CardView.Size.LARGE, "folk", "Townsperson", "Tribesperson")
+	card.tip_names["Hearth-mother's Doll"] = Color("#f0d040")
+	var tip := card._make_custom_tooltip("Gathers.\nHearth-mother's Doll doubles this pick: 4 people in all.") as Control
+	var rich := tip.find_children("*", "RichTextLabel", true, false)
+	check_eq(rich.size(), 1, "the line naming the relic is coloured")
+	check("[color=#f0d040]Hearth-mother's Doll[/color]" in (rich[0] as RichTextLabel).text, "in the relic's colour")
+	tip.free()
+	card.free()
