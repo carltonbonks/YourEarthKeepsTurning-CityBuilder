@@ -92,6 +92,10 @@ func test_highlights_come_once_each_at_their_moment_and_close_when_done() -> voi
 	screen.call("_refresh_live")
 	check_eq(tips.shown_id(), "first_tradition", "it shows")
 	check(not tips.framed().is_empty(), "framing the pick")
+	# The pick moves (laid out, fitted to the window, resized): the frame follows it on the next frame.
+	tips.target_rect = func(_name: String) -> Rect2: return Rect2(300, 200, 600, 320)
+	tips._process(0.0)
+	check_eq(tips.framed(), [Rect2(300, 200, 600, 320).grow(FirstTips.PAD)] as Array[Rect2], "the frame follows its target's rect")
 	run.choose_traditions(["stoneworkers"])
 	check_eq(FirstTips.due(run), ["first_draft"] as Array[String], "then the draft")
 	screen.call("_refresh_live")
@@ -127,6 +131,21 @@ func test_highlights_come_once_each_at_their_moment_and_close_when_done() -> voi
 			check(["panel", "core", "begin", "upgrades", "threat", "food"].has(t), "%s frames something the screen knows (%s)" % [id, t])
 	run.dispose()
 	screen.free()
+
+
+func test_the_note_never_covers_what_it_frames() -> void:
+	var screen := Rect2(0, 0, 1280, 720)
+	var note := Vector2(330, 150)
+	# The build hand's Core section along the bottom: no room below, so the note goes above it.
+	var core: Array[Rect2] = [Rect2(8, 446, 308, 192)]
+	var at := FirstTips.note_spot(screen, core, note)
+	check(not Rect2(at, note).intersects(core[0]), "the note sits clear of the hand")
+	check(at.y + note.y <= core[0].position.y, "above it")
+	# A tall pop-up filling most of the screen: the note still finds a free side.
+	var big: Array[Rect2] = [Rect2(380, 40, 560, 640)]
+	at = FirstTips.note_spot(screen, big, note)
+	check(not Rect2(at, note).intersects(big[0]), "the note sits beside a tall pop-up")
+	check(screen.encloses(Rect2(at, note)), "and on screen")
 
 
 func test_the_dimming_leaves_the_framed_parts_clear() -> void:
