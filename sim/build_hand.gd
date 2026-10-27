@@ -366,8 +366,7 @@ func need(type: String) -> String:
 	var def: Dictionary = content.buildings[type]
 	if def.has("housing") and not def.has("lodging") and run.housing() - run.population() <= 2:
 		return "housing"
-	if (def.get("daily", {}).has("food") or type == "drying_rack") \
-			and float(run.stock["food"]) < run.food_needed_today() * 3.0:
+	if feeds(type) and float(run.stock["food"]) < run.food_needed_today() * 3.0:
 		return "food"
 	if def.has("lodging") and run.world.hero_ai.count_lodgings() > 0 and free_beds() <= 0:
 		return "beds"
@@ -377,7 +376,7 @@ func need(type: String) -> String:
 		return "ageing"
 	if not run.world.tending(type).is_empty() and run.world.nodes_fullness(def["tends"]["tag"]) < content.num("build_tend_below"):
 		return "regrow"
-	if def.has("workshop") and _makes_fuel(type) and float(run.stock["fuel"]) < run.fuel_needed_tonight() * 2.0:
+	if def.has("workshop") and makes_fuel(type) and float(run.stock["fuel"]) < run.fuel_needed_tonight() * 2.0:
 		return "fuel"
 	if def.has("workshop"):
 		for id in content.recipes_for(type):
@@ -402,7 +401,13 @@ func need(type: String) -> String:
 	return ""
 
 
-func _makes_fuel(type: String) -> bool:
+## True for a building that brings food in (daily food, or the drying rack's smoked meat).
+func feeds(type: String) -> bool:
+	return run.content.buildings[type].get("daily", {}).has("food") or type == "drying_rack"
+
+
+## True for a workshop with a recipe that makes fuel.
+func makes_fuel(type: String) -> bool:
 	return run.content.recipes_for(type).any(func(id: String) -> bool:
 		return run.content.market["recipes"][id].get("makes", {}).has("fuel"))
 

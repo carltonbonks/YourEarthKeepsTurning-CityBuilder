@@ -75,6 +75,15 @@ static func fill(box: VBoxContainer, settings: GameSettings, on_change: Callable
 		again.disabled = true
 		changed.call())
 	_row(play, "Seen all the tips?", again)
+	var advisor := OptionButton.new()
+	var levels := ["urgent", "chatty", "off"]
+	for name: String in ["Urgent only", "Chatty", "Off"]:
+		advisor.add_item(name)
+	advisor.select(maxi(0, levels.find(settings.advisor)))
+	advisor.item_selected.connect(func(i: int) -> void:
+		settings.advisor = levels[i]
+		changed.call())
+	_row(play, "The Elder's warnings", advisor)
 	UiKit.note(play, "Sound and music settings arrive with the first sounds.", 12).custom_minimum_size.x = 260
 
 	var keys := _column(cols, "Keys")

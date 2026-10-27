@@ -12,6 +12,8 @@ const FADE_SECONDS := 1.0
 const WIDTH := 320.0
 
 var run: RunState
+## The problem the Elder is speaking about (Advisor.speaking_id): no alert for it meanwhile.
+var quiet := ""
 ## Alert id -> seconds it has been on screen (problems still true, so they don't come back).
 var _seen := {}
 var _labels := {}
@@ -63,6 +65,11 @@ func refresh() -> void:
 	var now := {}
 	for a: Dictionary in active(run):
 		now[a["id"]] = a["text"]
+		if a["id"] == quiet:
+			# The Elder says it instead; counted as seen, so it doesn't pop up after a "Not now".
+			_seen[a["id"]] = SHOW_SECONDS
+			_drop(a["id"])
+			continue
 		if not _seen.has(a["id"]):
 			_seen[a["id"]] = 0.0
 			_add(a["id"], a["text"])

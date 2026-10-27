@@ -33,6 +33,8 @@ var night_camera := true
 ## One-time tips while playing (FirstTips).
 var tips := true
 var tips_seen: Array = []
+## How much the Elder speaks up (Advisor): "off", "urgent" (only when a problem costs this round) or "chatty".
+var advisor := "urgent"
 ## The first-run camera tour has played (IntroTour); until it has, a new run opens on it and starts gently.
 var intro_seen := false
 var keys := DEFAULT_KEYS.duplicate()
@@ -50,6 +52,7 @@ static func load_saved() -> GameSettings:
 	s.start_speed = int(cfg.get_value("play", "start_speed", s.start_speed))
 	s.night_camera = bool(cfg.get_value("play", "night_camera", s.night_camera))
 	s.tips = bool(cfg.get_value("play", "tips", s.tips))
+	s.advisor = str(cfg.get_value("play", "advisor", s.advisor))
 	s.tips_seen = Array(cfg.get_value("play", "tips_seen", []))
 	s.intro_seen = bool(cfg.get_value("play", "intro_seen", false))
 	# Format 1's tips were paper notes; the highlights that replaced them start fresh, with the tour.
@@ -70,6 +73,7 @@ func save() -> void:
 	cfg.set_value("play", "start_speed", start_speed)
 	cfg.set_value("play", "night_camera", night_camera)
 	cfg.set_value("play", "tips", tips)
+	cfg.set_value("play", "advisor", advisor)
 	cfg.set_value("play", "tips_seen", tips_seen)
 	cfg.set_value("play", "intro_seen", intro_seen)
 	for action: String in ACTIONS:
