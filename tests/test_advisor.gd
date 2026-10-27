@@ -159,3 +159,36 @@ func test_alerts_keep_quiet_about_what_the_elder_says() -> void:
 	check(not alerts._labels.has("food"), "nor after a Not now")
 	alerts.free()
 	run.dispose()
+
+
+func test_an_attack_that_outmatches_the_town_points_at_defences() -> void:
+	var run := _building()
+	run.next_wave.clear()
+	check(not _ids(run).has("outmatched"), "no attack, no warning")
+	for i in 60:
+		run.next_wave.append("raider")
+	run.hand.blueprints.append("watch_post")
+	var ratio := Power.wave(run.content, run.waves.attack()) / maxf(1.0, float(Power.town(run.world)["total"]))
+	check(ratio > 1.3, "sixty raiders outmatch a young town")
+	var warn: Array = Advisor.concerns(run).filter(func(c: Dictionary) -> bool: return c["id"] == "outmatched")
+	check_eq(warn.size(), 1, "the Elder warns before the attack")
+	check(run.content.buildings[warn[0]["fix"]["type"]].has("attack"), "pointing at something that shoots")
+	_dawn(run, [{"role": "craftsperson"}, {"role": "warrior"}])
+	warn = Advisor.concerns(run).filter(func(c: Dictionary) -> bool: return c["id"] == "outmatched")
+	check_eq(warn[0]["fix"]["index"], 1, "at dawn, the warrior")
+	run.dispose()
+
+
+func test_idle_hands_point_at_a_building_that_gives_them_work() -> void:
+	var run := _building()
+	check(not _ids(run).has("slack:tribesperson"), "nothing counted, nothing said")
+	run.record.rounds.append({"folk_time": {"tribesperson": {"idle": 600.0, "gather": 600.0}}})
+	check_eq(run.people.busy_word("tribesperson"), "slack", "half the round idle reads Slack")
+	var slack: Array = Advisor.concerns(run).filter(func(c: Dictionary) -> bool: return c["id"] == "slack:tribesperson")
+	check_eq(slack.size(), 1, "idle tribespeople are raised")
+	var def: Dictionary = run.content.buildings[slack[0]["fix"]["type"]]
+	check(def.has("tends") or def.has("assist"), "pointing at a building they can work at")
+	check(str(slack[0]["text"]).contains("tribespeople"), "naming them")
+	_dawn(run, [{"role": "tribesperson"}])
+	check(not _ids(run).has("slack:tribesperson"), "never at dawn, where the answer is a building")
+	run.dispose()
