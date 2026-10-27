@@ -11,6 +11,8 @@ signal relic_picked(relic_id: String)
 signal traditions_chosen(ids: Array)
 ## The founding tradition left to chance (RunState.choose_random_tradition).
 signal random_tradition_chosen
+## The charter taken after an age-up (a path id from data/paths.json).
+signal charter_chosen(id: String)
 ## The pedlar invited on a pedlar round ("" for none).
 signal pedlar_chosen(id: String)
 ## replay = true restarts on the same seed, false on a new one.
@@ -97,6 +99,9 @@ func show_for_phase() -> void:
 			show_welcome(true)
 		else:
 			show_traditions()
+		return
+	if run.awaiting_charter():
+		show_charter()
 		return
 	if run.awaiting_pedlar():
 		show_pedlars()
@@ -224,6 +229,10 @@ func show_traditions(chosen: Array = []) -> void:
 		if t.has("blueprint"):
 			btn.add_chip("Brings: " + BuildHand.gift_name(content, t["blueprint"]), "house", CardView.TEXT, btn.family_color())
 		btn.tooltip_text = t["text"]
+		if content.paths["paths"].has(t.get("path", "")):
+			var path: Dictionary = content.paths["paths"][t["path"]]
+			btn.add_chip("Path: " + path["name"], "flag", CardView.TEXT, btn.family_color())
+			btn.tooltip_text += "\nStarts you on the %s path (%s): %s" % [path["name"], path["short"].to_lower(), path["tiers"][0]["text"]]
 		btn.disabled = not picked and chosen.size() >= to_pick and to_pick > 1
 		btn.pressed.connect(func() -> void:
 			var next := chosen.duplicate()
@@ -275,6 +284,42 @@ func show_settings() -> void:
 	show()
 
 
+## After an age-up: a charter, one of a few run paths (data/paths.json) to take up or raise a tier. Each card says
+## what the tier does, and its hover which buildings the path favours in the draft.
+func show_charter() -> void:
+	var content := run.content
+	_clear()
+	_title("A new age, a new charter. Which way does your town grow?")
+	var note := Label.new()
+	var held := StatusText.path_names(run)
+	note.text = "Each age-up brings a charter: one more path, or the next tier of one you hold.%s" % (
+		" Your paths: %s." % ", ".join(held) if not held.is_empty() else "")
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD
+	note.custom_minimum_size.x = 640
+	_box.add_child(note)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_box.add_child(row)
+	for id: String in run.charter_offer:
+		var path: Dictionary = content.paths["paths"][id]
+		var tier := run.path_tier(id) + 1
+		var text: String = run.next_path_tier(id).get("text", "")
+		var btn := CardView.new(CardView.Size.LARGE, "path", "Charter · tier %s" % StatusText.roman(tier), path["name"])
+		btn.custom_minimum_size.x = 220
+		btn.add_chip(path["short"])
+		if tier > 1:
+			btn.set_advice("Deepens your path")
+		btn.set_body(text, CardView.TEXT).set_footer(path["text"])
+		var favoured: Array = path.get("buildings", []).filter(func(b: String) -> bool: return content.buildings.has(b))
+		btn.tooltip_text = "%s\n%s\nIts buildings come up %s times as often in the blueprint draft: %s." % [path["text"], text,
+			str(content.int_num("path_card_weight")), ", ".join(favoured.map(func(b: String) -> String: return content.buildings[b]["name"]))]
+		btn.pressed.connect(func() -> void: charter_chosen.emit(id))
+		row.add_child(btn)
+	show()
+
+
 ## On a pedlar round: invite one pedlar (or none). Each card says what it sells, how far out it camps and
 ## which heroes would walk that far to trade.
 func show_pedlars() -> void:
@@ -318,7 +363,7 @@ func show_pedlars() -> void:
 
 ## What stops the town taking a dawn card: no room, or not enough shells.
 func _why_not_pick(card: Dictionary) -> String:
-	if not card["kind"] in ["promote", "venture"] and run.population() + run.people.card_people(card) > run.housing():
+	if not card["kind"] in ["promote", "venture", "guild"] and run.population() + run.people.card_people(card) > run.housing():
 		return "No room: build homes"
 	return UiKit.shortfall(run.stock, {"shells": card["cost"]})
 
@@ -385,6 +430,8 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 			btn = _promote_card(card, sz)
 		"venture":
 			btn = _venture_card(card, sz)
+		"guild":
+			btn = _guild_card(card, sz)
 		_:
 			var def: Dictionary = content.townsfolk[card["role"]]
 			var roles: Array = [card["role"]]
@@ -459,6 +506,23 @@ func _have_chip(btn: CardView, role: String) -> void:
 func _work_lines(role: String) -> String:
 	var lines := FolkAtWork.card_lines(run, role)
 	return "" if lines.is_empty() else "\n" + "\n".join(lines)
+
+
+## A trades guild: the band at its top tier learns a practice that keeps its nodes from running dry, and keeps to its trade.
+func _guild_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
+	var leaning: String = card["leaning"]
+	var g := run.people.guild_def(leaning)
+	var size := int(run.world.folk_ai.count_leanings().get("tribesperson/" + leaning, 0))
+	var btn := CardView.new(sz, "guild", "Trades guild", g["name"])
+	btn.set_price(run.stock, {})
+	btn.add_chip(g["practice"], "", CardView.GOOD)
+	btn.add_chip("Band of %d" % size)
+	btn.add_chip("Keeps to its trade", "", CardView.DANGER)
+	btn.set_body(g["text"], CardView.TEXT).set_footer("Instead of a newcomer")
+	btn.tooltip_text = "Charter the %s band as the %s.\n%s\nFrom now on its members keep to their trade: they only fetch %s, even when the town is short of something else, and never lend a hand at buildings.\nInstead of a newcomer today; offered until you take it." % [
+		run.folk_name("tribesperson", leaning).to_lower(), g["name"], g["text"],
+		", ".join(run.content.townsfolk["tribesperson"]["leanings"][leaning]["goods"]).replace("_", " ")]
+	return btn
 
 
 ## A venture: send tribespeople out, some never come back, the rest bring goods home.

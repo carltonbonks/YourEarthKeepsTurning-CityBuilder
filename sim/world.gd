@@ -357,7 +357,19 @@ func _dawn() -> void:
 
 ## Buildings that tend nodes ("tends" in buildings.json): each dawn every node carrying their tag within
 ## their radius regrows a share of its full size, once per such building.
+## Nodes a trades guild works ("guild_tend", FolkAI._guild_drain) regrow their share too, until full.
 func _tend_nodes() -> void:
+	for node in nodes:
+		var share := float(node.get("guild_tend", 0.0))
+		if share <= 0.0:
+			continue
+		var before := int(node["amount"])
+		if before >= int(node["max"]):
+			node.erase("guild_tend")
+			continue
+		node["amount"] = mini(int(node["max"]), before + maxi(1, roundi(float(node["max"]) * share)))
+		run.record.note_count("tended", int(node["amount"]) - before, node["gives"])
+		run.record.note_count("guild_tended", int(node["amount"]) - before, node["gives"])
 	for b in buildings:
 		var tends := tending(b["type"])
 		if tends.is_empty() or float(b["work_left"]) > 0.0:

@@ -154,7 +154,11 @@ extends RefCounted
 ##     for the town: folk, hero, tower or hearth -> count), "barricades_planned" (gaps the alarm sent folk to
 ##     barricade, each paid for), "barricades_raised" and "barricades_broken"; townsfolk impact rows may have
 ##     "barricaded" (barricades raised).
-const RECORD_FORMAT := 56
+## 57: run paths and trades guilds (Yusuf, 2026-10-27): top-level "paths" (path id -> tier held) and "guilds"
+##     (tribesperson leaning -> round chartered); a "charter" action ({offered, path, tier}, path "" when let go); a dawn
+##     pick may take "guild:<leaning>"; per round "guild_spared" (good -> goods a gentle guild left in the node) and
+##     "guild_tended" (good -> goods guild-worked nodes regrew at dawn, also counted in "tended").
+const RECORD_FORMAT := 57
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -204,6 +208,8 @@ func to_record() -> Dictionary:
 		"pool": run.hand.pool().duplicate(),
 		"traditions": run.traditions.duplicate(),
 		"tradition_random": run.tradition_random,
+		"paths": run.paths.duplicate(),
+		"guilds": run.guilds.duplicate(),
 		"gentle": run.gentle,
 		"prices": run.prices.duplicate(),
 		"age": run.age,

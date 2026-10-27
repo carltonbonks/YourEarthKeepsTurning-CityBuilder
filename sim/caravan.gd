@@ -17,7 +17,7 @@ func _init(run_state: RunState) -> void:
 
 
 func is_here() -> bool:
-	return run.world.count_buildings(run.content.trades["needs"]) > 0
+	return run.world.count_buildings(run.content.trades["needs"]) > 0 or run.mod("caravan_early") > 0.0
 
 
 ## Lays out this round's deals (called as the build phase begins); none until the caravan's building stands.

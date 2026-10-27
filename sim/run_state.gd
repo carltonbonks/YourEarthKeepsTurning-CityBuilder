@@ -36,6 +36,14 @@ var relic_acquired_round := {}
 var relic_offer: Array[String] = []
 ## Founding traditions chosen before round 1 (data/traditions.json), and whether that choice is made (or skipped).
 var traditions: Array[String] = []
+## Run paths (data/paths.json): path id -> tier held. A founding tradition's path starts at 1; each age-up brings a
+## charter that raises one (choose_charter).
+var paths := {}
+## Charters still to choose (one per age-up), and the paths offered for the one up now (shown while building).
+var charters_due := 0
+var charter_offer: Array[String] = []
+## Trades guilds chartered at dawn (People.charter_guild): tribesperson leaning -> the round it was chartered.
+var guilds := {}
 ## Upgrades taken this run (data/upgrades.json), in order.
 var upgrades: Array[String] = []
 var traditions_settled := false
@@ -137,6 +145,8 @@ func mod(key: String) -> float:
 		total += float(v) if v is float or v is int else 0.0
 	for id in traditions:
 		total += float(content.traditions[id].get("effects", {}).get(key, 0.0))
+	for tier in path_tiers():
+		total += float(tier.get("effects", {}).get(key, 0.0))
 	if world != null:
 		total += float(world.building_effects.get(key, 0.0))
 	return total
@@ -153,6 +163,8 @@ func _owned_effects() -> Array[Dictionary]:
 		out.append(content.relics[id]["effects"])
 	for id in traditions:
 		out.append(content.traditions[id].get("effects", {}))
+	for tier in path_tiers():
+		out.append(tier.get("effects", {}))
 	return out
 
 
@@ -215,6 +227,10 @@ func choose_traditions(ids: Array) -> void:
 		for good: String in start:
 			stock[good] = int(stock.get(good, 0)) + int(start[good])
 		tell("The people keep the ways of the %s." % content.traditions[id]["name"])
+		# A tradition starts the town down its path (tier I).
+		var path := str(content.traditions[id].get("path", ""))
+		if content.paths["paths"].has(path):
+			paths[path] = maxi(1, int(paths.get(path, 0)))
 		var gift := str(content.traditions[id].get("blueprint", ""))
 		if gift != "":
 			hand.gift(gift)
@@ -247,6 +263,94 @@ func tradition_leanings() -> Array[String]:
 		if leaning != "":
 			out.append(leaning)
 	return out
+
+
+# --- Run paths (data/paths.json) -----------------------------------------------
+
+## Every path tier the town holds, paths in id order, tier I first.
+func path_tiers() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if paths.is_empty():
+		return out
+	var ids := paths.keys()
+	ids.sort()
+	for id: String in ids:
+		var tiers: Array = content.paths["paths"][id]["tiers"]
+		for i in mini(int(paths[id]), tiers.size()):
+			out.append(tiers[i])
+	return out
+
+
+## The tier the town holds in a path (0 for none).
+func path_tier(id: String) -> int:
+	return int(paths.get(id, 0))
+
+
+## Whether a path the town holds favours this building's cards.
+func path_favours(building: String) -> bool:
+	return paths.keys().any(func(id: String) -> bool: return content.paths["paths"][id].get("buildings", []).has(building))
+
+
+## The dawn cards the town's paths always deal (townsfolk roles, or "hero"), in path order.
+func path_dawn_cards() -> Array[String]:
+	var out: Array[String] = []
+	for tier in path_tiers():
+		var role := str(tier.get("dawn_card", ""))
+		if role != "" and not out.has(role):
+			out.append(role)
+	return out
+
+
+## The next tier of a path ({} when the town holds them all).
+func next_path_tier(id: String) -> Dictionary:
+	var tiers: Array = content.paths["paths"][id]["tiers"]
+	return tiers[path_tier(id)] if path_tier(id) < tiers.size() else {}
+
+
+## True while building with a charter to choose (after the traditions, before a pedlar).
+func awaiting_charter() -> bool:
+	return phase == Phase.BUILD and not charter_offer.is_empty() and not awaiting_traditions()
+
+
+## Deals the charter up next (one per age-up): the town's strongest path's next tier first, then others at random,
+## charter_choices in all. Nothing when no path has a tier left.
+func _roll_charter() -> void:
+	if charters_due <= 0 or not charter_offer.is_empty():
+		return
+	var open: Array = content.paths["paths"].keys().filter(func(id: String) -> bool: return not next_path_tier(id).is_empty())
+	open.sort()
+	if open.is_empty():
+		charters_due = 0
+		return
+	var own := ""
+	for id: String in open:
+		if path_tier(id) > 0 and (own == "" or path_tier(id) > path_tier(own)):
+			own = id
+	if own != "":
+		charter_offer.append(own)
+		open.erase(own)
+	var rng := SeededRng.stream(run_seed, "charter", round_number * 10 + charters_due)
+	while charter_offer.size() < int(content.paths["charter_choices"]) and not open.is_empty():
+		var id: String = rng.pick(open)
+		open.erase(id)
+		charter_offer.append(id)
+
+
+## Takes a charter from the offer: the path goes up a tier ("" or an id not offered lets this one go).
+func choose_charter(id: String) -> void:
+	if not awaiting_charter():
+		return
+	var offered := charter_offer.duplicate()
+	charter_offer = []
+	charters_due -= 1
+	if id in offered:
+		paths[id] = path_tier(id) + 1
+		tell("A charter for the %s path: %s" % [content.paths["paths"][id]["name"].to_lower(), content.paths["paths"][id]["tiers"][path_tier(id) - 1]["text"]])
+		# Heroes' stats and the market's prizes read mod(), so they take the new tier at once.
+		for hero in living_heroes():
+			world.hero_ai.apply_hero_stats(hero)
+	record.note_action({"kind": "charter", "offered": offered, "path": id if id in offered else "", "tier": path_tier(id) if id in offered else 0})
+	_roll_charter()
 
 
 ## Whether one of the town's traditions favours this building's cards.
@@ -465,6 +569,8 @@ func on_building_done(type: String) -> void:
 		age_up_round = round_number
 		age_rounds[next_age] = round_number
 		record.note_value("aged_up", next_age)
+		# Each age-up brings a charter, chosen at the next build phase.
+		charters_due += 1
 		world.town.lay_hearth_ground(next_age)
 		open_ring()
 		tell("The %s is raised. The %s begins: %s." % [def["name"], content.age_name(age), content.ages["ages"][age].get("begins", "")])
@@ -539,7 +645,7 @@ func can_take_pick(index: int) -> bool:
 	if phase != Phase.PICK or index < 0 or index >= pick_offer.size():
 		return false
 	var card := pick_offer[index]
-	return (card["kind"] in ["promote", "venture"] or population() + people.card_people(card) <= housing()) and int(stock["shells"]) >= int(card["cost"])
+	return (card["kind"] in ["promote", "venture", "guild"] or population() + people.card_people(card) <= housing()) and int(stock["shells"]) >= int(card["cost"])
 
 
 ## Takes a dawn card (-1 skips), then lets the day begin.
@@ -561,6 +667,9 @@ func choose_pick(index: int) -> void:
 			tell("%s arrives and sleeps in %s." % [describe(hero), world.hero_ai.bed_name(hero.lodging)])
 		elif card["kind"] == "promote":
 			people.promote(card)
+			taken = people.card_label(card)
+		elif card["kind"] == "guild":
+			people.charter_guild(card)
 			taken = people.card_label(card)
 		elif card["kind"] == "venture":
 			venture = people.go_venturing(card)
@@ -682,7 +791,7 @@ func food_needed_today() -> int:
 		eaten += world.count_buildings(type) * int(content.buildings[type].get("eats", {}).get("food", 0))
 	eaten += world.hero_ai.hounds() * int(world.hero_ai.kennel_def().get("food", 0))
 	# Light eaters and those who eat for two (marks and card modifiers: upkeep) shift the town's mouths.
-	var mouths := maxf(0.0, population() + world.folk_ai.folk_sum("upkeep"))
+	var mouths := maxf(0.0, population() + world.folk_ai.folk_sum("upkeep") - count_role("warrior") * mod("warrior_food_saving"))
 	return maxi(0, int(ceil(mouths * content.num("food_per_person_per_day") * (1.0 - 0.25 * racks) - growth))) + eaten
 
 
@@ -918,6 +1027,7 @@ func _enter_build() -> void:
 	pedlar = ""
 	pedlar_offer = world.pedlar.roll_offer() if world.pedlar.is_pedlar_round(round_number) else ([] as Array[Dictionary])
 	pedlar_settled = pedlar_offer.is_empty()
+	_roll_charter()
 	caravan.lay_out()
 	hand.deal()
 	record.begin_round()

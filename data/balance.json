@@ -116,6 +116,8 @@
 	"gentle_first_dawn": 2,
 	"tradition_random_bonus": {"food": 5, "stone": 5, "fuel": 5},
 	"tradition_card_weight": 3,
+	"_paths_note": "Run paths (data/paths.json): a path's buildings come up path_card_weight times as often in the blueprint draft. Trades guilds: a tribesperson leaning's band at its top tier is offered as a guild card at dawn (instead of a newcomer, one a dawn, the biggest band first) until chartered.",
+	"path_card_weight": 2,
 	"tradition_band_ease": 1,
 	"_spoils_note": "After each round the relic offer gains one card of spoils (relics tagged spoils, data/relics.json) from the kind of enemy the attack was made of; spoils_kinds names each kind on the card (enemy tag -> what the band of them is called); spoils_foes names one of them and many of them, for the card's total (\"You get 16 food now, from the 8 beasts that came.\").",
 	"spoils_kinds": {"human": "warband", "beast": "pack", "undead": "barrow-dead", "siege": "siege train"},

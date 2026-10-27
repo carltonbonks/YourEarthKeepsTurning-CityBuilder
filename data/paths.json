@@ -1,0 +1,26 @@
+{
+	"_note": "Run paths (Yusuf, 2026-10-27, plan https://claude.ai/artifact/6v3b5DfbBM3B4xwYJvj3Cu): four ways to specialise a run, each tiers deep (RunState.paths: path -> tier held). A founding tradition's path (path in data/traditions.json) starts at tier 1; each age-up brings a charter (RunState.charters_due), a pick of charter_choices paths' next tier at the next build phase (RunState.charter_offer, choose_charter). Slice 1 has tier I only, so a charter adds a path the town doesn't hold yet. Each tier: text (what it does, for the card), effects (summed with relics' and traditions' in RunState.mod(), same keys), dawn_card (a townsfolk role, or hero, always among the dawn cards when the pool has one: People.offer_picks). A path's buildings come up path_card_weight times as often in the blueprint draft (data/balance.json), like a tradition's. Effect keys only paths use so far: warrior_food_saving (share of each warrior's food the town saves), patrol_ease (warriors count this many more toward patrol pairs and squads), caravan_early (the southern caravan comes without its building), path_band_ease (every leaning bands this many sooner, not on top of a tradition's own ease).",
+	"charter_choices": 3,
+	"paths": {
+		"heroes": {"name": "Heroes", "short": "Few strong individuals", "text": "A town that lives by its champions.",
+			"buildings": ["tavern", "shrine", "hunting_lodge", "training_yard", "kennel", "duel_ring", "trophy_hall", "warden_hut", "gibbet_post", "guildhall", "chapel"],
+			"tiers": [
+				{"text": "A hero card at every dawn once heroes have somewhere to sleep. Training yards, kennels, duelling rings and trophy halls come up twice as often.", "dawn_card": "hero", "effects": {}}
+			]},
+		"warband": {"name": "Warband", "short": "Many disciplined fighters", "text": "A town that holds its edge with spears.",
+			"buildings": ["watch_post", "gate", "stone_yard", "levy_hall", "beacon_tower", "lookout_cairn", "causeway"],
+			"tiers": [
+				{"text": "A warrior card at every dawn. Warriors eat half as much, and they patrol in pairs and squads one warrior sooner.", "dawn_card": "warrior", "effects": {"warrior_food_saving": 0.5, "patrol_ease": 1}}
+			]},
+		"guilds": {"name": "Guilds", "short": "Tribespeople and craftsfolk", "text": "A town that grows by its hands.",
+			"buildings": ["forester", "charcoal_pit", "knapper", "hide_rack", "bone_carver", "smoke_hut", "brewhouse", "garden", "drying_rack", "woodcutters_camp", "quarry_camp", "foragers_camp", "smelter", "bronzesmith", "charcoal_burner", "bloomery", "blacksmith", "field", "townhouse"],
+			"tiers": [
+				{"text": "One more dawn card, always a tribesperson among them. Every band forms one member sooner (not on top of your tradition's own band).", "dawn_card": "tribesperson", "effects": {"pick_bonus": 1, "path_band_ease": 1}}
+			]},
+		"trade": {"name": "Trade", "short": "Shells as power", "text": "A town that buys what it can't grow.",
+			"buildings": ["market", "provisions_stall", "arms_stall", "hide_stall", "charm_stall", "counting_house", "runners_hut", "tin_diggings"],
+			"tiers": [
+				{"text": "The southern caravan comes from the start, without waiting for its building, and lays out rarer deals twice as often. Traders leave 5 more shells every round.", "effects": {"caravan_early": 1, "trade_rarity": 1.0, "income": 5}}
+			]}
+	}
+}

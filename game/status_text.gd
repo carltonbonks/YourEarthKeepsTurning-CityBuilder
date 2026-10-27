@@ -16,7 +16,7 @@ const BAR_GOODS := ["wood", "stone", "shells"]
 const RED := "#e05050"
 const AMBER := "#e0a050"
 ## The top bar's chips, left to right.
-const CHIPS := ["round", "hearth", "people", "food", "fuel", "goods", "relics"]
+const CHIPS := ["round", "hearth", "people", "food", "fuel", "goods", "relics", "paths"]
 
 
 ## The short text of one top-bar chip.
@@ -46,7 +46,23 @@ static func chip(run: RunState, id: String) -> String:
 			return "  ".join(parts) + ("  [color=#9aa]+%d more[/color]" % more if more > 0 and run.round_number >= 2 else "")
 		"relics":
 			return "Relics %d" % run.relics.size()
+		"paths":
+			return "  ".join(path_names(run))
 	return ""
+
+
+## The town's paths as short names with their tier, e.g. ["Heroes I", "Trade I"], in id order.
+static func path_names(run: RunState) -> PackedStringArray:
+	var out := PackedStringArray()
+	var ids := run.paths.keys()
+	ids.sort()
+	for id: String in ids:
+		out.append("%s %s" % [run.content.paths["paths"][id]["name"], roman(run.path_tier(id))])
+	return out
+
+
+static func roman(n: int) -> String:
+	return ["", "I", "II", "III", "IV"][clampi(n, 0, 4)]
 
 
 ## Whether a top-bar chip shows yet. The bar grows with the town (Yusuf, 2026-10-26): relics from the first one or
@@ -54,6 +70,8 @@ static func chip(run: RunState, id: String) -> String:
 static func chip_shown(run: RunState, id: String) -> bool:
 	if id == "relics":
 		return run.round_number >= 2 or not run.relics.is_empty()
+	if id == "paths":
+		return not run.paths.is_empty() or not run.guilds.is_empty()
 	return true
 
 
@@ -117,6 +135,19 @@ static func chip_tip(run: RunState, id: String) -> Dictionary:
 			for rid in run.relics:
 				t["lines"].append("%s: %s" % [content.relics[rid]["name"], content.relics[rid]["text"]])
 				t["line_colors"][t["lines"].size() - 1] = content.rarity_color(content.rarity_of("relic", rid))
+			return t
+		"paths":
+			var t := Tooltips.new_tip("Your paths")
+			var ids := run.paths.keys()
+			ids.sort()
+			for pid: String in ids:
+				var path: Dictionary = content.paths["paths"][pid]
+				for i in run.path_tier(pid):
+					t["lines"].append("%s %s: %s" % [path["name"], roman(i + 1), path["tiers"][i]["text"]])
+			for leaning: String in run.guilds:
+				var g: Dictionary = run.people.guild_def(leaning)
+				t["lines"].append("%s (%s): %s" % [g["name"], g["practice"].to_lower(), g["text"]])
+			t["lines"].append("Each age-up brings a charter: one more path, or the next tier of one you hold.")
 			return t
 	return {}
 

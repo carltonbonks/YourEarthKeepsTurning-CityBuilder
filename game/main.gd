@@ -219,6 +219,13 @@ func _found_by_chance() -> void:
 	_overlays.show_for_phase()
 
 
+func _take_charter(id: String) -> void:
+	run.choose_charter(id)
+	_overlays.hide()
+	_refresh()
+	_overlays.show_for_phase()
+
+
 func _invite_pedlar(id: String) -> void:
 	run.choose_pedlar(id)
 	_overlays.hide()
@@ -226,7 +233,7 @@ func _invite_pedlar(id: String) -> void:
 
 
 func _begin_round() -> void:
-	if run.phase != RunState.Phase.BUILD or _hand_view.draft_pending():
+	if run.phase != RunState.Phase.BUILD or _hand_view.draft_pending() or run.awaiting_charter():
 		return
 	run.begin_round()
 	_tick_acc = 0.0
@@ -331,7 +338,8 @@ func _refresh() -> void:
 ## once it is taken the screen goes and the hand is free. Left alone while a menu, the title screen or
 ## another pick (traditions, pedlar) is up.
 func _show_draft() -> void:
-	if _menu_open or _held_for_turn or _title_screen.visible or _tour.playing() or run.awaiting_traditions() or run.awaiting_pedlar():
+	if _menu_open or _held_for_turn or _title_screen.visible or _tour.playing() or run.awaiting_traditions() or run.awaiting_charter() \
+			or run.awaiting_pedlar():
 		return
 	if _held_for_sparkle:
 		_overlays.hide()
@@ -531,6 +539,7 @@ func _build_ui() -> void:
 	_overlays.traditions_chosen.connect(_found)
 	_overlays.random_tradition_chosen.connect(_found_by_chance)
 	_overlays.pedlar_chosen.connect(_invite_pedlar)
+	_overlays.charter_chosen.connect(_take_charter)
 	_overlays.new_run_requested.connect(_restart)
 	_overlays.seed_run_requested.connect(_new_run)
 	_overlays.closed.connect(_close_menu)

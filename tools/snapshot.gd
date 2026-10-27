@@ -32,10 +32,12 @@ extends SceneTree
 ## one-time tip due at that moment (off otherwise, so pictures stay clear); seen=<id,id> marks tips as seen. The player's settings are never saved.
 ## doll=1 (with pick=1) gives Hearth-mother's Doll with its twin due on this dawn's townsfolk card.
 ## hover=<card title> shows that card's hover panel beside it, as resting the mouse on it does.
+## charter=1 shows a charter pick at the round's build (as after an age-up); guild=<leaning> (with pick=1) deals that
+## leaning's trades guild card first.
 ## reeve=1 raises a Reeve's hut once the bot has played to the round; people=1 shows the People panel (needs reeve=1).
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0", "charter": "0", "guild": ""}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -124,6 +126,11 @@ func _init() -> void:
 		lk.start(main._arena, lk.kill)
 		lk._from_ms = Time.get_ticks_msec() - float(args["lastkill_ms"])
 	main._overlays.hide()
+	if args["charter"] == "1" and run.phase == RunState.Phase.BUILD:
+		run.charters_due += 1
+		run._roll_charter()
+		main._refresh()
+		main._overlays.show_for_phase()
 	if args["pedlars"] == "1" and run.awaiting_pedlar():
 		main._refresh()
 		main._overlays.show_for_phase()
@@ -132,6 +139,8 @@ func _init() -> void:
 		run.begin_round()
 		if args["venture"] != "":
 			run.pick_offer[0] = {"kind": "venture", "role": "venture", "cost": 0, "venture": args["venture"]}
+		if args["guild"] != "":
+			run.pick_offer[0] = {"kind": "guild", "role": "guild", "cost": 0, "leaning": args["guild"]}
 		if args["master"] != "":
 			var crafter: Unit = run.world.folk[0]
 			crafter.made["knapper"] = 9

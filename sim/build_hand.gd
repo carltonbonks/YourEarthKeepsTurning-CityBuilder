@@ -438,6 +438,8 @@ func _fill(rng: SeededRng, avoid: Array = []) -> void:
 			weight *= content.num("build_new_weight")
 		if run.tradition_favours(type):
 			weight *= content.num("tradition_card_weight")
+		if run.path_favours(type):
+			weight *= content.num("path_card_weight")
 		# A reroll leans away from what was just offered, so it feels like a fresh deal.
 		if avoid.has(type):
 			weight *= 0.25
@@ -540,6 +542,8 @@ func _craft_weights(avoid: Array) -> Dictionary:
 			weight *= run.content.num("build_need_weight")
 		if run.tradition_favours(craft["workshop"]) or run.tradition_favours(craft["stall"]):
 			weight *= run.content.num("tradition_card_weight")
+		if run.path_favours(craft["workshop"]) or run.path_favours(craft["stall"]):
+			weight *= run.content.num("path_card_weight")
 		if avoid.has("craft:" + id):
 			weight *= 0.25
 		out[id] = weight

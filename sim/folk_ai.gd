@@ -328,6 +328,9 @@ func _warrior_tick(unit: Unit) -> void:
 ## (patrol_groups in data/townsfolk.json; the largest tier reached counts).
 func patrol_group_size() -> int:
 	var patrolling := _warriors - _shadowing()
+	# A path may have them pair up sooner (patrol_ease).
+	if patrolling > 0:
+		patrolling += int(w.run.mod("patrol_ease"))
 	var size := 1
 	for tier: Dictionary in w.content.townsfolk["warrior"]["patrol_groups"]:
 		if patrolling >= int(tier["from"]):
@@ -564,7 +567,7 @@ func _worker_tick(unit: Unit) -> void:
 					var plain := mini(int(node["amount"]), carry_of(unit, node["gives"]))
 					if take > plain:
 						w.run.relic_fired("node_yield", take - plain)
-					node["amount"] = int(node["amount"]) - take
+					node["amount"] = int(node["amount"]) - _guild_drain(unit, node, take)
 					w.run.record.note_count("gathered", take, node["gives"])
 					if leans_to(unit, node["gives"]):
 						w.run.record.note_count("gathered_leaned", take, node["gives"])
@@ -668,7 +671,8 @@ func _choose_work(unit: Unit) -> void:
 		return
 	var best := plan_trip(unit)
 	# With nothing the town is short of in reach, lend a hand in town rather than fetch more of what it has.
-	if (best < 0 or _trip_need <= w.content.num("gather_need_floor")) and _lend_a_hand(unit):
+	# Guild members keep to their trade: they fetch their own goods rather than lend a hand.
+	if (best < 0 or _trip_need <= w.content.num("gather_need_floor")) and guild_of(unit).is_empty() and _lend_a_hand(unit):
 		return
 	if best < 0:
 		# Nothing worth fetching: wait a moment before looking again.
@@ -859,6 +863,8 @@ func plan_trip(unit: Unit) -> int:
 		var good: String = node["gives"]
 		if not need.has(good) or (unit.type_id == "craftsperson" and good != "wood") or not _can_gather(node):
 			continue
+		if not guild_of(unit).is_empty() and not leans_to(unit, good):
+			continue
 		var free := int(node["amount"]) - int(_claimed.get(i, 0))
 		# First dibs: a gatherer leaning to the good counts what the others there who don't could leave it.
 		if leans_to(unit, good):
@@ -885,6 +891,32 @@ func plan_trip(unit: Unit) -> int:
 			best = i
 			_trip_need = float(need[good])
 	return best
+
+
+## The trades guild a townsperson belongs to (its leaning's "guild" in data/townsfolk.json, once chartered), or {}.
+func guild_of(unit: Unit) -> Dictionary:
+	if unit.leaning == "" or not w.run.guilds.has(unit.leaning):
+		return {}
+	return w.content.townsfolk[unit.type_id]["leanings"][unit.leaning].get("guild", {})
+
+
+## What a gathering trip takes from its node: a guild that drains gently ("drain") takes only that share of the haul,
+## the rest carried over on the node so the sum stays exact; a guild that tends ("tend") marks the node to regrow at
+## dawn (World._tend_nodes).
+func _guild_drain(unit: Unit, node: Dictionary, take: int) -> int:
+	var g := guild_of(unit)
+	if g.is_empty() or not leans_to(unit, node["gives"]):
+		return take
+	if g.has("tend"):
+		node["guild_tend"] = maxf(float(node.get("guild_tend", 0.0)), float(g["tend"]))
+	if not g.has("drain"):
+		return take
+	var owed := float(node.get("drain_owed", 0.0)) + take * float(g["drain"])
+	var cost := mini(take, int(owed + 0.0001))
+	node["drain_owed"] = owed - cost
+	if take > cost:
+		w.run.record.note_count("guild_spared", take - cost, node["gives"])
+	return cost
 
 
 ## True when a townsperson's leaning is toward this good.
@@ -947,10 +979,13 @@ func band_size_needed(role: String, leaning: String, tier: Dictionary) -> int:
 	return int(tier["size"]) - band_ease(leaning)
 
 
-## How many fewer townsfolk this leaning's bands need: tradition_band_ease for a tradition's leaning, plus
+## How many fewer townsfolk this leaning's bands need: tradition_band_ease for a tradition's leaning (or the Guilds
+## path's path_band_ease for any leaning, whichever is more), plus
 ## band_ease from buildings (the brewhouse).
 func band_ease(leaning: String) -> int:
-	return (w.content.int_num("tradition_band_ease") if w.run.tradition_leanings().has(leaning) else 0) + int(w.run.mod("band_ease"))
+	# The Guilds path's ease (path_band_ease) doesn't stack with a tradition's own: every band at most one sooner.
+	var ease := maxi(w.content.int_num("tradition_band_ease") if w.run.tradition_leanings().has(leaning) else 0, int(w.run.mod("path_band_ease")))
+	return ease + int(w.run.mod("band_ease"))
 
 
 ## The band tier a townsperson's leaning reaches this step, or {} when it has no leaning or too few share it.
