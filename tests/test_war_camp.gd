@@ -1,5 +1,6 @@
 extends TestCase
-## The war camp: raiders catch-up holds back camp in the wilds instead of vanishing (EnemyAI.make_camp).
+## The war camp: raiders catch-up holds back camp in the wilds instead of vanishing (EnemyAI.make_camp), and march
+## with the next round's attack unless heroes break the camp first (mercy as a loan); glory for an uneased attack.
 
 
 func _run(seed_value := 4821) -> RunState:
@@ -78,26 +79,88 @@ func test_battering_rams_never_camp() -> void:
 	check_eq(run.world.enemy_ai.make_camp(siege), 0, "rams stay away")
 
 
-func test_clearing_the_camp_pays_spoils_and_frees_the_land() -> void:
+func test_breaking_the_camp_frees_the_land_and_pays_no_plunder() -> void:
 	var run := _run()
 	_weaken(run)
 	_eased_camp(run)
 	var w := run.world
 	var hero := run.people.make_hero()
 	run.people.add_hero(hero)
-	var camp: Dictionary = w.dens[w.camp_index()]
-	var spoils := int(camp["joined"]) * w.content.int_num("camp_spoils_per_raider")
 	var shells := int(run.stock["shells"])
 	var finds := hero.items.size() + hero.spares.size()
 	for e in w.enemy_ai.camp_raiders():
 		w.damage(hero, e, e.hp + 1.0)
-	check_eq(int(run.stock["shells"]), shells + spoils, "the town takes the plunder")
+	check_eq(int(run.stock["shells"]), shells, "weakness no longer pays: no plunder")
 	check(hero.items.size() + hero.spares.size() > finds, "the hero who ended it finds an item")
 	check_eq(w.camp_index(), -1, "the camp is gone")
 	check_eq(int(run.record.entry.get("camps_cleared", 0)), 1, "logged")
 	w._cleanup()
 	check_eq(w.dens.size(), w.content.int_num("den_count"), "the camp is taken off the map")
 	check(w.nodes.all(func(n: Dictionary) -> bool: return not w.held_by_camp(n)), "no node is held any more")
+
+
+func test_campers_march_with_the_next_rounds_attack_not_this_ones() -> void:
+	var run := _run()
+	_weaken(run)
+	var joined := _eased_camp(run, 8)
+	var w := run.world
+	check(joined > 0, "a camp formed")
+	check(run.waves.camp_due().is_empty(), "raiders held back this round aren't due yet")
+	w.roll_wave_sides()
+	w.enemy_ai.spawn_wave()
+	check_eq(w.enemy_ai.camp_raiders().size(), joined, "this round they stay in camp")
+	# Next round the loan comes due.
+	run.round_number = 9
+	run.next_wave = []
+	check_eq(run.waves.camp_due().size(), joined, "every camper is due")
+	check_eq(run.waves.attack().size(), joined, "the attack counts them")
+	var campers := w.enemy_ai.camp_raiders()
+	w.enemy_ai.spawn_wave()
+	check(w.enemy_ai.camp_raiders().is_empty(), "they left the camp")
+	check(campers.all(func(e: Unit) -> bool: return e.den_index < 0 and e.target == null), "they march on the hearth with the attack")
+	check_eq(w.camp_index(), -1, "an empty camp is gone")
+	check_eq(int(run.record.entry.get("camp_marched", 0)), joined, "logged")
+
+
+func test_heroes_who_break_the_camp_first_cancel_the_loan() -> void:
+	var run := _run()
+	_weaken(run)
+	_eased_camp(run, 8)
+	var w := run.world
+	run.round_number = 9
+	run.next_wave = []
+	for e in w.enemy_ai.camp_raiders():
+		w.damage(null, e, e.hp + 1.0)
+	check(run.waves.camp_due().is_empty(), "nobody left to march")
+	w.roll_wave_sides()
+	w.enemy_ai.spawn_wave()
+	check(w.enemies.filter(func(e: Unit) -> bool: return e.alive and e.den_index < 0).is_empty(), "nobody marches")
+
+
+func test_glory_adds_a_relic_card_when_the_attack_was_not_eased() -> void:
+	var run := _run()
+	for i in 40:
+		run.world.folk_ai.add_folk("warrior")
+	run.round_number = 3
+	run.waves.plan(3)
+	check(not run.outmatched, "a strong town isn't outmatched")
+	var offer := run._roll_relic_offer()
+	check(run.glory, "glory")
+	var base := run.content.int_num("relic_choices") + run.content.int_num("glory_relic_choices")
+	check_eq(offer.size() - (1 if not run.spoils.is_empty() else 0), base, "one more relic to choose from")
+
+
+func test_no_glory_for_an_eased_attack_even_under_the_black_banner() -> void:
+	var run := _run()
+	_weaken(run)
+	run.relics.append("black_banner")
+	run.round_number = 8
+	run.waves.plan(8)
+	check_eq(run.wave_eased, 0, "the banner turns catch-up off")
+	check(run.outmatched, "but the town was still outmatched")
+	var offer := run._roll_relic_offer()
+	check(not run.glory, "no glory")
+	check_eq(offer.size() - (1 if not run.spoils.is_empty() else 0), run.content.int_num("relic_choices"), "the usual offer")
 
 
 func test_campers_stay_through_the_end_of_a_round() -> void:
@@ -116,6 +179,6 @@ func test_hover_explains_the_camp_and_the_land_it_holds() -> void:
 	var w := run.world
 	var tip := Tooltips.den(run, w.dens[w.camp_index()])
 	check_eq(tip["title"], "War camp", "the camp has its own card")
-	check(" ".join(tip["lines"]).contains("plunder"), "it says clearing it pays")
+	check(" ".join(tip["lines"]).contains("march"), "it says the camp marches with the next attack")
 	var held: Dictionary = w.nodes.filter(func(n: Dictionary) -> bool: return w.held_by_camp(n))[0]
 	check(" ".join(Tooltips.node(run, held)["lines"]).contains("war camp"), "a held node says why nobody gathers it")

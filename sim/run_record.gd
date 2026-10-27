@@ -145,7 +145,12 @@ extends RefCounted
 ## 54: townsfolk at work (Yusuf, 2026-10-26): per round "folk_time" = {role: {kind: seconds}}, how each townsfolk
 ##     role spent the round (kinds work, fallback, idle, down from data/townsfolk.json time_kinds; workers by day,
 ##     warriors day and night), rounded to whole seconds.
-const RECORD_FORMAT := 54
+## 55: mercy as a loan (Yusuf, 2026-10-26): per round "camp_due" (war camp raiders who joined in an earlier round,
+##     due to march with this round's attack, as the round begins), "camp_marched" (how many did march),
+##     "outmatched" (the scheduled wave was over catch-up's limit) and "glory" (the town held an attack the warband
+##     didn't need to ease, so the relic offer had glory_relic_choices more). "wave" now also counts the camp's
+##     raiders due, and "power"'s "wave" includes those who marched. "camp_spoils" stays 0 (no plunder).
+const RECORD_FORMAT := 55
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -228,7 +233,8 @@ func begin_round() -> void:
 		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0, "towers_broken": 0,
 		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {}, "idle_seconds": {}, "trips_bumped": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
-		"camps_cleared": 0, "camp_spoils": 0, "hearty_meals": 0,
+		"camps_cleared": 0, "camp_spoils": 0, "camp_due": run.waves.camp_due().size(), "camp_marched": 0,
+		"outmatched": run.outmatched, "glory": false, "hearty_meals": 0,
 		"build_hands": [run.hand.hand_entry()], "blueprints": [], "impact": {},
 		"deals_offered": run.caravan.labels(), "deals_rolls": run.caravan.offers.map(CardRoll.roll_of), "deals": []}
 

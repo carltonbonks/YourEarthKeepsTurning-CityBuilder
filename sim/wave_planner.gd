@@ -42,16 +42,18 @@ func generate(for_round: int) -> Array[String]:
 ## Catch-up only ever shrinks a wave, so a town that pulls ahead keeps its lead. Raiders are held
 ## back from the end of the list (never the boss) until the wave is at most catch_up_max_ratio
 ## times the town's power, keeping at least catch_up_min_share of them. Sets run.wave_eased and
-## run.held_back (the raiders held back, who make a war camp: EnemyAI.make_camp).
+## run.held_back (the raiders held back, who make a war camp: EnemyAI.make_camp), and run.outmatched (true when the
+## scheduled wave was over that limit, even when a relic turns catch-up off; a round that wasn't earns glory).
 func plan(for_round: int) -> Array[String]:
 	var content := run.content
 	var wave := generate(for_round)
 	run.wave_eased = 0
 	run.held_back = []
 	var cap := content.num("catch_up_max_ratio")
+	var limit := cap * float(Power.town(run.world)["total"])
+	run.outmatched = cap > 0.0 and Power.wave(content, wave) > limit
 	if cap <= 0.0 or run.has_effect("no_catch_up"):
 		return wave
-	var limit := cap * float(Power.town(run.world)["total"])
 	var keep := ceili(wave.size() * content.num("catch_up_min_share"))
 	while wave.size() > keep and Power.wave(content, wave) > limit:
 		var i := wave.size() - 1
@@ -88,9 +90,26 @@ func probe(for_round: int, night: int) -> Array[String]:
 	return out
 
 
-## Enemy type id -> count of the planned wave, for the wave preview.
+## The war camp's raiders who march with this round's attack: those who joined it in an earlier round (the loan
+## comes due a round later) and are still alive. Heroes who break the camp first take them off the list.
+func camp_due() -> Array[String]:
+	var out: Array[String] = []
+	for e in run.world.enemy_ai.camp_raiders():
+		if e.joined_round < run.round_number:
+			out.append(e.type_id)
+	return out
+
+
+## Everything that comes on the attack night: the planned wave and the war camp's raiders who march with it.
+func attack() -> Array[String]:
+	var out := run.next_wave.duplicate()
+	out.append_array(camp_due())
+	return out
+
+
+## Enemy type id -> count of the attack (the planned wave and the war camp's raiders due), for the wave preview.
 func counts() -> Dictionary:
 	var out := {}
-	for id in run.next_wave:
+	for id in attack():
 		out[id] = int(out.get(id, 0)) + 1
 	return out

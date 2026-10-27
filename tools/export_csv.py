@@ -156,7 +156,7 @@ def main(raw_folder, out_folder):
                 "wave_eased": rd.get("wave_eased", 0),
                 "siege_damage": rd.get("siege_damage", 0),
                 "towers_broken": rd.get("towers_broken", 0),
-                **{k: rd.get(k, "") for k in ["camp_joined", "camp_raiders", "camps_cleared", "camp_spoils"]},
+                **{k: rd.get(k, "") for k in ["camp_joined", "camp_raiders", "camps_cleared", "camp_spoils", "camp_due", "camp_marched", "outmatched", "glory"]},
                 "gathered_total": sum(rd.get("gathered", {}).values()) if "gathered" in rd else "",
                 "gathered_leaned_total": sum(rd.get("gathered_leaned", {}).values()) if "gathered_leaned" in rd else "",
                 "hearty_meals": rd.get("hearty_meals", ""),

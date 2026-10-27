@@ -119,6 +119,7 @@ func make_camp(types: Array[String]) -> int:
 		e.spawned = true
 		e.den_index = ci
 		e.wander_goal = e.pos
+		e.joined_round = w.run.round_number
 		w.enemies.append(e)
 	camp["joined"] = int(camp["joined"]) + joining.size()
 	return joining.size()
@@ -150,8 +151,8 @@ func _camp_site() -> Vector2:
 	return at.normalized() * maxf(at.length() + w.content.num("camp_offset"), w.content.num("camp_min_distance"))
 
 
-## When the war camp's last raider falls the camp is cleared: the town takes the spoils, and a hero
-## who struck the last blow finds an item too.
+## When the war camp's last raider falls the camp is cleared: the town takes the spoils (camp_spoils_per_raider,
+## 0 since mercy became a loan), and a hero who struck the last blow finds an item.
 func on_camper_killed(victim: Unit, attacker: Unit) -> void:
 	var ci := w.camp_index()
 	if ci < 0 or victim.den_index != ci or not camp_raiders().is_empty():
@@ -162,8 +163,9 @@ func on_camper_killed(victim: Unit, attacker: Unit) -> void:
 	w.run.stock["shells"] = int(w.run.stock["shells"]) + spoils
 	w.run.record.note_count("camps_cleared", 1)
 	w.run.record.note_count("camp_spoils", spoils)
-	var who := "%s clears" % attacker.display_name if attacker != null and attacker.is_hero() else "Your people clear"
-	w.run.tell("%s the war camp: %d shells of plunder come back to town, and the land round it is free again." % [who, spoils])
+	var who := "%s breaks" % attacker.display_name if attacker != null and attacker.is_hero() else "Your people break"
+	var plunder := ": %d shells of plunder come back to town, and" % spoils if spoils > 0 else ": nobody marches from it now, and"
+	w.run.tell("%s the war camp%s the land round it is free again." % [who, plunder])
 	if attacker != null and attacker.is_hero():
 		w.hero_ai.give_item(attacker, Loot.roll(w.content, w.rng, w.run.round_number, w.run.age))
 
@@ -172,13 +174,34 @@ func spawn_wave() -> void:
 	w.wave_spawned = true
 	w.wave_stats["hearth_hp_before"] = w.hearth_hp
 	var types := w.run.next_wave
-	w.run.record.note_power(types)
+	w.run.record.note_power(w.run.waves.attack())
 	var interval := w.content.num("wave_spawn_interval")
 	w.night_report["raiders"] = int(w.night_report["raiders"]) + types.size()
 	for i in types.size():
 		var side: float = w.wave_sides[i % w.wave_sides.size()]
 		var at := Vector2.from_angle(side + w.rng.randf_range(-0.25, 0.25)) * w.content.num("world_radius")
 		w.enemies.append(make_enemy(types[i], at, w.time + i * interval))
+	_camp_marches()
+
+
+## The loan comes due: the war camp's raiders who joined it in an earlier round leave it and march on the hearth
+## with the attack. A camp left empty is gone (no plunder: nobody broke it).
+func _camp_marches() -> void:
+	var ci := w.camp_index()
+	if ci < 0:
+		return
+	var marching := camp_raiders().filter(func(e: Unit) -> bool: return e.joined_round < w.run.round_number)
+	if marching.is_empty():
+		return
+	for e: Unit in marching:
+		e.den_index = -1
+		e.target = null
+	w.night_report["raiders"] = int(w.night_report["raiders"]) + marching.size()
+	w.run.record.note_count("camp_marched", marching.size())
+	if camp_raiders().is_empty():
+		w.dens[ci]["cleared"] = true
+		w.dens[ci]["marched"] = true
+	w.run.tell("The war camp's %d raider%s march on the hearth with the attack." % [marching.size(), "" if marching.size() == 1 else "s"])
 
 
 ## A small raid on an early night, from a random side, not warned of.

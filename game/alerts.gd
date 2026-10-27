@@ -48,7 +48,7 @@ static func active(r: RunState) -> Array[Dictionary]:
 		out.append({"id": "eased:%d" % r.round_number, "text": "The warband holds back %d raider%s this round." % [
 			r.wave_eased, "" if r.wave_eased == 1 else "s"]})
 	if r.phase == RunState.Phase.BUILD and w.camp_index() >= 0:
-		out.append({"id": "camp:%d" % r.round_number, "text": "A war camp of %d raiders holds land in the wilds: heroes can clear it for plunder." % [
+		out.append({"id": "camp:%d" % r.round_number, "text": "A war camp of %d raiders holds land in the wilds: it marches with the attack unless heroes break it." % [
 			w.enemy_ai.camp_raiders().size()]})
 	if w.pedlar.is_open():
 		var pedlar: String = content.pedlars["pedlars"][w.pedlar.camp["id"]]["name"]
