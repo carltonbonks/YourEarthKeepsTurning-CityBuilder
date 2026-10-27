@@ -40,6 +40,10 @@ var welcome_pending := false
 var showing_welcome := false
 ## The blueprint draft is up (show_draft); it stays through a show_for_phase while building.
 var showing_draft := false
+## True while the dawn pick is up (the Elder speaks over it, Advisor).
+var showing_pick := false
+## The dawn pick's cards, in pick_offer order, so the Elder can frame one.
+var _pick_buttons: Array[CardView] = []
 var _box: VBoxContainer
 var _panel: PanelContainer
 
@@ -78,6 +82,13 @@ func _init() -> void:
 ## Where the pop-up is on screen, or an empty rect when none is up.
 func panel_rect() -> Rect2:
 	return _panel.get_global_rect() if visible else Rect2()
+
+
+## Where dawn card `index` is on screen, or an empty rect when the dawn pick isn't up.
+func pick_card_rect(index: int) -> Rect2:
+	if not (visible and showing_pick) or index < 0 or index >= _pick_buttons.size():
+		return Rect2()
+	return _pick_buttons[index].get_global_rect()
 
 
 ## Centres the pop-up, shrinking it to fit the screen when it is too big (never below MIN_SCALE).
@@ -191,7 +202,9 @@ func show_pick() -> void:
 		UiKit.fade_if_disabled(btn, _why_not_pick(card))
 		btn.pressed.connect(func() -> void: pick_taken.emit(i))
 		row.add_child(btn)
+		_pick_buttons.append(btn)
 	_skip_button("Nobody today", func() -> void: pick_taken.emit(-1))
+	showing_pick = true
 	show()
 
 
@@ -1004,6 +1017,8 @@ func show_people() -> void:
 func _clear() -> void:
 	showing_draft = false
 	showing_welcome = false
+	showing_pick = false
+	_pick_buttons.clear()
 	_peek(null)
 	for child in _box.get_children():
 		child.queue_free()

@@ -35,10 +35,12 @@ extends SceneTree
 ## path=heroes:3,warband:3 sets the town's paths (making a Legend, two sergeants and the caravan's path deals).
 ## charter=1 shows a charter pick at the round's build (as after an age-up); guild=<leaning> (with pick=1) deals that
 ## leaning's trades guild card first.
+## hungry=1 empties the food store so the Elder speaks up (Advisor); showme=1 also presses its Show me;
+## hearth=<share> sets the hearth's health to that share of its max.
 ## reeve=1 raises a Reeve's hut once the bot has played to the round; people=1 shows the People panel (needs reeve=1).
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0", "charter": "0", "guild": "", "path": ""}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0", "charter": "0", "guild": "", "path": "", "hungry": "0", "showme": "0", "hearth": ""}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -286,6 +288,14 @@ func _init() -> void:
 		main._arena.victory.born = Time.get_ticks_msec() - float(args["won_ms"])
 		if main._arena.victory.born + Victory.SHOW_MS <= Time.get_ticks_msec():
 			main._arena.skip_victory()
+	if args["hungry"] == "1":
+		run.stock["food"] = 0
+	if args["hearth"] != "":
+		run.world.hearth_hp = run.hearth_max_hp() * float(args["hearth"])
+	if args["hungry"] == "1" or args["hearth"] != "":
+		main._refresh()
+		main._advisor._shown_at = -10.0
+		main._advisor._show_me = args["showme"] == "1"
 	match args["screen"]:
 		"title":
 			main._show_title()

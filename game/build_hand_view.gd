@@ -42,6 +42,8 @@ var _hints: Array[Label] = []
 var _begin: Button
 ## Each section's panel by its title ("Core", "Your blueprints", ...), for highlights (FirstTips).
 var _sections := {}
+## The hand's building cards by type, so the Elder can frame one (Advisor).
+var _cards := {}
 
 
 func _init() -> void:
@@ -80,13 +82,16 @@ func refresh() -> void:
 		child.queue_free()
 	_hints.clear()
 	_sections.clear()
+	_cards.clear()
 	var core := _section("Core", "Always on offer")
 	for type: String in run.hand.basics():
-		core.add_child(_card(type, run.hand.need(type), "basic"))
+		_cards[type] = _card(type, run.hand.need(type), "basic")
+		core.add_child(_cards[type])
 	var mine := _section("Your blueprints", "Drafted this run")
-	for type: String in run.hand.blueprints:
-		if run.world.count_buildings(type, false) < run.building_max(type):
-			mine.add_child(_card(type, run.hand.need(type), "blueprint"))
+	for type: String in hand_types(run):
+		if not _cards.has(type):
+			_cards[type] = _card(type, run.hand.need(type), "blueprint")
+			mine.add_child(_cards[type])
 	if mine.get_child_count() == 0:
 		var empty := UiKit.note(mine, "None yet.", 12)
 		empty.custom_minimum_size.x = 120
@@ -101,6 +106,23 @@ func refresh() -> void:
 	_caravan_cards(trading)
 	_drop_if_empty(trading)
 	_fit.call_deferred()
+
+
+## The buildings the hand offers to order: the basics, then the drafted blueprints still below their max.
+static func hand_types(r: RunState) -> Array[String]:
+	var out: Array[String] = r.hand.basics()
+	for type: String in r.hand.blueprints:
+		if not out.has(type) and r.world.count_buildings(type, false) < r.building_max(type):
+			out.append(type)
+	return out
+
+
+## Where the hand's card for `type` is on screen, or an empty rect when it isn't showing.
+func card_rect(type: String) -> Rect2:
+	var card: Control = _cards.get(type)
+	if card == null or not is_instance_valid(card) or not is_visible_in_tree():
+		return Rect2()
+	return card.get_global_rect()
 
 
 ## A labelled block of cards with a plain edge, so where one kind of card ends and the next begins is plain

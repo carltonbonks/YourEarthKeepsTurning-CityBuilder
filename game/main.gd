@@ -51,6 +51,10 @@ var _story: StoryLog
 var _overlays: Overlays
 var _title_screen: TitleScreen
 var _tips: FirstTips
+var _advisor: Advisor
+## Where the Elder was at the last layout (the clock and alerts keep clear of it).
+var _elder_rect := Rect2()
+var _advisor_acc := 0.0
 var _tour: IntroTour
 ## The row under the map (heroes, story).
 var _bottom: HBoxContainer
@@ -82,6 +86,11 @@ func _process(delta: float) -> void:
 	if _held_for_kill and not _arena.last_kill_playing():
 		_held_for_kill = false
 		_on_pause()
+	if run.phase != RunState.Phase.SIM:
+		_advisor_acc += delta
+		if _advisor_acc >= 0.25:
+			_advisor_acc = 0.0
+			_check_advisor()
 	if run.phase != RunState.Phase.SIM or _overlays.visible or _title_screen.visible:
 		return
 	_live_acc += delta
@@ -152,9 +161,10 @@ func _new_run(seed_value: int, tour := true) -> void:
 	_run_id = RunHistory.new_run_id(seed_value)
 	_arena.run = run
 	_arena.reset_camera()
-	for part: Variant in [_top, _hand_view, _threat, _alerts, _heroes, _story, _overlays]:
+	for part: Variant in [_top, _hand_view, _threat, _alerts, _heroes, _story, _overlays, _advisor]:
 		part.set("run", run)
 	_alerts.reset()
+	_advisor.reset()
 	_story.refresh()
 	_menu_open = false
 	_held_for_turn = false
@@ -366,6 +376,24 @@ func _refresh_live() -> void:
 	_layout_hud()
 	if _tips != null:
 		_tips.check(run, _menu_open or _title_screen.visible or _tour.playing() or (_overlays.visible and _overlays.showing_welcome))
+	_check_advisor()
+
+
+## The Elder speaks over the hand or the dawn pick only, and waits while a highlight is up. Checked on each
+## refresh and, while the sim is stopped for a decision, a few times a second (a highlight may close meanwhile).
+func _check_advisor() -> void:
+	if _advisor == null or _tips == null:
+		return
+	var choosing := _overlays.showing_pick if _overlays.visible else run.phase == RunState.Phase.BUILD
+	_advisor.check(_menu_open or _title_screen.visible or _tour.playing() or _tips.shown_id() != "" or not choosing
+		or _held_for_turn or _held_for_sparkle)
+	if _alerts.quiet != _advisor.speaking_id():
+		_alerts.quiet = _advisor.speaking_id()
+		_alerts.refresh()
+	var taken := _advisor.taken_rect()
+	if taken != _elder_rect:
+		_elder_rect = taken
+		_layout_hud()
 
 
 ## Where a highlight's target is on screen (FirstTips): the pop-up, parts of the hand, the attack card or a chip.
@@ -406,6 +434,11 @@ func _layout_hud() -> void:
 	if _hand_view.visible:
 		bottom -= maxf(_hand_view.size.y, _hand_view.get_combined_minimum_size().y)
 	var blocks: Array[Rect2] = []
+	# The Elder sits over the hand's left end; the clock and alerts keep above it.
+	var elder := _elder_rect
+	if elder.has_area():
+		var map_at := _map_box.get_global_rect().position
+		blocks.append(Rect2(elder.position - map_at, elder.size))
 	var left_x := m + 2.0
 	var left := HudLayout.free_span(left_x, left_x + Alerts.WIDTH, m, bottom, blocks)
 	_corner.position = Vector2(left_x, left.x)
@@ -567,6 +600,17 @@ func _build_ui() -> void:
 	_tour = IntroTour.new()
 	_tour.finished.connect(_tour_done)
 	add_child(_tour)
+
+	# The Elder sits over the picks (its line is part of choosing), under the one-time highlights.
+	_advisor = Advisor.new()
+	_advisor.settings = settings
+	_advisor.build_card_rect = _hand_view.card_rect
+	_advisor.pick_card_rect = _overlays.pick_card_rect
+	_advisor.anchor_rect = func() -> Rect2:
+		if _overlays.visible and _overlays.showing_pick:
+			return _overlays.panel_rect()
+		return _hand_view.get_global_rect() if _hand_view.visible else Rect2()
+	add_child(_advisor)
 
 	# One-time highlights sit above everything, picks included.
 	_tips = FirstTips.new()
