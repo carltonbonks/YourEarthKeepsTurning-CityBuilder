@@ -22,6 +22,8 @@ func _init(run_state: RunState) -> void:
 func offer_picks() -> void:
 	var content := run.content
 	var world := run.world
+	crown_legend()
+	raise_sergeants()
 	var rng := SeededRng.stream(run.run_seed, "picks", run.round_number * 10 + world.day_index())
 	var pool: Array[Dictionary] = []
 	var roles := content.townsfolk.keys()
@@ -443,7 +445,9 @@ func _promotion_card(rng: SeededRng) -> Dictionary:
 	var rules := run.content.promotions
 	var candidates: Array[Dictionary] = []
 	for u in run.world.folk:
-		if u.type_id == "warrior" and u.kills >= int(rules["warrior"]["kills"]) and run.world.hero_ai.count_lodgings() > 0:
+		# On the Warband path's capstone such a warrior becomes a sergeant instead (raise_sergeants).
+		if u.type_id == "warrior" and u.kills >= int(rules["warrior"]["kills"]) and run.world.hero_ai.count_lodgings() > 0 \
+				and not run.has_effect("sergeants"):
 			candidates.append({"kind": "promote", "role": "warrior", "cost": int(rules["warrior"]["cost"]), "unit": u})
 		elif u.type_id == "craftsperson" and u.master_of == "":
 			var best := ""
@@ -515,6 +519,48 @@ func _knight(card: Dictionary) -> void:
 	run.tell("%s kneels in the guildhall and rises a %s." % [was, run.content.hero_classes[hero.type_id]["name"].to_lower()])
 	run.record.note_list("promotions", {"day": run.world.day_index() + 1, "role": "champion", "name": hero.display_name,
 		"became": hero.type_id, "trait": hero.trait_id, "level": hero.level, "kills": hero.kills})
+
+
+# --- Path capstones ---------------------------------------------------------------
+
+## The Heroes path's capstone (path_legend, data/paths.json): with no legend living, the highest-level hero becomes the
+## town's Legend, legend_levels levels up and carrying a mythic item of the age. Called each dawn and on the charter.
+func crown_legend() -> void:
+	if not run.has_effect("path_legend") or run.living_heroes().any(func(h: Unit) -> bool: return h.legend):
+		return
+	var best: Unit = null
+	for hero in run.living_heroes():
+		if best == null or hero.level > best.level or (hero.level == best.level and hero.xp > best.xp):
+			best = hero
+	if best == null:
+		return
+	best.legend = true
+	best.level += run.content.int_num("legend_levels")
+	var rng := SeededRng.stream(run.run_seed, "path_legend", run.round_number * 10 + run.world.day_index())
+	var item := Loot.mythic(run.content, rng, run.round_number, run.age, str(run.content.traits[best.trait_id].get("prefers", "")))
+	if not item.is_empty():
+		best.items[Loot.slot(run.content, item)] = item
+	run.world.hero_ai.apply_hero_stats(best)
+	best.hp = best.max_hp
+	run.record.note_list("legends", {"day": run.world.day_index() + 1, "name": best.display_name, "class": best.type_id,
+		"level": best.level, "item": item.get("base", "")})
+	run.tell("%s is hailed as the town's Legend%s. Warriors fight harder at their side." % [run.describe(best),
+		", bearing the %s" % Loot.describe(run.content, item) if not item.is_empty() else ""])
+
+
+## The Warband path's capstone (sergeants, data/paths.json): each warrior with the promotion's kills becomes a sergeant.
+func raise_sergeants() -> void:
+	if not run.has_effect("sergeants"):
+		return
+	var kills := int(run.content.promotions["warrior"]["kills"])
+	for u in run.world.folk:
+		if u.alive and u.type_id == "warrior" and not u.sergeant and not u.hired and u.kills >= kills:
+			u.sergeant = true
+			var before := u.max_hp
+			run.world.folk_ai.apply_folk_stats(u)
+			u.hp = minf(u.max_hp, u.hp + u.max_hp - before)
+			run.record.note_count("sergeants", 1)
+			run.tell("A warrior with %d kills is made sergeant. The warriors round them fight harder." % u.kills)
 
 
 # --- Heroes -----------------------------------------------------------------

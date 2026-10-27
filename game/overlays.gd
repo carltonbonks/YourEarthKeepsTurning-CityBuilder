@@ -309,7 +309,9 @@ func show_charter() -> void:
 		var btn := CardView.new(CardView.Size.LARGE, "path", "Charter · tier %s" % StatusText.roman(tier), path["name"])
 		btn.custom_minimum_size.x = 220
 		btn.add_chip(path["short"])
-		if tier > 1:
+		if tier >= content.paths["paths"][id]["tiers"].size():
+			btn.set_advice("Capstone")
+		elif tier > 1:
 			btn.set_advice("Deepens your path")
 		# A tier II's cost goes on its own red line (data/paths.json texts end "Cost: ...").
 		var parts := text.split(" Cost: ", true, 1)

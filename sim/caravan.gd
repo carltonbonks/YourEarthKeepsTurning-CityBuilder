@@ -38,7 +38,14 @@ func lay_out() -> void:
 	for id: String in ids:
 		var key := str(deal(id).get("only_with", ""))
 		if key != "" and run.has_effect(key) and not offers.any(func(o: Dictionary) -> bool: return o["deal"] == id):
-			offers.append({"deal": id, "need": need(id), "taken": false})
+			var sure := {"deal": id, "need": need(id), "taken": false}
+			# A curio names its relic as it is laid out, so the card can show it.
+			if deal(id).get("curio", false):
+				var pool := run._relic_pool(false)
+				if pool.is_empty():
+					continue
+				sure["relic"] = SeededRng.stream(run.run_seed, "curio", run.round_number).pick(pool)
+			offers.append(sure)
 	var trades: Dictionary = run.content.trades
 	var count := int(trades["offers"]) + int(run.mod("trade_deals"))
 	var rng := SeededRng.stream(run.run_seed, "trade_deals", run.round_number)
@@ -122,6 +129,8 @@ func gets(id: String, offer := {}) -> Dictionary:
 func gives(id: String, offer := {}) -> Dictionary:
 	var mult := maxf(0.0, 1.0 + CardRoll.card_sum(run.content, offer, "price_mult"))
 	var out := {}
+	if offer.has("relic"):
+		out["shells"] = int(run.content.trades["curio_prices"][run.content.rarity_of("relic", offer["relic"])])
 	for good: String in deal(id)["give"]:
 		out[good] = int(ceil(float(deal(id)["give"][good]) * mult))
 	return out
@@ -158,6 +167,8 @@ func blocker(index: int) -> String:
 		return "No hero has a weapon"
 	if int(def.get("relic", 0)) > 0 and run._relic_pool(false).is_empty():
 		return "No relics left"
+	if offers[index].has("relic") and run.relics.has(offers[index]["relic"]):
+		return "Already yours"
 	return ""
 
 
@@ -199,6 +210,11 @@ func take(index: int) -> bool:
 				run.world.hero_ai.apply_hero_stats(hero)
 				reforged += 1
 		entry["reforged"] = reforged
+	if offer.has("relic"):
+		run._gain_relic(offer["relic"])
+		entry["relic"] = offer["relic"]
+		run.record.note_count("curios", 1)
+		run.tell("The curio dealer hands over %s." % run.content.relics[offer["relic"]]["name"])
 	if int(def.get("relic", 0)) > 0:
 		var rng := SeededRng.stream(run.run_seed, "trade_relic", run.round_number)
 		var relic: String = rng.pick(run._relic_pool(false))

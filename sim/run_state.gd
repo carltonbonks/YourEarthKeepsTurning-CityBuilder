@@ -351,6 +351,9 @@ func choose_charter(id: String) -> void:
 		# Heroes' stats and the market's prizes read mod(), so they take the new tier at once.
 		for hero in living_heroes():
 			world.hero_ai.apply_hero_stats(hero)
+		# A capstone lands at once: the Legend is hailed and veterans made sergeant on the charter itself.
+		people.crown_legend()
+		people.raise_sergeants()
 	record.note_action({"kind": "charter", "offered": offered, "path": id if id in offered else "", "tier": path_tier(id) if id in offered else 0})
 	_roll_charter()
 

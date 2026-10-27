@@ -340,7 +340,7 @@ func _buy_goods(run: RunState) -> void:
 		var def := run.caravan.deal(id)
 		var give := run.caravan.gives(id, offer)
 		# A rolled deal (a bargain, a bigger lot) is worth taking too.
-		var wanted: bool = offer["need"] != "" or def.has("folk") or def.has("smith") or def.has("relic") or (offer.has("roll") \
+		var wanted: bool = offer["need"] != "" or def.has("folk") or def.has("smith") or def.has("relic") or def.has("curio") or (offer.has("roll") \
 			and not CardRoll.card_has(run.content, offer, "wave_share"))
 		if wanted and int(run.stock["shells"]) - int(give.get("shells", 0)) >= trade_reserve:
 			run.caravan.take(i)

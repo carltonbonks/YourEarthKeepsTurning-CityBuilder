@@ -190,6 +190,11 @@ def main(raw_folder, out_folder):
                 "mustered": rd.get("mustered", 0),
                 "dusk_stakes": rd.get("dusk_stakes", 0),
                 "hired_blades": rd.get("hired_blades", 0),
+                "legends": len(rd.get("legends", [])),
+                "sergeants": rd.get("sergeants", 0),
+                "aura_blows": sum(rd.get("aura_blows", {}).values()),
+                "masterworks": sum(rd.get("masterworks", {}).values()),
+                "curios": rd.get("curios", 0),
                 **({"earth_" + k: (sum(rd["shift"].get(k, {}).values()) if isinstance(rd["shift"].get(k, ""), dict) else rd["shift"].get(k, ""))
                     for k in ["swallowed", "dens_swallowed", "ridges", "raised", "rifts", "grown", "roads_refunded"]}
                    if "shift" in rd else {"earth_" + k: "" for k in ["swallowed", "dens_swallowed", "ridges", "raised",

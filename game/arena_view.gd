@@ -603,6 +603,8 @@ func _draw_folk(u: Unit) -> void:
 	var at := victory.place(u, now)
 	var p := _stand(at, r) - Vector2(0.0, victory.hop(u, now) * r)
 	_shadow(at, r)
+	if u.sergeant:
+		_aura_ring(at, Color("#e8c050"))
 	draw_circle(p, r, Color(run.content.townsfolk[u.type_id]["color"]))
 	_draw_marker(u, p + Vector2(0.0, r), r * 0.55)
 	if u.carry_amount > 0:
@@ -622,6 +624,11 @@ func _draw_marker(u: Unit, at: Vector2, size: float) -> void:
 	elif u.escorted:
 		shape = "diamond"
 		color = Color(run.content.townsfolk["warrior"]["escort_color"])
+	if u.sergeant:
+		# A sergeant (Warband path capstone): a gold chevron over its head (_draw_folk rings its reach).
+		var top := at - Vector2(0.0, size * 4.2)
+		draw_polyline(PackedVector2Array([top + Vector2(-size, 0), top + Vector2(0, -size * 0.8), top + Vector2(size, 0)]),
+			Color("#e8c050"), 2.0)
 	match shape:
 		"diamond":
 			draw_colored_polygon(PackedVector2Array([at + Vector2(0, -size), at + Vector2(size, 0), at + Vector2(0, size),
@@ -640,6 +647,13 @@ func _draw_enemy(e: Unit) -> void:
 	if e.den_index >= 0:
 		draw_arc(p, r, 0, TAU, 16, Color("#301818"), 1.5)
 	_bar(p + Vector2(-r, -r - 5), r * 2.0, e.hp_fraction(), Color("#e05050"))
+
+
+## A faint ring on the ground round a Legend or sergeant, as far as warriors fight harder beside them (aura_reach).
+func _aura_ring(at: Vector2, tint: Color) -> void:
+	var reach := float(run.content.paths.get("aura_reach", 0))
+	if reach > 0.0:
+		draw_polyline(_closed(_ground_ring(at, reach, 32)), Color(tint, 0.18), 1.5)
 
 
 ## A soft dark ellipse on the ground under something standing (tilted view only).
@@ -791,6 +805,10 @@ func _draw_hero(hero: Unit, font: Font) -> void:
 	else:
 		draw_circle(p, r, color)
 		draw_arc(p, r, 0, TAU, 24, Color.WHITE if hero.energy > 0.0 else Color("#e05050"), 1.5)
+	if hero.legend:
+		# The town's Legend (Heroes path capstone): an orange ring, and a faint ring of the reach it lifts.
+		draw_arc(p, r + 3.0, 0, TAU, 24, run.content.rarity_color("orange"), 2.5)
+		_aura_ring(at, run.content.rarity_color("orange"))
 	draw_string(font, p + Vector2(-4, 4), hero.display_name.left(1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.BLACK)
 	_bar(p + Vector2(-r, -r - 9), r * 2.0, hero.hp_fraction(), Color("#5ee07a"))
 	_bar(p + Vector2(-r, -r - 5), r * 2.0, hero.energy / run.content.num("hero_energy_max"), Color("#7fd0ff"))
