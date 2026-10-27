@@ -235,8 +235,11 @@ func step() -> void:
 	if pause != Pause.NONE:
 		return
 	var was_night := is_night()
+	var was_dusk := is_dusk()
 	var old_day := day_index()
 	time += dt
+	if is_dusk() and not was_dusk and day_index() == content.int_num("days_per_round") - 1 and run.has_effect("dusk_stakes"):
+		folk_ai.stake_the_way()
 	if is_night() and not was_night:
 		_nightfall()
 	if is_wave_night() and not wave_spawned:
@@ -316,6 +319,10 @@ func _nightfall() -> void:
 			run.tell("The fire burns low. A cold night: everyone suffers.")
 	if is_wave_night():
 		run.tell("Night %d falls. The warned attack is coming from the %s." % [day_index() + 1, " and ".join(side_names())])
+		var spears := folk.filter(func(u: Unit) -> bool: return u.alive and folk_ai.levied(u)).size()
+		if spears > 0 and run.has_effect("muster"):
+			run.record.note_count("mustered", spears)
+			run.tell("%d tribespeople take up spears beside the warriors." % spears)
 	else:
 		run.tell("Night %d falls." % (day_index() + 1))
 		enemy_ai.spawn_probe()
@@ -418,6 +425,14 @@ func nodes_fullness(tag: String) -> float:
 
 func _finish_round() -> void:
 	_end_of_night_effects()
+	# Hired blades (Trade path tier II) take their pay and go at the round's end.
+	var hired := folk.filter(func(u: Unit) -> bool: return u.hired)
+	if not hired.is_empty():
+		folk = folk.filter(func(u: Unit) -> bool: return not u.hired)
+		var alive := hired.filter(func(u: Unit) -> bool: return u.alive).size()
+		run.record.note_count("hired_blades", alive)
+		if alive > 0:
+			run.tell("The hired blades take their pay and ride south with the caravan.")
 	_lay_risen()
 	# Wanderers slink back to their dens at the end of a round.
 	enemies = enemies.filter(func(e: Unit) -> bool: return e.alive and e.den_index >= 0)

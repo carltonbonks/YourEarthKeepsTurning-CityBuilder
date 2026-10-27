@@ -32,16 +32,22 @@ func lay_out() -> void:
 		o["lingered"] = true
 		o["need"] = need(o["deal"])
 		offers.append(o)
+	# Deals only a path brings (only_with) are always laid out while the town has it, on top of the rest.
+	var ids: Array = run.content.trades["deals"].keys()
+	ids.sort()
+	for id: String in ids:
+		var key := str(deal(id).get("only_with", ""))
+		if key != "" and run.has_effect(key) and not offers.any(func(o: Dictionary) -> bool: return o["deal"] == id):
+			offers.append({"deal": id, "need": need(id), "taken": false})
 	var trades: Dictionary = run.content.trades
 	var count := int(trades["offers"]) + int(run.mod("trade_deals"))
 	var rng := SeededRng.stream(run.run_seed, "trade_deals", run.round_number)
 	# Each deal laid out rolls its own rarity and modifiers (CardRoll), on a stream of its own.
 	var roll_rng := SeededRng.stream(run.run_seed, "trade_roll", run.round_number)
 	var weights := {}
-	var ids: Array = trades["deals"].keys()
-	ids.sort()
+	var drawn := offers.size()
 	for id: String in ids:
-		if offers.any(func(o: Dictionary) -> bool: return o["deal"] == id):
+		if offers.any(func(o: Dictionary) -> bool: return o["deal"] == id) or deal(id).has("only_with"):
 			continue
 		if not run.content.age_reached(run.age, trades["deals"][id].get("age", "")):
 			continue
@@ -52,7 +58,7 @@ func lay_out() -> void:
 		if need(id) != "":
 			weight *= float(trades["need_weight"])
 		weights[id] = weight
-	while offers.size() < count and not weights.is_empty():
+	while offers.size() - drawn < count and not weights.is_empty():
 		var id := rng.weighted(weights)
 		weights.erase(id)
 		var offer := {"deal": id, "need": need(id), "taken": false}
@@ -146,7 +152,7 @@ func blocker(index: int) -> String:
 		return "Taken"
 	var id: String = offers[index]["deal"]
 	var def := deal(id)
-	if folk_count(id, offers[index]) > 0 and run.population() + folk_count(id, offers[index]) > run.housing():
+	if folk_count(id, offers[index]) > 0 and not def.get("hired", false) and run.population() + folk_count(id, offers[index]) > run.housing():
 		return "No room: build homes"
 	if int(def.get("smith", 0)) > 0 and not run.living_heroes().any(func(h: Unit) -> bool: return h.items.has("weapon")):
 		return "No hero has a weapon"
@@ -178,7 +184,7 @@ func take(index: int) -> bool:
 	roles.sort()
 	for role: String in roles:
 		for i in int(folk[role]):
-			run.world.folk_ai.add_folk(role)
+			run.world.folk_ai.add_folk(role).hired = def.get("hired", false)
 	var entry := {"deal": id, "rarity": run.content.rarity_of("deal", id)}
 	if offer.has("roll"):
 		entry["roll"] = offer["roll"]

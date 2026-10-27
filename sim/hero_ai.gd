@@ -132,7 +132,7 @@ func hero_tick(hero: Unit) -> void:
 	hero.drilled_at = w.time
 	if w.walk_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * w.content.num("drill_radius"), 4.0):
 		w.folk_ai.take_pupils(hero)
-		var xp := w.content.num("drill_xp_per_second") * w.dt
+		var xp := w.content.num("drill_xp_per_second") * w.dt * (1.0 + w.run.mod("drill_xp"))
 		hero.xp += xp
 		var key := w.run.record.impact_key(hero)
 		if not key.is_empty():
@@ -712,7 +712,7 @@ func _drill_tick(hero: Unit, yard: int) -> void:
 	hero.drilled_at = w.time
 	if w.walk_toward(hero, b["pos"], 24.0):
 		w.folk_ai.take_pupils(hero)
-		var xp := float(drills["xp_per_second"]) * w.dt
+		var xp := float(drills["xp_per_second"]) * w.dt * (1.0 + w.run.mod("drill_xp"))
 		hero.xp += xp
 		var key := w.run.record.impact_key(hero)
 		if not key.is_empty():

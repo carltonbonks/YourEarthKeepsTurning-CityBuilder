@@ -339,6 +339,23 @@ func add_control(c: Control) -> void:
 	_gives.add_child(c)
 
 
+## What taking the card costs beyond its price (a path's tier II), on its own red line like an orange plaque's price.
+func add_cost_line(text: String) -> CardView:
+	var p := _label(_gives, text, 10, Color("#f2a39b"))
+	p.autowrap_mode = TextServer.AUTOWRAP_WORD
+	p.custom_minimum_size.x = SHAPE[card_size].x - 24.0
+	var ps := StyleBoxFlat.new()
+	ps.bg_color = Color("#e0574a", 0.18)
+	ps.border_color = Color("#e0574a", 0.6)
+	ps.border_width_top = 1
+	ps.content_margin_left = 3
+	ps.content_margin_top = 1
+	ps.content_margin_bottom = 1
+	p.add_theme_stylebox_override("normal", ps)
+	_fit()
+	return self
+
+
 ## As many lines as fit; the whole text belongs in tooltip_text too. Small cards keep it for the hover panel only.
 func set_body(text: String, tint := DIM) -> CardView:
 	_body.text = text

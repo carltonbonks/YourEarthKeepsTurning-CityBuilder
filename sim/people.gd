@@ -31,13 +31,15 @@ func offer_picks() -> void:
 			continue
 		var leanings := leanings_open(role)
 		if leanings.is_empty():
-			pool.append({"kind": "folk", "role": role, "cost": 0})
+			pool.append({"kind": "folk", "role": role, "cost": folk_card_cost(role)})
 		# A leaning the town's traditions favour is always among those dealt (the first one, if several).
 		var favoured := run.tradition_leanings().filter(func(l: String) -> bool: return leanings.has(l))
-		for i in mini(leanings.size(), int(content.townsfolk[role].get("leaning_cards", 1))):
+		# The Heroes path's second tier deals fewer tribesperson cards (fewer_tribes, data/paths.json).
+		var dealt := int(content.townsfolk[role].get("leaning_cards", 1)) - (int(run.mod("fewer_tribes")) if role == "tribesperson" else 0)
+		for i in mini(leanings.size(), maxi(1, dealt)):
 			var leaning: String = favoured[0] if i == 0 and not favoured.is_empty() else rng.pick(leanings)
 			leanings.erase(leaning)
-			pool.append({"kind": "folk", "role": role, "cost": 0, "leaning": leaning})
+			pool.append({"kind": "folk", "role": role, "cost": folk_card_cost(role), "leaning": leaning})
 	if world.hero_ai.count_lodgings() > 0:
 		var hero := make_hero(true)
 		pool.append({"kind": "hero", "role": "hero", "cost": hero_card_cost(hero.type_id), "hero": hero})
@@ -80,7 +82,8 @@ func offer_picks() -> void:
 	# Rarer cards are drawn less often, less so as the run goes on (Content.rarity_odds).
 	while run.pick_offer.size() < slots and not pool.is_empty():
 		var card: Dictionary = rng.pick_by(pool, func(c: Dictionary) -> float:
-			return content.rarity_odds(card_rarity(c), run.round_number) * reeve_tilt(c))
+			return content.rarity_odds(card_rarity(c), run.round_number) * reeve_tilt(c) \
+				* (maxf(0.0, 1.0 - run.mod("hero_card_scarcity")) if c["kind"] == "hero" else 1.0))
 		pool.erase(card)
 		_roll_dawn_card(card, roll_rng)
 		run.pick_offer.append(card)
@@ -93,6 +96,12 @@ func offer_picks() -> void:
 		run.pick_offer.append(guild)
 	run.picks_left = 1 + int(run.mod("extra_picks"))
 	run.phase = RunState.Phase.PICK
+
+
+## A townsfolk dawn card's price in shells: free, unless the Trade path's second tier charges for tribespeople and
+## warriors (folk_card_shells, data/paths.json).
+func folk_card_cost(role: String) -> int:
+	return int(run.mod("folk_card_shells")) if role in ["tribesperson", "warrior"] else 0
 
 
 # --- Townsfolk at work (Yusuf, 2026-10-26) -----------------------------------------------------------------
@@ -333,7 +342,10 @@ func guild_ready() -> String:
 		if run.guilds.has(leaning) or not leanings[leaning].has("guild"):
 			continue
 		var size := int(counts.get("tribesperson/" + leaning, 0))
-		if run.world.folk_ai.band_level("tribesperson", leaning, size) >= tiers.size() and size > best_size:
+		# The Guilds path's second tier charters smaller bands (guild_band, data/paths.json).
+		var full := run.world.folk_ai.band_level("tribesperson", leaning, size) >= tiers.size() \
+			or (run.mod("guild_band") > 0.0 and size >= int(run.mod("guild_band")))
+		if full and size > best_size:
 			best = leaning
 			best_size = size
 	return best
@@ -542,6 +554,7 @@ func make_hero(drawn_by_lodging := false) -> Unit:
 
 func add_hero(hero: Unit) -> void:
 	hero.pos = Vector2.from_angle(run.heroes.size() * 1.7 + 0.4) * 60.0
+	_take_heirloom(hero)
 	run.world.hero_ai.apply_hero_stats(hero)
 	run.heroes.append(hero)
 	run.world.hero_ai.assign_lodgings()
@@ -552,6 +565,35 @@ func bury_heroes() -> void:
 		if not hero.alive:
 			run.heroes.erase(hero)
 			run.fallen.append(hero)
+			_keep_heirloom(hero)
+
+
+## The Heroes path's second tier (heirlooms, data/paths.json): a fallen hero's most valuable item is kept for the
+## next hero to arrive.
+func _keep_heirloom(hero: Unit) -> void:
+	if run.mod("heirlooms") <= 0.0 or hero.items.is_empty():
+		return
+	var best := {}
+	for slot: String in hero.items:
+		var item: Dictionary = hero.items[slot]
+		if best.is_empty() or Loot.value(run.content, item) > Loot.value(run.content, best):
+			best = item
+	run.heirlooms.append(best.duplicate(true))
+	run.tell("%s's %s is kept as an heirloom for the next hero." % [hero.display_name, Loot.describe(run.content, best)])
+
+
+## A newly arrived hero takes the oldest heirloom waiting, if it beats what they carry in that slot.
+func _take_heirloom(hero: Unit) -> void:
+	if run.heirlooms.is_empty():
+		return
+	var item: Dictionary = run.heirlooms[0]
+	var slot := Loot.slot(run.content, item)
+	if hero.items.has(slot) and Loot.value(run.content, hero.items[slot]) >= Loot.value(run.content, item):
+		return
+	run.heirlooms.remove_at(0)
+	hero.items[slot] = item
+	run.record.note_count("heirlooms_passed", 1)
+	run.tell("%s takes up the heirloom %s." % [hero.display_name, Loot.describe(run.content, item)])
 
 
 func unused_name() -> String:

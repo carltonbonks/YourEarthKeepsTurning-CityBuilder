@@ -121,8 +121,8 @@ func test_an_age_up_brings_a_charter_at_the_next_build() -> void:
 	run._roll_charter()
 	check(run.awaiting_charter(), "offered once dealt (at the next build)")
 	check_eq(run.charter_offer.size(), 3, "three paths offered")
-	check(not run.charter_offer.has("heroes"), "slice 1: a path held at its last tier isn't offered again")
-	var pick := run.charter_offer[0]
+	check_eq(run.charter_offer[0], "heroes", "the town's own path's next tier comes first")
+	var pick := run.charter_offer[1]
 	run.choose_charter(pick)
 	check_eq(run.path_tier(pick), 1, "the charter adds the path")
 	check_eq(run.charters_due, 0, "nothing more owed")
@@ -130,6 +130,23 @@ func test_an_age_up_brings_a_charter_at_the_next_build() -> void:
 	var charter: Array = run.record.entry["actions"].filter(func(a: Dictionary) -> bool: return a["kind"] == "charter")
 	check_eq(charter.size(), 1, "the record keeps the charter")
 	check_eq(charter[0]["path"], pick, "with the path taken")
+
+
+func test_a_path_at_its_last_tier_is_not_offered() -> void:
+	var run := _run(["hunters"])
+	run.paths["heroes"] = run.content.paths["paths"]["heroes"]["tiers"].size()
+	run.charters_due = 1
+	run._roll_charter()
+	check(not run.charter_offer.has("heroes"), "a path held at its last tier isn't offered again")
+	run.choose_charter("heroes")
+	check_eq(run.path_tier("heroes"), run.content.paths["paths"]["heroes"]["tiers"].size(), "nor raised past it")
+
+
+func test_every_tier_ii_names_its_cost() -> void:
+	var paths: Dictionary = Content.load_default().paths["paths"]
+	for id: String in paths:
+		check(paths[id]["tiers"].size() >= 2, "%s has a tier II" % id)
+		check("Cost:" in str(paths[id]["tiers"][1]["text"]), "%s II says what it costs" % id)
 
 
 func test_charters_are_seeded() -> void:
@@ -242,3 +259,159 @@ func test_a_gentle_guild_drains_slower() -> void:
 	check_eq(taken, 21, "ten hauls of 3 stone take 21 from the rock, not 30")
 	var plain := run.world.folk_ai.add_folk("tribesperson")
 	check_eq(w.folk_ai._guild_drain(plain, node, 3), 3, "someone outside the guild takes the full haul")
+
+
+# --- Tier IIs (slice 2) --------------------------------------------------------------
+
+func test_heroes_ii_keeps_a_fallen_heros_best_item_for_the_next() -> void:
+	var run := _run(["hunters"])
+	run.paths["heroes"] = 2
+	var fallen := run.people.make_hero()
+	fallen.items = {"weapon": Loot.make("obsidian_edge", 3), "armor": Loot.make("hide_armour", 1)}
+	run.people.add_hero(fallen)
+	fallen.alive = false
+	run.people.bury_heroes()
+	check_eq(run.heirlooms.size(), 1, "the fallen hero's best item is kept")
+	check_eq(run.heirlooms[0]["base"], "obsidian_edge", "the most valuable one")
+	var next := run.people.make_hero()
+	next.items = {}
+	run.people.add_hero(next)
+	check_eq(next.items.get("weapon", {}).get("base", ""), "obsidian_edge", "the next hero takes it up")
+	check(run.heirlooms.is_empty(), "and it's gone from the hall")
+	var plain := _run(["hunters"])
+	var lost := plain.people.make_hero()
+	lost.items = {"weapon": Loot.make("obsidian_edge", 3)}
+	plain.people.add_hero(lost)
+	lost.alive = false
+	plain.people.bury_heroes()
+	check(plain.heirlooms.is_empty(), "without the path nothing is kept")
+
+
+func test_heroes_ii_deals_fewer_tribespeople() -> void:
+	var plain := 0
+	var heroes := 0
+	for s in 12:
+		var a := _run([], 700 + s)
+		plain += _dawn(a).filter(func(c: Dictionary) -> bool: return c["role"] == "tribesperson").size()
+		a.dispose()
+		var b := _run([], 700 + s)
+		b.paths["heroes"] = 2
+		heroes += _dawn(b).filter(func(c: Dictionary) -> bool: return c["role"] == "tribesperson").size()
+		b.dispose()
+	check(heroes < plain, "fewer tribesperson cards on Heroes II (%d vs %d in 12 dawns)" % [heroes, plain])
+
+
+func _wave_night(run: RunState) -> void:
+	var w := run.world
+	w.time = (run.content.int_num("days_per_round") - 1) * w.day_length() + run.content.num("day_seconds") + 1.0
+
+
+func test_warband_ii_musters_tribespeople_at_half_strength() -> void:
+	var run := _band_run("forager", 1)
+	var tribe: Unit = run.world.folk.filter(func(u: Unit) -> bool: return u.type_id == "tribesperson")[0]
+	_wave_night(run)
+	check(not run.world.folk_ai.levied(tribe), "no muster without the path")
+	run.paths["warband"] = 2
+	check(run.world.folk_ai.levied(tribe), "on Warband II tribespeople take up spears on the warned night")
+	var warrior_blow := float(run.content.townsfolk["warrior"]["attack"])
+	check_eq(run.world.folk_ai.relic_damage(tribe, tribe.attack), warrior_blow * 0.5, "with half a warrior's blow")
+	run.world.time = 1.0
+	check(not run.world.folk_ai.levied(tribe), "but not by day")
+
+
+func test_warband_ii_warriors_stop_shadowing_gatherers() -> void:
+	var run := _run([])
+	run.begin_round()
+	run.choose_pick(-1)
+	for i in 4:
+		run.world.folk_ai.add_folk("warrior")
+	run.world.folk_ai.begin_step()
+	run.paths["warband"] = 2
+	check_eq(run.world.folk_ai._shadowing(), 0, "no warrior shadows a gatherer on Warband II")
+
+
+func _to_warned_dusk(run: RunState) -> void:
+	var w := run.world
+	w.time = (run.content.int_num("days_per_round") - 1) * w.day_length() + run.content.num("day_seconds") \
+		- run.content.num("dusk_seconds") - w.dt * 0.5
+	w.step()
+
+
+func test_warband_ii_stakes_the_attacks_way_at_dusk() -> void:
+	var plain := _band_run("forager", 4)
+	plain.stock["wood"] = 50
+	_to_warned_dusk(plain)
+	check(plain.world.barricades.is_empty(), "no barricades at dusk without the path")
+	var staked := _band_run("forager", 4)
+	staked.paths["warband"] = 2
+	staked.stock["wood"] = 50
+	check(not staked.world.wave_sides.is_empty(), "the round has an attack's way")
+	_to_warned_dusk(staked)
+	check(not staked.world.barricades.is_empty(), "at the warned dusk the town barricades the way in")
+	check(int(staked.record.entry.get("dusk_stakes", 0)) > 0, "the record counts it")
+
+
+func test_guilds_ii_charters_a_band_of_four() -> void:
+	var run := _band_run("woodcutter", 4)
+	check_eq(run.people.guild_ready(), "", "a band of four isn't ready on tier I")
+	run.paths["guilds"] = 2
+	check_eq(run.people.guild_ready(), "woodcutter", "it is on Guilds II")
+
+
+func test_guilds_ii_deals_hero_cards_less_often() -> void:
+	var plain := 0
+	var guilds := 0
+	for s in 30:
+		for tier in [0, 2]:
+			var run := _run([], 900 + s)
+			if tier > 0:
+				run.paths["guilds"] = tier
+			run.build("tavern")
+			for b in run.world.buildings:
+				b["work_left"] = 0.0
+			run.on_building_done("tavern")
+			var n := _dawn(run).filter(func(c: Dictionary) -> bool: return c["kind"] == "hero").size()
+			if tier > 0:
+				guilds += n
+			else:
+				plain += n
+			run.dispose()
+	check(guilds < plain, "hero cards come up less often on Guilds II (%d vs %d in 30 dawns)" % [guilds, plain])
+
+
+func test_trade_ii_folk_cards_cost_shells() -> void:
+	var run := _run([])
+	run.paths["trade"] = 2
+	for c in _dawn(run):
+		if c["role"] in ["tribesperson", "warrior"]:
+			check_eq(int(c["cost"]), 3, "a %s card costs 3 shells" % c["role"])
+	run.stock["shells"] = 0
+	var at := -1
+	for i in run.pick_offer.size():
+		if run.pick_offer[i]["role"] == "tribesperson":
+			at = i
+	check(at >= 0 and not run.can_take_pick(at), "and can't be taken without them")
+
+
+func test_trade_ii_hires_blades_for_the_round() -> void:
+	var run := _run([])
+	run.caravan.lay_out()
+	check(not run.caravan.offers.any(func(o: Dictionary) -> bool: return o["deal"] == "hired_blades"), "no hired blades without the path")
+	run.paths["trade"] = 2
+	run.caravan.lay_out()
+	var at := -1
+	for i in run.caravan.offers.size():
+		if run.caravan.offers[i]["deal"] == "hired_blades":
+			at = i
+	check(at >= 0, "Trade II lays out hired blades")
+	check_eq(run.caravan.offers.size(), int(run.content.trades["offers"]) + 1, "on top of the usual deals")
+	var people := run.population()
+	for i in run.housing() - people:
+		run.world.folk_ai.add_folk("tribesperson")
+	run.stock["shells"] = 100
+	check(run.caravan.take(at), "taken with no free beds")
+	check_eq(run.population(), run.housing(), "the blades need no beds")
+	var warriors := func() -> int: return run.world.folk.filter(func(u: Unit) -> bool: return u.type_id == "warrior").size()
+	var with_blades: int = warriors.call()
+	run.world._finish_round()
+	check_eq(warriors.call(), with_blades - 3, "they leave as the round ends")

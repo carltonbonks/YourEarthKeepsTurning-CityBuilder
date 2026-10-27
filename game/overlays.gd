@@ -311,7 +311,11 @@ func show_charter() -> void:
 		btn.add_chip(path["short"])
 		if tier > 1:
 			btn.set_advice("Deepens your path")
-		btn.set_body(text, CardView.TEXT).set_footer(path["text"])
+		# A tier II's cost goes on its own red line (data/paths.json texts end "Cost: ...").
+		var parts := text.split(" Cost: ", true, 1)
+		btn.set_body(parts[0], CardView.TEXT).set_footer(path["text"])
+		if parts.size() > 1:
+			btn.add_cost_line("Cost: " + parts[1])
 		var favoured: Array = path.get("buildings", []).filter(func(b: String) -> bool: return content.buildings.has(b))
 		btn.tooltip_text = "%s\n%s\nIts buildings come up %s times as often in the blueprint draft: %s." % [path["text"], text,
 			str(content.int_num("path_card_weight")), ", ".join(favoured.map(func(b: String) -> String: return content.buildings[b]["name"]))]

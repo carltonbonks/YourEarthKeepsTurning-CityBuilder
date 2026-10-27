@@ -249,16 +249,21 @@ func _folk_act(unit: Unit) -> void:
 		_worker_tick(unit)
 
 
-## Levy Horn: on the warned night tribespeople fight like warriors.
+## Levy Horn: on the warned night tribespeople fight like warriors (so does the Warband path's muster, more weakly).
 func levied(unit: Unit) -> bool:
-	return unit.type_id == "tribesperson" and w.is_wave_night() and w.run.has_effect("levy")
+	return unit.type_id == "tribesperson" and w.is_wave_night() and (w.run.has_effect("levy") or w.run.has_effect("muster"))
+
+
+## The share of a warrior's blow a levied tribesperson strikes: all of it with a levy, else the muster's share.
+func levy_share() -> float:
+	return 1.0 if w.run.has_effect("levy") else w.run.mod("muster")
 
 
 ## A townsperson's blow after relics: Horde Drum (fighters hit harder the more of them there are)
-## and Levy Horn (levied tribespeople hit as hard as warriors).
+## and Levy Horn (levied tribespeople hit as hard as warriors; mustered ones with levy_share of a warrior's blow).
 func relic_damage(unit: Unit, amount: float) -> float:
 	if levied(unit):
-		amount = maxf(amount, float(w.content.townsfolk["warrior"]["attack"]) * amount / maxf(1.0, unit.attack))
+		amount = maxf(amount, float(w.content.townsfolk["warrior"]["attack"]) * levy_share() * amount / maxf(1.0, unit.attack))
 	var per := int(w.run.mod("horde_per"))
 	if per > 0 and w.content.unit_has_tag(unit, "fighter"):
 		amount += w.run.mod("horde_damage") * ((fighters - 1) / per)
@@ -340,7 +345,8 @@ func patrol_group_size() -> int:
 
 ## How many warriors shadow gatherers this step: the first slots, by day only (see _shadows).
 func _shadowing() -> int:
-	if w.is_dusk():
+	# The Warband path's second tier keeps every warrior on the edge (no_escort, data/paths.json).
+	if w.is_dusk() or w.run.has_effect("no_escort"):
 		return 0
 	return mini(int(_warriors * float(w.content.townsfolk["warrior"].get("shadow_share", 0.0))), _shadow_spots.size())
 
@@ -497,7 +503,7 @@ func _worker_tick(unit: Unit) -> void:
 				var rate := work_rate(unit)
 				if unit.master_of == shop["type"]:
 					rate *= float(w.run.craft_trait(unit).get("craft_rate", 1.0))
-				rate *= 1.0 + float(w.content.buildings[shop["type"]].get("craft_speed", 0.0))
+				rate *= 1.0 + float(w.content.buildings[shop["type"]].get("craft_speed", 0.0)) + w.run.mod("guild_craft_speed")
 				shop["craft_left"] = float(shop["craft_left"]) - rate * w.dt
 				if float(shop["craft_left"]) <= 0.0:
 					w.market.finish_craft(unit.task_index, unit)
@@ -589,7 +595,7 @@ func _worker_tick(unit: Unit) -> void:
 ## up to per_alarm gaps on that side (Town.barricade_plots), paying each one's cost from stock while it can, and the
 ## nearest free hands run to raise each one (data/town.json barricades). Folk only know what was seen: the way the
 ## spotted raider comes, not the warned way.
-func raise_alarm(at: Vector2) -> void:
+func raise_alarm(at: Vector2, staked := false) -> void:
 	var def: Dictionary = w.content.town["barricades"]
 	var angle := at.angle()
 	if w.alarm_ways.any(func(a: float) -> bool: return absf(angle_difference(a, angle)) < float(def["band"])):
@@ -606,9 +612,22 @@ func raise_alarm(at: Vector2) -> void:
 			"broken": false, "cost": cost})
 		_send_hands(w.barricades.size() - 1)
 		raised += 1
-	if raised > 0:
+	if raised > 0 and staked:
+		w.run.tell("At dusk folk stake the way to the %s: %d gap%s barricaded against tonight's attack." % [World.compass(angle), raised, "" if raised == 1 else "s"])
+		w.run.record.note_count("barricades_planned", raised)
+	elif raised > 0:
 		w.run.tell("Raiders spotted to the %s: folk run to barricade %d gap%s." % [World.compass(angle), raised, "" if raised == 1 else "s"])
 		w.run.record.note_count("barricades_planned", raised)
+
+
+## The Warband path's second tier (dusk_stakes, data/paths.json): at the warned dusk the town barricades the ways
+## tonight's attack comes, as if raiders had been spotted there.
+func stake_the_way() -> void:
+	var before := w.barricades.size()
+	for side in w.wave_sides:
+		raise_alarm(Vector2.from_angle(side) * float(w.content.town["barricades"]["spot_range"]), true)
+	if w.barricades.size() > before:
+		w.run.record.note_count("dusk_stakes", w.barricades.size() - before)
 
 
 ## The nearest hands townsfolk free to barricade (a role with "barricades", not on an errand, levied or already
