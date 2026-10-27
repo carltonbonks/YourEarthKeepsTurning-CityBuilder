@@ -348,7 +348,7 @@ static func _knobs_on(knobs: Dictionary, kd: Dictionary) -> bool:
 	return knobs.keys().any(func(tag: String) -> bool: return tag in kd.get("tags", []))
 
 
-## The war camp: who is in it, what it holds, and what clearing it pays.
+## The war camp: who is in it, what it holds, and when it marches.
 static func war_camp(run: RunState, d: Dictionary) -> Dictionary:
 	var c := run.content
 	var t := new_tip(c.world["dens"][d["type"]]["name"])
@@ -362,8 +362,16 @@ static func war_camp(run: RunState, d: Dictionary) -> Dictionary:
 		who.append("%s x%d" % [n, counts[n]])
 	t["lines"].append("Raiders the warband held back: %s." % ", ".join(who))
 	t["lines"].append("They set on anyone who comes close, and townsfolk won't gather near the camp.")
-	t["lines"].append("Clear it for %d shells of plunder; the hero who ends it also finds an item." % [
-		int(d["joined"]) * c.int_num("camp_spoils_per_raider")])
+	var due := run.waves.camp_due().size()
+	if due > 0:
+		t["lines"].append("%d of them march with this round's attack unless heroes break the camp first." % due)
+	else:
+		t["lines"].append("They march with next round's attack unless heroes break the camp first.")
+	var spoils := int(d["joined"]) * c.int_num("camp_spoils_per_raider")
+	if spoils > 0:
+		t["lines"].append("Break it for %d shells of plunder; the hero who ends it also finds an item." % spoils)
+	else:
+		t["lines"].append("The hero who breaks it finds an item.")
 	return t
 
 

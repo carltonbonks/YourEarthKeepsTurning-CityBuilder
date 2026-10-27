@@ -82,7 +82,8 @@ func test_broken_crown_gives_two_relics_and_shrinks_offers() -> void:
 	check(run.relics.slice(1).all(func(id: String) -> bool: return not run.content.has_tag("relic", id, "pact")), "gifts are not pacts")
 	run.round_number = 2
 	var relics := run._roll_relic_offer().filter(func(id: String) -> bool: return not run.content.has_tag("relic", id, "spoils"))
-	check_eq(relics.size(), run.content.int_num("relic_choices") - 1, "one card fewer")
+	var glory := run.content.int_num("glory_relic_choices") if run.glory else 0
+	check_eq(relics.size(), run.content.int_num("relic_choices") - 1 + glory, "one card fewer")
 	run.dispose()
 
 

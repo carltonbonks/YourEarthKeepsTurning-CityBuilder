@@ -71,7 +71,7 @@ func refresh() -> void:
 	var w := run.world
 	var building := run.phase == RunState.Phase.BUILD
 	var town := roundi(float(Power.town(w)["total"]))
-	var attack := roundi(Power.wave(content, run.next_wave))
+	var attack := roundi(Power.wave(content, run.waves.attack()))
 	if building or not w.wave_spawned:
 		_title.text = "[b]Night %d attack[/b] from the [color=#ff7060]%s[/color]" % [content.int_num("days_per_round"), " and ".join(w.side_names())]
 	else:
@@ -82,10 +82,8 @@ func refresh() -> void:
 	var ratio := float(attack) / maxf(1.0, town)
 	_verdict.text = "They outmatch you" if ratio > OUTMATCHED else ("An even fight" if ratio > EVEN else "You should hold")
 	_verdict.add_theme_color_override("font_color", Color("#ff7060") if ratio > OUTMATCHED else (Color("#e0c070") if ratio > EVEN else Color("#a8d890")))
-	_wanted[_eased] = run.wave_eased > 0
-	_eased.text = "The warband holds back %d raider%s: your town looks too weak to be worth them all.%s" % [
-		run.wave_eased, "" if run.wave_eased == 1 else "s",
-		" %d make a war camp in the wilds." % run.camp_joined if run.camp_joined > 0 else ""]
+	_eased.text = "\n".join(loan_lines(run))
+	_wanted[_eased] = _eased.text != "" and (building or not w.wave_spawned)
 	_ways.text = "\n".join(EarthReport.ways(run))
 	_wanted[_ways] = building or not w.wave_spawned
 	fit(_max_height)
@@ -141,8 +139,22 @@ static func tip(r: RunState) -> Dictionary:
 	t["lines"].append("Power counts heroes, warriors, the hearth and towers against every raider coming.")
 	t["lines"].append("Earlier nights bring only wanderers and small probes.")
 	t["lines"].append("The warband comes by a den's way and crosses one near plate on its way in. Between rounds that ring clicks round a plate, so the ground it crosses changes: hover a plate on the map to see what it does.")
-	if r.wave_eased > 0:
-		t["lines"].append("Catch-up: the warband holds back raiders when your town has fallen far behind. A strong town never faces more for being strong.")
-		t["lines"].append("Held-back raiders make a war camp out in the wilds: it blocks gathering nearby until heroes clear it, and clearing it pays.")
+	if r.wave_eased > 0 or not r.waves.camp_due().is_empty():
+		t["lines"].append("Catch-up is a loan: when your town has fallen far behind, the warband holds raiders back for a round. They make a war camp in the wilds that blocks gathering nearby, then march with the next attack unless heroes break the camp first. A strong town never faces more for being strong.")
+	if not r.outmatched:
+		t["lines"].append("Glory: hold this attack at full strength and you get one more relic to choose from.")
 	return t
+
+
+## The warband's loan in a line or two: raiders held back this round, and the war camp's raiders due tonight.
+static func loan_lines(r: RunState) -> Array[String]:
+	var out: Array[String] = []
+	var due := r.waves.camp_due().size()
+	if due > 0:
+		out.append("The war camp's %d raider%s march with this attack unless your heroes break the camp first." % [due, "" if due == 1 else "s"])
+	if r.wave_eased > 0:
+		out.append("The warband holds back %d raider%s: your town looks too weak to be worth them all.%s" % [
+			r.wave_eased, "" if r.wave_eased == 1 else "s",
+			" %d make a war camp and march with next round's attack." % r.camp_joined if r.camp_joined > 0 else ""])
+	return out
 

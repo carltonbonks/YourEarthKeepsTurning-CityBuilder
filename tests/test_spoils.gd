@@ -24,7 +24,7 @@ func test_no_spoils_without_an_attack() -> void:
 	var run := _run([] as Array[String])
 	var offer := run._roll_relic_offer()
 	check(run.spoils.is_empty(), "nothing came, so nothing to take")
-	check_eq(offer.size(), run.content.int_num("relic_choices"), "just the relics")
+	check_eq(offer.size(), run.content.int_num("relic_choices") + (1 if run.glory else 0), "just the relics (and glory's)")
 
 
 func test_pack_train_scales_with_the_warband() -> void:

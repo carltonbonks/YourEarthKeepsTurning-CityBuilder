@@ -61,6 +61,10 @@ var wave_eased := 0
 ## This round's raiders the warband held back, and how many of them joined the war camp.
 var held_back: Array[String] = []
 var camp_joined := 0
+## True when this round's scheduled wave outmatched the town enough for catch-up (see WavePlanner.plan).
+var outmatched := false
+## True when the town held an attack the warband didn't need to ease: the relic offer has glory_relic_choices more.
+var glory := false
 ## Plain-language story of what happened, newest last.
 var story: Array[String] = []
 ## The last night's report, shown at the next decision (see World.night_report).
@@ -906,7 +910,10 @@ func _enter_build() -> void:
 	if wave_eased > 0:
 		tell("Scouts say the warband holds back %d of its number: your camp looks too weak to be worth them all." % wave_eased)
 	if camp_joined > 0:
-		tell("%d of them make a war camp out in the wilds. Gatherers can't work near it until heroes clear it." % camp_joined)
+		tell("%d of them make a war camp out in the wilds. Gatherers can't work near it, and next round they march with the attack unless heroes break the camp first." % camp_joined)
+	var due := waves.camp_due().size()
+	if due > 0:
+		tell("The war camp's %d raider%s march with this round's attack unless heroes break the camp first." % [due, "" if due == 1 else "s"])
 	world.roll_wave_sides()
 	pedlar = ""
 	pedlar_offer = world.pedlar.roll_offer() if world.pedlar.is_pedlar_round(round_number) else ([] as Array[Dictionary])
@@ -997,6 +1004,11 @@ func _relic_odds(id: String) -> float:
 func _roll_relic_offer() -> Array[String]:
 	var rng := SeededRng.stream(run_seed, "relics", round_number)
 	var choices := maxi(1, content.int_num("relic_choices") + int(mod("relic_choices")))
+	glory = not outmatched and content.int_num("glory_relic_choices") > 0
+	if glory:
+		choices += content.int_num("glory_relic_choices")
+		tell("Glory: the warband came at full strength and your people held. One more relic to choose from.")
+		record.note_value("glory", true)
 	var pool := _relic_pool(is_pact_round())
 	var offer: Array[String] = []
 	while offer.size() < choices and not pool.is_empty():
