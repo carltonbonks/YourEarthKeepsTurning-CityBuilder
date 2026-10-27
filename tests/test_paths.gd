@@ -415,3 +415,131 @@ func test_trade_ii_hires_blades_for_the_round() -> void:
 	var with_blades: int = warriors.call()
 	run.world._finish_round()
 	check_eq(warriors.call(), with_blades - 3, "they leave as the round ends")
+
+
+# --- Capstones (slice 3) -------------------------------------------------------------
+
+func test_every_path_ends_in_a_capstone() -> void:
+	var paths: Dictionary = Content.load_default().paths["paths"]
+	for id: String in paths:
+		check_eq(paths[id]["tiers"].size(), 3, "%s has three tiers" % id)
+
+
+func test_heroes_iii_hails_the_highest_level_hero_as_legend() -> void:
+	var run := _run(["hunters"])
+	var low := run.people.make_hero()
+	low.level = 2
+	run.people.add_hero(low)
+	var high := run.people.make_hero()
+	high.level = 4
+	run.people.add_hero(high)
+	run.people.crown_legend()
+	check(not high.legend, "no legend below the capstone")
+	run.paths["heroes"] = 3
+	run.people.crown_legend()
+	check(high.legend and not low.legend, "the highest-level hero becomes the Legend")
+	check_eq(high.level, 4 + run.content.int_num("legend_levels"), "a few levels up")
+	run.people.crown_legend()
+	check_eq(high.level, 4 + run.content.int_num("legend_levels"), "and only once while they live")
+	high.alive = false
+	run.people.crown_legend()
+	check(low.legend, "when the Legend falls the next hero takes up the name")
+
+
+func test_warriors_hit_harder_beside_the_legend() -> void:
+	var run := _band_run("forager", 0)
+	run.paths["heroes"] = 3
+	var hero := run.people.make_hero()
+	run.people.add_hero(hero)
+	run.people.crown_legend()
+	var warrior := run.world.folk_ai.add_folk("warrior")
+	warrior.pos = Vector2(500, 0)
+	hero.pos = Vector2(0, 0)
+	var far := run.world.folk_ai.relic_damage(warrior, 10.0)
+	warrior.pos = Vector2(40, 0)
+	var near := run.world.folk_ai.relic_damage(warrior, 10.0)
+	check_eq(near, far * 1.2, "a warrior near the Legend hits 20% harder (%.1f vs %.1f)" % [near, far])
+
+
+func test_warband_iii_makes_veterans_sergeants_not_heroes() -> void:
+	var run := _band_run("forager", 0)
+	run.phase = RunState.Phase.BUILD
+	for good: String in run.stock:
+		run.stock[good] = 99
+	check(run.build("tavern"), "a tavern for the heroes")
+	for b in run.world.buildings:
+		b["work_left"] = 0.0
+	run.on_building_done("tavern")
+	var vet := run.world.folk_ai.add_folk("warrior")
+	vet.kills = int(run.content.promotions["warrior"]["kills"])
+	var rng := SeededRng.stream(1, "test")
+	check(not run.people._promotion_card(rng).is_empty(), "without the capstone the veteran is offered as a hero")
+	run.paths["warband"] = 3
+	check(run.people._promotion_card(rng).is_empty(), "on Warband III they aren't")
+	var hp := vet.max_hp
+	run.people.raise_sergeants()
+	check(vet.sergeant, "they become a sergeant")
+	check_eq(vet.max_hp, hp + float(run.content.paths["sergeant_hp"]), "with more HP")
+	var other := run.world.folk_ai.add_folk("warrior")
+	other.pos = Vector2(600, 0)
+	vet.pos = Vector2(0, 0)
+	run.world.folk_ai.begin_step()
+	var far := run.world.folk_ai.relic_damage(other, 10.0)
+	other.pos = Vector2(30, 0)
+	check_eq(run.world.folk_ai.relic_damage(other, 10.0), far * 1.2, "a warrior near the sergeant hits 20% harder")
+
+
+func _craft_many(run: RunState, n: int) -> Array:
+	var raise := func(type: String) -> int:
+		run.stock["wood"] = 99
+		run.stock["stone"] = 99
+		run.stock["shells"] = 99
+		check(run.build(type), "can order a %s" % type)
+		var i := run.world.buildings.size() - 1
+		run.world.buildings[i]["work_left"] = 0.0
+		run.on_building_done(type)
+		return i
+	raise.call("market")
+	var stall: int = raise.call("arms_stall")
+	var knapper: int = raise.call("knapper")
+	var made := []
+	for k in n:
+		for good: String in run.stock:
+			run.stock[good] = 99
+		if not run.world.market.start_craft(knapper):
+			check(false, "the knapper has something to make")
+			break
+		run.world.market.finish_craft(knapper)
+		made.append_array(run.world.buildings[stall]["goods"].filter(func(g: Dictionary) -> bool: return g.has("item")))
+		run.world.buildings[stall]["goods"].clear()
+	return made
+
+
+func test_guilds_iii_rolls_masterworks() -> void:
+	var plain := _craft_many(_run([]), 60)
+	var run := _run([])
+	run.paths["guilds"] = 3
+	var master := _craft_many(run, 60)
+	var rare := func(goods: Array) -> int: return goods.filter(func(g: Dictionary) -> bool: return not g["item"]["affixes"].is_empty()).size()
+	check(rare.call(master) > rare.call(plain), "more gear with affixes on Guilds III (%d vs %d of 60)" % [rare.call(master), rare.call(plain)])
+	check(int(run.record.entry.get("masterworks", {}).get("blue", 0)) > 0, "the record counts masterworks")
+
+
+func test_trade_iii_curio_dealer_sells_a_named_relic() -> void:
+	var run := _run([])
+	run.paths["trade"] = 3
+	run.caravan.lay_out()
+	var at := -1
+	for i in run.caravan.offers.size():
+		if run.caravan.offers[i]["deal"] == "curio_dealer":
+			at = i
+	check(at >= 0, "Trade III lays out the curio dealer")
+	var offer: Dictionary = run.caravan.offers[at]
+	var relic: String = offer.get("relic", "")
+	check(run.content.relics.has(relic), "naming its relic")
+	var price := int(run.caravan.gives("curio_dealer", offer)["shells"])
+	check_eq(price, int(run.content.trades["curio_prices"][run.content.rarity_of("relic", relic)]), "priced by its rarity")
+	run.stock["shells"] = price
+	check(run.caravan.take(at), "bought for shells")
+	check(run.relics.has(relic), "the town has the relic")
+	check_eq(int(run.stock["shells"]), 0, "and paid for it")

@@ -32,12 +32,13 @@ extends SceneTree
 ## one-time tip due at that moment (off otherwise, so pictures stay clear); seen=<id,id> marks tips as seen. The player's settings are never saved.
 ## doll=1 (with pick=1) gives Hearth-mother's Doll with its twin due on this dawn's townsfolk card.
 ## hover=<card title> shows that card's hover panel beside it, as resting the mouse on it does.
+## path=heroes:3,warband:3 sets the town's paths (making a Legend, two sergeants and the caravan's path deals).
 ## charter=1 shows a charter pick at the round's build (as after an age-up); guild=<leaning> (with pick=1) deals that
 ## leaning's trades guild card first.
 ## reeve=1 raises a Reeve's hut once the bot has played to the round; people=1 shows the People panel (needs reeve=1).
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0", "charter": "0", "guild": ""}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0", "charter": "0", "guild": "", "path": ""}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -126,6 +127,20 @@ func _init() -> void:
 		lk.start(main._arena, lk.kill)
 		lk._from_ms = Time.get_ticks_msec() - float(args["lastkill_ms"])
 	main._overlays.hide()
+	if args["path"] != "":
+		# path=<id>:<tier>[,...] sets the town's paths, hails a Legend, makes sergeants and lays the caravan out again.
+		for spec in args["path"].split(","):
+			var pt: PackedStringArray = spec.split(":")
+			run.paths[pt[0]] = int(pt[1]) if pt.size() > 1 else 1
+		run.people.crown_legend()
+		for u in run.world.folk.filter(func(f: Unit) -> bool: return f.type_id == "warrior").slice(0, 2):
+			u.kills = maxi(u.kills, int(run.content.promotions["warrior"]["kills"]))
+		run.people.raise_sergeants()
+		if run.phase == RunState.Phase.BUILD:
+			run.caravan.lay_out()
+		# A charter shown next must open first, as in play (the draft waits for it).
+		if args["charter"] != "1":
+			main._refresh()
 	if args["charter"] == "1" and run.phase == RunState.Phase.BUILD:
 		run.charters_due += 1
 		run._roll_charter()

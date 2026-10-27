@@ -526,6 +526,8 @@ func _deal_card(index: int) -> CardView:
 		btn.add_people(roles)
 	if def.get("hired", false):
 		btn.add_chip("this round only")
+	if offer.has("relic"):
+		btn.add_chip(content.relics[offer["relic"]]["name"], "relic", CardView.GOOD)
 	if int(def.get("smith", 0)) > 0:
 		btn.add_chip("weapons +%d tier%s" % [def["smith"], "s" if int(def["smith"]) > 1 else ""], "", CardView.GOOD)
 	if int(def.get("relic", 0)) > 0:
@@ -557,6 +559,8 @@ static func deal_brings(r: RunState, id: String, offer := {}) -> String:
 		parts.append("hero weapons +%d tier%s" % [def["smith"], "s" if int(def["smith"]) > 1 else ""])
 	if int(def.get("relic", 0)) > 0:
 		parts.append("a relic")
+	if offer.has("relic"):
+		parts.append("%s (%s)" % [r.content.relics[offer["relic"]]["name"], r.content.relics[offer["relic"]]["text"]])
 	return ", ".join(parts)
 
 

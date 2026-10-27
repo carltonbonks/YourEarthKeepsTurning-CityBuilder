@@ -145,6 +145,20 @@ func finish_craft(index: int, crafter: Unit = null) -> void:
 			var ids: Array = w.content.items["affixes"].keys().filter(func(a: String) -> bool: return a != "cursed")
 			ids.sort()
 			affixes.append(w.rng.pick(ids))
+		# The Guilds path's capstone (masterworks): gear rolls blue (an affix at least) or yellow (two at least).
+		var at_least := 0
+		if w.run.has_effect("masterwork_blue") or w.run.has_effect("masterwork_yellow"):
+			var roll := w.rng.randf()
+			if roll < w.run.mod("masterwork_yellow"):
+				at_least = 2
+			elif roll < w.run.mod("masterwork_yellow") + w.run.mod("masterwork_blue"):
+				at_least = 1
+		if affixes.size() < at_least:
+			var pool: Array = w.content.items["affixes"].keys().filter(func(a: String) -> bool: return a != "cursed" and not affixes.has(a))
+			pool.sort()
+			while affixes.size() < at_least and not pool.is_empty():
+				affixes.append(pool.pop_at(w.rng.randi_range(0, pool.size() - 1)))
+			w.run.record.note_count("masterworks", 1, "yellow" if at_least >= 2 else "blue")
 		good["item"] = Loot.make(r["item"], int(good["tier"]), affixes)
 	b["craft"] = ""
 	b["made"] = int(b["made"]) + 1

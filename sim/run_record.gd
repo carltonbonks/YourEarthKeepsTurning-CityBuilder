@@ -161,7 +161,11 @@ extends RefCounted
 ## 58: path tier IIs (Yusuf, 2026-10-27): per round "heirlooms_passed" (heroes who took up a fallen hero's item),
 ##     "mustered" (tribespeople who took up spears on the warned night), "dusk_stakes" (barricades planned at the
 ##     warned dusk) and "hired_blades" (hired warriors who left at the round's end).
-const RECORD_FORMAT := 58
+## 59: path capstones (Yusuf, 2026-10-27): per round "legends" (heroes hailed as the town's Legend: day, name, class,
+##     level, item), "sergeants" (warriors made sergeant), "aura_blows" (legend/sergeant -> warrior blows they lifted),
+##     "masterworks" (blue/yellow -> workshop gear rolled up) and "curios" (relics bought from the curio dealer; the
+##     deal's "deals" entry names the relic).
+const RECORD_FORMAT := 59
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -242,7 +246,7 @@ func begin_round() -> void:
 		"heroes_start": run.living_heroes().size(), "actions": [], "picks": [],
 		"whims": [], "loot": [], "sales": [], "hero_spending": {},
 		"prices": run.prices.duplicate(), "crafted": {}, "market": [], "prizes": 0, "obsidian": 0, "yields": {},
-		"age": run.age, "rings_open": run.rings_open, "promotions": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
+		"age": run.age, "rings_open": run.rings_open, "promotions": [], "legends": [], "trades": {}, "cassiterite": 0, "heroes_left": [], "paving": {},
 		"breaches": 0, "wave_eased": run.wave_eased, "siege_damage": 0, "towers_broken": 0,
 		"gathered": {}, "gathered_leaned": {}, "gathered_band": {}, "trips_cut_short": {}, "tended": {}, "idle_seconds": {}, "trips_bumped": {},
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),

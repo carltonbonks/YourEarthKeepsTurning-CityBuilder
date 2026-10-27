@@ -91,6 +91,10 @@ var craft_trait := ""
 var well_fed := false
 ## A hero with a hound from the kennel hits harder; the hound runs off when the hero falls back badly hurt.
 var hound := false
+## Heroes: the town's Legend (Heroes path tier III); warriors near them hit harder.
+var legend := false
+## Warriors: a sergeant (Warband path tier III); warriors near them hit harder.
+var sergeant := false
 ## Townsfolk: hired for this round only from the caravan (Trade path tier II); they leave as the round ends.
 var hired := false
 ## Townsfolk: the leaning their dawn card came with (a key of their role's "leanings"), or "".

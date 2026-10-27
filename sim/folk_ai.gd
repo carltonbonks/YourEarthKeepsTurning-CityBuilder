@@ -45,6 +45,8 @@ var _free_pupils: Array[Unit] = []
 var _pupils_of := {}
 ## Living warriors this step.
 var _warriors := 0
+## Living sergeants this step (Warband path tier III).
+var _sergeants: Array[Unit] = []
 ## Role -> daytime seconds spent idle not yet written to the record (it counts whole seconds).
 var _idle_time := {}
 ## Role -> time kind -> seconds this round (FolkAI._note_time), written to the record as "folk_time".
@@ -71,6 +73,7 @@ func begin_step() -> void:
 	_free_pupils.clear()
 	_pupils_of.clear()
 	_warriors = 0
+	_sergeants.clear()
 	fighters = 0
 	leaning_counts = count_leanings()
 	for unit in w.folk:
@@ -82,6 +85,8 @@ func begin_step() -> void:
 			_warrior_list.append(unit)
 			if unit.alive:
 				_warriors += 1
+				if unit.sergeant:
+					_sergeants.append(unit)
 				if unit.drill_with != null:
 					_pupils_of[unit.drill_with] = int(_pupils_of.get(unit.drill_with, 0)) + 1
 		elif unit.alive:
@@ -172,6 +177,8 @@ func apply_folk_stats(unit: Unit) -> void:
 	if unit.type_id == "warrior":
 		unit.max_hp += w.run.mod("warrior_hp")
 		unit.attack += w.run.mod("warrior_attack")
+		if unit.sergeant:
+			unit.max_hp += float(w.content.paths.get("sergeant_hp", 0))
 	unit.max_hp += w.run.tool_bonus(unit.type_id, "hp")
 	unit.attack += w.run.tool_bonus(unit.type_id, "attack")
 	unit.attack_range = float(def["range"])
@@ -264,10 +271,28 @@ func levy_share() -> float:
 func relic_damage(unit: Unit, amount: float) -> float:
 	if levied(unit):
 		amount = maxf(amount, float(w.content.townsfolk["warrior"]["attack"]) * levy_share() * amount / maxf(1.0, unit.attack))
+	if unit.type_id == "warrior":
+		amount *= 1.0 + aura_bonus(unit)
 	var per := int(w.run.mod("horde_per"))
 	if per > 0 and w.content.unit_has_tag(unit, "fighter"):
 		amount += w.run.mod("horde_damage") * ((fighters - 1) / per)
 	return amount
+
+
+## The share harder a warrior hits from the path capstones' auras: within aura_reach (data/paths.json) of the town's
+## Legend (legend_aura) and of a sergeant (sergeant_aura), one of each kind.
+func aura_bonus(unit: Unit) -> float:
+	var bonus := 0.0
+	var reach := float(w.content.paths.get("aura_reach", 0))
+	if w.run.has_effect("legend_aura") and w.run.heroes.any(func(h: Unit) -> bool:
+			return h.alive and h.legend and h.pos.distance_to(unit.pos) <= reach):
+		bonus += w.run.mod("legend_aura")
+		w.run.record.note_count("aura_blows", 1, "legend")
+	if w.run.has_effect("sergeant_aura") and _sergeants.any(func(s: Unit) -> bool:
+			return s.alive and s.pos.distance_to(unit.pos) <= reach):
+		bonus += w.run.mod("sergeant_aura")
+		w.run.record.note_count("aura_blows", 1, "sergeant")
+	return bonus
 
 
 ## Warriors: fall back to heal when hurt, fight what comes near, answer calls for help. Otherwise, by day, the first
