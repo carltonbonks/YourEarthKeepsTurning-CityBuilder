@@ -9,6 +9,8 @@ signal skip_pressed
 signal menu_pressed
 
 const SPEEDS := [0, 1, 2, 4, 8]
+## The chips that shorten, first to last, when the bar is wider than the screen.
+const COMPACT_ORDER := ["food", "fuel", "goods", "round"]
 
 var run: RunState
 var _chips := {}
@@ -64,6 +66,23 @@ func refresh() -> void:
 		var label := _chips[id] as RichTextLabel
 		label.get_parent().visible = StatusText.chip_shown(run, id)
 		label.text = StatusText.chip(run, id)
+	# Too wide for the screen (food running out says so at length): chips drop their trailing words, one at a time,
+	# until the bar fits. The full story is still on each chip's hover.
+	var room := get_viewport_rect().size.x - 16.0 if is_inside_tree() else INF
+	for id: String in COMPACT_ORDER:
+		if get_combined_minimum_size().x <= room:
+			break
+		var label := _chips[id] as RichTextLabel
+		label.text = compact(label.text, id)
+
+
+## A chip's text without its trailing words: "Food 0" for "Food 0  runs out at dawn", the goods without "+2 more".
+static func compact(text: String, id: String) -> String:
+	if id == "goods":
+		var cut := text.find("  [color=#9aa]+")
+		return text.substr(0, cut) if cut >= 0 else text
+	var at := text.find("  ")
+	return text.substr(0, at) if at >= 0 else text
 
 
 ## Where a chip is on screen ("food"), or an empty rect if it is hidden.

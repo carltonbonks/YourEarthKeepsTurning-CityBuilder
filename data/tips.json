@@ -1,5 +1,5 @@
 {
-	"_note": "What a new player is told (game/welcome_panel.gd, game/first_tips.gd, game/intro_tour.gd). welcome: the 'how a round works' screen shown before the traditions pick of every run but a player's first (Yusuf, 2026-10-24; the first run opens on the tour instead, 2026-10-26): title, intro, steps (when, name, text), rounds_line, earth_line, ages_line and closing (Yusuf's line: try things, a fallen village is another story lost to time; the loss screen shows lost_line). tour: the camera tour that opens a player's first run (IntroTour), shot by shot: shot (hearth, town, hero, den or map, IntroTour.shot_view says where each looks), seconds and the caption. tips: one-time highlights (Yusuf, 2026-10-26), each shown once the first time its moment comes (FirstTips.due says when), in this order when several are due: a hi-viz frame round the part of the screen it is about with the rest dimmed, and a note beside it. target is what it frames (panel: the pop-up that is up; core, begin or upgrades: those parts of the building hand; threat: the attack card; food: the food chip; map: nothing, the note sits over the map), or a list of them. A highlight closes once its moment passes (the player did the thing); ok: true gives it a Got it button too. advisor: the Elder (game/advisor.gd, Yusuf 2026-10-27), who says one line during the build phase and dawn picks only when a problem will cost the town this round and a card on screen would help: per_round = most lines a round, silence_after = times waved off (Not now) before that problem is never raised again in the run, ages = the advisor's name and colours in each age, levels = the thresholds for the Urgent only and Chatty settings (food_days and fuel_nights left, hearth_share of its max health), lines = what it says ({when}, {hero} and {card} are filled in).",
+	"_note": "What a new player is told (game/welcome_panel.gd, game/first_tips.gd, game/intro_tour.gd). welcome: the 'how a round works' screen shown before the traditions pick of every run but a player's first (Yusuf, 2026-10-24; the first run opens on the tour instead, 2026-10-26): title, intro, steps (when, name, text), rounds_line, earth_line, ages_line and closing (Yusuf's line: try things, a fallen village is another story lost to time; the loss screen shows lost_line). tour: the camera tour that opens a player's first run (IntroTour), shot by shot: shot (hearth, town, hero, den or map, IntroTour.shot_view says where each looks), seconds and the caption. tips: one-time highlights (Yusuf, 2026-10-26), each shown once the first time its moment comes (FirstTips.due says when), in this order when several are due: a hi-viz frame round the part of the screen it is about with the rest dimmed, and a note beside it. target is what it frames (panel: the pop-up that is up; core, begin or upgrades: those parts of the building hand; threat: the attack card; food: the food chip; map: nothing, the note sits over the map), or a list of them. A highlight closes once its moment passes (the player did the thing); ok: true gives it a Got it button too. advisor: the Elder (game/advisor.gd, Yusuf 2026-10-27), who says one line during the build phase and dawn picks only when a problem will cost the town this round and a card on screen would help: per_round = most lines a round, silence_after = times waved off (Not now) before that problem is never raised again in the run, ages = the advisor's name and colours in each age, levels = the thresholds for the Urgent only and Chatty settings (food_days and fuel_nights left, hearth_share of its max health, outmatch = the attack's power over the town's, on the attack card's scale), lines = what it says (slack_roles = the roles it speaks for when most of their last round went idle, with their plural) ({when}, {hero} and {card} are filled in).",
 	"welcome": {
 		"title": "You rule. You don't command.",
 		"intro": "Your heroes and townsfolk think for themselves. You shape the town around them, then watch what they make of it. Each round goes like this:",
@@ -125,8 +125,8 @@
 			"medieval": {"name": "The Steward", "robe": "#34465f", "trim": "#c8ced6"}
 		},
 		"levels": {
-			"urgent": {"food_days": 1.0, "fuel_nights": 1.0, "hearth_share": 0.35},
-			"chatty": {"food_days": 2.0, "fuel_nights": 2.0, "hearth_share": 0.5}
+			"urgent": {"food_days": 1.0, "fuel_nights": 1.0, "hearth_share": 0.35, "outmatch": 1.3},
+			"chatty": {"food_days": 2.0, "fuel_nights": 2.0, "hearth_share": 0.5, "outmatch": 1.1}
 		},
 		"lines": {
 			"hearth": "The hearth won't take another night like the last.",
@@ -138,6 +138,9 @@
 			"fuel_later": "within two nights",
 			"builders": "Our new buildings stand half-raised. We need hands.",
 			"mood": "{hero} is restless and talks of leaving.",
+			"outmatched": "The third night's attack is stronger than all our fighters.",
+			"slack": "Our {people} stood idle much of last round. Give them work.",
+			"slack_roles": {"tribesperson": "tribespeople", "craftsperson": "craftspeople"},
 			"fix": "The {card} card would help."
 		}
 	}

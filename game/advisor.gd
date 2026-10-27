@@ -80,6 +80,10 @@ static func concerns(r: RunState, level := "urgent") -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
 	if w.hearth_hp < r.hearth_max_hp() * float(lv["hearth_share"]):
 		found.append({"id": "hearth", "text": lines["hearth"]})
+	# The night-3 attack against the town's fighters, on the attack card's scale (Power).
+	var ratio := Power.wave(r.content, r.waves.attack()) / maxf(1.0, float(Power.town(w)["total"]))
+	if ratio > float(lv["outmatch"]):
+		found.append({"id": "outmatched", "text": lines["outmatched"]})
 	var days := StatusText.food_days(r)
 	if days >= 0.0 and days < float(lv["food_days"]):
 		found.append({"id": "food", "text": str(lines["food"]).format({"when": lines["food_soon" if days < 1.0 else "food_later"]})})
@@ -92,6 +96,11 @@ static func concerns(r: RunState, level := "urgent") -> Array[Dictionary]:
 	for hero in r.living_heroes():
 		if hero.mood <= r.content.num("mood_grumble_at"):
 			found.append({"id": "mood:" + hero.display_name, "text": str(lines["mood"]).format({"hero": hero.display_name})})
+	# A role that mostly stood idle last round (Slack on its dawn card, People.busy_word): work for them is a building.
+	if r.phase == RunState.Phase.BUILD:
+		for role: String in lines["slack_roles"]:
+			if r.count_role(role) > 0 and r.people.busy_word(role) == "slack":
+				found.append({"id": "slack:" + role, "text": str(lines["slack"]).format({"people": lines["slack_roles"][role]})})
 	for c in found:
 		var fix := fix_for(r, c["id"])
 		if fix.is_empty():
@@ -131,8 +140,12 @@ static func _build_answers(r: RunState, id: String, type: String) -> bool:
 		return r.hand.feeds(type)
 	if id == "fuel":
 		return r.hand.makes_fuel(type)
-	if id == "hearth":
+	if id == "hearth" or id == "outmatched":
 		return def.has("attack") or def.has("hearth_hp")
+	if id == "slack:craftsperson":
+		return def.has("workshop")
+	if id == "slack:tribesperson":
+		return def.has("tends") or (def.has("assist") and not def.has("workshop"))
 	if id.begins_with("mood:"):
 		return def.has("lodging")
 	return false
@@ -142,12 +155,12 @@ static func _build_answers(r: RunState, id: String, type: String) -> bool:
 static func _pick_answers(r: RunState, id: String, card: Dictionary) -> int:
 	var role: String = card.get("role", "")
 	if card["kind"] == "hero":
-		return 1 if id == "hearth" else 0
+		return 1 if id == "hearth" or id == "outmatched" else 0
 	if card["kind"] != "folk":
 		return 0
 	if id == "builders":
 		return 1 if role == "craftsperson" else 0
-	if id == "hearth":
+	if id == "hearth" or id == "outmatched":
 		return 1 if r.content.has_tag("townsfolk", role, "fighter") else 0
 	if id == "food" or id == "fuel":
 		if role != "tribesperson":
