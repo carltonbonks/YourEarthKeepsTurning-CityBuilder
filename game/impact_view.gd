@@ -89,6 +89,8 @@ static func work_text(row: Dictionary) -> String:
 		parts.append("paved %d" % row["paved"])
 	if int(row.get("patched", 0)) > 0:
 		parts.append("mended hearth %d" % row["patched"])
+	if int(row.get("barricaded", 0)) > 0:
+		parts.append("raised %d barricade%s" % [row["barricaded"], "" if int(row["barricaded"]) == 1 else "s"])
 	if int(row.get("helped", 0)) > 0:
 		parts.append("lent a hand %ds" % row["helped"])
 	if int(row.get("supplied", 0)) > 0:

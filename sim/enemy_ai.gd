@@ -296,6 +296,41 @@ func towers_tick() -> void:
 				target.grudge_until = w.time + w.content.num("tower_grudge_seconds")
 
 
+## The town spots raiders coming for it (not den wanderers): a townsperson or hero near one, or the hearth or a
+## standing tower that can see it, each farther on open ground and nearer in cover (Earth.sight_at). The first
+## sighting of each raider raises the alarm from its way (FolkAI.raise_alarm), where folk run to barricade the gaps.
+func spot_tick() -> void:
+	var def: Dictionary = w.content.town["barricades"]
+	for e in w.enemies:
+		if e.spotted or not e.alive or not e.spawned or e.den_index >= 0 or e.risen:
+			continue
+		var by := _spotter(e, float(def["spot_range"]))
+		if by.is_empty():
+			continue
+		e.spotted = true
+		w.spots.append({"by": by["pos"], "at": e.pos, "time": w.time})
+		w.run.record.note_count("spotted", 1, by["who"])
+		w.folk_ai.raise_alarm(e.pos)
+	var keep := float(def["spot_show_seconds"])
+	w.spots = w.spots.filter(func(s: Dictionary) -> bool: return w.time - float(s["time"]) < keep)
+
+
+## Who sees raider e first: {pos, who} ("folk", "hero", "tower" or "hearth"), or {} for nobody yet.
+func _spotter(e: Unit, reach: float) -> Dictionary:
+	var sight := w.earth.sight_at(e.pos)
+	var friend := w.nearest_friend(e.pos, reach * sight)
+	if friend != null:
+		return {"pos": friend.pos, "who": "hero" if friend.is_hero() else "folk"}
+	for b in w.buildings:
+		var def: Dictionary = w.content.buildings[b["type"]]
+		if def.has("range") and def.has("attack") and float(b["work_left"]) <= 0.0 \
+				and not (def.has("tower_hp") and float(b["hp"]) <= 0.0) and (b["pos"] as Vector2).distance_to(e.pos) <= float(def["range"]) * sight:
+			return {"pos": b["pos"], "who": "tower"}
+	if e.pos.length() <= w.content.num("hearth_range") * sight:
+		return {"pos": Vector2.ZERO, "who": "hearth"}
+	return {}
+
+
 ## The nearest raider the hearth or a tower at `from` can see with this range: the near plate a raider stands on
 ## stretches or shortens how far off it is seen (Earth.sight_at: open Stonefield, Greenwood cover).
 func sighted(from: Vector2, reach: float) -> Unit:

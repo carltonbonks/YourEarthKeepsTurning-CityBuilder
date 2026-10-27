@@ -76,6 +76,17 @@ const SUPPLY_DROPS_KEPT := 8
 ## The last enemy to fall: {pos, type, boss, invader (a raider, not a den wanderer), by (who felled it, or ""), time},
 ## {} before any. The view reads it to make the night's last kill land (LastKill); no rule does.
 var last_felled := {}
+## Quick defences (data/town.json barricades): {plot, pos, work_left, built, broken, cost} per barricade thrown up
+## since dawn, the barricade on each walled square (square index -> index into barricades), and the ways the alarm
+## has been raised from since dawn (angles). All cleared at dawn (Town.clear_barricades).
+var barricades: Array[Dictionary] = []
+var barricade_square := {}
+var alarm_ways: Array[float] = []
+## Recent spottings for the view: {by (where the spotter stood), at (the raider), time}. No rule reads it.
+var spots: Array[Dictionary] = []
+## The routes the warned attack would take tonight (route_preview), cached until the ground or the ways change.
+var _routes: Array = []
+var _routes_seen := []
 
 ## Where enemies and friends (townsfolk and heroes) stand, for fast nearest-unit lookups (see UnitGrid).
 ## Rebuilt each step when those units stop moving; a stale grid is never read (the lookups scan the lists instead).
@@ -197,6 +208,19 @@ static func compass(angle: float) -> String:
 	return ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"][posmod(roundi(angle / (PI / 4.0)), 8)]
 
 
+## The way each of this round's warned sides would come in tonight, as the raiders' own pathfinding sees the
+## ground now (Pathing.route_preview from the map's edge to the hearth): one point list per side. The view draws
+## it; no rule reads it. Cached until the town's squares, its gates or the ways change.
+func raider_routes() -> Array:
+	var seen := [pathing.version, pathing.ground_version, wave_sides.duplicate()]
+	if seen != _routes_seen:
+		_routes_seen = seen
+		_routes = []
+		for side in wave_sides:
+			_routes.append(pathing.route_preview(Vector2.from_angle(side) * content.num("world_radius") * 0.98, Vector2.ZERO))
+	return _routes
+
+
 ## The wave side names, for the UI and story.
 func side_names() -> Array[String]:
 	var names: Array[String] = []
@@ -250,6 +274,7 @@ func step() -> void:
 	for enemy in enemies:
 		if enemy.alive and enemy.spawned:
 			enemy_ai.enemy_tick(enemy)
+	enemy_ai.spot_tick()
 	_friend_grid_ok = false
 	enemy_ai.towers_tick()
 	_cleanup()
@@ -317,6 +342,7 @@ func _dawn() -> void:
 	_tend_nodes()
 	earth.dawn()
 	pathing.wear_trails()
+	town.clear_barricades()
 	town.patch_walls()
 	enemy_ai.mend_towers()
 	pedlar.hire_guards()
@@ -561,6 +587,13 @@ func _batter(unit: Unit, square: int) -> void:
 		run.record.note_count("siege_damage", roundi(unit.attack * enemy_ai.war_chant()))
 		enemy_ai.thorns(unit)
 	if pathing.hit_wall(square, unit.attack * enemy_ai.war_chant()):
+		if barricade_square.has(square):
+			var b: Dictionary = barricades[barricade_square[square]]
+			if not b["broken"]:
+				b["broken"] = true
+				run.record.note_count("barricades_broken", 1)
+				run.tell("Raiders break through a barricade.")
+			return
 		run.record.note_breach()
 		if not bool(night_report.get("breached", false)):
 			night_report["breached"] = true

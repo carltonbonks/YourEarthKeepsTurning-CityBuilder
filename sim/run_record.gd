@@ -150,7 +150,11 @@ extends RefCounted
 ##     "outmatched" (the scheduled wave was over catch-up's limit) and "glory" (the town held an attack the warband
 ##     didn't need to ease, so the relic offer had glory_relic_choices more). "wave" now also counts the camp's
 ##     raiders due, and "power"'s "wave" includes those who marched. "camp_spoils" stays 0 (no plunder).
-const RECORD_FORMAT := 55
+## 56: raider routes and quick defences (Yusuf, 2026-10-27): per round "spotted" (who first saw each raider coming
+##     for the town: folk, hero, tower or hearth -> count), "barricades_planned" (gaps the alarm sent folk to
+##     barricade, each paid for), "barricades_raised" and "barricades_broken"; townsfolk impact rows may have
+##     "barricaded" (barricades raised).
+const RECORD_FORMAT := 56
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -235,6 +239,7 @@ func begin_round() -> void:
 		"camp_joined": run.camp_joined, "camp_raiders": run.world.enemy_ai.camp_raiders().size(),
 		"camps_cleared": 0, "camp_spoils": 0, "camp_due": run.waves.camp_due().size(), "camp_marched": 0,
 		"outmatched": run.outmatched, "glory": false, "hearty_meals": 0,
+		"spotted": {}, "barricades_planned": 0, "barricades_raised": 0, "barricades_broken": 0,
 		"build_hands": [run.hand.hand_entry()], "blueprints": [], "impact": {},
 		"deals_offered": run.caravan.labels(), "deals_rolls": run.caravan.offers.map(CardRoll.roll_of), "deals": []}
 

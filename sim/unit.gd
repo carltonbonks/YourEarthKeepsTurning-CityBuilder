@@ -113,6 +113,8 @@ var time := {}
 var time_last := {}
 var brought := 0
 var brought_last := 0
+## The barricade (index into World.barricades) this townsperson runs to raise, -1 for none.
+var barricade := -1
 
 # Enemy-only.
 var spawn_time := 0.0
@@ -121,6 +123,8 @@ var is_boss := false
 var den_index := -1  ## Which den a wanderer belongs to; -1 for wave enemies.
 var wander_goal := Vector2.ZERO
 var is_probe := false  ## Part of a small raid on an early night.
+## Seen by the town (EnemyAI.spot_tick): the alarm has been raised for it.
+var spotted := false
 ## Sentient enemies chase whoever last hurt them until this time.
 var grudge_until := -1.0
 ## A sentient enemy shot by a tower goes for that building (index into World.buildings), -1 for none.
