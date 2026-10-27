@@ -27,6 +27,7 @@ var town: Dictionary  ## data/town.json: town rings and plots, obstacles, ground
 var tags: Dictionary  ## data/tags.json: what each tag that a rule reads means, for tooltips.
 var plates: Dictionary  ## data/plates.json: the shifting earth past the town (see Earth).
 var traditions: Dictionary  ## data/traditions.json: founding traditions picked before round 1.
+var paths: Dictionary  ## data/paths.json: run paths (heroes, warband, guilds, trade) and their tiers; charters at age-ups.
 var crafts: Dictionary  ## data/crafts.json: a workshop and its stall drafted together, and what each craft opens.
 var ventures: Dictionary  ## data/ventures.json: dawn cards that spend tribespeople for goods.
 var pedlars: Dictionary  ## data/pedlars.json: the pedlars invited on pedlar rounds and their camp (see PedlarCamp).
@@ -59,6 +60,7 @@ static func load_default() -> Content:
 	c.tags = _strip(_read("tags.json"))
 	c.plates = _strip(_read("plates.json"))
 	c.traditions = _strip(_read("traditions.json"))
+	c.paths = _strip(_read("paths.json"))
 	c.crafts = _strip(_read("crafts.json"))
 	c.ventures = _strip(_read("ventures.json"))
 	c.pedlars = _strip(_read("pedlars.json"))

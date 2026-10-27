@@ -55,7 +55,7 @@ func test_start_goods_and_effects() -> void:
 	var shells := int(run.stock["shells"])
 	run.choose_traditions(["traders"])
 	check_eq(int(run.stock["shells"]), shells + 15, "traders bring shells")
-	check_eq(run.mod("income"), 5.0, "traders' effect counts like a relic's")
+	check_eq(run.mod("income") - run.content.paths["paths"]["trade"]["tiers"][0]["effects"]["income"], 5.0, "traders' effect counts like a relic's (on top of the trade path's)")
 	check(not run.tradition_random, "a chosen tradition is not chance")
 	var wood_run := _run()
 	var wood := int(wood_run.stock["wood"])
@@ -105,6 +105,8 @@ func test_tradition_leaning_comes_more_often_and_bands_sooner() -> void:
 	check(favoured > plain, "woodfolk are offered woodcutters more often (%d vs %d in 40 dawns)" % [favoured, plain])
 	var run := _run()
 	run.choose_traditions(["woodfolk"])
+	# Woodfolk start on the Guilds path, which bands every leaning sooner (tests/test_paths.gd); here only the tradition.
+	run.paths.erase("guilds")
 	var w := run.world
 	check_eq(w.folk_ai.band_level("tribesperson", "woodcutter", 2), 1, "two woodcutters band for woodfolk")
 	check_eq(w.folk_ai.band_level("tribesperson", "forager", 2), 0, "but two foragers do not")

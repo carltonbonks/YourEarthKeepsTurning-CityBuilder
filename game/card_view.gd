@@ -32,6 +32,8 @@ const FAMILIES := {
 	"relic": {"color": "#d4ccb8", "icon": "relic"},
 	"spoils": {"color": "#9bb07a", "icon": "sack"},
 	"tradition": {"color": "#b8a888", "icon": "flag"},
+	"path": {"color": "#7aa0a8", "icon": "flag"},
+	"guild": {"color": "#a8946a", "icon": "hammer"},
 }
 const BONE := Color("#e6e1d3")
 const FACE := Color("#2a2e36")

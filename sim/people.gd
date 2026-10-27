@@ -59,14 +59,24 @@ func offer_picks() -> void:
 	_kin_join()
 	var promote := _promotion_card(rng)
 	var venture := _venture_card()
+	var guild := guild_card()
 	# A hollow-eyed seer (data/card_mods.json pick_bonus) adds a card while they live.
 	var seers := int(world.folk_ai.folk_sum("pick_bonus"))
 	if seers > 0:
 		run.record.note_count("card_mods_fired", seers, "hollow_seer")
 	var slots := maxi(1, content.int_num("pick_choices") + int(run.mod("pick_bonus")) + seers) - (0 if promote.is_empty() else 1) \
-		- (0 if venture.is_empty() else 1)
+		- (0 if venture.is_empty() else 1) - (0 if guild.is_empty() else 1)
 	# Each card dealt rolls its own rarity (CardRoll), on a stream of its own so the cards dealt stay the same.
 	var roll_rng := SeededRng.stream(run.run_seed, "card_roll", run.round_number * 10 + world.day_index())
+	# A run path's dawn card (data/paths.json dawn_card) is always among those dealt when the pool has one.
+	for role in run.path_dawn_cards():
+		var sure := pool.filter(func(c: Dictionary) -> bool: return c["role"] == role)
+		if sure.is_empty() or run.pick_offer.size() >= slots:
+			continue
+		var card: Dictionary = rng.pick(sure)
+		pool.erase(card)
+		_roll_dawn_card(card, roll_rng)
+		run.pick_offer.append(card)
 	# Rarer cards are drawn less often, less so as the run goes on (Content.rarity_odds).
 	while run.pick_offer.size() < slots and not pool.is_empty():
 		var card: Dictionary = rng.pick_by(pool, func(c: Dictionary) -> float:
@@ -79,6 +89,8 @@ func offer_picks() -> void:
 	if not venture.is_empty():
 		_roll_dawn_card(venture, roll_rng)
 		run.pick_offer.append(venture)
+	if not guild.is_empty():
+		run.pick_offer.append(guild)
 	run.picks_left = 1 + int(run.mod("extra_picks"))
 	run.phase = RunState.Phase.PICK
 
@@ -214,7 +226,7 @@ func hero_card_cost(class_id: String) -> int:
 ## How many people a dawn card brings into town (0 for a promotion or a venture).
 func card_people(card: Dictionary) -> int:
 	match card["kind"]:
-		"promote", "venture":
+		"promote", "venture", "guild":
 			return 0
 		"family":
 			return card["roles"].size() + CardRoll.extra_people(run.content, card)
@@ -233,6 +245,8 @@ func card_rarity(card: Dictionary) -> String:
 			return str(content.ventures[card["venture"]].get("rarity", "white"))
 		"family":
 			return str(content.balance.get("family_rarity", "white"))
+		"guild":
+			return "blue"
 	return content.rarity_of("townsfolk", card["role"])
 
 
@@ -243,6 +257,8 @@ func card_label(card: Dictionary) -> String:
 		return "venture:" + card["venture"]
 	if card["kind"] == "family":
 		return "family"
+	if card["kind"] == "guild":
+		return "guild:" + card["leaning"]
 	return "hero:" + card["hero"].type_id if card["kind"] == "hero" else card["role"]
 
 
@@ -302,6 +318,47 @@ func spend_bloodsworn() -> void:
 
 
 # --- Ventures ---------------------------------------------------------------
+
+# --- Trades guilds (Yusuf, 2026-10-27) -------------------------------------------
+
+## The tribesperson leaning ready to become a trades guild: its band has reached the top band tier, it has a guild
+## in data (townsfolk.json "guild") and isn't one yet. The biggest band first; "" when none is ready.
+func guild_ready() -> String:
+	var tiers: Array = run.content.townsfolk["tribesperson"].get("band_tiers", [])
+	var leanings: Dictionary = run.content.townsfolk["tribesperson"].get("leanings", {})
+	var counts := run.world.folk_ai.count_leanings()
+	var best := ""
+	var best_size := 0
+	for leaning in leanings_open("tribesperson"):
+		if run.guilds.has(leaning) or not leanings[leaning].has("guild"):
+			continue
+		var size := int(counts.get("tribesperson/" + leaning, 0))
+		if run.world.folk_ai.band_level("tribesperson", leaning, size) >= tiers.size() and size > best_size:
+			best = leaning
+			best_size = size
+	return best
+
+
+## The guild card for the band ready to charter one, or {} (it takes a newcomer's place among the dawn cards).
+func guild_card() -> Dictionary:
+	var leaning := guild_ready()
+	if leaning == "":
+		return {}
+	return {"kind": "guild", "role": "guild", "cost": 0, "leaning": leaning}
+
+
+## A guild's data (townsfolk.json "guild" on a tribesperson leaning).
+func guild_def(leaning: String) -> Dictionary:
+	return run.content.townsfolk["tribesperson"]["leanings"][leaning].get("guild", {})
+
+
+## Charters a band as a trades guild: its members learn the practice and keep to their trade from now on.
+func charter_guild(card: Dictionary) -> void:
+	var leaning: String = card["leaning"]
+	run.guilds[leaning] = run.round_number
+	var g := guild_def(leaning)
+	run.tell("The %s band together as the %s: %s." % [run.folk_name("tribesperson", leaning).to_lower() + "s", g["name"], g["practice"].to_lower()])
+
 
 ## Now and then a venture card: send tribespeople out for goods, some never come back (data/ventures.json).
 ## {} when none comes up this dawn or the town can't spare enough tribespeople.

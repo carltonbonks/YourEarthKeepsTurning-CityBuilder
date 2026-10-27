@@ -101,6 +101,11 @@ static func band_line(run: RunState, role: String, leaning: String, joining := f
 	var out := "Band of %d %s: %s." % [size, plural, band_bonus({}, now, goods)]
 	if not next.is_empty():
 		out += " At %d: %s." % [folk_ai.band_size_needed(role, leaning, next), band_bonus(now, next, goods)]
+	var guild: Dictionary = lean.get("guild", {})
+	if run.guilds.has(leaning):
+		out += " They are the %s (%s)." % [guild["name"], guild["practice"].to_lower()]
+	elif not guild.is_empty():
+		out += " At the top tier the band can be chartered as the %s (%s)." % [guild["name"], guild["practice"].to_lower()]
 	return out
 
 

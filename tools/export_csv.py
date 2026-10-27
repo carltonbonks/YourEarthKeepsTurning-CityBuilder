@@ -91,6 +91,9 @@ def main(raw_folder, out_folder):
             "crafts": " ".join(r.get("crafts", [])),
             "traditions": " ".join(r.get("traditions", [])), "tradition_random": 1 if r.get("tradition_random") else 0,
             "gentle": 1 if r.get("gentle") else 0,
+            "paths": " ".join("%s:%d" % (k, v) for k, v in sorted(r.get("paths", {}).items())),
+            "guilds": " ".join(sorted(r.get("guilds", {}))),
+            "charters": " ".join(a.get("path", "") for rd in rounds for a in rd.get("actions", []) if a.get("kind") == "charter"),
             "tradition_blueprint": " ".join(a.get("building", a.get("craft", "")) for rd in rounds for a in rd.get("actions", []) if a.get("kind") == "tradition_blueprint"),
             "buildings_total": len(r.get("buildings", [])),
             "huts": r.get("buildings", []).count("hut"),
@@ -181,6 +184,8 @@ def main(raw_folder, out_folder):
                 **{"band_end_" + k: rd.get("bands_end", {}).get(k, 0) if "bands_end" in rd else "" for k in LEANINGS},
                 **{"leaning_end_" + k: rd.get("leanings_end", {}).get(k, 0) if "leanings_end" in rd else "" for k in LEANINGS},
                 "tended_total": sum(rd.get("tended", {}).values()) if "tended" in rd else "",
+                "guild_tended": sum(rd.get("guild_tended", {}).values()),
+                "guild_spared": sum(rd.get("guild_spared", {}).values()),
                 **({"earth_" + k: (sum(rd["shift"].get(k, {}).values()) if isinstance(rd["shift"].get(k, ""), dict) else rd["shift"].get(k, ""))
                     for k in ["swallowed", "dens_swallowed", "ridges", "raised", "rifts", "grown", "roads_refunded"]}
                    if "shift" in rd else {"earth_" + k: "" for k in ["swallowed", "dens_swallowed", "ridges", "raised",

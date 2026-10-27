@@ -36,6 +36,10 @@ var gate_round := 3
 var traditions := true
 const TRADITIONS := {"balanced": ["hunters"], "workers": ["stoneworkers"], "heroes": ["hunters"],
 	"market": ["traders"], "bronze": ["smiths"], "medieval": ["woodfolk"]}
+## The run paths it takes charters for, most wanted first (data/paths.json), by style.
+const PATHS := {"balanced": ["heroes", "guilds", "warband", "trade"], "workers": ["warband", "guilds", "trade", "heroes"],
+	"heroes": ["heroes", "trade", "warband", "guilds"], "market": ["trade", "heroes", "guilds", "warband"],
+	"bronze": ["guilds", "trade", "heroes", "warband"], "medieval": ["guilds", "warband", "heroes", "trade"]}
 ## Gardens: one a round while food in store would last fewer than this many days (0 = never). balance_run.gd: gardens=.
 var garden_days := 3.0
 ## Orders the forester and charcoal pit when the cards recommend them. balance_run.gd: upkeep=0 turns it off.
@@ -73,6 +77,8 @@ func play_run(run: RunState) -> void:
 func build(run: RunState) -> void:
 	if run.awaiting_traditions():
 		run.choose_traditions(TRADITIONS.get(style, []) if traditions else [])
+	while run.awaiting_charter():
+		run.choose_charter(charter(run))
 	if run.awaiting_pedlar():
 		run.choose_pedlar(_pedlar(run) if pedlar else "")
 	_wishes = []
@@ -379,6 +385,14 @@ func free_beds(run: RunState) -> int:
 	return beds - run.living_heroes().size()
 
 
+## The offered charter whose path its style wants most.
+func charter(run: RunState) -> String:
+	for id: String in PATHS.get(style, PATHS["balanced"]):
+		if id in run.charter_offer:
+			return id
+	return run.charter_offer[0]
+
+
 func pick(run: RunState) -> int:
 	var best := -1
 	var best_score := -INF
@@ -392,6 +406,9 @@ func pick(run: RunState) -> int:
 				score = 6.0
 			"venture":
 				score = venture_score(run, card)
+			"guild":
+				# A guild keeps its band's nodes going for the rest of the run.
+				score = 7.0
 			"family":
 				score = 8.0 if style == "medieval" else 3.5
 			"hero":
