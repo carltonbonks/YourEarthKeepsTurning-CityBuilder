@@ -26,6 +26,9 @@ var content: Content
 var _shown := ""
 ## True once the highlight showing has been on screen (one hidden while its target was away isn't seen).
 var _displayed := false
+## What the showing highlight frames (target names) and where those are now, measured afresh every frame so the
+## frame follows its target through layout, fitting and window resizes.
+var _targets: Array[String] = []
 var _rects: Array[Rect2] = []
 var _note: PanelContainer
 var _kicker: Label
@@ -178,12 +181,9 @@ func check(run: RunState, blocked: bool) -> void:
 		hide()
 		return
 	var tip: Dictionary = content.tips["tips"][_shown]
-	_rects.clear()
-	for name in targets(tip):
-		var r: Rect2 = target_rect.call(name) if target_rect.is_valid() else Rect2()
-		if r.has_area():
-			_rects.append(r.grow(PAD))
-	if _rects.is_empty() and not targets(tip).is_empty():
+	_targets = targets(tip)
+	_measure()
+	if _rects.is_empty() and not _targets.is_empty():
 		hide()  # What it points at isn't on screen yet (a pick waiting for the earth's turn).
 		return
 	var total: int = content.tips["tips"].size()
@@ -206,9 +206,26 @@ func framed() -> Array[Rect2]:
 	return _rects
 
 
+## Where the framed targets are on screen right now (global rects, padded). Read from the targets themselves
+## each time, never kept from an earlier frame: a pop-up just shown hasn't been laid out or fitted yet.
+func _measure() -> void:
+	_rects.clear()
+	for name in _targets:
+		var r: Rect2 = target_rect.call(name) if target_rect.is_valid() else Rect2()
+		if r.has_area():
+			_rects.append(r.grow(PAD))
+
+
 func _process(_delta: float) -> void:
-	if visible and not _rects.is_empty():
-		queue_redraw()
+	if not visible or _targets.is_empty():
+		return
+	var was := _rects.duplicate()
+	_measure()
+	if _rects.is_empty():
+		_rects = was  # Gone for a moment (a pop-up refilling); check() hides the highlight if it stays gone.
+	elif _rects != was:
+		_place_note(_note.get_combined_minimum_size())
+	queue_redraw()
 
 
 func _draw() -> void:
@@ -228,24 +245,69 @@ func _draw() -> void:
 		draw_rect(r.grow(6.0 + 2.0 * pulse), HIVIZ, false, 2.5)
 
 
-## Puts the note below the first framed part, or above it, or beside it, kept on screen.
+## Puts the note below the first framed part, or above it, or beside it: the first of those that fits on screen
+## and covers no framed part (the note must never sit over what the player is told to use). Kept on screen.
 func _place_note(note_size: Vector2) -> void:
 	var screen := size
-	var p: Vector2
 	if _rects.is_empty():
-		p = map_anchor.call(note_size) if map_anchor.is_valid() else (screen - note_size) * 0.5
-	else:
-		var r := Rect2(_rects[0].position - get_global_rect().position, _rects[0].size)
-		if r.end.y + GAP + note_size.y <= screen.y - 8.0:
-			p = Vector2(r.position.x, r.end.y + GAP)
-		elif r.position.y - GAP - note_size.y >= 8.0:
-			p = Vector2(r.position.x, r.position.y - GAP - note_size.y)
-		elif r.position.x - GAP - note_size.x >= 8.0:
-			p = Vector2(r.position.x - GAP - note_size.x, r.position.y)
-		else:
-			p = Vector2(r.end.x + GAP, r.position.y)
-	var most := screen - note_size - Vector2(8, 8)
-	_note.position = Vector2(clampf(p.x, 8.0, maxf(8.0, most.x)), clampf(p.y, 8.0, maxf(8.0, most.y)))
+		var at: Vector2 = map_anchor.call(note_size) if map_anchor.is_valid() else (screen - note_size) * 0.5
+		_note.position = _on_screen(at, note_size)
+		return
+	var offset := get_global_rect().position
+	var local: Array[Rect2] = []
+	for f in _rects:
+		local.append(Rect2(f.position - offset, f.size).grow(6.0))  # Outside the frame's outer band too.
+	_note.position = note_spot(Rect2(Vector2.ZERO, screen), local, note_size)
+
+
+## Where a note of `note_size` goes beside the first of `framed` (local rects) on `screen`: below, above, left
+## or right of it, the first spot that is on screen and over none of `framed`; failing that, the corner of the
+## screen that covers the least of them.
+static func note_spot(screen: Rect2, framed: Array[Rect2], note_size: Vector2) -> Vector2:
+	var r := framed[0]
+	var tries: Array[Vector2] = [
+		Vector2(r.position.x, r.end.y + GAP),
+		Vector2(r.position.x, r.position.y - GAP - note_size.y),
+		Vector2(r.position.x - GAP - note_size.x, r.position.y),
+		Vector2(r.end.x + GAP, r.position.y),
+	]
+	var best := Vector2.ZERO
+	var least := INF
+	for i in tries.size():
+		var raw := tries[i]
+		var p := _clamp_to(screen, raw, note_size)
+		var covered := _covered(Rect2(p, note_size), framed)
+		# A spot that had to be pushed back on screen by more than a little is only a fallback.
+		if covered == 0.0 and p.distance_to(raw) <= note_size.length() * 0.25:
+			return p
+		if covered < least:
+			least = covered
+			best = p
+	var m := 8.0
+	for c in [screen.position + Vector2(m, m), Vector2(screen.end.x - note_size.x - m, screen.position.y + m),
+			Vector2(screen.position.x + m, screen.end.y - note_size.y - m), screen.end - note_size - Vector2(m, m)]:
+		var covered := _covered(Rect2(c, note_size), framed)
+		if covered < least:
+			least = covered
+			best = c
+	return _clamp_to(screen, best, note_size)
+
+
+static func _covered(note: Rect2, framed: Array[Rect2]) -> float:
+	var area := 0.0
+	for f in framed:
+		area += note.intersection(f).get_area()
+	return area
+
+
+static func _clamp_to(screen: Rect2, p: Vector2, note_size: Vector2) -> Vector2:
+	var least := screen.position + Vector2(8, 8)
+	var most := screen.end - note_size - Vector2(8, 8)
+	return Vector2(clampf(p.x, least.x, maxf(least.x, most.x)), clampf(p.y, least.y, maxf(least.y, most.y)))
+
+
+func _on_screen(p: Vector2, note_size: Vector2) -> Vector2:
+	return _clamp_to(Rect2(Vector2.ZERO, size), p, note_size)
 
 
 func _mark_seen(id: String) -> void:
@@ -256,5 +318,6 @@ func _mark_seen(id: String) -> void:
 
 func _close() -> void:
 	_shown = ""
+	_targets.clear()
 	_rects.clear()
 	hide()
