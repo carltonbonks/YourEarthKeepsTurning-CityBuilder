@@ -524,6 +524,8 @@ func _deal_card(index: int) -> CardView:
 		for i in int(folk[role]):
 			roles.append(role)
 		btn.add_people(roles)
+	if def.get("hired", false):
+		btn.add_chip("this round only")
 	if int(def.get("smith", 0)) > 0:
 		btn.add_chip("weapons +%d tier%s" % [def["smith"], "s" if int(def["smith"]) > 1 else ""], "", CardView.GOOD)
 	if int(def.get("relic", 0)) > 0:
@@ -549,7 +551,8 @@ static func deal_brings(r: RunState, id: String, offer := {}) -> String:
 	var folk := r.caravan.folk_of(id, offer)
 	for role: String in folk:
 		var n := int(folk[role])
-		parts.append("%d %s%s join" % [n, r.content.townsfolk[role]["name"].to_lower(), "s" if n > 1 else ""])
+		parts.append("%d %s%s %s" % [n, r.content.townsfolk[role]["name"].to_lower(), "s" if n > 1 else "",
+			"fight this round, no beds needed" if def.get("hired", false) else "join"])
 	if int(def.get("smith", 0)) > 0:
 		parts.append("hero weapons +%d tier%s" % [def["smith"], "s" if int(def["smith"]) > 1 else ""])
 	if int(def.get("relic", 0)) > 0:

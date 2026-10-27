@@ -91,6 +91,8 @@ var craft_trait := ""
 var well_fed := false
 ## A hero with a hound from the kennel hits harder; the hound runs off when the hero falls back badly hurt.
 var hound := false
+## Townsfolk: hired for this round only from the caravan (Trade path tier II); they leave as the round ends.
+var hired := false
 ## Townsfolk: the leaning their dawn card came with (a key of their role's "leanings"), or "".
 var leaning := ""
 ## Townsfolk: a gatherer a warrior keeps watch over walks faster while no foe is near (set each step, FolkAI).

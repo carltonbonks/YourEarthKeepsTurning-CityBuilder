@@ -44,6 +44,8 @@ var charters_due := 0
 var charter_offer: Array[String] = []
 ## Trades guilds chartered at dawn (People.charter_guild): tribesperson leaning -> the round it was chartered.
 var guilds := {}
+## Heirlooms (Heroes path tier II): fallen heroes' best items waiting for the next hero to arrive, oldest first.
+var heirlooms: Array[Dictionary] = []
 ## Upgrades taken this run (data/upgrades.json), in order.
 var upgrades: Array[String] = []
 var traditions_settled := false
@@ -392,8 +394,9 @@ func living_heroes() -> Array[Unit]:
 	return heroes.filter(func(h: Unit) -> bool: return h.alive)
 
 
+## Everyone who needs a bed: townsfolk (not blades hired for the round) and living heroes.
 func population() -> int:
-	return world.folk.size() + living_heroes().size()
+	return world.folk.filter(func(u: Unit) -> bool: return not u.hired).size() + living_heroes().size()
 
 
 func housing() -> int:

@@ -158,7 +158,10 @@ extends RefCounted
 ##     (tribesperson leaning -> round chartered); a "charter" action ({offered, path, tier}, path "" when let go); a dawn
 ##     pick may take "guild:<leaning>"; per round "guild_spared" (good -> goods a gentle guild left in the node) and
 ##     "guild_tended" (good -> goods guild-worked nodes regrew at dawn, also counted in "tended").
-const RECORD_FORMAT := 57
+## 58: path tier IIs (Yusuf, 2026-10-27): per round "heirlooms_passed" (heroes who took up a fallen hero's item),
+##     "mustered" (tribespeople who took up spears on the warned night), "dusk_stakes" (barricades planned at the
+##     warned dusk) and "hired_blades" (hired warriors who left at the round's end).
+const RECORD_FORMAT := 58
 
 var run: RunState
 ## Finished rounds, oldest first.

@@ -186,6 +186,10 @@ def main(raw_folder, out_folder):
                 "tended_total": sum(rd.get("tended", {}).values()) if "tended" in rd else "",
                 "guild_tended": sum(rd.get("guild_tended", {}).values()),
                 "guild_spared": sum(rd.get("guild_spared", {}).values()),
+                "heirlooms_passed": rd.get("heirlooms_passed", 0),
+                "mustered": rd.get("mustered", 0),
+                "dusk_stakes": rd.get("dusk_stakes", 0),
+                "hired_blades": rd.get("hired_blades", 0),
                 **({"earth_" + k: (sum(rd["shift"].get(k, {}).values()) if isinstance(rd["shift"].get(k, ""), dict) else rd["shift"].get(k, ""))
                     for k in ["swallowed", "dens_swallowed", "ridges", "raised", "rifts", "grown", "roads_refunded"]}
                    if "shift" in rd else {"earth_" + k: "" for k in ["swallowed", "dens_swallowed", "ridges", "raised",
