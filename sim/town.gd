@@ -626,6 +626,57 @@ func patch_walls() -> void:
 			on_built(b)
 
 
+# --- Barricades -------------------------------------------------------------------
+
+## Up to n free plots beside buildings (like a gate's spot) facing a way in (angle), within the barricades' band:
+## the outermost ring first, true gaps between two buildings first, then the nearest to the way.
+func barricade_plots(angle: float, n: int) -> Array[int]:
+	var band := float(w.content.town["barricades"]["band"])
+	var taken := {}
+	for b in w.barricades:
+		taken[int(b["plot"])] = true
+	var order: Array = []
+	for k in plots.size():
+		if not plot_free(k) or taken.has(k) or _sides_closed(k) == 0:
+			continue
+		var off := absf(angle_difference(angle, (plots[k]["pos"] as Vector2).angle()))
+		if off <= band:
+			order.append([-int(plots[k]["ring"]), -_sides_closed(k), off, k])
+	order.sort()
+	var out: Array[int] = []
+	for entry: Array in order.slice(0, n):
+		out.append(entry[3])
+	return out
+
+
+## Barricade bi is raised: a wall of the barricades' hp on each open square of its plot.
+func raise_barricade(bi: int) -> void:
+	var b: Dictionary = w.barricades[bi]
+	b["built"] = true
+	b["work_left"] = 0.0
+	for i in plots[int(b["plot"])]["cells"]:
+		if not pathing.is_solid(i):
+			pathing.set_wall(i, float(w.content.town["barricades"]["hp"]))
+			w.barricade_square[i] = bi
+	w.run.record.note_count("barricades_raised", 1)
+
+
+## At dawn every barricade comes down (those never raised give their cost back) and the alarm is quiet again.
+func clear_barricades() -> void:
+	for i: int in w.barricade_square:
+		pathing.set_wall(i, 0.0)
+	for b in w.barricades:
+		if not b["built"]:
+			for good: String in b["cost"]:
+				w.run.stock[good] = int(w.run.stock.get(good, 0)) + int(b["cost"][good])
+	w.barricades.clear()
+	w.barricade_square.clear()
+	w.alarm_ways.clear()
+	w.spots.clear()
+	for unit in w.folk:
+		unit.barricade = -1
+
+
 ## {built, broken} gate counts (a gate is broken when raiders have opened any square of it).
 func gate_counts() -> Dictionary:
 	var out := {"built": 0, "broken": 0}

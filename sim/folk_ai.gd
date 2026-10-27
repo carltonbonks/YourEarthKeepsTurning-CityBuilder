@@ -442,6 +442,8 @@ func _worker_tick(unit: Unit) -> void:
 	if unit.errand_for != null:
 		_run_errand(unit)
 		return
+	if unit.barricade >= 0 and _barricade_tick(unit):
+		return
 	if unit.carry_amount > 0 and (unit.task != "gather" or w.is_dusk()):
 		unit.task = "return"
 	if unit.task == "return":
@@ -578,6 +580,64 @@ func _worker_tick(unit: Unit) -> void:
 			unit.task_timer -= w.dt
 			if unit.task_timer <= 0.0:
 				unit.task = ""
+
+
+## Raiders were spotted at `at`: unless the alarm was already raised from that way since dawn, the town barricades
+## up to per_alarm gaps on that side (Town.barricade_plots), paying each one's cost from stock while it can, and the
+## nearest free hands run to raise each one (data/town.json barricades). Folk only know what was seen: the way the
+## spotted raider comes, not the warned way.
+func raise_alarm(at: Vector2) -> void:
+	var def: Dictionary = w.content.town["barricades"]
+	var angle := at.angle()
+	if w.alarm_ways.any(func(a: float) -> bool: return absf(angle_difference(a, angle)) < float(def["band"])):
+		return
+	w.alarm_ways.append(angle)
+	var raised := 0
+	for k in w.town.barricade_plots(angle, int(def["per_alarm"])):
+		var cost: Dictionary = def["cost"]
+		if not cost.keys().all(func(good: String) -> bool: return int(w.run.stock.get(good, 0)) >= int(cost[good])):
+			break
+		for good: String in cost:
+			w.run.stock[good] = int(w.run.stock[good]) - int(cost[good])
+		w.barricades.append({"plot": k, "pos": w.town.plots[k]["pos"], "work_left": float(def["work"]), "built": false,
+			"broken": false, "cost": cost})
+		_send_hands(w.barricades.size() - 1)
+		raised += 1
+	if raised > 0:
+		w.run.tell("Raiders spotted to the %s: folk run to barricade %d gap%s." % [World.compass(angle), raised, "" if raised == 1 else "s"])
+		w.run.record.note_count("barricades_planned", raised)
+
+
+## The nearest hands townsfolk free to barricade (a role with "barricades", not on an errand, levied or already
+## barricading) within reach of barricade bi run to it.
+func _send_hands(bi: int) -> void:
+	var def: Dictionary = w.content.town["barricades"]
+	var site: Vector2 = w.barricades[bi]["pos"]
+	var free: Array = []
+	for unit in w.folk:
+		if unit.alive and unit.barricade < 0 and unit.errand_for == null and not levied(unit) \
+				and w.content.townsfolk[unit.type_id].get("barricades", false) and unit.pos.distance_to(site) <= float(def["reach"]):
+			free.append([unit.pos.distance_to(site), unit])
+	free.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+	for n in mini(int(def["hands"]), free.size()):
+		(free[n][1] as Unit).barricade = bi
+
+
+## A townsperson running to raise its barricade. Returns false once there is nothing left to do there.
+func _barricade_tick(unit: Unit) -> bool:
+	var b: Dictionary = w.barricades[unit.barricade] if unit.barricade < w.barricades.size() else {}
+	if b.is_empty() or b["built"]:
+		unit.barricade = -1
+		return false
+	unit.intent = "throwing up a barricade"
+	unit.activity = "barricade"
+	if w.walk_toward(unit, b["pos"], 12.0):
+		b["work_left"] = float(b["work_left"]) - work_rate(unit) * w.dt
+		if float(b["work_left"]) <= 0.0:
+			w.town.raise_barricade(unit.barricade)
+			w.run.record.note_impact("folk", unit.type_id, "barricaded", 1.0)
+			unit.barricade = -1
+	return true
 
 
 ## Counts a daytime second spent idle toward the round's "idle_seconds" for the unit's role.

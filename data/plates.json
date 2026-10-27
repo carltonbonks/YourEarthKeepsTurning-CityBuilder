@@ -1,5 +1,5 @@
 {
-	"_note": "The turning earth as this round's weather (sim/earth.gd; Yusuf, 2026-10-25, replacing the earth dial). Just past the still town lies one ring of plates (rings: r0 to r1 from the hearth, plates of them, cuts staggered a little), each plate of a kind from near_kinds, dealt one each per run in a seeded order. Once between rounds the ring clicks round the hearth by one whole plate (every click_every turns; dir 1 clockwise on screen, -1 the other way), carrying what stands on it. The night's attack crosses one plate on its way in from its den, and the threat card names that plate's kind in one line. Per kind: walk = how fast anyone walks over it (x), raider_walk = how fast raiders walk over it (x, on top of walk), sight = how far the hearth and towers see raiders standing on it (x their range), regrow = share of full that plant-tagged nodes on it regrow each dawn, rise_chance = chance a raider who falls on it gets up again once at rise_hp of its health, grave_goods = chance a hero who kills a raider on it digs up an item; tags = what relics and buildings key on (plate_knobs); gives and takes = the plate's hover, short = the threat card's few words. enabled = false keeps the earth still (for tests that need a fixed map). colors = the map's tint for each kind, and edge for the faint lines round the plates.",
+	"_note": "The turning earth as this round's weather (sim/earth.gd; Yusuf, 2026-10-25, replacing the earth dial). Just past the still town lies one ring of plates (rings: r0 to r1 from the hearth, plates of them, cuts staggered a little), each plate of a kind from near_kinds, dealt one each per run in a seeded order. Once between rounds the ring clicks round the hearth by one whole plate (every click_every turns; dir 1 clockwise on screen, -1 the other way), carrying what stands on it. The night's attack crosses one plate on its way in from its den, and the threat card names that plate's kind in one line. Per kind: walk = how fast anyone walks over it (x), raider_walk = how fast raiders walk over it (x, on top of walk), sight = how far the hearth and towers see raiders standing on it (x their range), regrow = share of full that plant-tagged nodes on it regrow each dawn, rise_chance = chance a raider who falls on it gets up again once at rise_hp of its health, grave_goods = chance a hero who kills a raider on it digs up an item; tags = what relics and buildings key on (plate_knobs); gives and takes = the plate's hover, short = the threat card's few words. enabled = false keeps the earth still (for tests that need a fixed map). colors = the map's tint for each kind, and edge for the faint lines round the plates. route_looks = how the red line of tonight's attack (game/raider_route.gd) looks where it crosses a plate of each kind: color and line (wave, dots, chevrons or crosses); open country is plain.",
 	"enabled": true,
 	"rings": [
 		{
@@ -56,6 +56,12 @@
 			"takes": "A raider who falls on it may get up again, once.",
 			"short": "the fallen may get up again"
 		}
+	},
+	"route_looks": {
+		"fen": {"color": "#7ec4b8", "line": "wave"},
+		"greenwood": {"color": "#d0483f", "line": "dots"},
+		"stonefield": {"color": "#ff6a3a", "line": "chevrons"},
+		"barrow": {"color": "#c592e0", "line": "crosses"}
 	},
 	"colors": {
 		"fen": "#5f7f63",

@@ -321,6 +321,37 @@ func _route_time(a: Vector2, route: PackedVector2Array, goal: Vector2, enemy := 
 	return total + at.distance_to(goal) / walk_speed(index_of(goal), enemy)
 
 
+## The way a raider would come from one point to another as the ground lies now, for drawing: the raiders' route
+## (gates cost extra), or the straight line when that is as quick, with its corners pulled tight so only the
+## turns are left. Raiders work their way along it bit by bit (next_point), so they keep close to it.
+func route_preview(from: Vector2, to: Vector2) -> PackedVector2Array:
+	var route := find_path(from, to, true)
+	if route.is_empty() or _line_time(from, to, true) <= _route_time(from, route, to, true) * 1.02:
+		return PackedVector2Array([from, to])
+	var on_route := {}
+	for p in route:
+		on_route[index_of(p)] = true
+	var points := PackedVector2Array([from])
+	route.append(to)
+	var anchor := from
+	for k in range(1, route.size()):
+		if not _open_line(anchor, route[k], on_route):
+			anchor = route[k - 1]
+			points.append(anchor)
+	points.append(to)
+	return points
+
+
+## True if the straight line between two points crosses nothing solid, nor a gate the route itself doesn't go through.
+func _open_line(a: Vector2, b: Vector2, on_route: Dictionary) -> bool:
+	var steps := ceili(a.distance_to(b) / (cell * 0.5))
+	for k in range(1, steps + 1):
+		var i := index_of(a.lerp(b, float(k) / steps))
+		if solid[i] == 1 or (wall_hp[i] > 0.0 and not on_route.has(i)):
+			return false
+	return true
+
+
 ## True if the straight line between two points crosses nothing solid and stays on one kind of ground.
 func _clear_line(a: Vector2, b: Vector2, enemy := false) -> bool:
 	var kind := ground[index_of(a)]

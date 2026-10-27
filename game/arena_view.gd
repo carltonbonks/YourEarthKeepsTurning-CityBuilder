@@ -66,6 +66,8 @@ var celebrations := Celebrations.new()
 var victory := Victory.new()
 var upgrade_glow := UpgradeGlow.new()
 var last_kill := LastKill.new()
+var raider_route := RaiderRoute.new()
+var quick_defences := QuickDefences.new()
 var light := Lighting.new()
 var _light_layer: Control
 var _top_layer: Control
@@ -271,6 +273,9 @@ func _draw() -> void:
 	_draw_ground()
 	_draw_preview()
 	_ground_circle(Vector2.ZERO, World.HEARTH_RADIUS, Color("#5a4030"), 32)
+	# The way tonight's attack will come, and the barricades folk threw up once raiders were spotted.
+	raider_route.draw(self, run, Time.get_ticks_msec(), _slide_angle(0))
+	quick_defences.draw(self, run)
 
 	# Warned attack sides: red wedges at the map edge until the wave arrives.
 	if not w.wave_spawned:
@@ -410,6 +415,8 @@ func _draw_top() -> void:
 	celebrations.draw_top(_top_layer, size, font, Time.get_ticks_msec(), _to_screen, run.heroes, HERO_RADIUS * maxf(1.0, zoom * 0.7))
 	victory.draw_top(_top_layer, size, font, Time.get_ticks_msec())
 	last_kill.draw_top(_top_layer, self, font)
+	raider_route.draw_labels(_top_layer, self, run, font, Time.get_ticks_msec(), _slide_angle(0))
+	quick_defences.draw_top(_top_layer, self, run, font)
 	if _mouse.x >= 0.0 and not _dragging:
 		var tip := hovered(_mouse)
 		if not tip.is_empty():
