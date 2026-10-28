@@ -32,8 +32,8 @@ func _init() -> void:
 	_text.scroll_active = false
 	_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_text.custom_minimum_size.y = 68
-	_text.add_theme_font_size_override("normal_font_size", 12)
-	_text.add_theme_font_size_override("bold_font_size", 12)
+	_text.add_theme_font_size_override("normal_font_size", UiKit.BODY)
+	_text.add_theme_font_size_override("bold_font_size", UiKit.BODY)
 	_text.resized.connect(func() -> void: _shown = -1)
 	add_child(_text)
 	var side := VBoxContainer.new()
@@ -78,8 +78,8 @@ func refresh() -> void:
 	var from := maxi(0, _shown - LINES)
 	while true:
 		var lines := PackedStringArray()
-		for line in run.story.slice(from):
-			lines.append(as_bbcode(line))
+		for i in range(from, _shown):
+			lines.append(as_bbcode(run, i))
 		_text.text = "\n".join(lines)
 		if from >= _shown - 1 or _text.size.y <= 0.0 or _text.get_content_height() <= _text.size.y:
 			break
@@ -94,7 +94,6 @@ static func build_label(path := BUILD_INFO) -> String:
 	return label if label != "" else "dev build"
 
 
-## One story line, in bold when it marks a turn of the run (a new round, the attack, the end).
-static func as_bbcode(line: String) -> String:
-	var bold := line.begins_with("Round ") or line.begins_with("The hearth") or line.begins_with("Night 3") or line.begins_with("No one")
-	return ("[b]%s[/b]" if bold else "%s") % line
+## Story line i as BBCode in its emphasis tier (UiKit.story_line).
+static func as_bbcode(r: RunState, i: int) -> String:
+	return UiKit.story_line(r.story[i], r.story_tiers[i] if i < r.story_tiers.size() else RunState.NOTICE)

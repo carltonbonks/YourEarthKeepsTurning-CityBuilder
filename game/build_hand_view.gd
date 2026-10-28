@@ -93,7 +93,7 @@ func refresh() -> void:
 			_cards[type] = _card(type, run.hand.need(type), "blueprint")
 			mine.add_child(_cards[type])
 	if mine.get_child_count() == 0:
-		var empty := UiKit.note(mine, "None yet.", 12)
+		var empty := UiKit.note(mine, "None yet.", UiKit.CAPTION)
 		empty.custom_minimum_size.x = 120
 		empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		empty.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -152,14 +152,14 @@ func _section(title: String, hint: String) -> HBoxContainer:
 	head.scroll_active = false
 	head.autowrap_mode = TextServer.AUTOWRAP_OFF
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	head.add_theme_font_size_override("normal_font_size", 12)
-	head.add_theme_font_size_override("bold_font_size", 14)
-	head.text = "[b][color=#%s]%s[/color][/b]" % [color.to_html(false), title.to_upper()]
+	head.add_theme_font_size_override("normal_font_size", UiKit.CAPTION)
+	head.add_theme_font_size_override("bold_font_size", UiKit.STRONG)
+	head.text = "[b]%s[/b]" % UiKit.tint(title.to_upper(), color)
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 8)
 	box.add_child(top)
 	top.add_child(head)
-	var hint_label := UiKit.note(top, hint, 12)
+	var hint_label := UiKit.note(top, hint, UiKit.CAPTION)
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	hint_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_hints.append(hint_label)

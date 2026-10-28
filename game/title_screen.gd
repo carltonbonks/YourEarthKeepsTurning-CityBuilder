@@ -36,7 +36,7 @@ func _init() -> void:
 
 	var kicker := Label.new()
 	kicker.text = "A HANDS-OFF FRONTIER ROGUELITE"
-	kicker.add_theme_font_size_override("font_size", 13)
+	kicker.add_theme_font_size_override("font_size", UiKit.BODY)
 	kicker.add_theme_color_override("font_color", EMBER)
 	column.add_child(kicker)
 	var title := Label.new()
@@ -45,7 +45,7 @@ func _init() -> void:
 	title.add_theme_color_override("font_color", Color("#ece5d8"))
 	title.add_theme_constant_override("line_spacing", -6)
 	column.add_child(title)
-	var tagline := UiKit.note(column, "Raise a people from campfire to stone keep. You shape the town; they choose their own fights.", 16, MUTED)
+	var tagline := UiKit.note(column, "Raise a people from campfire to stone keep. You shape the town; they choose their own fights.", UiKit.STRONG, MUTED)
 	tagline.custom_minimum_size.x = 420
 	var gap := Control.new()
 	gap.custom_minimum_size.y = 24
@@ -76,7 +76,7 @@ func _init() -> void:
 
 	var footer := Label.new()
 	footer.text = "v%s · playtest build" % str(ProjectSettings.get_setting("application/config/version", ""))
-	footer.add_theme_font_size_override("font_size", 13)
+	footer.add_theme_font_size_override("font_size", UiKit.BODY)
 	footer.add_theme_color_override("font_color", Color("#8f8676"))
 	footer.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	footer.position = Vector2(96, -44)

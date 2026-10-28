@@ -211,9 +211,9 @@ func _init() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
 	_bubble.add_child(box)
-	_line = UiKit.note(box, "", 15, INK)
+	_line = UiKit.note(box, "", UiKit.STRONG, INK)
 	_line.custom_minimum_size.x = BUBBLE_WIDTH - 24.0
-	_fix = UiKit.note(box, "", 13, QUIET)
+	_fix = UiKit.note(box, "", UiKit.BODY, QUIET)
 	_fix.custom_minimum_size.x = BUBBLE_WIDTH - 24.0
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -230,7 +230,7 @@ func _button(text: String, strong: bool, on_press: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", 13)
+	b.add_theme_font_size_override("font_size", UiKit.BODY)
 	var s := StyleBoxFlat.new()
 	s.bg_color = Color(EMBER, 0.25) if strong else Color(0, 0, 0, 0)
 	s.border_color = EMBER if strong else Color(QUIET, 0.5)

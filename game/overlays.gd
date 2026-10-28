@@ -137,7 +137,7 @@ func show_draft(hand: BuildHandView) -> void:
 	_clear()
 	showing_draft = true
 	_title(hand.draft_title() + " to start building")
-	var sub := UiKit.note(_box, "It joins Your blueprints in the hand and stays on offer for the whole run.", 14)
+	var sub := UiKit.note(_box, "It joins Your blueprints in the hand and stays on offer for the whole run.", UiKit.STRONG)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub.tooltip_text = BuildHandView.pool_line(run)
 	sub.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -182,11 +182,11 @@ func show_pick() -> void:
 	var room := run.population() < run.housing()
 	_night_summary("Shells %d  ·  Room %d / %d" % [run.stock["shells"], run.population(), run.housing()])
 	if not room:
-		UiKit.note(_box, "No room for anyone new. Build huts at the start of the next round.", 14, Color("#e0a050")) \
+		UiKit.note(_box, "No room for anyone new. Build huts at the start of the next round.", UiKit.STRONG, UiKit.EMBER) \
 			.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if run.hunger_turned_away != "":
 		var role: String = content.townsfolk[run.hunger_turned_away]["name"].to_lower()
-		UiKit.note(_box, "Word has spread that a %s left hungry: no %s will join today." % [role, role], 14, Color("#e0a050")) \
+		UiKit.note(_box, "Word has spread that a %s left hungry: no %s will join today." % [role, role], UiKit.STRONG, UiKit.EMBER) \
 			.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
@@ -576,7 +576,7 @@ func show_venture_result() -> void:
 	var lost := int(result["lost"])
 	var line := Label.new()
 	line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	line.add_theme_font_size_override("font_size", 18)
+	line.add_theme_font_size_override("font_size", UiKit.TITLE)
 	if lost == 0:
 		line.text = "All %d tribespeople came home." % result["send"]
 		line.add_theme_color_override("font_color", VentureFigures.HOME_COLOR)
@@ -586,7 +586,7 @@ func show_venture_result() -> void:
 	_box.add_child(line)
 	var goods: Dictionary = result["goods"]
 	var brought := ", ".join(goods.keys().map(func(g: String) -> String: return "%d %s" % [goods[g], g.replace("_", " ")]))
-	UiKit.note(_box, "They bring home %s." % brought, 15, Color("#e8e8e8")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UiKit.note(_box, "They bring home %s." % brought, UiKit.STRONG, UiKit.INK).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var center := CenterContainer.new()
 	_box.add_child(center)
 	UiKit.primary(UiKit.button(center, "Carry on", func() -> void: closed.emit())).custom_minimum_size = Vector2(220, 36)
@@ -649,7 +649,7 @@ func _night_summary(extra := "") -> void:
 	var n := run.last_night
 	if n.is_empty():
 		if extra != "":
-			UiKit.note(_box, extra, 14, Color("#e8e8e8")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			UiKit.note(_box, extra, UiKit.STRONG, UiKit.INK).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		return
 	var deaths: Array = n["deaths"]
 	var left: Array = n.get("left", [])
@@ -669,7 +669,7 @@ func _night_summary(extra := "") -> void:
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	label.custom_minimum_size.x = 600
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_color_override("font_color", Color("#e0a050") if not lost.is_empty() else Color("#a8c8a0"))
+	label.add_theme_color_override("font_color", UiKit.EMBER if not lost.is_empty() else UiKit.GOOD)
 	_box.add_child(label)
 
 
@@ -682,7 +682,7 @@ func _impact_line() -> void:
 	line.alignment = BoxContainer.ALIGNMENT_CENTER
 	line.add_theme_constant_override("separation", 10)
 	_box.add_child(line)
-	var label := UiKit.note(line, ImpactView.headline(run, shown["impact"]), 13, UiKit.HEADING_COLOR)
+	var label := UiKit.note(line, ImpactView.headline(run, shown["impact"]), UiKit.BODY, UiKit.HEADING_COLOR)
 	label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	var open := Button.new()
 	open.text = "Who did what"
@@ -786,7 +786,7 @@ func show_end() -> void:
 	summary.custom_minimum_size.x = 420
 	_box.add_child(summary)
 	if not won:
-		UiKit.note(_box, content.tips["welcome"]["lost_line"], 16, Color("#d9cbb3")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		UiKit.note(_box, content.tips["welcome"]["lost_line"], UiKit.STRONG, Color("#d9cbb3")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	UiKit.primary(UiKit.button(_box, "New run", func() -> void: new_run_requested.emit(false)))
 	UiKit.button(_box, "Replay seed %d" % run.run_seed, func() -> void: new_run_requested.emit(true))
 	UiKit.button(_box, "Who did what", func() -> void: show_impact(true))
@@ -803,11 +803,11 @@ func show_history() -> void:
 	var stats := Label.new()
 	stats.text = "No runs saved yet. Runs are saved at every dawn and after each round." if runs.is_empty() \
 		else "\n".join(RunStats.report(runs).slice(0, 6))
-	stats.add_theme_font_size_override("font_size", 13)
+	stats.add_theme_font_size_override("font_size", UiKit.BODY)
 	_box.add_child(stats)
 	var hint := Label.new()
 	hint.text = "To share runs, download them as one file and attach it to a chat message."
-	hint.add_theme_font_size_override("font_size", 12)
+	hint.add_theme_font_size_override("font_size", UiKit.CAPTION)
 	hint.add_theme_color_override("font_color", UiKit.HINT_COLOR)
 	_box.add_child(hint)
 	var scroll := ScrollContainer.new()
@@ -822,7 +822,7 @@ func show_history() -> void:
 		var label := Label.new()
 		label.text = RunHistory.one_line(data)
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		label.add_theme_font_size_override("font_size", 13)
+		label.add_theme_font_size_override("font_size", UiKit.BODY)
 		row.add_child(label)
 		var copy := Button.new()
 		copy.text = "Copy"
@@ -964,11 +964,11 @@ func show_log() -> void:
 	text.bbcode_enabled = true
 	text.custom_minimum_size = Vector2(760, 460)
 	text.scroll_following = true
-	text.add_theme_font_size_override("normal_font_size", 13)
-	text.add_theme_font_size_override("bold_font_size", 13)
+	text.add_theme_font_size_override("normal_font_size", UiKit.BODY)
+	text.add_theme_font_size_override("bold_font_size", UiKit.BODY)
 	var lines := PackedStringArray()
-	for line in run.story:
-		lines.append(StoryLog.as_bbcode(line))
+	for i in run.story.size():
+		lines.append(StoryLog.as_bbcode(run, i))
 	text.text = "\n".join(lines)
 	_box.add_child(text)
 	UiKit.button(_box, "Back", func() -> void: closed.emit())
@@ -1031,6 +1031,6 @@ func _clear() -> void:
 func _title(text: String) -> void:
 	var title := Label.new()
 	title.text = text
-	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_font_size_override("font_size", UiKit.HEADING)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_box.add_child(title)

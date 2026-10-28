@@ -295,7 +295,7 @@ func step() -> void:
 				hearth_hp -= e.attack * 3.0
 				e.alive = false
 			if not wave_left.is_empty():
-				run.tell("The last raiders loot the edge of town and slip away.")
+				run.tell("The last raiders loot the edge of town and slip away.", RunState.PROBLEM)
 			_finish_round()
 
 
@@ -312,11 +312,11 @@ func _nightfall() -> void:
 		var wood := mini(short, int(run.stock["wood"])) if content.balance.get("wood_burns_as_fuel", false) else 0
 		if wood > 0:
 			run.stock["wood"] = int(run.stock["wood"]) - wood
-			run.tell("Out of fuel: %d wood goes on the fire instead." % wood)
+			run.tell("Out of fuel: %d wood goes on the fire instead." % wood, RunState.PROBLEM)
 		if wood < short:
 			cold_tonight = true
 			night_report["cold"] = true
-			run.tell("The fire burns low. A cold night: everyone suffers.")
+			run.tell("The fire burns low. A cold night: everyone suffers.", RunState.PROBLEM)
 	if is_wave_night():
 		run.tell("Night %d falls. The warned attack is coming from the %s." % [day_index() + 1, " and ".join(side_names())])
 		var spears := folk.filter(func(u: Unit) -> bool: return u.alive and folk_ai.levied(u)).size()
@@ -324,7 +324,7 @@ func _nightfall() -> void:
 			run.record.note_count("mustered", spears)
 			run.tell("%d tribespeople take up spears beside the warriors." % spears)
 	else:
-		run.tell("Night %d falls." % (day_index() + 1))
+		run.tell("Night %d falls." % (day_index() + 1), RunState.AMBIENT)
 		enemy_ai.spawn_probe()
 
 
@@ -432,7 +432,7 @@ func _finish_round() -> void:
 		var alive := hired.filter(func(u: Unit) -> bool: return u.alive).size()
 		run.record.note_count("hired_blades", alive)
 		if alive > 0:
-			run.tell("The hired blades take their pay and ride south with the caravan.")
+			run.tell("The hired blades take their pay and ride south with the caravan.", RunState.AMBIENT)
 	_lay_risen()
 	# Wanderers slink back to their dens at the end of a round.
 	enemies = enemies.filter(func(e: Unit) -> bool: return e.alive and e.den_index >= 0)
@@ -619,12 +619,12 @@ func _batter(unit: Unit, square: int) -> void:
 			if not b["broken"]:
 				b["broken"] = true
 				run.record.note_count("barricades_broken", 1)
-				run.tell("Raiders break through a barricade.")
+				run.tell("Raiders break through a barricade.", RunState.PROBLEM)
 			return
 		run.record.note_breach()
 		if not bool(night_report.get("breached", false)):
 			night_report["breached"] = true
-			run.tell("Raiders break through a gate.")
+			run.tell("Raiders break through a gate.", RunState.PROBLEM)
 
 
 func fight(unit: Unit, foe: Unit) -> void:
@@ -710,13 +710,13 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 			night_report["hero_deaths"] = int(night_report["hero_deaths"]) + 1
 			if wave_spawned:
 				wave_stats["hero_deaths"].append({"hero": victim.display_name, "killer": killer, "time": snappedf(time, 0.1)})
-			run.tell("%s fell to a %s." % [run.describe(victim), attacker.display_name if attacker != null else "the dark"])
+			run.tell("%s fell to a %s." % [run.describe(victim), attacker.display_name if attacker != null else "the dark"], RunState.MOMENT)
 		else:
-			run.tell("A %s was killed by a %s." % [victim.display_name.to_lower(), attacker.display_name.to_lower() if attacker != null else "beast"])
+			run.tell("A %s was killed by a %s." % [victim.display_name.to_lower(), attacker.display_name.to_lower() if attacker != null else "beast"], RunState.PROBLEM)
 		night_report["deaths"].append(victim.display_name)
 		if victim.errand_for != null:
 			run.record.note_count("runners_lost", 1, victim.errand_for.display_name)
-			run.tell("The runner carrying supplies to %s never arrives." % victim.errand_for.display_name)
+			run.tell("The runner carrying supplies to %s never arrives." % victim.errand_for.display_name, RunState.PROBLEM)
 			victim.errand_for.runner = null
 			victim.errand_for = null
 			victim.parcel = {}
@@ -751,7 +751,7 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 		run.record.note_count("grave_goods", 1)
 		run.tell("%s turns up grave goods on the barrow." % attacker.display_name)
 	if victim.is_boss:
-		run.tell("%s slays %s!" % [attacker.display_name, victim.display_name])
+		run.tell("%s slays %s!" % [attacker.display_name, victim.display_name], RunState.MOMENT)
 
 
 ## Who landed a killing blow, for the view: a hero by name, a townsperson by role ("a warrior"), else the hearth or the tower that shot.

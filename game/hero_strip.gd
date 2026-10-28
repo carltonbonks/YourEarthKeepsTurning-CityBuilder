@@ -11,7 +11,7 @@ const CHIP_WIDTH := 116.0
 const MIN_CHIP_WIDTH := 72.0
 const BAR_SIZE := Vector2(5, 30)
 const HEALTH_COLOR := Color("#7fd07f")
-const LOW_HEALTH_COLOR := Color("#e0a050")
+const LOW_HEALTH_COLOR := UiKit.EMBER
 const LOST_COLOR := Color("#b03a3a")
 
 var run: RunState
@@ -58,7 +58,7 @@ func _rebuild(living: Array[Unit]) -> void:
 		child.queue_free()
 	_parts.clear()
 	if living.is_empty() and run.fallen.is_empty() and run.departed.is_empty():
-		UiKit.note(_row, "No heroes yet. Build a lodging and they come to the dawn picks.", 12)
+		UiKit.note(_row, "No heroes yet. Build a lodging and they come to the dawn picks.", UiKit.CAPTION)
 		return
 	for hero in living:
 		var chip := TipChip.new()
@@ -74,7 +74,7 @@ func _rebuild(living: Array[Unit]) -> void:
 		box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		side.add_child(box)
 		var name := Label.new()
-		name.add_theme_font_size_override("font_size", 13)
+		name.add_theme_font_size_override("font_size", UiKit.BODY)
 		name.add_theme_color_override("font_color", Color(run.content.hero_classes[hero.type_id]["color"]))
 		name.clip_text = true
 		box.add_child(name)
@@ -83,13 +83,13 @@ func _rebuild(living: Array[Unit]) -> void:
 		box.add_child(line)
 		var dot := Label.new()
 		dot.text = "●"
-		dot.add_theme_font_size_override("font_size", 11)
+		dot.add_theme_font_size_override("font_size", UiKit.CAPTION)
 		line.add_child(dot)
 		var doing := Label.new()
 		doing.clip_text = true
 		doing.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		doing.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		doing.add_theme_font_size_override("font_size", 11)
+		doing.add_theme_font_size_override("font_size", UiKit.CAPTION)
 		doing.add_theme_color_override("font_color", UiKit.HINT_COLOR)
 		line.add_child(doing)
 		_row.add_child(chip)
@@ -101,7 +101,7 @@ func _rebuild(living: Array[Unit]) -> void:
 		var l := Label.new()
 		l.text = "%d lost" % lost
 		l.add_theme_color_override("font_color", LOST_COLOR.lightened(0.25))
-		l.add_theme_font_size_override("font_size", 12)
+		l.add_theme_font_size_override("font_size", UiKit.CAPTION)
 		chip.add_child(l)
 		_row.add_child(chip)
 	_fit_chips()

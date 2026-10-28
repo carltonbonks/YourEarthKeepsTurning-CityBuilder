@@ -165,7 +165,7 @@ func on_camper_killed(victim: Unit, attacker: Unit) -> void:
 	w.run.record.note_count("camp_spoils", spoils)
 	var who := "%s breaks" % attacker.display_name if attacker != null and attacker.is_hero() else "Your people break"
 	var plunder := ": %d shells of plunder come back to town, and" % spoils if spoils > 0 else ": nobody marches from it now, and"
-	w.run.tell("%s the war camp%s the land round it is free again." % [who, plunder])
+	w.run.tell("%s the war camp%s the land round it is free again." % [who, plunder], RunState.MOMENT)
 	if attacker != null and attacker.is_hero():
 		w.hero_ai.give_item(attacker, Loot.roll(w.content, w.rng, w.run.round_number, w.run.age))
 
@@ -201,7 +201,7 @@ func _camp_marches() -> void:
 	if camp_raiders().is_empty():
 		w.dens[ci]["cleared"] = true
 		w.dens[ci]["marched"] = true
-	w.run.tell("The war camp's %d raider%s march on the hearth with the attack." % [marching.size(), "" if marching.size() == 1 else "s"])
+	w.run.tell("The war camp's %d raider%s march on the hearth with the attack." % [marching.size(), "" if marching.size() == 1 else "s"], RunState.PROBLEM)
 
 
 ## A small raid on an early night, from a random side, not warned of.
@@ -373,7 +373,7 @@ func _attack_tower(enemy: Unit, b: int) -> void:
 		enemy.target_tower = -1
 		w.run.record.note_count("towers_broken", 1)
 		w.run.tell("A %s broke the %s: it shoots no more until it is mended at dawn." % [
-			enemy.display_name.to_lower(), w.content.buildings[building["type"]]["name"].to_lower()])
+			enemy.display_name.to_lower(), w.content.buildings[building["type"]]["name"].to_lower()], RunState.PROBLEM)
 
 
 ## At dawn, every tower is mended to full health.

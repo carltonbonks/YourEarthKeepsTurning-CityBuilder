@@ -27,8 +27,8 @@ func _init(dev_mode: bool) -> void:
 		label.fit_content = true
 		label.autowrap_mode = TextServer.AUTOWRAP_OFF
 		label.scroll_active = false
-		label.add_theme_font_size_override("normal_font_size", 13)
-		label.add_theme_font_size_override("bold_font_size", 13)
+		label.add_theme_font_size_override("normal_font_size", UiKit.BODY)
+		label.add_theme_font_size_override("bold_font_size", UiKit.BODY)
 		chip.add_child(label)
 		add_child(chip)
 		_chips[id] = label
@@ -79,7 +79,7 @@ func refresh() -> void:
 ## A chip's text without its trailing words: "Food 0" for "Food 0  runs out at dawn", the goods without "+2 more".
 static func compact(text: String, id: String) -> String:
 	if id == "goods":
-		var cut := text.find("  [color=#9aa]+")
+		var cut := text.find("  " + UiKit.tint("+", UiKit.DIM).trim_suffix("[/color]"))
 		return text.substr(0, cut) if cut >= 0 else text
 	var at := text.find("  ")
 	return text.substr(0, at) if at >= 0 else text

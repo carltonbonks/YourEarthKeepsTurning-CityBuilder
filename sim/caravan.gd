@@ -74,7 +74,7 @@ func lay_out() -> void:
 			run.round_number, run.content.num("trade_roll_mult"))
 		offers.append(offer)
 	if not offers.is_empty():
-		run.tell("The %s lays out %d deals." % [trades["name"].to_lower(), offers.size()])
+		run.tell("The %s lays out %d deals." % [trades["name"].to_lower(), offers.size()], RunState.AMBIENT)
 
 
 func deal(id: String) -> Dictionary:
@@ -226,7 +226,7 @@ func take(index: int) -> bool:
 		entry["got"] = got
 	run.record.note_list("deals", entry)
 	run.record.note_action({"kind": "deal", "deal": id})
-	run.tell("Trade: %s." % def["name"])
+	run.tell("Trade: %s." % def["name"], RunState.AMBIENT)
 	return true
 
 
@@ -240,7 +240,7 @@ func _transmute(offer: Dictionary) -> void:
 		for i in more:
 			run.next_wave.append(rng.pick(run.next_wave))
 		run.record.note_count("card_mods_fired", 1, "smugglers_hoard")
-		run.tell("Word of the smuggled hoard spreads: %d more raiders join this round's attack." % more)
+		run.tell("Word of the smuggled hoard spreads: %d more raiders join this round's attack." % more, RunState.PROBLEM)
 	if CardRoll.card_sum(content, offer, "curse_hero") > 0.0:
 		var heroes := run.living_heroes().filter(func(h: Unit) -> bool: return h.trait_id != "greedy")
 		if not heroes.is_empty():
@@ -249,7 +249,7 @@ func _transmute(offer: Dictionary) -> void:
 			hero.trait_id = "greedy"
 			run.world.hero_ai.apply_hero_stats(hero)
 			run.record.note_count("card_mods_fired", 1, "cursed_gold")
-			run.tell("The cursed gold gets into %s's head: they are greedy now." % hero.display_name)
+			run.tell("The cursed gold gets into %s's head: they are greedy now." % hero.display_name, RunState.PROBLEM)
 
 
 ## The deal ids laid out this round, for the record.

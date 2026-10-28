@@ -6,7 +6,7 @@ extends RefCounted
 
 const GROUPS := ["heroes", "folk", "defences"]
 const GROUP_TITLES := {"heroes": "Heroes", "folk": "Townsfolk", "defences": "Hearth and towers"}
-const DEALT_COLOR := Color("#e0a050")
+const DEALT_COLOR := UiKit.EMBER
 const TAKEN_COLOR := Color("#d07070")
 
 
@@ -153,7 +153,7 @@ static func sorted_rows(impact: Dictionary, group: String) -> Array:
 ## Builds the tables into `parent`.
 static func build(parent: Control, run: RunState, impact: Dictionary) -> void:
 	if impact.is_empty():
-		UiKit.note(parent, "Nothing to show yet: this fills in as the round plays.", 13)
+		UiKit.note(parent, "Nothing to show yet: this fills in as the round plays.", UiKit.BODY)
 		return
 	var dealt_all := maxi(1, total(impact, "dealt"))
 	# No scrolling: the table takes the room it needs, and the pop-up shrinks to fit the screen (Overlays).
@@ -172,7 +172,7 @@ static func build(parent: Control, run: RunState, impact: Dictionary) -> void:
 		grid.add_theme_constant_override("v_separation", 2)
 		box.add_child(grid)
 		for title: String in ["", "Dealt", "Taken", "Kills", "Lost", "Work"]:
-			UiKit.note(grid, title, 11)
+			UiKit.note(grid, title, UiKit.CAPTION)
 		for who: String in keys:
 			var row: Dictionary = impact[group][who]
 			_cell(grid, row_name(run, group, who, row), 13, Color.WHITE, 220)

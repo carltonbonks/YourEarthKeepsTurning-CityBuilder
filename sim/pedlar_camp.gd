@@ -81,7 +81,7 @@ func open(choice: Dictionary) -> void:
 			"sold": 0, "sold_value": 0, "bought": [], "guards": [], "paid": [], "fell": false, "left": 0}}
 	w.run.record.note_value("pedlar", camp["record"])
 	w.run.tell("The %s sets up camp %s of the town with %d wares." % [d["name"].to_lower(),
-		World.compass(Vector2(choice["pos"]).angle()), wares.size()])
+		World.compass(Vector2(choice["pos"]).angle()), wares.size()], RunState.AMBIENT)
 	hire_guards()
 
 
@@ -125,7 +125,7 @@ func hire_guards() -> void:
 		camp["guards"].append(h.id)
 		h.resting = false
 		camp["record"]["guards"].append(h.display_name)
-		w.run.tell("%s takes the %s's coin to guard the camp." % [h.display_name, def(camp["id"])["name"].to_lower()])
+		w.run.tell("%s takes the %s's coin to guard the camp." % [h.display_name, def(camp["id"])["name"].to_lower()], RunState.AMBIENT)
 
 
 ## How far from the hearth this hero will walk to trade: bolder and greedier heroes go further,
@@ -212,7 +212,7 @@ func trade(hero: Unit) -> void:
 		rec["sold_value"] = int(rec["sold_value"]) + total
 		hero.gold += total
 		w.run.tell("%s sells %d found item%s to the %s for %d shells." % [hero.display_name, hero.spares.size(),
-			"" if hero.spares.size() == 1 else "s", name, total])
+			"" if hero.spares.size() == 1 else "s", name, total], RunState.AMBIENT)
 		hero.spares.clear()
 	var pick := best_ware(hero)
 	if pick < 0:
@@ -225,7 +225,7 @@ func trade(hero: Unit) -> void:
 	rec["bought"].append({"hero": hero.display_name, "base": item["base"], "tier": item["tier"],
 		"affixes": item["affixes"].duplicate(), "price": cost})
 	w.run.record.note_hero_spending("pedlar", cost)
-	w.run.tell("%s buys a %s from the %s for %d shells." % [hero.display_name, Loot.describe(w.content, item), name, cost])
+	w.run.tell("%s buys a %s from the %s for %d shells." % [hero.display_name, Loot.describe(w.content, item), name, cost], RunState.AMBIENT)
 	w.hero_ai.give_item(hero, item)
 
 
@@ -258,7 +258,7 @@ func _fall() -> void:
 	camp["record"]["left"] = 0
 	camp["wares"] = []
 	camp["guards"] = []
-	w.run.tell("Raiders overrun the %s's camp. The pedlar flees with what is left, and the guards go unpaid." % def(camp["id"])["name"].to_lower())
+	w.run.tell("Raiders overrun the %s's camp. The pedlar flees with what is left, and the guards go unpaid." % def(camp["id"])["name"].to_lower(), RunState.PROBLEM)
 
 
 ## At dusk on the last day the pedlar packs up: each guard still standing takes a ware as pay
@@ -280,9 +280,9 @@ func pack_up() -> void:
 	camp["record"]["left"] = camp["wares"].size()
 	var name: String = def(camp["id"])["name"]
 	if paid.is_empty():
-		w.run.tell("The %s packs up and heads off before nightfall." % name.to_lower())
+		w.run.tell("The %s packs up and heads off before nightfall." % name.to_lower(), RunState.AMBIENT)
 	else:
-		w.run.tell("The %s packs up before nightfall and pays %s in wares." % [name.to_lower(), " and ".join(paid)])
+		w.run.tell("The %s packs up before nightfall and pays %s in wares." % [name.to_lower(), " and ".join(paid)], RunState.AMBIENT)
 
 
 ## Which ware a guard takes as pay: the biggest gain over what they wear, else the most valuable.

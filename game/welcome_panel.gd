@@ -12,10 +12,10 @@ static func fill(box: VBoxContainer, content: Content, settings: GameSettings, g
 	var w: Dictionary = content.tips["welcome"]
 	var title := Label.new()
 	title.text = w["title"]
-	title.add_theme_font_size_override("font_size", 34)
+	title.add_theme_font_size_override("font_size", UiKit.HEADING)
 	title.add_theme_color_override("font_color", UiKit.HEADING_COLOR)
 	box.add_child(title)
-	UiKit.note(box, w["intro"], 15, UiKit.HINT_COLOR).custom_minimum_size.x = 900
+	UiKit.note(box, w["intro"], UiKit.STRONG, UiKit.HINT_COLOR).custom_minimum_size.x = 900
 
 	var steps := HBoxContainer.new()
 	steps.add_theme_constant_override("separation", 14)
@@ -35,20 +35,20 @@ static func fill(box: VBoxContainer, content: Content, settings: GameSettings, g
 		var col := VBoxContainer.new()
 		col.add_theme_constant_override("separation", 6)
 		panel.add_child(col)
-		UiKit.note(col, str(step["when"]).to_upper(), 12, EMBER)
+		UiKit.note(col, str(step["when"]).to_upper(), UiKit.CAPTION, UiKit.DIM)
 		var heading := Label.new()
 		heading.text = step["name"]
-		heading.add_theme_font_size_override("font_size", 24)
+		heading.add_theme_font_size_override("font_size", UiKit.HEADING)
 		col.add_child(heading)
-		UiKit.note(col, step["text"], 14, BODY).custom_minimum_size.x = 250
+		UiKit.note(col, step["text"], UiKit.BODY, BODY).custom_minimum_size.x = 250
 
 	var rounds := content.int_num("rounds_to_win")
 	# One line under the other, each wrapping across the full width: side by side, a long line squeezed the other.
 	var lines := VBoxContainer.new()
 	lines.add_theme_constant_override("separation", 2)
 	box.add_child(lines)
-	UiKit.note(lines, str(w["rounds_line"]) % rounds, 14, Color("#ece5d8"))
-	UiKit.note(lines, w["earth_line"], 14, UiKit.HINT_COLOR)
+	UiKit.note(lines, str(w["rounds_line"]) % rounds, UiKit.BODY, Color("#ece5d8"))
+	UiKit.note(lines, w["earth_line"], UiKit.BODY, UiKit.HINT_COLOR)
 	var strip := HBoxContainer.new()
 	strip.add_theme_constant_override("separation", 4)
 	box.add_child(strip)
@@ -61,12 +61,12 @@ static func fill(box: VBoxContainer, content: Content, settings: GameSettings, g
 	var ends := HBoxContainer.new()
 	box.add_child(ends)
 	for text: String in ["Round 1", w["ages_line"], "Round %d" % rounds]:
-		var l := UiKit.note(ends, text, 12, UiKit.HINT_COLOR)
+		var l := UiKit.note(ends, text, UiKit.CAPTION, UiKit.HINT_COLOR)
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if text == w["ages_line"] \
 			else (HORIZONTAL_ALIGNMENT_LEFT if text == "Round 1" else HORIZONTAL_ALIGNMENT_RIGHT)
 
-	var closing := UiKit.note(box, w["closing"], 19, Color("#d9cbb3"))
+	var closing := UiKit.note(box, w["closing"], UiKit.TITLE, Color("#d9cbb3"))
 	closing.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(HSeparator.new())
 

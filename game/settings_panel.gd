@@ -3,7 +3,6 @@ extends RefCounted
 ## The Settings screen (from the title screen and the menu): screen, play and keys, in three columns.
 ## Every change saves and takes effect at once. Sound joins when the game has sounds.
 
-const EMBER := Color("#e39a4a")
 
 
 ## Fills `box`; `on_back` closes it, `on_change` runs after any change (the screen applies it).
@@ -12,7 +11,7 @@ static func fill(box: VBoxContainer, settings: GameSettings, on_change: Callable
 	box.add_child(head)
 	var title := Label.new()
 	title.text = "Settings"
-	title.add_theme_font_size_override("font_size", 30)
+	title.add_theme_font_size_override("font_size", UiKit.HEADING)
 	title.add_theme_color_override("font_color", UiKit.HEADING_COLOR)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
@@ -40,7 +39,7 @@ static func fill(box: VBoxContainer, settings: GameSettings, on_change: Callable
 		settings.ui_scale = GameSettings.UI_SCALES[i]
 		changed.call())
 	_row(screen, "Interface size", scale)
-	UiKit.note(screen, "Interface size makes the cards and text bigger or smaller. V tilts the map in play.", 12).custom_minimum_size.x = 260
+	UiKit.note(screen, "Interface size makes the cards and text bigger or smaller. V tilts the map in play.", UiKit.CAPTION).custom_minimum_size.x = 260
 
 	var play := _column(cols, "Play")
 	var speed := OptionButton.new()
@@ -84,7 +83,7 @@ static func fill(box: VBoxContainer, settings: GameSettings, on_change: Callable
 		settings.advisor = levels[i]
 		changed.call())
 	_row(play, "The Elder's warnings", advisor)
-	UiKit.note(play, "Sound and music settings arrive with the first sounds.", 12).custom_minimum_size.x = 260
+	UiKit.note(play, "Sound and music settings arrive with the first sounds.", UiKit.CAPTION).custom_minimum_size.x = 260
 
 	var keys := _column(cols, "Keys")
 	var buttons := {}
@@ -99,7 +98,7 @@ static func fill(box: VBoxContainer, settings: GameSettings, on_change: Callable
 		b.show_key()
 		buttons[action] = b
 		_row(keys, GameSettings.ACTIONS[action], b)
-	UiKit.note(keys, "Click a key, then press the new one. A key already in use swaps places.", 12).custom_minimum_size.x = 260
+	UiKit.note(keys, "Click a key, then press the new one. A key already in use swaps places.", UiKit.CAPTION).custom_minimum_size.x = 260
 
 
 static func _column(parent: Control, heading: String) -> VBoxContainer:
@@ -107,7 +106,7 @@ static func _column(parent: Control, heading: String) -> VBoxContainer:
 	col.custom_minimum_size.x = 280
 	col.add_theme_constant_override("separation", 4)
 	parent.add_child(col)
-	UiKit.note(col, heading.to_upper(), 13, EMBER)
+	UiKit.note(col, heading.to_upper(), UiKit.BODY, UiKit.DIM)
 	return col
 
 
