@@ -407,7 +407,7 @@ func _upgrade_card(offer: Dictionary) -> CardView:
 	var building: String = run.content.buildings[up["building"]]["name"]
 	var btn := CardView.new(CardView.Size.MEDIUM, "building", "Upgrade", up["name"]).set_band_icon("hammer")
 	var have := run.world.count_buildings(up["building"])
-	btn.set_advice("Changes your %d %s" % [have, building.to_lower() if have == 1 else plural(building).to_lower()])
+	btn.set_advice("Changes your %s" % building.to_lower() if have == 1 else "Changes your %d %s" % [have, plural(building).to_lower()])
 	btn.add_chip("No new building", "", CardView.BONE)
 	btn.set_body(up["text"]).set_footer("Lights up on the map")
 	btn.tooltip_text = "Draft it: every %s, built or still to come, is changed for the rest of the run. Nothing new is built: it improves what you have.\n%s" % [building.to_lower(), up["text"]]

@@ -49,7 +49,7 @@ func refresh() -> void:
 		var doing := hero.intent if hero.intent != "" and run.phase == RunState.Phase.SIM else ("tired" if hero.energy <= 0.0 else "")
 		(parts[2] as Label).add_theme_color_override("font_color", Color(mood))
 		(parts[3] as Label).text = doing
-		(parts[4] as Label).text = "%s  Lv%d" % [hero.display_name, hero.level]
+		(parts[4] as Label).text = "%s  Lv %d" % [hero.display_name, hero.level]
 
 
 func _rebuild(living: Array[Unit]) -> void:

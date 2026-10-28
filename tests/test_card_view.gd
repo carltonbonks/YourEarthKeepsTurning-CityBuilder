@@ -168,3 +168,20 @@ func test_a_named_relic_shows_in_its_colour_in_the_hover_panel() -> void:
 	check("[color=#f0d040]Hearth-mother's Doll[/color]" in (rich[0] as RichTextLabel).text, "in the relic's colour")
 	tip.free()
 	card.free()
+
+
+func test_chips_read_as_labels_with_a_capital() -> void:
+	check_eq(CardView.sentence("sells weapons"), "Sells weapons", "a chip's first word takes a capital")
+	check_eq(CardView.sentence("→ greedy ranger"), "→ Greedy ranger", "after an arrow too")
+	check_eq(CardView.sentence("+16 food"), "+16 food", "a number first keeps the words after it")
+	check_eq(CardView.sentence("3 kills"), "3 kills", "")
+	var card := CardView.new(CardView.Size.LARGE, "trade", "Pedlar", "Smith")
+	card.add_chip("can be lost")
+	check(_texts(card).has("Can be lost"), "add_chip applies it")
+	card.free()
+
+
+func test_keys_show_as_their_cap_reads() -> void:
+	check_eq(GameSettings.key_name(KEY_BRACKETRIGHT), "]", "a bracket key shows its symbol, not BracketRight")
+	check_eq(GameSettings.key_name(KEY_V), "V", "a letter stays a letter")
+	check_eq(GameSettings.key_name(KEY_SPACE), "Space", "a named key keeps its name")

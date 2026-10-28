@@ -371,7 +371,7 @@ func show_pedlars() -> void:
 		btn.custom_minimum_size.x = 220
 		btn.add_chip("sells " + sells)
 		btn.add_chip("tier %d" % run.world.pedlar.ware_tier(id))
-		btn.add_chip(where.to_lower(), "map", CardView.TEXT, btn.family_color())
+		btn.add_chip(where, "map", CardView.TEXT, btn.family_color())
 		btn.set_body(d["text"]).set_footer(footer)
 		btn.tooltip_text = "%s\nSells %s, about tier %d.\n%s.\n%s" % [d["text"], sells, run.world.pedlar.ware_tier(id), where, footer]
 		btn.pressed.connect(func() -> void: pedlar_chosen.emit(id))
@@ -436,14 +436,14 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 				who[role] = int(who.get(role, 0)) + 1
 			var parts := PackedStringArray()
 			for role: String in who:
-				parts.append("%d %s" % [who[role], content.townsfolk[role]["name"].to_lower()])
+				parts.append("%d %s" % [who[role], content.townsfolk[role]["name"].to_lower() if who[role] == 1 else FolkAtWork.plural(run, role)])
 			btn = CardView.new(sz, "folk", "Family", "A family")
 			btn.set_price(run.stock, {})
 			var roles: Array = card["roles"].duplicate()
 			for i in CardRoll.extra_people(content, card):
 				roles.append("tribesperson")
 			btn.add_people(roles)
-			btn.set_body(", ".join(parts)).set_footer("Needs %d beds" % run.people.card_people(card))
+			btn.set_body(", ".join(parts) + ".").set_footer("Needs %d beds" % run.people.card_people(card))
 			btn.tooltip_text = "A whole family moves in at once: %s.\nEach eats %s a day." % [", ".join(parts), _food_each()]
 		"promote":
 			btn = _promote_card(card, sz)
@@ -734,10 +734,10 @@ func _relic_card(id: String) -> CardView:
 		if line != "":
 			text = line + ("" if r.get("effects", {}).is_empty() else "\n" + text)
 			btn.set_body(text, CardView.TEXT)
-		footer = "Instead of a relic."
+		footer = "Instead of a relic"
 	btn.set_footer(footer)
 	var tags := Tooltips.tag_notes(run, "relic", id)
-	btn.tooltip_text = text + ("\n" + footer if footer != "" else "") + ("\nTags: " + "\n".join(tags) if not tags.is_empty() else "")
+	btn.tooltip_text = text + ("\n" + footer + "." if footer != "" else "") + ("\nTags: " + "\n".join(tags) if not tags.is_empty() else "")
 	btn.pressed.connect(func() -> void: relic_picked.emit(id))
 	return btn
 
