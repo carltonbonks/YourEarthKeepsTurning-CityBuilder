@@ -192,15 +192,15 @@ func _fit() -> void:
 	if _fitting or size.x < SHAPE[card_size].x - 0.5:
 		return
 	_fitting = true
-	var lines := _body_lines
+	# A label's measured height lags a change to its line count, so the lines that fit are worked out from the
+	# room the rest of the card leaves and one line's height, not by trimming and measuring again (which ran a long
+	# body down to nothing: the craftsperson's dawn card showed no words).
+	_body.visible = false
+	var room: float = SHAPE[card_size].y - _box.get_combined_minimum_size().y - 4.0
+	var step := float(_body.get_line_height()) + float(_body.get_theme_constant("line_spacing"))
+	var lines := mini(_body_lines, floori((room + float(_body.get_theme_constant("line_spacing"))) / step)) if step > 0.0 else 0
 	_body.max_lines_visible = lines
-	_body.visible = _body_wanted
-	while _body.visible and _box.get_combined_minimum_size().y > SHAPE[card_size].y:
-		lines -= 1
-		if lines <= 0:
-			_body.visible = false
-		else:
-			_body.max_lines_visible = lines
+	_body.visible = _body_wanted and lines > 0
 	custom_minimum_size.y = maxf(SHAPE[card_size].y, _box.get_combined_minimum_size().y)
 	_fitting = false
 
@@ -243,8 +243,10 @@ func _chip_label(parent: Control, text: String, tint: Color, font_size := 12) ->
 	return l
 
 
-## A chip on the gives row: a few words, an optional icon before them.
+## A chip on the gives row: a few words, an optional icon before them. Chips read as short labels, so the first
+## word takes a capital ("Sells weapons", "→ Greedy ranger"); one that leads with a number keeps it ("+16 food").
 func add_chip(text: String, icon := "", tint := TEXT, icon_tint := Color(0, 0, 0, 0)) -> PanelContainer:
+	text = sentence(text)
 	var chip := PanelContainer.new()
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var st := StyleBoxFlat.new()
@@ -577,6 +579,17 @@ func _make_custom_tooltip(for_text: String) -> Object:
 	for line: String in split[1]:
 		_tip_line(box, line, 11, Color("#9ea39a"))
 	return box
+
+
+## Text with its first letter capitalised, unless a number comes first ("+16 food", "3 kills" stay as they are).
+static func sentence(text: String) -> String:
+	for i in text.length():
+		var ch := text[i]
+		if ch.is_valid_int():
+			return text
+		if ch.to_upper() != ch.to_lower():
+			return text.substr(0, i) + ch.to_upper() + text.substr(i + 1)
+	return text
 
 
 ## Splits hover text into the card's own lines (those holding one of its lead lines; the first line if none do) and the

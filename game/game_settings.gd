@@ -112,5 +112,7 @@ func rebind(action: String, keycode: int) -> void:
 	apply_keys()
 
 
+## A key as its cap reads ("]" rather than "BracketRight"), for the settings, the menu and how a round works.
 static func key_name(keycode: int) -> String:
-	return OS.get_keycode_string(keycode as Key)
+	var printed := char(keycode) if keycode > 32 and keycode < 127 else ""
+	return printed if printed != "" and not printed.is_valid_identifier() else OS.get_keycode_string(keycode as Key)
