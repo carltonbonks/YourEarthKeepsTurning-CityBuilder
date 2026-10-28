@@ -346,7 +346,7 @@ func test_a_venture_shows_its_dead_as_red_crosses() -> void:
 
 
 func test_two_picks_a_dawn_keeps_the_pick_open() -> void:
-	# Twin Fires and Antler Crown take two newcomers a dawn: after the first, the pick must show again
+	# Twin fires and Antler crown take two newcomers a dawn: after the first, the pick must show again
 	# (it used to hide, leaving neither the cards nor the Begin round button).
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.set("save_runs", false)

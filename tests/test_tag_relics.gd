@@ -38,7 +38,7 @@ func test_foe_damage_adds_up_across_relics() -> void:
 	var run := _run()
 	run._gain_relic("grave_salt")
 	run._gain_relic("bone_ward")
-	check_eq(run.tag_mod("foe_damage", ["undead", "sentient"]), 1.5, "Grave Salt and Bone Ward both count")
+	check_eq(run.tag_mod("foe_damage", ["undead", "sentient"]), 1.5, "Grave salt and Bone ward both count")
 	check_eq(run.tag_mod("foe_damage", ["beast"]), 0.0, "neither reaches beasts")
 	run.dispose()
 
@@ -103,5 +103,5 @@ func test_tooltips_name_tags_and_the_relics_acting_on_them() -> void:
 	check(Tooltips.gear_line(c, "weapon", Loot.make("bone_spear", 1)).ends_with("[bone]"), "gear shows its tags")
 	run._gain_relic("blood_mark")
 	var notes := " ".join(PackedStringArray(Tooltips.tag_notes(run, "enemy", "wolf")))
-	check(notes.contains("Hunter's Blood-mark"), "a wolf's beast tag names the owned relic")
+	check(notes.contains("Hunter's blood-mark"), "a wolf's beast tag names the owned relic")
 	run.dispose()

@@ -135,7 +135,7 @@ static func tip(r: RunState) -> Dictionary:
 	var ids := counts.keys()
 	ids.sort()
 	for id: String in ids:
-		t["lines"].append("%s x%d" % [content.enemies[id]["name"], counts[id]])
+		t["lines"].append("%s ×%d" % [content.enemies[id]["name"], counts[id]])
 	t["lines"].append("Power counts heroes, warriors, the hearth and towers against every raider coming.")
 	t["lines"].append("Earlier nights bring only wanderers and small probes.")
 	t["lines"].append("The warband comes by a den's way and crosses one near plate on its way in. Between rounds that ring clicks round a plate, so the ground it crosses changes: hover a plate on the map to see what it does.")

@@ -38,8 +38,8 @@ func _init(dev_mode: bool) -> void:
 	var group := ButtonGroup.new()
 	for s: int in SPEEDS:
 		var b := Button.new()
-		b.text = "II" if s == 0 else "%dx" % s
-		b.tooltip_text = "Pause (Space)" if s == 0 else "Play at %dx speed (Space pauses)" % s
+		b.text = "II" if s == 0 else "%d×" % s
+		b.tooltip_text = "Pause (Space)" if s == 0 else "Play at %d× speed (Space pauses)" % s
 		b.toggle_mode = true
 		b.button_group = group
 		b.focus_mode = Control.FOCUS_NONE

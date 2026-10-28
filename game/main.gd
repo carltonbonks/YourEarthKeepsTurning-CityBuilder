@@ -281,7 +281,7 @@ func _take_pick(index: int) -> void:
 	if not run.last_venture.is_empty():
 		_overlays.show_venture_result()
 	else:
-		# A second newcomer the same dawn (Twin Fires, Antler Crown) keeps the dawn pick open.
+		# A second newcomer the same dawn (Twin fires, Antler crown) keeps the dawn pick open.
 		_overlays.show_for_phase()
 
 

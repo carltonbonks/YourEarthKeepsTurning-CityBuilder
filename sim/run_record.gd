@@ -43,7 +43,7 @@ extends RefCounted
 ##     type -> fresh nodes in rifts), "roads_refunded" (squares of paving swallowed and paid back).
 ## 20: rule-changing relics: per round "relic_effects" (effect key from data/relics.json -> times its rule fired,
 ##     or shells/fuel it brought, e.g. "kill_shells", "turncoat_chance", "risen_per_night") and "relic_gifts" (relics
-##     Broken Crown handed out with it). Relics now include pacts (tag "pact"), offered on pact_rounds.
+##     Broken crown handed out with it). Relics now include pacts (tag "pact"), offered on pact_rounds.
 ## 21: tribespeople's leanings: a dawn pick entry has "offered_leanings" (one per offered card, "" for none) when any card
 ##     had one, and "leaning" when the card taken had one; per round "gathered_leaned" (good -> amount brought in by
 ##     gatherers leaning toward it) and "leanings_end" (leaning -> townsfolk with it at the round's end).

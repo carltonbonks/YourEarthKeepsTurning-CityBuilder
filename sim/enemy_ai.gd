@@ -50,7 +50,7 @@ func enemy_tick(enemy: Unit) -> void:
 		enemy.target = null
 	elif not holding_grudge and (enemy.target == null or not enemy.target.alive or enemy.pos.distance_to(enemy.target.pos) > aggro * 3.0):
 		enemy.target = w.nearest_friend(enemy.pos, aggro)
-		# Wolf-mother's Skull: beasts let townsfolk be unless one strikes them (a grudge).
+		# Wolf-mother's skull: beasts let townsfolk be unless one strikes them (a grudge).
 		if enemy.target != null and enemy.target.is_folk() and w.run.has_effect("beast_peace") and w.content.unit_has_tag(enemy, "beast"):
 			enemy.target = null
 	if enemy.target != null:
@@ -218,10 +218,10 @@ func spawn_probe() -> void:
 		w.enemies.append(e)
 	w.night_report["raiders"] = int(w.night_report["raiders"]) + types.size()
 	if not types.is_empty():
-		w.run.tell("Raiders probe the camp from the %s." % ["east", "south", "west", "north"][int(round(side / (PI / 2.0))) % 4])
+		w.run.tell("Raiders probe the town from the %s." % ["east", "south", "west", "north"][int(round(side / (PI / 2.0))) % 4])
 
 
-## Ram-thorn Stakes: a siege engine that strikes a gate or the hearth is hurt in turn.
+## Ram-thorn stakes: a siege engine that strikes a gate or the hearth is hurt in turn.
 func thorns(enemy: Unit) -> void:
 	var hurt := w.run.mod("siege_thorns")
 	if hurt > 0.0 and enemy.alive:

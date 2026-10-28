@@ -56,9 +56,9 @@ var gentle := false
 var tradition_random := false
 ## The spoils in this round's relic offer: {id, kind (enemy tag), foes (how many of that kind came)}, or {}.
 var spoils := {}
-## Max hearth HP the town has earned for good (Ancestor Bones).
+## Max hearth HP the town has earned for good (Ancestor bones).
 var bonus_hearth_hp := 0.0
-## Dawn cards still to take this dawn (Twin Fires gives two), and townsfolk cards taken this run (Hearth-mother's Doll).
+## Dawn cards still to take this dawn (Twin fires gives two), and townsfolk cards taken this run (Hearth-mother's doll).
 var picks_left := 1
 var folk_cards_taken := 0
 ## Dawn cards: {kind: "folk"|"hero"|"promote"|"family", role: String, cost: int, hero: Unit (for hero cards),
@@ -691,10 +691,10 @@ func choose_pick(index: int) -> void:
 			CardRoll.apply_to(self, newcomer, card)
 			taken = card["role"]
 			if card.has("roll"):
-				tell("A %s joins the settlement: %s." % [folk_name(card["role"], leaning).to_lower(),
+				tell("A %s joins the town: %s." % [folk_name(card["role"], leaning).to_lower(),
 					"; ".join(CardRoll.lines(content, card)).to_lower()])
 			else:
-				tell("A %s joins the settlement." % folk_name(card["role"], leaning).to_lower())
+				tell("A %s joins the town." % folk_name(card["role"], leaning).to_lower())
 			var extra := CardRoll.extra_people(content, card)
 			for i in extra:
 				world.folk_ai.add_folk(card["role"], leaning)
@@ -702,11 +702,11 @@ func choose_pick(index: int) -> void:
 			var doll := doll_twin_next()
 			folk_cards_taken += 1
 			if doll:
-				# Hearth-mother's Doll doubles the whole card: a Twins card brings four.
+				# Hearth-mother's doll doubles the whole card: a Twins card brings four.
 				for i in 1 + extra:
 					world.folk_ai.add_folk(card["role"], leaning)
 				relic_fired("twin_every")
-				tell("Hearth-mother's Doll doubles the %s: %d come in all." % [folk_name(card["role"], leaning).to_lower(), 2 * (1 + extra)])
+				tell("Hearth-mother's doll doubles the %s: %d come in all." % [folk_name(card["role"], leaning).to_lower(), 2 * (1 + extra)])
 	var entry := {"day": world.day_index() + 1, "offered": pick_offer.map(people.card_label), "taken": taken}
 	var leanings := pick_offer.map(func(c: Dictionary) -> String: return str(c.get("leaning", "")))
 	if leanings.any(func(l: String) -> bool: return l != ""):
@@ -729,7 +729,7 @@ func choose_pick(index: int) -> void:
 		entry["venture_goods"] = venture["goods"]
 	record.note_list("picks", entry)
 	picks_left -= 1
-	# Twin Fires: another newcomer from the cards left, unless the player skipped.
+	# Twin fires: another newcomer from the cards left, unless the player skipped.
 	if took and picks_left > 0 and pick_offer.size() > 1:
 		pick_offer.remove_at(index)
 		if not pick_offer.is_empty():
@@ -743,7 +743,7 @@ func choose_pick(index: int) -> void:
 	world.hero_ai.roll_whims()
 
 
-## Whether Hearth-mother's Doll doubles the next townsfolk card taken (every 3rd one).
+## Whether Hearth-mother's doll doubles the next townsfolk card taken (every 3rd one).
 func doll_twin_next() -> bool:
 	var every := int(mod("twin_every"))
 	return every > 0 and (folk_cards_taken + 1) % every == 0
@@ -974,7 +974,7 @@ func choose_relic(relic_id: String) -> void:
 	elif relic_id != "" and relic_id in relic_offer:
 		_gain_relic(relic_id)
 		tell("Relic taken: %s." % content.relics[relic_id]["name"])
-		# Broken Crown, Starfall Idol: more relics at once, drawn from the ordinary ones.
+		# Broken crown, Starfall idol: more relics at once, drawn from the ordinary ones.
 		var gifts := int(content.relics[relic_id]["effects"].get("gain_relics", 0))
 		if gifts > 0:
 			var rng := SeededRng.stream(run_seed, "relic_gifts", round_number)
@@ -1023,7 +1023,7 @@ func _enter_build() -> void:
 	next_wave = waves.plan(round_number)
 	camp_joined = world.enemy_ai.make_camp(held_back)
 	if wave_eased > 0:
-		tell("Scouts say the warband holds back %d of its number: your camp looks too weak to be worth them all." % wave_eased)
+		tell("Scouts say the warband holds back %d of its number: your town looks too weak to be worth them all." % wave_eased)
 	if camp_joined > 0:
 		tell("%d of them make a war camp out in the wilds. Gatherers can't work near it, and next round they march with the attack unless heroes break the camp first." % camp_joined)
 	var due := waves.camp_due().size()
@@ -1090,7 +1090,7 @@ func _gain_relic(relic_id: String) -> void:
 	for i in int(effects.get("free_hero", 0)):
 		var hero := people.make_hero()
 		people.add_hero(hero)
-		tell("%s follows the wanderer's fire to your camp." % describe(hero))
+		tell("%s follows the wanderer's fire to your town." % describe(hero))
 	for u in world.folk:
 		world.folk_ai.apply_folk_stats(u)
 	for h in heroes:

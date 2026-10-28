@@ -2,7 +2,7 @@ class_name Lighting
 extends RefCounted
 ## Light over the map, view only: the sun's tint through the day, night falling and lifting, and
 ## warm glows where things burn. The hearth glows while it is lit, brighter at night. Shots from the
-## hearth and watch posts glow when the town owns a relic tagged "fire" (Fire Arrows). Glows are
+## hearth and watch posts glow when the town owns a relic tagged "fire" (Fire arrows). Glows are
 ## added onto the picture (ArenaView draws them on a layer that blends by adding light), so they
 ## brighten the ground under the night instead of painting over it.
 

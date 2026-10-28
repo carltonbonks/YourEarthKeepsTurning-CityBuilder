@@ -30,7 +30,7 @@ extends SceneTree
 ## lastkill=1 (with night=1) plays on until a night's last raider falls and shows the beat lastkill_ms= in (default 600);
 ## lastkill=2 waits for the kill that breaks the round's attack.
 ## one-time tip due at that moment (off otherwise, so pictures stay clear); seen=<id,id> marks tips as seen. The player's settings are never saved.
-## doll=1 (with pick=1) gives Hearth-mother's Doll with its twin due on this dawn's townsfolk card.
+## doll=1 (with pick=1) gives Hearth-mother's doll with its twin due on this dawn's townsfolk card.
 ## hover=<card title> shows that card's hover panel beside it, as resting the mouse on it does.
 ## path=heroes:3,warband:3 sets the town's paths (making a Legend, two sergeants and the caravan's path deals).
 ## charter=1 shows a charter pick at the round's build (as after an age-up); guild=<leaning> (with pick=1) deals that

@@ -178,7 +178,7 @@ func show_pick() -> void:
 	var content := run.content
 	_clear()
 	var day := run.world.day_index() + 1
-	_title("Dawn of day %d: who joins the settlement?" % day)
+	_title("Dawn of day %d: who joins the town?" % day)
 	var room := run.population() < run.housing()
 	_night_summary("Shells %d  ·  Room %d / %d" % [run.stock["shells"], run.population(), run.housing()])
 	if not room:
@@ -365,7 +365,9 @@ func show_pedlars() -> void:
 		var footer := "Would go: " + goers
 		if not who["guarded"].is_empty():
 			footer += "\nOnce guarded: " + ", ".join(who["guarded"])
-		var where := "Camps %d out, %s" % [roundi(pos.length()), World.compass(pos.angle())]
+		# Distance in the player's words, never map units (docs/TEXT_STYLE.md).
+		var reach: String = {"near": "Camps near town", "middle": "Camps a fair walk out", "far": "Camps far out"}.get(d["camp"], "Camps out")
+		var where := "%s, %s" % [reach, World.compass(pos.angle())]
 		var sells: String = slots.get(d["slot"], d["slot"])
 		var btn := CardView.new(CardView.Size.LARGE, "trade", "Pedlar · %s" % d["camp"], d["name"])
 		btn.custom_minimum_size.x = 220
@@ -456,7 +458,7 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 			var roles: Array = [card["role"]]
 			for i in CardRoll.extra_people(content, card):
 				roles.append(card["role"])
-			# Hearth-mother's Doll: the card it doubles counts everyone in, and says so.
+			# Hearth-mother's doll: the card it doubles counts everyone in, and says so.
 			var doll := run.doll_twin_next()
 			if doll:
 				roles.append_array(roles.duplicate())
@@ -503,14 +505,14 @@ func _doll_chip(btn: CardView, doll: bool) -> void:
 		btn.add_chip("Doll: doubled", "relic", CardView.GOOD)
 
 
-## What Hearth-mother's Doll does on this dawn's townsfolk cards, for the hover panel ("" without the Doll).
+## What Hearth-mother's doll does on this dawn's townsfolk cards, for the hover panel ("" without the Doll).
 func _doll_line(people: int, doll: bool) -> String:
 	var left := run.doll_picks_to_twin()
 	if left == 0:
 		return ""
 	if doll:
-		return "Hearth-mother's Doll doubles this pick: %d people in all." % people
-	return "Hearth-mother's Doll doubles the %s townsfolk card you take from now." % ["next", "second", "third"][mini(left, 3) - 1]
+		return "Hearth-mother's doll doubles this pick: %d people in all." % people
+	return "Hearth-mother's doll doubles the %s townsfolk card you take from now." % ["next", "second", "third"][mini(left, 3) - 1]
 
 
 ## How many of this role the town has now, so a dawn pick reads as "a fourth warrior" rather than "a warrior".
@@ -631,12 +633,12 @@ func _promote_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 ## Where a hero of this trait goes by day, as one line for the card.
 func _wilds_line(trait_id: String) -> String:
 	var w := float(run.content.traits[trait_id]["wilds"])
-	return "Hunts far out at the dens by day." if w > 0.6 else ("Stays near the camp." if w < 0.2 else "Ventures out sometimes.")
+	return "Hunts far out at the dens by day." if w > 0.6 else ("Stays near the town." if w < 0.2 else "Ventures out sometimes.")
 
 
 func _trait_hint(trait_id: String) -> String:
 	var t: Dictionary = run.content.traits[trait_id]
-	var wilds := "hunts far out at the dens by day" if float(t["wilds"]) > 0.6 else ("stays near the camp" if float(t["wilds"]) < 0.2 else "ventures out sometimes")
+	var wilds := "hunts far out at the dens by day" if float(t["wilds"]) > 0.6 else ("stays near the town" if float(t["wilds"]) < 0.2 else "ventures out sometimes")
 	return "%s: %s, retreats at %d%% health, goes to rest when energy falls to %d." % [t["name"], wilds,
 		roundi(float(t["retreat_at"]) * 100.0), int(t.get("tired_at", 25))]
 
@@ -651,8 +653,10 @@ func _night_summary(extra := "") -> void:
 		return
 	var deaths: Array = n["deaths"]
 	var left: Array = n.get("left", [])
-	var text := "Night %d: raiders %d, enemies killed %d, hearth damage %d. " % [
-		n["night"], n["raiders"], n["kills"], n["hearth_damage"]]
+	# Chronicle voice (docs/TEXT_STYLE.md): what happened, in a sentence, not a row of figures.
+	var text := "Night %d: %d raider%s came, and the town felled %d. %s " % [n["night"], n["raiders"],
+		"" if int(n["raiders"]) == 1 else "s", n["kills"],
+		"The hearth took no harm." if int(n["hearth_damage"]) == 0 else "The hearth took %d damage." % n["hearth_damage"]]
 	var lost := PackedStringArray()
 	for name: String in deaths:
 		lost.append("%s (killed)" % name)
@@ -775,7 +779,7 @@ func show_end() -> void:
 	var won := run.phase == RunState.Phase.WON
 	_title("Victory! The people endure." if won else "The fire goes out in round %d." % run.round_number)
 	var summary := Label.new()
-	summary.text = "Seed %d  ·  heroes lost: %d  ·  townsfolk lost: %d  ·  relics: %s" % [run.run_seed, run.fallen.size(), run.fallen_folk,
+	summary.text = "Seed %d  ·  Heroes lost %d  ·  Townsfolk lost %d  ·  Relics %s" % [run.run_seed, run.fallen.size(), run.fallen_folk,
 		", ".join(run.relics.map(func(id: String) -> String: return content.relics[id]["name"])) if not run.relics.is_empty() else "none"]
 	summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	summary.autowrap_mode = TextServer.AUTOWRAP_WORD

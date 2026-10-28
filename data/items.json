@@ -18,13 +18,13 @@
 		"mail_hauberk": {"tags": ["iron"], "name": "mail hauberk", "slot": "armor", "hp": 22, "speed": -2, "age": "medieval", "min_tier": 3},
 		"steel_plate": {"tags": ["iron"], "name": "steel plate", "slot": "armor", "hp": 28, "speed": -6, "steel": true, "age": "medieval", "min_tier": 4},
 		"reliquary": {"name": "reliquary", "slot": "charm", "rest_heal": 0.8, "bane": {"tag": "undead", "attack": 4}, "age": "medieval", "min_tier": 3},
-		"wolfmothers_fang": {"tags": ["bone"], "name": "Wolfmother's Fang", "rarity": "orange", "slot": "weapon", "attack": 4, "speed": 5, "bane": {"tag": "beast", "attack": 2}},
-		"skyfall_shard": {"tags": ["iron"], "name": "Skyfall Shard", "rarity": "orange", "slot": "weapon", "attack": 5, "energy": 0.1, "metal": true, "min_tier": 2},
-		"mammoth_mantle": {"tags": ["hide"], "name": "Mammoth-hide Mantle", "rarity": "orange", "slot": "armor", "hp": 22, "rest_heal": 0.5},
-		"barrow_kings_ring": {"name": "Barrow-king's Ring", "rarity": "orange", "slot": "charm", "loot": 2, "energy": 0.1, "bane": {"tag": "undead", "attack": 2}},
-		"sunstone_torc": {"tags": ["bronze"], "name": "Sunstone Torc", "rarity": "orange", "slot": "charm", "rest_heal": 1.2, "loot": 1, "energy": 0.1, "age": "bronze", "min_tier": 2},
+		"wolfmothers_fang": {"tags": ["bone"], "name": "Wolfmother's fang", "rarity": "orange", "slot": "weapon", "attack": 4, "speed": 5, "bane": {"tag": "beast", "attack": 2}},
+		"skyfall_shard": {"tags": ["iron"], "name": "Skyfall shard", "rarity": "orange", "slot": "weapon", "attack": 5, "energy": 0.1, "metal": true, "min_tier": 2},
+		"mammoth_mantle": {"tags": ["hide"], "name": "Mammoth-hide mantle", "rarity": "orange", "slot": "armor", "hp": 22, "rest_heal": 0.5},
+		"barrow_kings_ring": {"name": "Barrow-king's ring", "rarity": "orange", "slot": "charm", "loot": 2, "energy": 0.1, "bane": {"tag": "undead", "attack": 2}},
+		"sunstone_torc": {"tags": ["bronze"], "name": "Sunstone torc", "rarity": "orange", "slot": "charm", "rest_heal": 1.2, "loot": 1, "energy": 0.1, "age": "bronze", "min_tier": 2},
 		"oathkeeper": {"tags": ["iron"], "name": "Oathkeeper", "rarity": "orange", "slot": "weapon", "attack": 7, "speed": 2, "metal": true, "steel": true, "age": "medieval", "min_tier": 3},
-		"hollow_kings_mail": {"tags": ["iron"], "name": "Hollow King's Mail", "rarity": "orange", "slot": "armor", "hp": 26, "energy": 0.1, "age": "medieval", "min_tier": 3}
+		"hollow_kings_mail": {"tags": ["iron"], "name": "Hollow king's mail", "rarity": "orange", "slot": "armor", "hp": 26, "energy": 0.1, "age": "medieval", "min_tier": 3}
 	},
 	"affixes": {
 		"keen": {"name": "Keen", "attack": 2},

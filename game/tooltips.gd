@@ -137,7 +137,7 @@ static func enemy(run: RunState, type_id: String, u: Unit = null) -> Dictionary:
 	if def.has("mail"):
 		t["lines"].append("Mail: shrugs off %d%% of each blow unless it is steel" % roundi(float(def["mail"]) * 100.0))
 	if def.has("war_chant"):
-		t["lines"].append("Hangs back and makes every enemy hit %d%% harder while it lives" % roundi(float(def["war_chant"]) * 100.0))
+		t["lines"].append("Hangs back and makes every raider hit %d%% harder while it lives" % roundi(float(def["war_chant"]) * 100.0))
 	var yields: Dictionary = def.get("yields", {})
 	if not yields.is_empty():
 		t["lines"].append("Carcass gives %s" % _goods(yields))
@@ -364,7 +364,7 @@ static func war_camp(run: RunState, d: Dictionary) -> Dictionary:
 	names.sort()
 	var who: Array[String] = []
 	for n: String in names:
-		who.append("%s x%d" % [n, counts[n]])
+		who.append("%s ×%d" % [n, counts[n]])
 	t["lines"].append("Raiders the warband held back: %s." % ", ".join(who))
 	t["lines"].append("They set on anyone who comes close, and townsfolk won't gather near the camp.")
 	var due := run.waves.camp_due().size()

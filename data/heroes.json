@@ -231,7 +231,7 @@
 		},
 		"guard": {
 			"name": "staying close",
-			"text": "Keeps near the camp today.",
+			"text": "Keeps near the town today.",
 			"wilds": 0.0
 		},
 		"lie_in": {
