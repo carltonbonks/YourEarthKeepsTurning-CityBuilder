@@ -74,8 +74,8 @@ var light := Lighting.new()
 var sprites := SpriteBook.new()
 ## Off in Settings: everything is drawn as plain shapes, as before the art.
 var art := true
-## Which way each walker last moved, for its sprite: instance id -> [where it was, facing].
-var _heading := {}
+## How each walker's sprite moves, faces, swings and flashes between sim steps.
+var motion := WalkerMotion.new()
 var _light_layer: Control
 var _top_layer: Control
 ## The plot the hovered building card would go on, blinked on the map; -1 for none.
@@ -617,15 +617,19 @@ func _draw_folk(u: Unit) -> void:
 	var r := FOLK_RADIUS * maxf(1.0, zoom * 0.7)
 	var now := float(Time.get_ticks_msec())
 	var at := victory.place(u, now)
+	var look := {}
+	if _has_art(u.type_id):
+		look = _look(u, at, u.type_id, now)
+		at = look["at"]
 	var p := _stand(at, r) - Vector2(0.0, victory.hop(u, now) * r)
 	_shadow(at, r)
 	if u.sergeant:
 		_aura_ring(at, Color("#e8c050"))
 	var feet := p + Vector2(0.0, r)
 	var top := p - Vector2(0.0, r)
-	if _has_art(u.type_id):
+	if not look.is_empty():
 		var scale := sprites.walker_scale(u.type_id, r)
-		sprites.draw(self, u.type_id, feet, scale, _facing(u, at, u.type_id))
+		sprites.draw_walker(self, u.type_id, feet, scale, look)
 		top = feet - Vector2(0.0, sprites.height_at(u.type_id, scale))
 	else:
 		draw_circle(p, r, Color(run.content.townsfolk[u.type_id]["color"]))
@@ -664,13 +668,18 @@ func _draw_marker(u: Unit, at: Vector2, size: float) -> void:
 
 func _draw_enemy(e: Unit) -> void:
 	var r := (BOSS_RADIUS if e.is_boss else ENEMY_RADIUS) * maxf(1.0, zoom * 0.7)
-	var p := _stand(e.pos, r)
-	_shadow(e.pos, r)
-	var top := p - Vector2(0.0, r)
+	var at := e.pos
+	var look := {}
 	if _has_art(e.type_id):
+		look = _look(e, at, e.type_id, float(Time.get_ticks_msec()))
+		at = look["at"]
+	var p := _stand(at, r)
+	_shadow(at, r)
+	var top := p - Vector2(0.0, r)
+	if not look.is_empty():
 		var feet := p + Vector2(0.0, r)
 		var scale := sprites.walker_scale(e.type_id, r)
-		sprites.draw(self, e.type_id, feet, scale, _facing(e, e.pos, e.type_id))
+		sprites.draw_walker(self, e.type_id, feet, scale, look)
 		top = feet - Vector2(0.0, sprites.height_at(e.type_id, scale))
 	else:
 		draw_circle(p, r, Color(run.content.enemies[e.type_id]["color"]))
@@ -684,18 +693,9 @@ func _has_art(id: String) -> bool:
 	return art and iso and sprites.has(id)
 
 
-## The sprite frame a walker shows: the way it last moved at least a step, kept while it stands (at first it faces
-## the hearth).
-func _facing(u: Unit, at: Vector2, id: String) -> int:
-	var key := u.get_instance_id()
-	var facings := int(sprites.info(id)["facings"])
-	var seen: Array = _heading.get(key, [at, SpriteBook.facing_of(-at, facings)])
-	if at.distance_to(seen[0]) >= 0.8:
-		seen = [at, SpriteBook.facing_of(at - Vector2(seen[0]), facings)]
-	if _heading.size() > 4000:
-		_heading.clear()
-	_heading[key] = seen
-	return seen[1]
+## How a walker with art is drawn this frame (WalkerMotion): smoothed spot, facing, walk or swing, hit flash.
+func _look(u: Unit, at: Vector2, id: String, now: float) -> Dictionary:
+	return motion.look(u, at, int(sprites.info(id)["facings"]), now)
 
 
 ## A faint ring on the ground round a Legend or sergeant, as far as warriors fight harder beside them (aura_reach).
@@ -844,9 +844,12 @@ func _draw_hero(hero: Unit, font: Font) -> void:
 	var r := HERO_RADIUS * maxf(1.0, zoom * 0.7)
 	var now := float(Time.get_ticks_msec())
 	var at := victory.place(hero, now)
+	var color := Color(run.content.hero_classes[hero.type_id]["color"])
+	if _has_art(hero.type_id):
+		_draw_hero_sprite(hero, at, r, color, font, now)
+		return
 	var p := _stand(at, r) - Vector2(0.0, victory.hop(hero, now) * r)
 	_shadow(at, r)
-	var color := Color(run.content.hero_classes[hero.type_id]["color"])
 	if hero.resting and not victory.active():
 		# Sleepers are drawn dimmer, with a "z" (but everyone is up to celebrate a win).
 		draw_circle(p, r * 0.8, Color(color, 0.55))
@@ -862,6 +865,29 @@ func _draw_hero(hero: Unit, font: Font) -> void:
 	_bar(p + Vector2(-r, -r - 9), r * 2.0, hero.hp_fraction(), Color("#5ee07a"))
 	_bar(p + Vector2(-r, -r - 5), r * 2.0, hero.energy / run.content.num("hero_energy_max"), Color("#7fd0ff"))
 	draw_string(font, p + Vector2(r + 3, 4), hero.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
+
+
+## A hero drawn as their class's sprite: a ring on the ground in the class's colour (red once out of energy),
+## dimmed with a "z" while asleep, then the bars and name over their head.
+func _draw_hero_sprite(hero: Unit, place: Vector2, r: float, color: Color, font: Font, now: float) -> void:
+	var look := _look(hero, place, hero.type_id, now)
+	var at: Vector2 = look["at"]
+	var feet := _to_screen(at) - Vector2(0.0, victory.hop(hero, now) * r)
+	_shadow(at, r)
+	var ring := _closed(_ground_ring(at, r * 0.9 / _scale(), 18))
+	draw_polyline(ring, color if hero.energy > 0.0 else Color("#e05050"), 2.0)
+	if hero.legend:
+		draw_polyline(_closed(_ground_ring(at, r * 1.25 / _scale(), 18)), run.content.rarity_color("orange"), 2.5)
+		_aura_ring(at, run.content.rarity_color("orange"))
+	var asleep := hero.resting and not victory.active()
+	var scale := sprites.walker_scale(hero.type_id, r)
+	sprites.draw_walker(self, hero.type_id, feet, scale, look, Color(0.55, 0.58, 0.68) if asleep else Color.WHITE)
+	var top := feet - Vector2(0.0, sprites.height_at(hero.type_id, scale))
+	if asleep:
+		draw_string(font, top + Vector2(r * 0.4, 2.0), "z", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#cfe0ff"))
+	_bar(top + Vector2(-r, -9), r * 2.0, hero.hp_fraction(), Color("#5ee07a"))
+	_bar(top + Vector2(-r, -5), r * 2.0, hero.energy / run.content.num("hero_energy_max"), Color("#7fd0ff"))
+	draw_string(font, top.lerp(feet, 0.45) + Vector2(r * 0.8, 4), hero.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
 
 
 ## Ring plots: free ones in opened rings as nearly invisible outlines (Yusuf, 2026-10-21), obstacles filled in.

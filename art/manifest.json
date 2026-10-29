@@ -1,5 +1,5 @@
 {
-	"_note": "Every piece of map art, by content id (the id in data/*.json it draws). tools/render_art.sh renders each one from its model into art/sprites/<id>.png (one frame per facing, left to right) plus art/sprites/index.json, which the game reads (game/sprite_book.gd); an id with no row here is drawn as its placeholder shape. kind = building, townsfolk, hero or enemy (the content table the id is checked against). model = the source: a Blender Python script under art/models/ with a build(kit) function, or later a .glb file (see docs/ART_SPEC.md). frame = [width, height] in pixels of one rendered frame. ortho = how many model units the frame spans across (the camera's orthographic scale), so pixels per unit = frame width / ortho. facings = 1 for buildings (the camera never turns) or 8 for anything that walks (facing 0 looks along +x in the sim, each next one 45 degrees round toward +y). Buildings: world_per_unit = sim world units per model unit, so the sprite is drawn at the map's own scale. Walkers: height_r = how tall the figure stands on screen, in multiples of the placeholder circle's radius it replaces. licence = where the art comes from and the terms it is used under (CC0 packs, own work, bought); a credits screen is built from these lines.",
+	"_note": "Every piece of map art, by content id (the id in data/*.json it draws). tools/render_art.sh renders each one from its model into art/sprites/<id>.png (one row per facing, one column per animation frame: idle, walk, attack) plus art/sprites/index.json, which the game reads (game/sprite_book.gd); an id with no row here is drawn as its placeholder shape. kind = building, townsfolk, hero or enemy (the content table the id is checked against). model = the source: a Blender Python script under art/models/ with a build(kit) function, or later a .glb file (see docs/ART_SPEC.md). frame = [width, height] in pixels of one rendered frame. ortho = how many model units the frame spans across (the camera's orthographic scale), so pixels per unit = frame width / ortho. rig = how a walker moves for its animations (humanoid, quadruped, or none for things like the ram that only rock and lunge; tools/render_art.py poses it), left out for buildings. facings = 1 for buildings (the camera never turns) or 8 for anything that walks (facing 0 looks along +x in the sim, each next one 45 degrees round toward +y). Buildings: world_per_unit = sim world units per model unit, so the sprite is drawn at the map's own scale. Walkers: height_r = how tall the figure stands on screen, in multiples of the placeholder circle's radius it replaces. licence = where the art comes from and the terms it is used under (CC0 packs, own work, bought); a credits screen is built from these lines.",
 	"sprites": {
 		"hut": {
 			"kind": "building",
@@ -16,8 +16,79 @@
 			"frame": [96, 96],
 			"ortho": 2.4,
 			"facings": 8,
+			"rig": "humanoid",
 			"height_r": 2.9,
 			"licence": "Own work, built in code (art/models/tribesperson.py)"
+		},
+		"warrior": {
+			"kind": "townsfolk",
+			"model": "art/models/warrior.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.9,
+			"licence": "Own work, built in code (art/models/warrior.py)"
+		},
+		"craftsperson": {
+			"kind": "townsfolk",
+			"model": "art/models/craftsperson.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.9,
+			"licence": "Own work, built in code (art/models/craftsperson.py)"
+		},
+		"hunter": {
+			"kind": "hero",
+			"model": "art/models/hunter.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.25,
+			"licence": "Own work, built in code (art/models/hunter.py)"
+		},
+		"champion": {
+			"kind": "hero",
+			"model": "art/models/champion.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.4,
+			"licence": "Own work, built in code (art/models/champion.py)"
+		},
+		"stalker": {
+			"kind": "hero",
+			"model": "art/models/stalker.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.25,
+			"licence": "Own work, built in code (art/models/stalker.py)"
+		},
+		"knight": {
+			"kind": "hero",
+			"model": "art/models/knight.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.25,
+			"licence": "Own work, built in code (art/models/knight.py)"
+		},
+		"raider": {
+			"kind": "enemy",
+			"model": "art/models/raider.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.4,
+			"licence": "Own work, built in code (art/models/raider.py)"
 		},
 		"wolf": {
 			"kind": "enemy",
@@ -25,8 +96,99 @@
 			"frame": [96, 96],
 			"ortho": 2.4,
 			"facings": 8,
+			"rig": "quadruped",
 			"height_r": 2.2,
 			"licence": "Own work, built in code (art/models/wolf.py)"
+		},
+		"cave_bear": {
+			"kind": "enemy",
+			"model": "art/models/cave_bear.py",
+			"frame": [128, 128],
+			"ortho": 3.2,
+			"facings": 8,
+			"rig": "quadruped",
+			"height_r": 2.9,
+			"licence": "Own work, built in code (art/models/cave_bear.py)"
+		},
+		"bone_caller": {
+			"kind": "enemy",
+			"model": "art/models/bone_caller.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.5,
+			"licence": "Own work, built in code (art/models/bone_caller.py)"
+		},
+		"bronze_reaver": {
+			"kind": "enemy",
+			"model": "art/models/bronze_reaver.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.5,
+			"licence": "Own work, built in code (art/models/bronze_reaver.py)"
+		},
+		"barrow_wight": {
+			"kind": "enemy",
+			"model": "art/models/barrow_wight.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.5,
+			"licence": "Own work, built in code (art/models/barrow_wight.py)"
+		},
+		"antlered_king": {
+			"kind": "enemy",
+			"model": "art/models/antlered_king.py",
+			"frame": [128, 128],
+			"ortho": 3.6,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.1,
+			"licence": "Own work, built in code (art/models/antlered_king.py)"
+		},
+		"man_at_arms": {
+			"kind": "enemy",
+			"model": "art/models/man_at_arms.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.5,
+			"licence": "Own work, built in code (art/models/man_at_arms.py)"
+		},
+		"battering_ram": {
+			"kind": "enemy",
+			"model": "art/models/battering_ram.py",
+			"frame": [128, 128],
+			"ortho": 3.4,
+			"facings": 8,
+			"rig": "none",
+			"height_r": 2.4,
+			"licence": "Own work, built in code (art/models/battering_ram.py)"
+		},
+		"hollow_knight": {
+			"kind": "enemy",
+			"model": "art/models/hollow_knight.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.6,
+			"licence": "Own work, built in code (art/models/hollow_knight.py)"
+		},
+		"black_margrave": {
+			"kind": "enemy",
+			"model": "art/models/black_margrave.py",
+			"frame": [128, 128],
+			"ortho": 3.4,
+			"facings": 8,
+			"rig": "humanoid",
+			"height_r": 2.0,
+			"licence": "Own work, built in code (art/models/black_margrave.py)"
 		}
 	}
 }

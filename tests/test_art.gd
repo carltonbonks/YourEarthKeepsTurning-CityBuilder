@@ -28,6 +28,7 @@ func test_manifest_rows_name_real_content_and_say_where_they_come_from() -> void
 		else:
 			check_eq(int(row["facings"]), 8, "%s walks, so it has 8 facings" % id)
 			check(float(row.get("height_r", 0.0)) > 0.0, "%s has a height_r" % id)
+			check(row.get("rig", "") in ["humanoid", "quadruped", "none"], "%s has a rig the renderer can pose" % id)
 
 
 func test_every_row_is_rendered_and_every_sprite_has_a_row() -> void:
@@ -44,8 +45,13 @@ func test_every_row_is_rendered_and_every_sprite_has_a_row() -> void:
 			continue
 		var info := book.info(id)
 		var tex: Texture2D = info["texture"]
-		check_eq(Vector2i(tex.get_width(), tex.get_height()), Vector2i(int(info["frame"][0]) * int(info["facings"]), int(info["frame"][1])),
-			"%s's sheet holds one frame per facing" % id)
+		var columns := 0
+		for anim: String in info["anims"]:
+			columns += int(info["anims"][anim][1])
+		check_eq(Vector2i(tex.get_width(), tex.get_height()), Vector2i(int(info["frame"][0]) * columns, int(info["frame"][1]) * int(info["facings"])),
+			"%s's sheet holds a row per facing and a column per animation frame" % id)
+		if info["kind"] != "building":
+			check(info["anims"].has("walk") and info["anims"].has("attack"), "%s walks and strikes" % id)
 		check(float(info["figure_px"]) > 0.0, "%s stands above its feet" % id)
 
 
@@ -70,3 +76,32 @@ func test_sprites_draw_only_tilted_and_with_the_setting_on() -> void:
 	view.iso = false
 	check(not view._has_art("hut"), "the flat map is always shapes")
 	view.free()
+
+
+func test_walkers_glide_walk_strike_and_flash() -> void:
+	var motion := WalkerMotion.new()
+	var u := Unit.new()
+	u.cooldown = 1.0
+	u.hp = 10.0
+	var first := motion.look(u, Vector2(100, 0), 8, 0.0)
+	check_eq(int(first["facing"]), 4, "a newcomer faces the hearth")
+	check(not first["walking"], "standing still at first")
+	var moved := motion.look(u, Vector2(110, 0), 8, 16.0)
+	check(moved["walking"], "a unit that moved walks")
+	check(Vector2(moved["at"]).x > 100.0 and Vector2(moved["at"]).x < 110.0, "the drawn spot glides toward the real one")
+	check_eq(int(moved["facing"]), 0, "it faces the way it moved")
+	var later := motion.look(u, Vector2(110, 0), 8, 1000.0)
+	check(not later["walking"], "it stands once it stops")
+	check(Vector2(later["at"]).distance_to(Vector2(110, 0)) < 0.1, "and has caught up")
+	u.cooldown_left = 1.0
+	u.hp = 7.0
+	var struck := motion.look(u, Vector2(110, 0), 8, 1016.0)
+	check(float(struck["attack"]) >= 0.0, "a blow starts the swing")
+	check(Color(struck["tint"]).r > 1.0, "a hit flashes")
+	var after := motion.look(u, Vector2(110, 0), 8, 1016.0 + WalkerMotion.ATTACK_MS + 1.0)
+	check_eq(float(after["attack"]), -1.0, "the swing plays once")
+	check_eq(Color(after["tint"]), Color.WHITE, "the flash fades")
+	var book := SpriteBook.new()
+	check_eq(book.walker_frame("tribesperson", struck)["anim"], "attack", "a swing shows the attack frames")
+	check_eq(book.walker_frame("tribesperson", moved)["anim"], "walk", "a walker shows the walk frames")
+	check_eq(book.walker_frame("tribesperson", later)["anim"], "idle", "a stander stands")

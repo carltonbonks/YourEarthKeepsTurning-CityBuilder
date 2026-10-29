@@ -6,7 +6,7 @@ How the game's map art is made, and what any art we buy or commission must match
 
 1. **A model per content id.** The id is the one in `data/*.json` (`hut`, `tribesperson`, `wolf`). Today each model is a Blender Python script in `art/models/<id>.py` with a `build(kit)` function that makes its parts with `art/lib/kit.py`. A bought or commissioned model will be a `.glb` file in `art/models/`. The renderer doesn't load those yet: the first one we buy adds that step.
 2. **A manifest row** in `art/manifest.json`: kind, model, frame size, camera scale, facings, size on the map and licence. Its `_note` explains each key.
-3. **Render:** `tools/render_art.sh [id...]` runs Blender headless and writes `art/sprites/<id>.png` (one frame per facing, left to right) and `art/sprites/index.json`, then prints where it saved a contact sheet of everything. The three pieces we have take under a minute. The first run installs Blender (about 400 MB, a few minutes).
+3. **Render:** `tools/render_art.sh [id...]` runs Blender headless and writes `art/sprites/<id>.png` (one row per facing, one column per animation frame) and `art/sprites/index.json`, then prints where it saved a contact sheet of everything. Each walker takes about 15 seconds. The first run installs Blender (about 400 MB, a few minutes).
 4. **Draw:** `game/sprite_book.gd` loads the sprites, and `game/arena_view.gd` draws an id's sprite in the tilted view. An id with no art keeps its placeholder shape, so art can arrive one piece at a time.
 5. **Check:** `tests/test_art.gd` fails if a row names an id that doesn't exist, has no licence, or isn't rendered, or if a sprite has no row.
 
@@ -29,8 +29,9 @@ Commit the model, the manifest row, the PNG, its `.import` file and `index.json`
 ## Walkers
 
 - **8 facings.** Facing 0 looks along +x on the sim's map, and each next one turns 45 degrees toward +y. The renderer turns the model for each facing.
-- **Animations (slice 2):** `idle`, `walk`, `work` (gather or carry), `attack` and `fall`, each 4 to 8 frames. Rigged characters use one humanoid rig with Mixamo-style bone names, so bought characters and animations share a skeleton. Beasts get their own rig per kind.
-- **Size on the map:** `height_r` in the manifest says how tall the figure stands, in multiples of the placeholder circle's radius (townsfolk 2.9, wolves 2.2; heroes will use about 2.3 of their larger circle, so a hero stands a little taller than a townsperson, Yusuf 2026-10-29).
+- **Animations (slice 2):** `idle` (1 frame), `walk` (6) and `attack` (4), posed by `tools/render_art.py` from a simple joint rig: our script models hang their arms and legs on empties named `arm_l`, `arm_r`, `leg_l`, `leg_r` (humanoid) or `leg_fl`, `leg_fr`, `leg_bl`, `leg_br` (quadruped); `rig: none` only bobs and lunges. `work` (gather or carry) and `fall` come later. Bought rigged characters should use one humanoid rig with Mixamo-style bone names, so they and their animations share a skeleton; the renderer will play their clips into the same columns. Beasts get their own rig per kind.
+- **How they move on the map:** `game/walker_motion.gd` glides each sprite between the sim's steps, turns it the way it walks, steps the walk with the ground covered, plays a blow when it strikes (facing its target) and flashes it when hit.
+- **Size on the map:** `height_r` in the manifest says how tall the figure stands, in multiples of the placeholder circle's radius (townsfolk 2.9, wolves 2.2; heroes about 2.25 to 2.4 of their larger circle, so a hero stands a little taller than a townsperson, Yusuf 2026-10-29).
 
 ## Buildings
 

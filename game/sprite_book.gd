@@ -39,7 +39,7 @@ func info(id: String) -> Dictionary:
 	return _sprites.get(id, {})
 
 
-## Which of `facings` frames looks most along `dir` (a direction on the sim's map).
+## Which of `facings` sheet rows looks most along `dir` (a direction on the sim's map).
 static func facing_of(dir: Vector2, facings: int) -> int:
 	if facings <= 1 or dir == Vector2.ZERO:
 		return 0
@@ -64,10 +64,32 @@ func height_at(id: String, scale: float) -> float:
 	return float(_sprites[id]["figure_px"]) * scale
 
 
-## Draws `id`'s frame `facing` with its feet on `feet`, each sprite pixel `scale` screen pixels.
-func draw(canvas: CanvasItem, id: String, feet: Vector2, scale: float, facing := 0, tint := Color.WHITE) -> void:
+## Which frame of `anim` (idle, walk, attack: see tools/render_art.py ANIMS) a walker shows: {"anim", "frame"}.
+## The walk steps with the ground walked, so legs keep pace at any speed; a blow plays through once.
+func walker_frame(id: String, look: Dictionary) -> Dictionary:
+	var anims: Dictionary = _sprites[id].get("anims", {})
+	if float(look.get("attack", -1.0)) >= 0.0 and anims.has("attack"):
+		return {"anim": "attack", "frame": int(float(look["attack"]) * int(anims["attack"][1]))}
+	if look.get("walking", false) and anims.has("walk"):
+		return {"anim": "walk", "frame": int(float(look["walked"]) / WalkerMotion.STRIDE)}
+	return {"anim": "idle", "frame": 0}
+
+
+## Draws `id` with its feet on `feet`, each sprite pixel `scale` screen pixels: the frame of `anim` (wrapping
+## round its frames) seen from `facing`.
+func draw(canvas: CanvasItem, id: String, feet: Vector2, scale: float, facing := 0, tint := Color.WHITE,
+		anim := "idle", frame_index := 0) -> void:
 	var s: Dictionary = _sprites[id]
 	var frame := Vector2(s["frame"][0], s["frame"][1])
 	var anchor := Vector2(s["anchor"][0], s["anchor"][1])
-	var src := Rect2(Vector2(frame.x * clampi(facing, 0, int(s["facings"]) - 1), 0.0), frame)
+	var span: Array = s.get("anims", {}).get(anim, [0, 1])
+	var col := int(span[0]) + posmod(frame_index, int(span[1]))
+	var row := clampi(facing, 0, int(s["facings"]) - 1)
+	var src := Rect2(Vector2(frame.x * col, frame.y * row), frame)
 	canvas.draw_texture_rect_region(s["texture"], Rect2(feet - anchor * scale, frame * scale), src, tint)
+
+
+## Draws a walker as WalkerMotion.look sees it.
+func draw_walker(canvas: CanvasItem, id: String, feet: Vector2, scale: float, look: Dictionary, tint := Color.WHITE) -> void:
+	var f := walker_frame(id, look)
+	draw(canvas, id, feet, scale, int(look["facing"]), tint * Color(look["tint"]), f["anim"], f["frame"])
