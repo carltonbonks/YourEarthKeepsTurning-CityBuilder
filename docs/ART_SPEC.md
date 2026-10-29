@@ -33,9 +33,15 @@ Commit the model, the manifest row, the PNG, its `.import` file and `index.json`
 - **How they move on the map:** `game/walker_motion.gd` glides each sprite between the sim's steps, turns it the way it walks, steps the walk with the ground covered, plays a blow when it strikes (facing its target) and flashes it when hit.
 - **Size on the map:** `height_r` in the manifest says how tall the figure stands, in multiples of the placeholder circle's radius (townsfolk 2.9, wolves 2.2; heroes about 2.25 to 2.4 of their larger circle, so a hero stands a little taller than a townsperson, Yusuf 2026-10-29).
 
-## Buildings
+## Buildings and the land (slice 3)
 
-- One facing. States (slice 3): being built, standing, damaged, broken and upgraded. For now a building being built shows a faint ghost of its sprite and a broken tower is darkened.
+- **Every building** has a model, built from the shared parts in `art/lib/kit.py` (`town_mats` for the town's everyday materials so buildings share a look, `hall`, `round_hut`, `stall`, `tent`, `fence`, `logs`, `pile`, `fire`, `glow` for embers and lamps). Buildings face the camera's side with their doors (+x or -y).
+- **One facing**, except things turned across the way people walk through: gates and barricades have 8, facing 0 letting people through along +x, and the game turns them to point out from the hearth.
+- **States:** a building being built (or an outpost raiders wrecked) is a faint ghost of its sprite that firms up as the work goes on; a broken tower or barricade is darkened; a battered gate fades. Damaged and upgraded looks come later.
+- **Tall pieces** (towers, the keep, two-storey houses, the old oak) use a taller frame such as 256 by 384; the camera's scale always spans the frame's width, so a tall frame shows more sky, not a smaller building.
+- **The land:** resource nodes (shrink as they are worked, fade when worked out), dens, the hearth (burning, and cold on a cold night), the pedlar's camp and the plots' obstacles all have sprites. The turning ring's plates are dressed with props (`plate_<kind>`: reeds and pools, trees, stones, graves) that `game/ground_props.gd` scatters over each plate and turns with it.
+- **Looks in one sheet:** a row with `variants: n` renders its model's `build(kit, variant)` n times into the columns of one sheet (the plates' props, the hearth's burning and cold looks).
+- **Kinds** (the manifest's `kind`, checked against data by `tests/test_art.gd`): building, townsfolk, hero, enemy, node, den, obstacle, plate (`plate_` + a kind in data/plates.json) and scenery (barricade, pedlar_camp, hearth).
 
 ## Bought or commissioned art
 

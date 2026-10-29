@@ -30,6 +30,69 @@
 			"figure_px": 88.39,
 			"height_r": 2.1
 		},
+		"arms_stall": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 137.77,
+			"world_per_unit": 9.0
+		},
+		"barricade": {
+			"kind": "scenery",
+			"frame": [
+				192,
+				192
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				96.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 79.58,
+			"world_per_unit": 9.0
+		},
+		"barrow": {
+			"kind": "den",
+			"frame": [
+				320,
+				320
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				160.0,
+				220.97
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 109.97,
+			"world_per_unit": 9.0
+		},
 		"barrow_wight": {
 			"kind": "enemy",
 			"frame": [
@@ -88,6 +151,48 @@
 			"figure_px": 58.39,
 			"height_r": 2.4
 		},
+		"beacon_tower": {
+			"kind": "building",
+			"frame": [
+				256,
+				384
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				265.16
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 230.16,
+			"world_per_unit": 9.0
+		},
+		"berries": {
+			"kind": "node",
+			"frame": [
+				192,
+				192
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				96.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 56.58,
+			"world_per_unit": 9.0
+		},
 		"black_margrave": {
 			"kind": "enemy",
 			"frame": [
@@ -116,6 +221,48 @@
 			"px_per_unit": 37.6471,
 			"figure_px": 77.39,
 			"height_r": 2.0
+		},
+		"blacksmith": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 176.77,
+			"world_per_unit": 9.0
+		},
+		"bloomery": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 93.77,
+			"world_per_unit": 9.0
 		},
 		"bone_caller": {
 			"kind": "enemy",
@@ -146,6 +293,111 @@
 			"figure_px": 66.29,
 			"height_r": 2.5
 		},
+		"bone_carver": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 112.77,
+			"world_per_unit": 9.0
+		},
+		"bone_pit": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 110.77,
+			"world_per_unit": 9.0
+		},
+		"boulder": {
+			"kind": "obstacle",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 86.77,
+			"world_per_unit": 9.0
+		},
+		"brewhouse": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 144.77,
+			"world_per_unit": 9.0
+		},
+		"bronze_moot": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 146.77,
+			"world_per_unit": 9.0
+		},
 		"bronze_reaver": {
 			"kind": "enemy",
 			"frame": [
@@ -174,6 +426,90 @@
 			"px_per_unit": 40.0,
 			"figure_px": 66.29,
 			"height_r": 2.5
+		},
+		"bronzesmith": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 135.77,
+			"world_per_unit": 9.0
+		},
+		"brush": {
+			"kind": "node",
+			"frame": [
+				192,
+				192
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				96.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 51.58,
+			"world_per_unit": 9.0
+		},
+		"cassiterite": {
+			"kind": "node",
+			"frame": [
+				192,
+				192
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				96.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 55.58,
+			"world_per_unit": 9.0
+		},
+		"causeway": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 101.77,
+			"world_per_unit": 9.0
 		},
 		"cave_bear": {
 			"kind": "enemy",
@@ -233,6 +569,132 @@
 			"figure_px": 66.29,
 			"height_r": 2.4
 		},
+		"chapel": {
+			"kind": "building",
+			"frame": [
+				256,
+				384
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				265.16
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 167.16,
+			"world_per_unit": 9.0
+		},
+		"charcoal_burner": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 120.77,
+			"world_per_unit": 9.0
+		},
+		"charcoal_pit": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 51.77,
+			"world_per_unit": 9.0
+		},
+		"charm_stall": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 137.77,
+			"world_per_unit": 9.0
+		},
+		"copper_seam": {
+			"kind": "node",
+			"frame": [
+				192,
+				192
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				96.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 61.58,
+			"world_per_unit": 9.0
+		},
+		"counting_house": {
+			"kind": "building",
+			"frame": [
+				256,
+				384
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				265.16
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 187.16,
+			"world_per_unit": 9.0
+		},
 		"craftsperson": {
 			"kind": "townsfolk",
 			"frame": [
@@ -261,6 +723,301 @@
 			"px_per_unit": 40.0,
 			"figure_px": 65.29,
 			"height_r": 2.9
+		},
+		"drying_rack": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 113.77,
+			"world_per_unit": 9.0
+		},
+		"duel_ring": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 114.77,
+			"world_per_unit": 9.0
+		},
+		"field": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 73.77,
+			"world_per_unit": 9.0
+		},
+		"flint_pit": {
+			"kind": "node",
+			"frame": [
+				192,
+				192
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				96.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 29.58,
+			"world_per_unit": 9.0
+		},
+		"foragers_camp": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 116.77,
+			"world_per_unit": 9.0
+		},
+		"forester": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 118.77,
+			"world_per_unit": 9.0
+		},
+		"garden": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 83.77,
+			"world_per_unit": 9.0
+		},
+		"gate": {
+			"kind": "building",
+			"frame": [
+				192,
+				192
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				96.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 124.58,
+			"world_per_unit": 9.0
+		},
+		"gibbet_post": {
+			"kind": "building",
+			"frame": [
+				256,
+				384
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				265.16
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 151.16,
+			"world_per_unit": 9.0
+		},
+		"grove": {
+			"kind": "node",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 154.77,
+			"world_per_unit": 9.0
+		},
+		"guildhall": {
+			"kind": "building",
+			"frame": [
+				256,
+				384
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				265.16
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 208.16,
+			"world_per_unit": 9.0
+		},
+		"hearth": {
+			"kind": "scenery",
+			"frame": [
+				512,
+				512
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					2
+				]
+			},
+			"anchor": [
+				256.0,
+				353.55
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 187.55,
+			"world_per_unit": 9.0,
+			"variants": 2
+		},
+		"hide_rack": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 120.77,
+			"world_per_unit": 9.0
+		},
+		"hide_stall": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 137.77,
+			"world_per_unit": 9.0
 		},
 		"hollow_knight": {
 			"kind": "enemy",
@@ -320,6 +1077,27 @@
 			"figure_px": 65.29,
 			"height_r": 2.25
 		},
+		"hunting_lodge": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 173.77,
+			"world_per_unit": 9.0
+		},
 		"hut": {
 			"kind": "building",
 			"frame": [
@@ -339,6 +1117,69 @@
 			],
 			"px_per_unit": 60.9524,
 			"figure_px": 138.77,
+			"world_per_unit": 9.0
+		},
+		"iron_bog": {
+			"kind": "node",
+			"frame": [
+				192,
+				192
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				96.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 70.58,
+			"world_per_unit": 9.0
+		},
+		"kennel": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 114.77,
+			"world_per_unit": 9.0
+		},
+		"knapper": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 124.77,
 			"world_per_unit": 9.0
 		},
 		"knight": {
@@ -370,6 +1211,69 @@
 			"figure_px": 66.29,
 			"height_r": 2.25
 		},
+		"levy_hall": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 139.77,
+			"world_per_unit": 9.0
+		},
+		"longhouse": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 163.77,
+			"world_per_unit": 9.0
+		},
+		"lookout_cairn": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 128.77,
+			"world_per_unit": 9.0
+		},
 		"man_at_arms": {
 			"kind": "enemy",
 			"frame": [
@@ -398,6 +1302,241 @@
 			"px_per_unit": 40.0,
 			"figure_px": 66.29,
 			"height_r": 2.5
+		},
+		"market": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 124.77,
+			"world_per_unit": 9.0
+		},
+		"oath_stone": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 134.77,
+			"world_per_unit": 9.0
+		},
+		"obsidian": {
+			"kind": "node",
+			"frame": [
+				192,
+				192
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				96.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 66.58,
+			"world_per_unit": 9.0
+		},
+		"old_oak": {
+			"kind": "obstacle",
+			"frame": [
+				256,
+				384
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				265.16
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 193.16,
+			"world_per_unit": 9.0
+		},
+		"pedlar_camp": {
+			"kind": "scenery",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 100.77,
+			"world_per_unit": 9.0
+		},
+		"plate_barrow": {
+			"kind": "plate",
+			"frame": [
+				128,
+				192
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					4
+				]
+			},
+			"anchor": [
+				64.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 89.58,
+			"world_per_unit": 9.0,
+			"variants": 4
+		},
+		"plate_fen": {
+			"kind": "plate",
+			"frame": [
+				128,
+				192
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					4
+				]
+			},
+			"anchor": [
+				64.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 58.58,
+			"world_per_unit": 9.0,
+			"variants": 4
+		},
+		"plate_greenwood": {
+			"kind": "plate",
+			"frame": [
+				128,
+				192
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					4
+				]
+			},
+			"anchor": [
+				64.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 125.58,
+			"world_per_unit": 9.0,
+			"variants": 4
+		},
+		"plate_stonefield": {
+			"kind": "plate",
+			"frame": [
+				128,
+				192
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					4
+				]
+			},
+			"anchor": [
+				64.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 35.58,
+			"world_per_unit": 9.0,
+			"variants": 4
+		},
+		"provisions_stall": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 137.77,
+			"world_per_unit": 9.0
+		},
+		"quarry_camp": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 113.77,
+			"world_per_unit": 9.0
 		},
 		"raider": {
 			"kind": "enemy",
@@ -428,6 +1567,153 @@
 			"figure_px": 65.29,
 			"height_r": 2.4
 		},
+		"reeves_hut": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 119.77,
+			"world_per_unit": 9.0
+		},
+		"rocks": {
+			"kind": "node",
+			"frame": [
+				192,
+				192
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				96.0,
+				132.58
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 50.58,
+			"world_per_unit": 9.0
+		},
+		"runners_hut": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 111.77,
+			"world_per_unit": 9.0
+		},
+		"seer_tent": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 138.77,
+			"world_per_unit": 9.0
+		},
+		"shrine": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 120.77,
+			"world_per_unit": 9.0
+		},
+		"smelter": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 151.77,
+			"world_per_unit": 9.0
+		},
+		"smoke_hut": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 146.77,
+			"world_per_unit": 9.0
+		},
 		"stalker": {
 			"kind": "hero",
 			"frame": [
@@ -456,6 +1742,132 @@
 			"px_per_unit": 40.0,
 			"figure_px": 66.29,
 			"height_r": 2.25
+		},
+		"stone_keep": {
+			"kind": "building",
+			"frame": [
+				256,
+				384
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				265.16
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 228.16,
+			"world_per_unit": 9.0
+		},
+		"stone_yard": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 83.77,
+			"world_per_unit": 9.0
+		},
+		"tavern": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 171.77,
+			"world_per_unit": 9.0
+		},
+		"tin_diggings": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 110.77,
+			"world_per_unit": 9.0
+		},
+		"townhouse": {
+			"kind": "building",
+			"frame": [
+				256,
+				384
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				265.16
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 208.16,
+			"world_per_unit": 9.0
+		},
+		"training_yard": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 95.77,
+			"world_per_unit": 9.0
 		},
 		"tribesperson": {
 			"kind": "townsfolk",
@@ -486,6 +1898,69 @@
 			"figure_px": 65.29,
 			"height_r": 2.9
 		},
+		"trophy_hall": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 147.77,
+			"world_per_unit": 9.0
+		},
+		"war_camp": {
+			"kind": "den",
+			"frame": [
+				320,
+				320
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				160.0,
+				220.97
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 131.97,
+			"world_per_unit": 9.0
+		},
+		"warden_hut": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 100.77,
+			"world_per_unit": 9.0
+		},
 		"warrior": {
 			"kind": "townsfolk",
 			"frame": [
@@ -515,6 +1990,27 @@
 			"figure_px": 66.29,
 			"height_r": 2.9
 		},
+		"watch_post": {
+			"kind": "building",
+			"frame": [
+				256,
+				384
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				265.16
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 205.16,
+			"world_per_unit": 9.0
+		},
 		"wolf": {
 			"kind": "enemy",
 			"frame": [
@@ -543,6 +2039,48 @@
 			"px_per_unit": 40.0,
 			"figure_px": 44.29,
 			"height_r": 2.2
+		},
+		"wolf_den": {
+			"kind": "den",
+			"frame": [
+				320,
+				320
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				160.0,
+				220.97
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 80.97,
+			"world_per_unit": 9.0
+		},
+		"woodcutters_camp": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 116.77,
+			"world_per_unit": 9.0
 		}
 	}
 }

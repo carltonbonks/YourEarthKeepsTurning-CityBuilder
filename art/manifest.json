@@ -1,5 +1,5 @@
 {
-	"_note": "Every piece of map art, by content id (the id in data/*.json it draws). tools/render_art.sh renders each one from its model into art/sprites/<id>.png (one row per facing, one column per animation frame: idle, walk, attack) plus art/sprites/index.json, which the game reads (game/sprite_book.gd); an id with no row here is drawn as its placeholder shape. kind = building, townsfolk, hero or enemy (the content table the id is checked against). model = the source: a Blender Python script under art/models/ with a build(kit) function, or later a .glb file (see docs/ART_SPEC.md). frame = [width, height] in pixels of one rendered frame. ortho = how many model units the frame spans across (the camera's orthographic scale), so pixels per unit = frame width / ortho. rig = how a walker moves for its animations (humanoid, quadruped, or none for things like the ram that only rock and lunge; tools/render_art.py poses it), left out for buildings. facings = 1 for buildings (the camera never turns) or 8 for anything that walks (facing 0 looks along +x in the sim, each next one 45 degrees round toward +y). Buildings: world_per_unit = sim world units per model unit, so the sprite is drawn at the map's own scale. Walkers: height_r = how tall the figure stands on screen, in multiples of the placeholder circle's radius it replaces. licence = where the art comes from and the terms it is used under (CC0 packs, own work, bought); a credits screen is built from these lines.",
+	"_note": "Every piece of map art, by content id (the id in data/*.json it draws). tools/render_art.sh renders each one from its model into art/sprites/<id>.png (one row per facing, one column per animation frame: idle, walk, attack) plus art/sprites/index.json, which the game reads (game/sprite_book.gd); an id with no row here is drawn as its placeholder shape. kind = building, townsfolk, hero, enemy, node, den, obstacle, plate (plate_<kind>, the turning ring's props) or scenery (barricade, pedlar_camp, hearth): the content table the id is checked against (tests/test_art.gd). model = the source: a Blender Python script under art/models/ with a build(kit) function, or later a .glb file (see docs/ART_SPEC.md). frame = [width, height] in pixels of one rendered frame. ortho = how many model units the frame spans across (the camera's orthographic scale), so pixels per unit = frame width / ortho. rig = how a walker moves for its animations (humanoid, quadruped, or none for things like the ram that only rock and lunge; tools/render_art.py poses it), left out for buildings. variants = how many looks a prop comes in (its build(kit, variant) is rendered once per column). facings = 1 for buildings (the camera never turns), 8 for gates and barricades (turned across the way through) or 8 for anything that walks (facing 0 looks along +x in the sim, each next one 45 degrees round toward +y). Buildings: world_per_unit = sim world units per model unit, so the sprite is drawn at the map's own scale. Walkers: height_r = how tall the figure stands on screen, in multiples of the placeholder circle's radius it replaces. licence = where the art comes from and the terms it is used under (CC0 packs, own work, bought); a credits screen is built from these lines.",
 	"sprites": {
 		"hut": {
 			"kind": "building",
@@ -189,6 +189,668 @@
 			"rig": "humanoid",
 			"height_r": 2.0,
 			"licence": "Own work, built in code (art/models/black_margrave.py)"
+		},
+		"watch_post": {
+			"kind": "building",
+			"model": "art/models/watch_post.py",
+			"frame": [256, 384],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/watch_post.py)"
+		},
+		"longhouse": {
+			"kind": "building",
+			"model": "art/models/longhouse.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/longhouse.py)"
+		},
+		"tavern": {
+			"kind": "building",
+			"model": "art/models/tavern.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/tavern.py)"
+		},
+		"shrine": {
+			"kind": "building",
+			"model": "art/models/shrine.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/shrine.py)"
+		},
+		"garden": {
+			"kind": "building",
+			"model": "art/models/garden.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/garden.py)"
+		},
+		"drying_rack": {
+			"kind": "building",
+			"model": "art/models/drying_rack.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/drying_rack.py)"
+		},
+		"market": {
+			"kind": "building",
+			"model": "art/models/market.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/market.py)"
+		},
+		"gate": {
+			"kind": "building",
+			"model": "art/models/gate.py",
+			"frame": [192, 192],
+			"ortho": 3.15,
+			"facings": 8,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/gate.py)"
+		},
+		"arms_stall": {
+			"kind": "building",
+			"model": "art/models/arms_stall.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/arms_stall.py)"
+		},
+		"hide_stall": {
+			"kind": "building",
+			"model": "art/models/hide_stall.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/hide_stall.py)"
+		},
+		"charm_stall": {
+			"kind": "building",
+			"model": "art/models/charm_stall.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/charm_stall.py)"
+		},
+		"provisions_stall": {
+			"kind": "building",
+			"model": "art/models/provisions_stall.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/provisions_stall.py)"
+		},
+		"knapper": {
+			"kind": "building",
+			"model": "art/models/knapper.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/knapper.py)"
+		},
+		"hide_rack": {
+			"kind": "building",
+			"model": "art/models/hide_rack.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/hide_rack.py)"
+		},
+		"bone_carver": {
+			"kind": "building",
+			"model": "art/models/bone_carver.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/bone_carver.py)"
+		},
+		"reeves_hut": {
+			"kind": "building",
+			"model": "art/models/reeves_hut.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/reeves_hut.py)"
+		},
+		"runners_hut": {
+			"kind": "building",
+			"model": "art/models/runners_hut.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/runners_hut.py)"
+		},
+		"smoke_hut": {
+			"kind": "building",
+			"model": "art/models/smoke_hut.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/smoke_hut.py)"
+		},
+		"forester": {
+			"kind": "building",
+			"model": "art/models/forester.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/forester.py)"
+		},
+		"charcoal_pit": {
+			"kind": "building",
+			"model": "art/models/charcoal_pit.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/charcoal_pit.py)"
+		},
+		"hunting_lodge": {
+			"kind": "building",
+			"model": "art/models/hunting_lodge.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/hunting_lodge.py)"
+		},
+		"stone_yard": {
+			"kind": "building",
+			"model": "art/models/stone_yard.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/stone_yard.py)"
+		},
+		"bronze_moot": {
+			"kind": "building",
+			"model": "art/models/bronze_moot.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/bronze_moot.py)"
+		},
+		"smelter": {
+			"kind": "building",
+			"model": "art/models/smelter.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/smelter.py)"
+		},
+		"bronzesmith": {
+			"kind": "building",
+			"model": "art/models/bronzesmith.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/bronzesmith.py)"
+		},
+		"stone_keep": {
+			"kind": "building",
+			"model": "art/models/stone_keep.py",
+			"frame": [256, 384],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/stone_keep.py)"
+		},
+		"townhouse": {
+			"kind": "building",
+			"model": "art/models/townhouse.py",
+			"frame": [256, 384],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/townhouse.py)"
+		},
+		"field": {
+			"kind": "building",
+			"model": "art/models/field.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/field.py)"
+		},
+		"charcoal_burner": {
+			"kind": "building",
+			"model": "art/models/charcoal_burner.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/charcoal_burner.py)"
+		},
+		"bloomery": {
+			"kind": "building",
+			"model": "art/models/bloomery.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/bloomery.py)"
+		},
+		"blacksmith": {
+			"kind": "building",
+			"model": "art/models/blacksmith.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/blacksmith.py)"
+		},
+		"guildhall": {
+			"kind": "building",
+			"model": "art/models/guildhall.py",
+			"frame": [256, 384],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/guildhall.py)"
+		},
+		"chapel": {
+			"kind": "building",
+			"model": "art/models/chapel.py",
+			"frame": [256, 384],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/chapel.py)"
+		},
+		"gibbet_post": {
+			"kind": "building",
+			"model": "art/models/gibbet_post.py",
+			"frame": [256, 384],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/gibbet_post.py)"
+		},
+		"warden_hut": {
+			"kind": "building",
+			"model": "art/models/warden_hut.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/warden_hut.py)"
+		},
+		"trophy_hall": {
+			"kind": "building",
+			"model": "art/models/trophy_hall.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/trophy_hall.py)"
+		},
+		"training_yard": {
+			"kind": "building",
+			"model": "art/models/training_yard.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/training_yard.py)"
+		},
+		"kennel": {
+			"kind": "building",
+			"model": "art/models/kennel.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/kennel.py)"
+		},
+		"duel_ring": {
+			"kind": "building",
+			"model": "art/models/duel_ring.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/duel_ring.py)"
+		},
+		"seer_tent": {
+			"kind": "building",
+			"model": "art/models/seer_tent.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/seer_tent.py)"
+		},
+		"brewhouse": {
+			"kind": "building",
+			"model": "art/models/brewhouse.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/brewhouse.py)"
+		},
+		"levy_hall": {
+			"kind": "building",
+			"model": "art/models/levy_hall.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/levy_hall.py)"
+		},
+		"bone_pit": {
+			"kind": "building",
+			"model": "art/models/bone_pit.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/bone_pit.py)"
+		},
+		"beacon_tower": {
+			"kind": "building",
+			"model": "art/models/beacon_tower.py",
+			"frame": [256, 384],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/beacon_tower.py)"
+		},
+		"counting_house": {
+			"kind": "building",
+			"model": "art/models/counting_house.py",
+			"frame": [256, 384],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/counting_house.py)"
+		},
+		"oath_stone": {
+			"kind": "building",
+			"model": "art/models/oath_stone.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/oath_stone.py)"
+		},
+		"woodcutters_camp": {
+			"kind": "building",
+			"model": "art/models/woodcutters_camp.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/woodcutters_camp.py)"
+		},
+		"quarry_camp": {
+			"kind": "building",
+			"model": "art/models/quarry_camp.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/quarry_camp.py)"
+		},
+		"foragers_camp": {
+			"kind": "building",
+			"model": "art/models/foragers_camp.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/foragers_camp.py)"
+		},
+		"tin_diggings": {
+			"kind": "building",
+			"model": "art/models/tin_diggings.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/tin_diggings.py)"
+		},
+		"causeway": {
+			"kind": "building",
+			"model": "art/models/causeway.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/causeway.py)"
+		},
+		"lookout_cairn": {
+			"kind": "building",
+			"model": "art/models/lookout_cairn.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/lookout_cairn.py)"
+		},
+		"brush": {
+			"kind": "node",
+			"model": "art/models/brush.py",
+			"frame": [192, 192],
+			"ortho": 3.15,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/brush.py)"
+		},
+		"berries": {
+			"kind": "node",
+			"model": "art/models/berries.py",
+			"frame": [192, 192],
+			"ortho": 3.15,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/berries.py)"
+		},
+		"grove": {
+			"kind": "node",
+			"model": "art/models/grove.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/grove.py)"
+		},
+		"rocks": {
+			"kind": "node",
+			"model": "art/models/rocks.py",
+			"frame": [192, 192],
+			"ortho": 3.15,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/rocks.py)"
+		},
+		"flint_pit": {
+			"kind": "node",
+			"model": "art/models/flint_pit.py",
+			"frame": [192, 192],
+			"ortho": 3.15,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/flint_pit.py)"
+		},
+		"obsidian": {
+			"kind": "node",
+			"model": "art/models/obsidian.py",
+			"frame": [192, 192],
+			"ortho": 3.15,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/obsidian.py)"
+		},
+		"copper_seam": {
+			"kind": "node",
+			"model": "art/models/copper_seam.py",
+			"frame": [192, 192],
+			"ortho": 3.15,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/copper_seam.py)"
+		},
+		"iron_bog": {
+			"kind": "node",
+			"model": "art/models/iron_bog.py",
+			"frame": [192, 192],
+			"ortho": 3.15,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/iron_bog.py)"
+		},
+		"cassiterite": {
+			"kind": "node",
+			"model": "art/models/cassiterite.py",
+			"frame": [192, 192],
+			"ortho": 3.15,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/cassiterite.py)"
+		},
+		"wolf_den": {
+			"kind": "den",
+			"model": "art/models/wolf_den.py",
+			"frame": [320, 320],
+			"ortho": 5.25,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/wolf_den.py)"
+		},
+		"barrow": {
+			"kind": "den",
+			"model": "art/models/barrow.py",
+			"frame": [320, 320],
+			"ortho": 5.25,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/barrow.py)"
+		},
+		"war_camp": {
+			"kind": "den",
+			"model": "art/models/war_camp.py",
+			"frame": [320, 320],
+			"ortho": 5.25,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/war_camp.py)"
+		},
+		"barricade": {
+			"kind": "scenery",
+			"model": "art/models/barricade.py",
+			"frame": [192, 192],
+			"ortho": 3.15,
+			"facings": 8,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/barricade.py)"
+		},
+		"pedlar_camp": {
+			"kind": "scenery",
+			"model": "art/models/pedlar_camp.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/pedlar_camp.py)"
+		},
+		"plate_fen": {
+			"kind": "plate",
+			"model": "art/models/plate_fen.py",
+			"frame": [128, 192],
+			"ortho": 2.1,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"variants": 4,
+			"licence": "Own work, built in code (art/models/plate_fen.py)"
+		},
+		"plate_greenwood": {
+			"kind": "plate",
+			"model": "art/models/plate_greenwood.py",
+			"frame": [128, 192],
+			"ortho": 2.1,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"variants": 4,
+			"licence": "Own work, built in code (art/models/plate_greenwood.py)"
+		},
+		"plate_stonefield": {
+			"kind": "plate",
+			"model": "art/models/plate_stonefield.py",
+			"frame": [128, 192],
+			"ortho": 2.1,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"variants": 4,
+			"licence": "Own work, built in code (art/models/plate_stonefield.py)"
+		},
+		"plate_barrow": {
+			"kind": "plate",
+			"model": "art/models/plate_barrow.py",
+			"frame": [128, 192],
+			"ortho": 2.1,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"variants": 4,
+			"licence": "Own work, built in code (art/models/plate_barrow.py)"
+		},
+		"boulder": {
+			"kind": "obstacle",
+			"model": "art/models/boulder.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/boulder.py)"
+		},
+		"old_oak": {
+			"kind": "obstacle",
+			"model": "art/models/old_oak.py",
+			"frame": [256, 384],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/old_oak.py)"
+		},
+		"hearth": {
+			"kind": "scenery",
+			"model": "art/models/hearth.py",
+			"frame": [512, 512],
+			"ortho": 8.4,
+			"facings": 1,
+			"variants": 2,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/hearth.py)"
 		}
 	}
 }

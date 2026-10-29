@@ -4,7 +4,7 @@ Run it through tools/render_art.sh, which runs it in Blender's Python (the bpy p
 it builds the model, points an orthographic camera at it from the map's own angle (the tilted view
 in game/arena_view.gd: turned 45 degrees, looking down 30 degrees so the ground squashes 2:1), and
 renders its frames into art/sprites/<id>.png: one row per facing, and along each row the
-animations in ANIMS (walkers with a rig) or one frame (buildings). art/sprites/index.json gets
+animations in ANIMS (walkers with a rig), one frame (buildings) or one per variant (props). art/sprites/index.json gets
 what the game needs to place each frame: frame size, facings, where the feet are, pixels per model
 unit and how tall the figure stands.
 
@@ -62,6 +62,7 @@ def light_and_camera(row):
     cam = bpy.data.cameras.new("cam")
     cam.type = "ORTHO"
     cam.ortho_scale = row["ortho"]
+    cam.sensor_fit = "HORIZONTAL"  # ortho spans the frame's width, even for a tall frame
     co = bpy.data.objects.new("cam", cam)
     sc.collection.objects.link(co)
     sc.camera = co
@@ -127,41 +128,58 @@ def pose(rig, anim, t, n, joints, pivot, facing_angle):
             joints[name].rotation_euler = (0, angle, 0)
 
 
-def render(sprite_id, row, out_dir, tmp_dir):
+def build_scene(row, variant):
+    """Builds the model (variant `variant` for props that come in several looks) under one pivot to turn
+    it by, and returns the pivot and the joints the renderer poses."""
     empty_scene()
-    load_model(row["model"]).build(kit)
+    model = load_model(row["model"])
+    if int(row.get("variants", 1)) > 1:
+        model.build(kit, variant)
+    else:
+        model.build(kit)
     pivot = bpy.data.objects.new("pivot", None)
     bpy.context.scene.collection.objects.link(pivot)
     for obj in list(bpy.data.objects):
         if obj is not pivot and obj.parent is None:
             obj.parent = pivot
     joints = {o.name: o for o in bpy.data.objects if o.type == "EMPTY" and o is not pivot}
-    sc, cam = light_and_camera(row)
+    return pivot, joints
+
+
+def render(sprite_id, row, out_dir, tmp_dir):
     facings = int(row["facings"])
     rig = row.get("rig", "")
-    anims = ANIMS if rig else [("idle", 1)]
+    variants = int(row.get("variants", 1))
+    # Walkers get the animations along each row; props that come in several looks get one per column.
+    anims = ANIMS if rig else [("idle", variants)]
     columns = sum(n for _, n in anims)
     w, h = row["frame"]
     sheet = Image.new("RGBA", (w * columns, h * facings))
     top = h
-    for i in range(facings):
-        angle = math.radians(360.0 / facings * i)
-        pivot.rotation_euler = (0, 0, -angle)
-        col = 0
-        for anim, n in anims:
-            for t in range(n):
-                pose(rig, anim, t, n, joints, pivot, angle)
-                path = os.path.join(tmp_dir, "%s_%d_%d.png" % (sprite_id, i, col))
-                sc.render.filepath = path
-                bpy.ops.render.render(write_still=True)
-                im = Image.open(path).convert("RGBA")
-                sheet.paste(im, (w * col, h * i))
-                if anim == "idle":
-                    # How tall the figure stands above its feet: the tallest facing, standing still.
-                    box = im.getchannel("A").point(lambda v: 255 if v > 40 else 0).getbbox()
-                    if box:
-                        top = min(top, box[1])
-                col += 1
+    for v in range(variants):
+        pivot, joints = build_scene(row, v)
+        sc, cam = light_and_camera(row)
+        for i in range(facings):
+            angle = math.radians(360.0 / facings * i)
+            pivot.rotation_euler = (0, 0, -angle)
+            col = 0
+            for anim, n in anims:
+                for t in range(n):
+                    if variants > 1 and t != v:
+                        col += 1
+                        continue
+                    pose(rig, anim, t, n, joints, pivot, angle)
+                    path = os.path.join(tmp_dir, "%s_%d_%d.png" % (sprite_id, i, col))
+                    sc.render.filepath = path
+                    bpy.ops.render.render(write_still=True)
+                    im = Image.open(path).convert("RGBA")
+                    sheet.paste(im, (w * col, h * i))
+                    if anim == "idle":
+                        # How tall the figure stands above its feet: the tallest facing, standing still.
+                        box = im.getchannel("A").point(lambda v: 255 if v > 40 else 0).getbbox()
+                        if box:
+                            top = min(top, box[1])
+                    col += 1
     pivot.location = (0, 0, 0)
     sheet.save(os.path.join(out_dir, sprite_id + ".png"), optimize=True)
     feet = world_to_camera_view(sc, cam, Vector((0, 0, 0)))
@@ -179,7 +197,7 @@ def render(sprite_id, row, out_dir, tmp_dir):
     for anim, n in anims:
         info["anims"][anim] = [col, n]
         col += n
-    for key in ("world_per_unit", "height_r"):
+    for key in ("world_per_unit", "height_r", "variants"):
         if key in row:
             info[key] = row[key]
     return info
