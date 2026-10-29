@@ -10,6 +10,8 @@ extends Control
 ## Invaders glow faintly red, more so at night. The night's last kill is held for a moment (LastKill). A won run
 ## ends on the map first (Victory).
 ## Light (Lighting) is drawn on a child layer that adds light, and the tooltip on a layer above that.
+## In the tilted view, anything with rendered art (SpriteBook, art/sprites/) is drawn as its sprite instead
+## of its shape, unless the Rendered art setting is off; walkers face the way they last moved.
 
 const HERO_RADIUS := 9.0
 const FOLK_RADIUS := 5.5
@@ -69,6 +71,11 @@ var last_kill := LastKill.new()
 var raider_route := RaiderRoute.new()
 var quick_defences := QuickDefences.new()
 var light := Lighting.new()
+var sprites := SpriteBook.new()
+## Off in Settings: everything is drawn as plain shapes, as before the art.
+var art := true
+## Which way each walker last moved, for its sprite: instance id -> [where it was, facing].
+var _heading := {}
 var _light_layer: Control
 var _top_layer: Control
 ## The plot the hovered building card would go on, blinked on the map; -1 for none.
@@ -129,6 +136,8 @@ func zoom_to_fit(radius: float, fill: float) -> float:
 
 
 func _ready() -> void:
+	# Sprites are drawn smaller than they were rendered, so they are smoothed with mipmaps.
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	var add := CanvasItemMaterial.new()
 	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	_light_layer = _layer(_draw_lights)
@@ -531,14 +540,21 @@ func _draw_building(bi: int, font: Font) -> void:
 		# A broken tower is drawn dark until it is mended at dawn; a hurt one shows its health.
 		var tower_hp := float(def.get("tower_hp", 0.0))
 		var broken := tower_hp > 0.0 and float(b["hp"]) <= 0.0
-		_draw_block(shape, lift, col.darkened(0.6) if broken else col, Color("#e05050") if broken else Color("#e8d9a8"))
+		if _has_art(b["type"]):
+			sprites.draw(self, b["type"], _to_screen(b["pos"]), sprites.building_scale(b["type"], s), 0,
+				Color(0.4, 0.4, 0.4) if broken else Color.WHITE)
+		else:
+			_draw_block(shape, lift, col.darkened(0.6) if broken else col, Color("#e05050") if broken else Color("#e8d9a8"))
 		if tower_hp > 0.0 and float(b["hp"]) < tower_hp:
 			_bar(p + Vector2(-half, half + 3), half * 2.0, float(b["hp"]) / tower_hp, Color("#e05050"))
 	else:
 		var done := 1.0 - work_left / float(def["work"])
 		draw_colored_polygon(shape, Color(col, 0.25))
 		draw_polyline(_closed(shape), col, 1.5)
-		if lift >= 1.0:
+		if _has_art(b["type"]):
+			# Being built: a faint ghost of the building that firms up as the work goes on.
+			sprites.draw(self, b["type"], _to_screen(b["pos"]), sprites.building_scale(b["type"], s), 0, Color(1, 1, 1, 0.2 + 0.5 * done))
+		elif lift >= 1.0:
 			_draw_block(shape, lift, Color(col, 0.55), col)
 		_bar(p + Vector2(-half, half + 3), half * 2.0, done, Color("#e8d9a8"))
 	# Stalls show a dot per good on sale; workshops show how far the current good is.
@@ -605,12 +621,19 @@ func _draw_folk(u: Unit) -> void:
 	_shadow(at, r)
 	if u.sergeant:
 		_aura_ring(at, Color("#e8c050"))
-	draw_circle(p, r, Color(run.content.townsfolk[u.type_id]["color"]))
-	_draw_marker(u, p + Vector2(0.0, r), r * 0.55)
+	var feet := p + Vector2(0.0, r)
+	var top := p - Vector2(0.0, r)
+	if _has_art(u.type_id):
+		var scale := sprites.walker_scale(u.type_id, r)
+		sprites.draw(self, u.type_id, feet, scale, _facing(u, at, u.type_id))
+		top = feet - Vector2(0.0, sprites.height_at(u.type_id, scale))
+	else:
+		draw_circle(p, r, Color(run.content.townsfolk[u.type_id]["color"]))
+	_draw_marker(u, feet, r * 0.55)
 	if u.carry_amount > 0:
-		draw_circle(p + Vector2(r, -r), r * 0.5, Color(main_color(u.carrying)))
+		draw_circle(top + Vector2(r, 0.0), r * 0.5, Color(main_color(u.carrying)))
 	if u.hp < u.max_hp:
-		_bar(p + Vector2(-r, -r - 4), r * 2.0, u.hp_fraction(), Color("#5ee07a"))
+		_bar(top + Vector2(-r, -4), r * 2.0, u.hp_fraction(), Color("#5ee07a"))
 
 
 ## The small marker at a townsperson's feet: its mark's shape and colour (data/marks.json), or a diamond while a
@@ -643,10 +666,36 @@ func _draw_enemy(e: Unit) -> void:
 	var r := (BOSS_RADIUS if e.is_boss else ENEMY_RADIUS) * maxf(1.0, zoom * 0.7)
 	var p := _stand(e.pos, r)
 	_shadow(e.pos, r)
-	draw_circle(p, r, Color(run.content.enemies[e.type_id]["color"]))
-	if e.den_index >= 0:
-		draw_arc(p, r, 0, TAU, 16, Color("#301818"), 1.5)
-	_bar(p + Vector2(-r, -r - 5), r * 2.0, e.hp_fraction(), Color("#e05050"))
+	var top := p - Vector2(0.0, r)
+	if _has_art(e.type_id):
+		var feet := p + Vector2(0.0, r)
+		var scale := sprites.walker_scale(e.type_id, r)
+		sprites.draw(self, e.type_id, feet, scale, _facing(e, e.pos, e.type_id))
+		top = feet - Vector2(0.0, sprites.height_at(e.type_id, scale))
+	else:
+		draw_circle(p, r, Color(run.content.enemies[e.type_id]["color"]))
+		if e.den_index >= 0:
+			draw_arc(p, r, 0, TAU, 16, Color("#301818"), 1.5)
+	_bar(top + Vector2(-r, -5), r * 2.0, e.hp_fraction(), Color("#e05050"))
+
+
+## True when `id` is drawn as its rendered sprite (tilted view, Rendered art on, and art exists for it).
+func _has_art(id: String) -> bool:
+	return art and iso and sprites.has(id)
+
+
+## The sprite frame a walker shows: the way it last moved at least a step, kept while it stands (at first it faces
+## the hearth).
+func _facing(u: Unit, at: Vector2, id: String) -> int:
+	var key := u.get_instance_id()
+	var facings := int(sprites.info(id)["facings"])
+	var seen: Array = _heading.get(key, [at, SpriteBook.facing_of(-at, facings)])
+	if at.distance_to(seen[0]) >= 0.8:
+		seen = [at, SpriteBook.facing_of(at - Vector2(seen[0]), facings)]
+	if _heading.size() > 4000:
+		_heading.clear()
+	_heading[key] = seen
+	return seen[1]
 
 
 ## A faint ring on the ground round a Legend or sergeant, as far as warriors fight harder beside them (aura_reach).

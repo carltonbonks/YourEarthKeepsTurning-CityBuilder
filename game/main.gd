@@ -196,6 +196,7 @@ func _tour_done() -> void:
 	_arena.run = run
 	_arena.reset_camera()
 	_arena.night_camera = settings.night_camera
+	_arena.art = settings.art
 	for part: Control in [_top, _bottom, _corner, _threat]:
 		part.visible = true
 	_refresh()
@@ -213,6 +214,7 @@ func _show_title() -> void:
 func _apply_settings() -> void:
 	settings.apply(get_window() if is_inside_tree() else null)
 	_arena.night_camera = settings.night_camera
+	_arena.art = settings.art
 
 
 func _found(ids: Array) -> void:
@@ -620,3 +622,4 @@ func _build_ui() -> void:
 	_tips.map_anchor = _tip_position
 	add_child(_tips)
 	_arena.night_camera = settings.night_camera
+	_arena.art = settings.art

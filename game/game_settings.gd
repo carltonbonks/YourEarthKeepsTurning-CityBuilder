@@ -26,6 +26,8 @@ const UI_SCALES := [0.8, 0.9, 1.0, 1.1, 1.2]
 
 var fullscreen := false
 var ui_scale := 1.0
+## The map draws rendered art where it has it (SpriteBook); off draws plain shapes everywhere.
+var art := true
 ## The speed each run starts at (one of TopBar.SPEEDS past 0).
 var start_speed := 2
 ## The map closes in on the town as night falls (NightCamera).
@@ -49,6 +51,7 @@ static func load_saved() -> GameSettings:
 		return s
 	s.fullscreen = bool(cfg.get_value("screen", "fullscreen", s.fullscreen))
 	s.ui_scale = float(cfg.get_value("screen", "ui_scale", s.ui_scale))
+	s.art = bool(cfg.get_value("screen", "art", s.art))
 	s.start_speed = int(cfg.get_value("play", "start_speed", s.start_speed))
 	s.night_camera = bool(cfg.get_value("play", "night_camera", s.night_camera))
 	s.tips = bool(cfg.get_value("play", "tips", s.tips))
@@ -70,6 +73,7 @@ func save() -> void:
 	cfg.set_value("meta", "format", FORMAT)
 	cfg.set_value("screen", "fullscreen", fullscreen)
 	cfg.set_value("screen", "ui_scale", ui_scale)
+	cfg.set_value("screen", "art", art)
 	cfg.set_value("play", "start_speed", start_speed)
 	cfg.set_value("play", "night_camera", night_camera)
 	cfg.set_value("play", "tips", tips)

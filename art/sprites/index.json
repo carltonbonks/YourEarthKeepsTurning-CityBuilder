@@ -1,0 +1,50 @@
+{
+	"_note": "Written by tools/render_art.py from art/manifest.json; do not edit by hand.",
+	"sprites": {
+		"hut": {
+			"kind": "building",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 60.9524,
+			"figure_px": 138.77,
+			"world_per_unit": 9.0
+		},
+		"tribesperson": {
+			"kind": "townsfolk",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 65.29,
+			"height_r": 3.6
+		},
+		"wolf": {
+			"kind": "enemy",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 44.29,
+			"height_r": 2.6
+		}
+	}
+}

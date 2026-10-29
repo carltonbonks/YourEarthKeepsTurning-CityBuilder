@@ -1,0 +1,32 @@
+{
+	"_note": "Every piece of map art, by content id (the id in data/*.json it draws). tools/render_art.sh renders each one from its model into art/sprites/<id>.png (one frame per facing, left to right) plus art/sprites/index.json, which the game reads (game/sprite_book.gd); an id with no row here is drawn as its placeholder shape. kind = building, townsfolk, hero or enemy (the content table the id is checked against). model = the source: a Blender Python script under art/models/ with a build(kit) function, or later a .glb file (see docs/ART_SPEC.md). frame = [width, height] in pixels of one rendered frame. ortho = how many model units the frame spans across (the camera's orthographic scale), so pixels per unit = frame width / ortho. facings = 1 for buildings (the camera never turns) or 8 for anything that walks (facing 0 looks along +x in the sim, each next one 45 degrees round toward +y). Buildings: world_per_unit = sim world units per model unit, so the sprite is drawn at the map's own scale. Walkers: height_r = how tall the figure stands on screen, in multiples of the placeholder circle's radius it replaces. licence = where the art comes from and the terms it is used under (CC0 packs, own work, bought); a credits screen is built from these lines.",
+	"sprites": {
+		"hut": {
+			"kind": "building",
+			"model": "art/models/hut.py",
+			"frame": [256, 256],
+			"ortho": 4.2,
+			"facings": 1,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/hut.py)"
+		},
+		"tribesperson": {
+			"kind": "townsfolk",
+			"model": "art/models/tribesperson.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"height_r": 3.6,
+			"licence": "Own work, built in code (art/models/tribesperson.py)"
+		},
+		"wolf": {
+			"kind": "enemy",
+			"model": "art/models/wolf.py",
+			"frame": [96, 96],
+			"ortho": 2.4,
+			"facings": 8,
+			"height_r": 2.6,
+			"licence": "Own work, built in code (art/models/wolf.py)"
+		}
+	}
+}
