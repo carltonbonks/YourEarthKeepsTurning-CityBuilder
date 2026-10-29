@@ -1,6 +1,325 @@
 {
 	"_note": "Written by tools/render_art.py from art/manifest.json; do not edit by hand.",
 	"sprites": {
+		"antlered_king": {
+			"kind": "enemy",
+			"frame": [
+				128,
+				128
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				64.0,
+				88.39
+			],
+			"px_per_unit": 35.5556,
+			"figure_px": 88.39,
+			"height_r": 2.1
+		},
+		"barrow_wight": {
+			"kind": "enemy",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 66.29,
+			"height_r": 2.5
+		},
+		"battering_ram": {
+			"kind": "enemy",
+			"frame": [
+				128,
+				128
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				64.0,
+				88.39
+			],
+			"px_per_unit": 37.6471,
+			"figure_px": 58.39,
+			"height_r": 2.4
+		},
+		"black_margrave": {
+			"kind": "enemy",
+			"frame": [
+				128,
+				128
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				64.0,
+				88.39
+			],
+			"px_per_unit": 37.6471,
+			"figure_px": 77.39,
+			"height_r": 2.0
+		},
+		"bone_caller": {
+			"kind": "enemy",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 66.29,
+			"height_r": 2.5
+		},
+		"bronze_reaver": {
+			"kind": "enemy",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 66.29,
+			"height_r": 2.5
+		},
+		"cave_bear": {
+			"kind": "enemy",
+			"frame": [
+				128,
+				128
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				64.0,
+				88.39
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 58.39,
+			"height_r": 2.9
+		},
+		"champion": {
+			"kind": "hero",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 66.29,
+			"height_r": 2.4
+		},
+		"craftsperson": {
+			"kind": "townsfolk",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 65.29,
+			"height_r": 2.9
+		},
+		"hollow_knight": {
+			"kind": "enemy",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 66.29,
+			"height_r": 2.6
+		},
+		"hunter": {
+			"kind": "hero",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 65.29,
+			"height_r": 2.25
+		},
 		"hut": {
 			"kind": "building",
 			"frame": [
@@ -8,6 +327,12 @@
 				256
 			],
 			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
 			"anchor": [
 				128.0,
 				176.77
@@ -16,6 +341,122 @@
 			"figure_px": 138.77,
 			"world_per_unit": 9.0
 		},
+		"knight": {
+			"kind": "hero",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 66.29,
+			"height_r": 2.25
+		},
+		"man_at_arms": {
+			"kind": "enemy",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 66.29,
+			"height_r": 2.5
+		},
+		"raider": {
+			"kind": "enemy",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 65.29,
+			"height_r": 2.4
+		},
+		"stalker": {
+			"kind": "hero",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 66.29,
+			"height_r": 2.25
+		},
 		"tribesperson": {
 			"kind": "townsfolk",
 			"frame": [
@@ -23,12 +464,55 @@
 				96
 			],
 			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
 			"anchor": [
 				48.0,
 				66.29
 			],
 			"px_per_unit": 40.0,
 			"figure_px": 65.29,
+			"height_r": 2.9
+		},
+		"warrior": {
+			"kind": "townsfolk",
+			"frame": [
+				96,
+				96
+			],
+			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
+			"anchor": [
+				48.0,
+				66.29
+			],
+			"px_per_unit": 40.0,
+			"figure_px": 66.29,
 			"height_r": 2.9
 		},
 		"wolf": {
@@ -38,6 +522,20 @@
 				96
 			],
 			"facings": 8,
+			"anims": {
+				"idle": [
+					0,
+					1
+				],
+				"walk": [
+					1,
+					6
+				],
+				"attack": [
+					7,
+					4
+				]
+			},
 			"anchor": [
 				48.0,
 				66.29

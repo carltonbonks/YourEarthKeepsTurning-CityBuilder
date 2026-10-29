@@ -3,7 +3,8 @@
 Run it through tools/render_art.sh, which runs it in Blender's Python (the bpy package). For each id
 it builds the model, points an orthographic camera at it from the map's own angle (the tilted view
 in game/arena_view.gd: turned 45 degrees, looking down 30 degrees so the ground squashes 2:1), and
-renders one frame per facing into art/sprites/<id>.png, left to right. art/sprites/index.json gets
+renders its frames into art/sprites/<id>.png: one row per facing, and along each row the
+animations in ANIMS (walkers with a rig) or one frame (buildings). art/sprites/index.json gets
 what the game needs to place each frame: frame size, facings, where the feet are, pixels per model
 unit and how tall the figure stands.
 
@@ -27,7 +28,7 @@ sys.path.insert(0, os.path.join(ROOT, "art", "lib"))
 import kit  # noqa: E402
 
 ELEVATION = math.radians(30.0)  # sin(30) = 0.5, ArenaView.ISO_SQUASH
-SAMPLES = 32
+SAMPLES = 24
 
 
 def load_model(path):
@@ -87,6 +88,45 @@ def light_and_camera(row):
     return sc, co
 
 
+## Animations every walker gets, in the order they sit along each row of its sheet, and their frames.
+ANIMS = [("idle", 1), ("walk", 6), ("attack", 4)]
+## How an attack swings, frame by frame: the weapon arm (radians round the left-right axis: + is up and
+## back, - forward), the other arm, and how far a beast lunges (model units along its facing).
+ATTACK_ARM = [1.4, 2.5, -0.6, -1.0]
+ATTACK_OFF_ARM = [-0.3, -0.4, 0.3, 0.2]
+ATTACK_LUNGE = [0.0, -0.08, 0.22, 0.12]
+STRIDE = 0.5  ## How far legs swing at mid-stride, radians.
+
+
+def pose(rig, anim, t, n, joints, pivot, facing_angle):
+    """Sets the joints (and the whole figure's lean) for frame t of n of an animation."""
+    for j in joints.values():
+        j.rotation_euler = (0, 0, 0)
+    pivot.location = (0, 0, 0)
+    swing = {}
+    if anim == "walk":
+        p = math.sin(2 * math.pi * t / n)
+        if rig == "humanoid":
+            swing = {"leg_l": STRIDE * p, "leg_r": -STRIDE * p, "arm_l": -0.7 * STRIDE * p, "arm_r": 0.7 * STRIDE * p}
+        elif rig == "quadruped":
+            swing = {"leg_fl": 0.9 * STRIDE * p, "leg_br": 0.9 * STRIDE * p, "leg_fr": -0.9 * STRIDE * p, "leg_bl": -0.9 * STRIDE * p}
+        else:
+            pivot.location = (0, 0, 0.03 * abs(p))
+    elif anim == "attack":
+        if rig == "humanoid":
+            swing = {"arm_r": ATTACK_ARM[t], "arm_l": ATTACK_OFF_ARM[t]}
+            if t >= 2:
+                swing.update({"leg_l": -0.3, "leg_r": 0.25})
+        else:
+            lunge = ATTACK_LUNGE[t]
+            pivot.location = (lunge * math.cos(-facing_angle), lunge * math.sin(-facing_angle), 0)
+            if rig == "quadruped":
+                swing = {"leg_fl": -2.0 * ATTACK_LUNGE[t], "leg_fr": -2.4 * ATTACK_LUNGE[t]}
+    for name, angle in swing.items():
+        if name in joints:
+            joints[name].rotation_euler = (0, angle, 0)
+
+
 def render(sprite_id, row, out_dir, tmp_dir):
     empty_scene()
     load_model(row["model"]).build(kit)
@@ -95,36 +135,50 @@ def render(sprite_id, row, out_dir, tmp_dir):
     for obj in list(bpy.data.objects):
         if obj is not pivot and obj.parent is None:
             obj.parent = pivot
+    joints = {o.name: o for o in bpy.data.objects if o.type == "EMPTY" and o is not pivot}
     sc, cam = light_and_camera(row)
     facings = int(row["facings"])
+    rig = row.get("rig", "")
+    anims = ANIMS if rig else [("idle", 1)]
+    columns = sum(n for _, n in anims)
     w, h = row["frame"]
-    frames = []
+    sheet = Image.new("RGBA", (w * columns, h * facings))
+    top = h
     for i in range(facings):
-        pivot.rotation_euler = (0, 0, -math.radians(360.0 / facings * i))
-        path = os.path.join(tmp_dir, "%s_%d.png" % (sprite_id, i))
-        sc.render.filepath = path
-        bpy.ops.render.render(write_still=True)
-        frames.append(Image.open(path).convert("RGBA"))
-    sheet = Image.new("RGBA", (w * facings, h))
-    for i, im in enumerate(frames):
-        sheet.paste(im, (w * i, 0))
+        angle = math.radians(360.0 / facings * i)
+        pivot.rotation_euler = (0, 0, -angle)
+        col = 0
+        for anim, n in anims:
+            for t in range(n):
+                pose(rig, anim, t, n, joints, pivot, angle)
+                path = os.path.join(tmp_dir, "%s_%d_%d.png" % (sprite_id, i, col))
+                sc.render.filepath = path
+                bpy.ops.render.render(write_still=True)
+                im = Image.open(path).convert("RGBA")
+                sheet.paste(im, (w * col, h * i))
+                if anim == "idle":
+                    # How tall the figure stands above its feet: the tallest facing, standing still.
+                    box = im.getchannel("A").point(lambda v: 255 if v > 40 else 0).getbbox()
+                    if box:
+                        top = min(top, box[1])
+                col += 1
+    pivot.location = (0, 0, 0)
     sheet.save(os.path.join(out_dir, sprite_id + ".png"), optimize=True)
     feet = world_to_camera_view(sc, cam, Vector((0, 0, 0)))
     anchor = [round(feet.x * w, 2), round((1.0 - feet.y) * h, 2)]
-    # How tall the figure stands above its feet, in pixels, the tallest of its facings.
-    top = h
-    for im in frames:
-        box = im.getchannel("A").point(lambda v: 255 if v > 40 else 0).getbbox()
-        if box:
-            top = min(top, box[1])
     info = {
         "kind": row["kind"],
         "frame": [w, h],
         "facings": facings,
+        "anims": {},
         "anchor": anchor,
         "px_per_unit": round(w / row["ortho"], 4),
         "figure_px": round(anchor[1] - top, 2),
     }
+    col = 0
+    for anim, n in anims:
+        info["anims"][anim] = [col, n]
+        col += n
     for key in ("world_per_unit", "height_r"):
         if key in row:
             info[key] = row[key]
@@ -164,8 +218,15 @@ def main():
 
 
 def contact_sheet(out_dir, index, path):
-    """Every sprite on dark ground, all facings, for a quick look (an agent can open the file)."""
-    rows = [Image.open(os.path.join(out_dir, i + ".png")) for i in index]
+    """Every sprite on dark ground for a quick look (an agent can open the file): for walkers the row
+    facing the viewer (facing 1), every animation frame along it."""
+    rows = []
+    for i in index:
+        im = Image.open(os.path.join(out_dir, i + ".png"))
+        fh = index[i]["frame"][1]
+        if index[i]["facings"] > 1:
+            im = im.crop((0, fh, im.width, fh * 2))
+        rows.append(im)
     if not rows:
         return
     pad = 8
