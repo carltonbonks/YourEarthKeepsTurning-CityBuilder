@@ -37,7 +37,7 @@ const INVADER_GLOW_DAY := 0.08
 const INVADER_GLOW_NIGHT := 0.3
 const INVADER_RED := Color(1.0, 0.18, 0.12)
 ## What each kind of standing thing is, for the back-to-front pass.
-enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO, PEDLAR }
+enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO, PEDLAR, OBSTACLE, PROP }
 
 ## A won run's ending has played out (or was clicked past): the end screen can open.
 signal victory_done
@@ -76,6 +76,7 @@ var sprites := SpriteBook.new()
 var art := true
 ## How each walker's sprite moves, faces, swings and flashes between sim steps.
 var motion := WalkerMotion.new()
+var ground_props := GroundProps.new()
 var _light_layer: Control
 var _top_layer: Control
 ## The plot the hovered building card would go on, blinked on the map; -1 for none.
@@ -303,6 +304,13 @@ func _draw() -> void:
 			_queue(things, keys, Kind.NODE, node, node["pos"])
 	for den in w.dens:
 		_queue(things, keys, Kind.DEN, den, den["pos"])
+	# With rendered art, obstacles stand up off their plots and the turning ring's plates carry their own look.
+	for k in w.town.plots.size():
+		var plot: Dictionary = w.town.plots[k]
+		if plot["obstacle"] != "" and int(plot["building"]) < 0 and w.town.ring_open(plot) and _has_art(plot["obstacle"]):
+			_queue(things, keys, Kind.OBSTACLE, plot, plot["pos"])
+	for prop: Array in ground_props.props(w, _slide_angle(0), _has_art):
+		_queue(things, keys, Kind.PROP, prop, prop[0])
 	for bi in w.buildings.size():
 		_queue(things, keys, Kind.BUILDING, bi, w.buildings[bi]["pos"])
 	if w.pedlar.is_open():
@@ -338,6 +346,13 @@ func _draw() -> void:
 				_draw_hero(thing[1], font)
 			Kind.PEDLAR:
 				_draw_pedlar(font)
+			Kind.OBSTACLE:
+				var plot: Dictionary = thing[1]
+				sprites.draw(self, plot["obstacle"], _to_screen(plot["pos"]), sprites.building_scale(plot["obstacle"], _scale()))
+			Kind.PROP:
+				var prop: Array = thing[1]
+				sprites.draw(self, prop[1], _to_screen(prop[0]), sprites.building_scale(prop[1], _scale()) * float(prop[3]), 0,
+					Color.WHITE, "idle", int(prop[2]))
 
 	# Shots fly at chest height.
 	var chest := _chest()
@@ -445,9 +460,14 @@ func _draw_node(node: Dictionary, font: Font) -> void:
 	var r := _node_radius(node)
 	var at := _slid(node["pos"])
 	var p := _stand(at, r)
-	_shadow(at, r)
 	var col := Color(def["color"])
-	draw_circle(p, r, col if left > 0.0 else Color(col, 0.25))
+	if _has_art(node["type"]):
+		# A node shrinks as it is worked and fades once it is worked out.
+		sprites.draw(self, node["type"], _to_screen(at), sprites.building_scale(node["type"], _scale()) * (0.55 + 0.45 * left), 0,
+			Color.WHITE if left > 0.0 else Color(0.6, 0.6, 0.6, 0.45))
+	else:
+		_shadow(at, r)
+		draw_circle(p, r, col if left > 0.0 else Color(col, 0.25))
 	if zoom > 1.6:
 		draw_string(font, p + Vector2(r + 2, 4), "%s %d" % [def["name"], node["amount"]], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#c8c8b0"))
 
@@ -465,9 +485,12 @@ func _draw_den(den: Dictionary, font: Font) -> void:
 		draw_polyline(_closed(_ground_ring(den["pos"], run.content.num("camp_hold_radius"), 40)), Color(0.8, 0.3, 0.2, 0.45), 1.5)
 	var at := _slid(den["pos"])
 	var p := _stand(at, r)
-	_shadow(at, r)
-	draw_circle(p, r, Color(def["color"]))
-	draw_arc(p, r, 0, TAU, 24, Color("#a05050"), 2.0)
+	if _has_art(den["type"]):
+		sprites.draw(self, den["type"], _to_screen(at), sprites.building_scale(den["type"], _scale()))
+	else:
+		_shadow(at, r)
+		draw_circle(p, r, Color(def["color"]))
+		draw_arc(p, r, 0, TAU, 24, Color("#a05050"), 2.0)
 	draw_string(font, p + Vector2(-r, r + 12), def["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#d0a0a0"))
 
 
@@ -481,10 +504,13 @@ func _draw_pedlar(font: Font) -> void:
 	var beat := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.004)
 	var ring := _ground_ring(at, r * (1.6 + 0.5 * beat) / _scale(), 40)
 	draw_polyline(_closed(ring), Color(1.0, 0.85, 0.35, 0.75 - 0.5 * beat), 3.0)
-	_shadow(at, r)
-	var top := base + Vector2(0, -r * 1.8)
-	draw_colored_polygon(PackedVector2Array([base + Vector2(-r, 0), top, base + Vector2(r, 0)]), Color("#c89a4a"))
-	draw_colored_polygon(PackedVector2Array([base + Vector2(-r * 0.35, 0), top, base + Vector2(r * 0.35, 0)]), Color("#8a3a2a"))
+	if _has_art("pedlar_camp"):
+		sprites.draw(self, "pedlar_camp", base, sprites.building_scale("pedlar_camp", _scale()))
+	else:
+		_shadow(at, r)
+		var top := base + Vector2(0, -r * 1.8)
+		draw_colored_polygon(PackedVector2Array([base + Vector2(-r, 0), top, base + Vector2(r, 0)]), Color("#c89a4a"))
+		draw_colored_polygon(PackedVector2Array([base + Vector2(-r * 0.35, 0), top, base + Vector2(r * 0.35, 0)]), Color("#8a3a2a"))
 	_bar(base + Vector2(-r, 4), r * 2.0, float(camp["hp"]) / float(run.content.pedlars["hp"]), Color("#d8b860"))
 	var name: String = run.content.pedlars["pedlars"][camp["id"]]["name"]
 	draw_string(font, base + Vector2(-r, 21), "Pedlar: %s (%d wares)" % [name, camp["wares"].size()], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffe0a0"))
@@ -522,6 +548,15 @@ func _draw_building(bi: int, font: Font) -> void:
 		# side of the opening (across the ring, the way people walk through).
 		var whole := w.town.gate_health(bi)
 		draw_colored_polygon(shape, Color(col, 0.12 + 0.18 * whole))
+		if _has_art(b["type"]):
+			# The gate's sprite turned so its way through runs out from the hearth; it fades as it is battered.
+			sprites.draw(self, b["type"], _to_screen(b["pos"]), sprites.building_scale(b["type"], s),
+				SpriteBook.facing_of(Vector2(b["pos"]), 8), Color(1, 1, 1, 0.35 + 0.65 * whole))
+			if whole < 1.0:
+				_bar(p + Vector2(-half, half + 3), half * 2.0, whole, UiKit.EMBER)
+			if zoom > 1.4:
+				draw_string(font, p + Vector2(-half, -half - 3), def["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#d8d0b8"))
+			return
 		var edge := _closed(shape)
 		for k in edge.size() - 1:
 			draw_dashed_line(edge[k], edge[k + 1], Color("#e8d9a8", 0.5 + 0.5 * whole), 1.5, 4.0)
@@ -553,7 +588,8 @@ func _draw_building(bi: int, font: Font) -> void:
 		draw_polyline(_closed(shape), col, 1.5)
 		if _has_art(b["type"]):
 			# Being built: a faint ghost of the building that firms up as the work goes on.
-			sprites.draw(self, b["type"], _to_screen(b["pos"]), sprites.building_scale(b["type"], s), 0, Color(1, 1, 1, 0.2 + 0.5 * done))
+			sprites.draw(self, b["type"], _to_screen(b["pos"]), sprites.building_scale(b["type"], s),
+				SpriteBook.facing_of(Vector2(b["pos"]), int(sprites.info(b["type"])["facings"])), Color(1, 1, 1, 0.2 + 0.5 * done))
 		elif lift >= 1.0:
 			_draw_block(shape, lift, Color(col, 0.55), col)
 		_bar(p + Vector2(-half, half + 3), half * 2.0, done, Color("#e8d9a8"))
@@ -605,6 +641,11 @@ func _draw_hearth() -> void:
 	var s := _scale()
 	var hearth_r := World.HEARTH_RADIUS * s
 	var center := _to_screen(Vector2.ZERO)
+	if _has_art("hearth"):
+		sprites.draw(self, "hearth", center, sprites.building_scale("hearth", s), 0, Color.WHITE, "idle", 1 if run.world.cold_tonight else 0)
+		var up := sprites.height_at("hearth", sprites.building_scale("hearth", s))
+		_bar(center + Vector2(-hearth_r * 0.6, -up * 0.55), hearth_r * 1.2, run.world.hearth_hp / run.hearth_max_hp(), Color("#7fd0ff"))
+		return
 	if not iso:
 		draw_circle(center, hearth_r, Color("#5a4030"))
 	var fire := hearth_r * (0.3 if iso else 0.55)
@@ -899,7 +940,8 @@ func _draw_plots() -> void:
 			continue
 		var shape := _screen_poly(town.plot_outline(k))
 		if plot["obstacle"] != "":
-			draw_colored_polygon(shape, Color(run.content.town["obstacles"][plot["obstacle"]]["color"]))
+			var stain := 0.35 if _has_art(plot["obstacle"]) else 1.0
+			draw_colored_polygon(shape, Color(run.content.town["obstacles"][plot["obstacle"]]["color"], stain))
 		else:
 			draw_polyline(_closed(shape), Color(0.6, 0.65, 0.45, 0.05), 1.0)
 

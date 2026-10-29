@@ -3,11 +3,43 @@ extends TestCase
 ## real content id and is rendered, every rendered sprite has its row, and walkers pick the frame for the way
 ## they move.
 
-const KIND_TABLES := {"building": "buildings", "townsfolk": "townsfolk", "hero": "hero_classes", "enemy": "enemies"}
+## Kinds of art and the content table their ids come from (scenery has a fixed list: things with no table of their own).
+const WALKERS := ["townsfolk", "hero", "enemy"]
+const SCENERY := ["barricade", "pedlar_camp", "hearth"]
 
 
 func _json(path: String) -> Dictionary:
 	return JSON.parse_string(FileAccess.get_file_as_string(path))
+
+
+## The ids a kind of art may use, or null for an unknown kind.
+func _ids_for(content: Content, kind: String) -> Variant:
+	match kind:
+		"building":
+			return content.buildings
+		"townsfolk":
+			return content.townsfolk
+		"hero":
+			return content.hero_classes
+		"enemy":
+			return content.enemies
+		"node":
+			return content.world["nodes"]
+		"den":
+			return content.world["dens"]
+		"obstacle":
+			return content.town["obstacles"]
+		"plate":
+			var ids := {}
+			for k: String in content.plates["near_kinds"]:
+				ids["plate_" + k] = true
+			return ids
+		"scenery":
+			var ids := {}
+			for k: String in SCENERY:
+				ids[k] = true
+			return ids
+	return null
 
 
 func test_manifest_rows_name_real_content_and_say_where_they_come_from() -> void:
@@ -16,19 +48,21 @@ func test_manifest_rows_name_real_content_and_say_where_they_come_from() -> void
 	check(not rows.is_empty(), "the manifest lists some art")
 	for id: String in rows:
 		var row: Dictionary = rows[id]
-		check(KIND_TABLES.has(row.get("kind", "")), "%s has a known kind" % id)
-		if KIND_TABLES.has(row.get("kind", "")):
-			var table: Dictionary = content.get(KIND_TABLES[row["kind"]])
-			check(table.has(id), "%s is a %s id in data/" % [id, row["kind"]])
+		var ids: Variant = _ids_for(content, str(row.get("kind", "")))
+		check(ids != null, "%s has a known kind" % id)
+		if ids != null:
+			check((ids as Dictionary).has(id), "%s is a %s id in data/" % [id, row["kind"]])
 		check(FileAccess.file_exists("res://" + str(row.get("model", ""))), "%s's model file exists" % id)
 		check(str(row.get("licence", "")) != "", "%s says where it comes from (licence)" % id)
-		if row.get("kind", "") == "building":
-			check_eq(int(row["facings"]), 1, "%s is a building, seen from one side" % id)
-			check(float(row.get("world_per_unit", 0.0)) > 0.0, "%s has a world_per_unit" % id)
-		else:
+		if row.get("kind", "") in WALKERS:
 			check_eq(int(row["facings"]), 8, "%s walks, so it has 8 facings" % id)
 			check(float(row.get("height_r", 0.0)) > 0.0, "%s has a height_r" % id)
 			check(row.get("rig", "") in ["humanoid", "quadruped", "none"], "%s has a rig the renderer can pose" % id)
+		else:
+			# Things that stand still: seen from one side, or 8 for those turned across the way through (gates).
+			check(int(row["facings"]) in [1, 8], "%s is seen from 1 side or turned 8 ways" % id)
+			check(float(row.get("world_per_unit", 0.0)) > 0.0, "%s has a world_per_unit" % id)
+			check(not row.has("rig"), "%s stands still (no rig)" % id)
 
 
 func test_every_row_is_rendered_and_every_sprite_has_a_row() -> void:
@@ -50,8 +84,10 @@ func test_every_row_is_rendered_and_every_sprite_has_a_row() -> void:
 			columns += int(info["anims"][anim][1])
 		check_eq(Vector2i(tex.get_width(), tex.get_height()), Vector2i(int(info["frame"][0]) * columns, int(info["frame"][1]) * int(info["facings"])),
 			"%s's sheet holds a row per facing and a column per animation frame" % id)
-		if info["kind"] != "building":
+		if info["kind"] in WALKERS:
 			check(info["anims"].has("walk") and info["anims"].has("attack"), "%s walks and strikes" % id)
+		else:
+			check_eq(int(info["anims"]["idle"][1]), int(info.get("variants", 1)), "%s has a column per look" % id)
 		check(float(info["figure_px"]) > 0.0, "%s stands above its feet" % id)
 
 
@@ -105,3 +141,26 @@ func test_walkers_glide_walk_strike_and_flash() -> void:
 	check_eq(book.walker_frame("tribesperson", struck)["anim"], "attack", "a swing shows the attack frames")
 	check_eq(book.walker_frame("tribesperson", moved)["anim"], "walk", "a walker shows the walk frames")
 	check_eq(book.walker_frame("tribesperson", later)["anim"], "idle", "a stander stands")
+
+
+func test_plates_carry_their_own_look_and_turn_with_the_ring() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	var w := run.world
+	var props := GroundProps.new()
+	var all := func(_id: String) -> bool: return true
+	var laid := props.props(w, 0.0, all)
+	check(laid.size() > 40, "the plates are dressed (%d props)" % laid.size())
+	var near: Dictionary = w.earth.rings[0]
+	for p: Array in laid:
+		var at: Vector2 = p[0]
+		check(at.length() >= float(near["r0"]) and at.length() <= float(near["r1"]), "props stay on the turning ring")
+		check(p[1] == "plate_" + w.earth.kind_at(at), "each prop shows its own plate's kind")
+		for node in w.nodes:
+			if w.node_active(node):
+				check(at.distance_to(node["pos"]) >= GroundProps.KEEP_CLEAR, "props keep clear of nodes")
+	check_eq(props.props(w, 0.0, all).size(), laid.size(), "the same props every frame")
+	var turned := props.props(w, 0.3, all)
+	if not turned.is_empty() and not laid.is_empty():
+		check(Vector2(turned[0][0]).distance_to(laid[0][0]) > 1.0, "props slide with their plate")
+	var none := func(_id: String) -> bool: return false
+	check(props.props(w, 0.0, none).is_empty(), "no art, no props")

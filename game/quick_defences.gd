@@ -22,12 +22,24 @@ func draw(view: ArenaView, run: RunState) -> void:
 	for bi in w.barricades.size():
 		var b: Dictionary = w.barricades[bi]
 		var base := view._screen_poly(w.town.plot_outline(int(b["plot"])))
+		var art := view._has_art("barricade")
+		var facing := SpriteBook.facing_of(Vector2(b["pos"]), 8)
+		var scale := view.sprites.building_scale("barricade", view._scale()) if art else 0.0
 		if not b["built"]:
 			var done := 1.0 - float(b["work_left"]) / float(def["work"])
 			view.draw_colored_polygon(base, Color(timber, 0.15 + 0.45 * done))
 			view.draw_polyline(view._closed(base), Color(timber.lightened(0.3), 0.8), 1.0)
+			if art:
+				view.sprites.draw(view, "barricade", view._to_screen(b["pos"]), scale, facing, Color(1, 1, 1, 0.2 + 0.5 * done))
 			continue
 		var health := health_of(w, bi)
+		if art:
+			# Stood across the gap like a gate, darkened once it is broken down.
+			view.sprites.draw(view, "barricade", view._to_screen(b["pos"]), scale, facing,
+				Color.WHITE if health > 0.0 else Color(0.35, 0.35, 0.35, 0.8))
+			if health > 0.0:
+				view._bar(view._to_screen(b["pos"]) - Vector2(10.0, view._lift(LIFT) + 8.0), 20.0, health, Color("#7cc46a"))
+			continue
 		var c := timber if health > 0.0 else timber.darkened(0.55)
 		view._draw_block(base, view._lift(LIFT if health > 0.0 else 1.0), c, timber.darkened(0.6))
 		if health > 0.0:
