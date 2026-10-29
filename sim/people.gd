@@ -325,7 +325,7 @@ func spend_bloodsworn() -> void:
 		if rounds > 0 and run.round_number - unit.joined_round + 1 >= rounds:
 			run.world.folk.erase(unit)
 			run.record.note_count("card_mods_fired", 1, "bloodsworn")
-			run.tell("A bloodsworn %s has given all they had and is laid to rest." % run.content.townsfolk[unit.type_id]["name"].to_lower())
+			run.tell("A bloodsworn %s has given all they had and is laid to rest." % run.content.townsfolk[unit.type_id]["name"].to_lower(), RunState.PROBLEM)
 
 
 # --- Ventures ---------------------------------------------------------------
@@ -371,7 +371,7 @@ func charter_guild(card: Dictionary) -> void:
 	var leaning: String = card["leaning"]
 	run.guilds[leaning] = run.round_number
 	var g := guild_def(leaning)
-	run.tell("The %s band together as the %s: %s." % [run.folk_name("tribesperson", leaning).to_lower() + "s", g["name"], g["practice"].to_lower()])
+	run.tell("The %s band together as the %s: %s." % [run.folk_name("tribesperson", leaning).to_lower() + "s", g["name"], g["practice"].to_lower()], RunState.MOMENT)
 
 
 ## Now and then a venture card: send tribespeople out for goods, some never come back (data/ventures.json).
@@ -496,7 +496,7 @@ func promote(card: Dictionary) -> void:
 		hero.kills = u.kills
 		run.world.folk.erase(u)
 		add_hero(hero)
-		run.tell("A warrior who has stood watch since %s and killed %d foes is raised up: %s." % [since, u.kills, run.describe(hero)])
+		run.tell("A warrior who has stood watch since %s and killed %d foes is raised up: %s." % [since, u.kills, run.describe(hero)], RunState.MOMENT)
 		entry.merge({"name": hero.display_name, "became": hero.type_id, "trait": hero.trait_id, "kills": u.kills})
 	else:
 		u.display_name = card["name"]
@@ -504,7 +504,7 @@ func promote(card: Dictionary) -> void:
 		u.craft_trait = card["trait"]
 		var t: Dictionary = run.content.promotions["craftsperson"]["traits"][u.craft_trait]
 		run.tell("%s, a craftsperson since %s, becomes master of the %s. %s: %s" % [u.display_name, since,
-			run.content.buildings[u.master_of]["name"].to_lower(), t["name"], t["text"]])
+			run.content.buildings[u.master_of]["name"].to_lower(), t["name"], t["text"]], RunState.MOMENT)
 		entry.merge({"name": u.display_name, "became": "master_" + u.master_of, "trait": u.craft_trait, "made": int(u.made[u.master_of])})
 	run.record.note_list("promotions", entry)
 
@@ -516,7 +516,7 @@ func _knight(card: Dictionary) -> void:
 	hero.type_id = run.content.promotions["champion"]["becomes"]
 	run.world.hero_ai.apply_hero_stats(hero)
 	hero.hp = hero.max_hp
-	run.tell("%s kneels in the guildhall and rises a %s." % [was, run.content.hero_classes[hero.type_id]["name"].to_lower()])
+	run.tell("%s kneels in the guildhall and rises a %s." % [was, run.content.hero_classes[hero.type_id]["name"].to_lower()], RunState.MOMENT)
 	run.record.note_list("promotions", {"day": run.world.day_index() + 1, "role": "champion", "name": hero.display_name,
 		"became": hero.type_id, "trait": hero.trait_id, "level": hero.level, "kills": hero.kills})
 
@@ -545,7 +545,7 @@ func crown_legend() -> void:
 	run.record.note_list("legends", {"day": run.world.day_index() + 1, "name": best.display_name, "class": best.type_id,
 		"level": best.level, "item": item.get("base", "")})
 	run.tell("%s is hailed as the town's Legend%s. Warriors fight harder at their side." % [run.describe(best),
-		", bearing the %s" % Loot.describe(run.content, item) if not item.is_empty() else ""])
+		", bearing the %s" % Loot.describe(run.content, item) if not item.is_empty() else ""], RunState.MOMENT)
 
 
 ## The Warband path's capstone (sergeants, data/paths.json): each warrior with the promotion's kills becomes a sergeant.
@@ -560,7 +560,7 @@ func raise_sergeants() -> void:
 			run.world.folk_ai.apply_folk_stats(u)
 			u.hp = minf(u.max_hp, u.hp + u.max_hp - before)
 			run.record.note_count("sergeants", 1)
-			run.tell("A warrior with %d kills is made sergeant. The warriors round them fight harder." % u.kills)
+			run.tell("A warrior with %d kills is made sergeant. The warriors round them fight harder." % u.kills, RunState.MOMENT)
 
 
 # --- Heroes -----------------------------------------------------------------
@@ -639,7 +639,7 @@ func _take_heirloom(hero: Unit) -> void:
 	run.heirlooms.remove_at(0)
 	hero.items[slot] = item
 	run.record.note_count("heirlooms_passed", 1)
-	run.tell("%s takes up the heirloom %s." % [hero.display_name, Loot.describe(run.content, item)])
+	run.tell("%s takes up the heirloom %s." % [hero.display_name, Loot.describe(run.content, item)], RunState.AMBIENT)
 
 
 func unused_name() -> String:
@@ -696,7 +696,7 @@ func update_moods() -> void:
 		if hero.mood <= content.num("mood_leave_at"):
 			_hero_leaves(hero, worst)
 		elif hero.mood <= content.num("mood_grumble_at") and hero.mood < before and worst != "":
-			run.tell("%s grumbles: they %s. They may leave if this goes on." % [hero.display_name, worst])
+			run.tell("%s grumbles: they %s. They may leave if this goes on." % [hero.display_name, worst], RunState.PROBLEM)
 	hungry_today = false
 
 
@@ -708,7 +708,7 @@ func _hero_leaves(hero: Unit, why: String) -> void:
 	run.world.night_report["heroes_left"].append(hero.display_name)
 	run.record.note_list("heroes_left", {"day": run.world.day_index() + 1, "hero": hero.display_name, "trait": hero.trait_id,
 		"mood": roundi(hero.mood), "why": why})
-	run.tell("%s has had enough%s and leaves town with their gear." % [run.describe(hero), " (%s)" % why if why != "" else ""])
+	run.tell("%s has had enough%s and leaves town with their gear." % [run.describe(hero), " (%s)" % why if why != "" else ""], RunState.PROBLEM)
 	run.world.hero_ai.assign_lodgings()
 
 
@@ -718,7 +718,7 @@ func level_up(hero: Unit) -> void:
 		hero.xp -= per_level * hero.level
 		hero.level += 1
 		run.world.hero_ai.apply_hero_stats(hero)
-		run.tell("%s reaches level %d." % [hero.display_name, hero.level])
+		run.tell("%s reaches level %d." % [hero.display_name, hero.level], RunState.MOMENT)
 
 
 func heal_between_rounds() -> void:
@@ -754,7 +754,7 @@ func heroes_sell_finds() -> void:
 		hero.gold += total - tax
 		run.stock["shells"] = int(run.stock["shells"]) + tax
 		run.tell("%s sells %d found item%s %s for %d shells; the town keeps %d." % [hero.display_name,
-			hero.spares.size(), "" if hero.spares.size() == 1 else "s", where, total, tax])
+			hero.spares.size(), "" if hero.spares.size() == 1 else "s", where, total, tax], RunState.AMBIENT)
 		hero.spares.clear()
 
 

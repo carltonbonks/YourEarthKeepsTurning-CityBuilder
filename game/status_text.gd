@@ -13,8 +13,10 @@ const RESOURCE_AGE := {"copper": "bronze", "cassiterite": "bronze", "tin": "bron
 	"bog_iron": "medieval", "charcoal": "medieval", "iron": "medieval", "steel": "medieval"}
 ## Goods always shown on the bar: what building cards cost. Everything else is in the hover card.
 const BAR_GOODS := ["wood", "stone", "shells"]
-const RED := "#e05050"
+## State colours (docs/TEXT_STYLE.md): a number on the bar is ink unless it says something is wrong.
+const RED := "#ff7a6a"
 const AMBER := "#e0a050"
+const INK := "#ece8de"
 ## The top bar's chips, left to right.
 const CHIPS := ["round", "hearth", "people", "food", "fuel", "goods", "relics", "paths"]
 
@@ -27,23 +29,23 @@ static func chip(run: RunState, id: String) -> String:
 			return "[b]Round %d / %d[/b]  %s" % [run.round_number, content.int_num("rounds_to_win"), content.age_name(run.age)]
 		"hearth":
 			var share := run.world.hearth_hp / maxf(1.0, run.hearth_max_hp())
-			return "Hearth [color=%s]%d / %d[/color]" % [RED if share < 0.35 else (AMBER if share < 0.7 else "#e8e8e8"),
+			return "Hearth [color=%s]%d / %d[/color]" % [RED if share < 0.35 else (AMBER if share < 0.7 else INK),
 				maxi(0, int(run.world.hearth_hp)), int(run.hearth_max_hp())]
 		"people":
 			var full := run.population() >= run.housing()
-			return "People [color=%s]%d / %d[/color]" % [AMBER if full else "#e8e8e8", run.population(), run.housing()]
+			return "People [color=%s]%d / %d[/color]" % [AMBER if full else INK, run.population(), run.housing()]
 		"food":
 			var days := food_days(run)
-			return "[color=%s]Food %d[/color]  %s" % [RESOURCE_COLORS["food"], run.stock["food"], _lasts(days, "day")]
+			return "Food %d  %s" % [run.stock["food"], _lasts(days, "day")]
 		"fuel":
 			var nights := fuel_nights(run)
-			return "[color=%s]Fuel %d[/color]  %s" % [RESOURCE_COLORS["fuel"], run.stock["fuel"], _lasts(nights, "night")]
+			return "Fuel %d  %s" % [run.stock["fuel"], _lasts(nights, "night")]
 		"goods":
 			var parts := PackedStringArray()
 			for r: String in bar_goods(run):
-				parts.append("[color=%s]%s %d[/color]" % [RESOURCE_COLORS[r], r.capitalize(), run.stock[r]])
+				parts.append("%s %d" % [r.capitalize(), run.stock[r]])
 			var more := _listed_goods(run).filter(func(r: String) -> bool: return not BAR_GOODS.has(r) and r != "food" and r != "fuel").size()
-			return "  ".join(parts) + ("  [color=#9aa]+%d more[/color]" % more if more > 0 and run.round_number >= 2 else "")
+			return "  ".join(parts) + ("  " + UiKit.tint("+%d more" % more, UiKit.DIM) if more > 0 and run.round_number >= 2 else "")
 		"relics":
 			return "Relics %d" % run.relics.size()
 		"paths":
@@ -163,12 +165,12 @@ static func _listed_goods(run: RunState) -> Array[String]:
 
 static func _lasts(amount: float, unit: String) -> String:
 	if amount < 0.0:
-		return "[color=#a8d890]growing[/color]" if unit == "day" else "[color=#9aa]no burn[/color]"
+		return UiKit.tint("growing", UiKit.GOOD) if unit == "day" else UiKit.tint("no burn", UiKit.DIM)
 	if amount < 1.0:
 		return "[color=%s]runs out %s[/color]" % [RED, "tonight" if unit == "night" else "at dawn"]
 	var n := int(amount)
 	var count := "8+ %ss" % unit if n > 8 else "%d %s%s" % [n, unit, "" if n == 1 else "s"]
-	return "[color=%s]%s[/color]" % [AMBER if amount < 2.0 else "#c8c8c8", count]
+	return "[color=%s]%s[/color]" % [AMBER if amount < 2.0 else UiKit.hex(UiKit.DIM), count]
 
 
 ## How many dawns the food lasts at today's rate (-1 if gardens and fields outgrow what is eaten).
@@ -254,16 +256,16 @@ static func clock(run: RunState) -> String:
 	var content := run.content
 	var w := run.world
 	if run.phase == RunState.Phase.BUILD:
-		return "[b]Build[/b]: draft a blueprint, order from the cards, then begin the round" if run.hand.picks > 0 \
-			else "[b]Build[/b]: order from the cards, then begin the round"
+		return "[b]Build[/b]: draft a blueprint, order from the cards, then begin the round." if run.hand.picks > 0 \
+			else "[b]Build[/b]: order from the cards, then begin the round."
 	var night := w.is_night()
 	var wave_night := w.day_index() == content.int_num("days_per_round") - 1
 	var text := "[b]Day %d / %d[/b]  %s%s" % [w.day_index() + 1, content.int_num("days_per_round"),
-		"[color=#8fa8ff]Night[/color]" if night else ("[color=#e0a050]Dusk[/color]" if w.is_dusk() else "[color=#ffe08a]Day[/color]"),
-		("   [color=#ff7060]Attack tonight from the %s[/color]" % " and ".join(w.side_names())) if wave_night and not w.wave_spawned else ""]
+		UiKit.tint("Night" if night else ("Dusk" if w.is_dusk() else "Day"), UiKit.NIGHT if night else UiKit.DIM),
+		("   " + UiKit.tint("Attack tonight from the %s" % " and ".join(w.side_names()), UiKit.DANGER)) if wave_night and not w.wave_spawned else ""]
 	if w.wave_spawned:
 		var left := w.enemies.filter(func(e: Unit) -> bool: return e.alive and e.den_index < 0).size()
-		text += "   [color=#ff7060]Raiders left %d[/color]" % left
+		text += "   " + UiKit.tint("Raiders left %d" % left, UiKit.DANGER)
 	if w.cold_tonight:
-		text += "   [color=#8fd0ff]No fuel: a cold night[/color]"
+		text += "   " + UiKit.tint("No fuel: a cold night", UiKit.DANGER)
 	return text

@@ -5,7 +5,7 @@ extends RefCounted
 
 const RISE_MS := 2200.0
 const RISE_PX := 30.0
-const FONT_SIZE := 14
+const FONT_SIZE := UiKit.STRONG
 const COLOR := Color("#e8c890")
 
 var _world: World

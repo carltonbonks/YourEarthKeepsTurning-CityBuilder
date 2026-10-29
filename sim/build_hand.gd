@@ -150,7 +150,7 @@ func clear_ring() -> bool:
 		run.stock[r] = int(run.stock[r]) - int(cost[r])
 	run.open_ring()
 	run.record.note_action({"kind": "clear_ring", "ring": run.rings_open})
-	run.tell("Townsfolk clear the ground for a new ring of plots round the town.")
+	run.tell("Townsfolk clear the ground for a new ring of plots round the town.", RunState.AMBIENT)
 	_after_draft()
 	return true
 
@@ -210,7 +210,7 @@ func _apply_roll(type: String, card: Dictionary, key: String) -> void:
 	if CardRoll.card_has(run.content, card, "free_copy") and run.world.count_buildings(type, false) < run.building_max(type) \
 			and run.world.add_building(type):
 		run.record.note_count("card_mods_fired", 1, "twin_built")
-		run.tell("A second %s goes up for free." % name.to_lower())
+		run.tell("A second %s goes up for free." % name.to_lower(), RunState.AMBIENT)
 
 
 func _after_draft() -> void:

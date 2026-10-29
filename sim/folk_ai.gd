@@ -510,7 +510,7 @@ func _worker_tick(unit: Unit) -> void:
 			if w.walk_toward(unit, site["pos"], 14.0):
 				site["work_left"] = float(site["work_left"]) - work_rate(unit) * w.dt
 				if float(site["work_left"]) <= 0.0:
-					w.run.tell("A %s is finished." % w.content.buildings[site["type"]]["name"].to_lower())
+					w.run.tell("A %s is finished." % w.content.buildings[site["type"]]["name"].to_lower(), RunState.AMBIENT)
 					w.run.on_building_done(site["type"])
 					w.run.record.note_impact("folk", unit.type_id, "raised", 1.0)
 					w.town.on_built(unit.task_index)
@@ -641,7 +641,7 @@ func raise_alarm(at: Vector2, staked := false) -> void:
 		w.run.tell("At dusk folk stake the way to the %s: %d gap%s barricaded against tonight's attack." % [World.compass(angle), raised, "" if raised == 1 else "s"])
 		w.run.record.note_count("barricades_planned", raised)
 	elif raised > 0:
-		w.run.tell("Raiders spotted to the %s: folk run to barricade %d gap%s." % [World.compass(angle), raised, "" if raised == 1 else "s"])
+		w.run.tell("Raiders spotted to the %s: folk run to barricade %d gap%s." % [World.compass(angle), raised, "" if raised == 1 else "s"], RunState.PROBLEM)
 		w.run.record.note_count("barricades_planned", raised)
 
 
@@ -1190,7 +1190,7 @@ func _deliver(unit: Unit, hero: Unit) -> void:
 	if w.supply_drops.size() > World.SUPPLY_DROPS_KEPT:
 		w.supply_drops.pop_front()
 	w.supplies_delivered += 1
-	w.run.tell("A runner reaches %s with %s (%d shells)." % [hero.display_name, w.content.recipe_name(good["recipe"]), price + fee])
+	w.run.tell("A runner reaches %s with %s (%d shells)." % [hero.display_name, w.content.recipe_name(good["recipe"]), price + fee], RunState.AMBIENT)
 	unit.parcel = {}
 	hero.pack.append(good["recipe"])
 	w.hero_ai.on_supplied(hero, effect)

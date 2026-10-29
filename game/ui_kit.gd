@@ -2,11 +2,59 @@ class_name UiKit
 extends RefCounted
 ## Small builders for the placeholder UI, shared by the screen's panels. Cards are CardView.
 
-const HINT_COLOR := Color("#9aa")
-const HEADING_COLOR := Color("#e8d9a8")
-## Advice and the one button that moves the game on: bone, never a rarity colour (white, blue, yellow and
-## orange are kept for card frames, CardView).
-const RECOMMEND_COLOR := Color("#e6e1d3")
+## The text language (docs/TEXT_STYLE.md). Each colour means one thing; text that doesn't carry the meaning is
+## INK or DIM. The four rarity colours belong to card frames (CardView) and appear nowhere else.
+const INK := Color("#ece8de")
+const DIM := Color("#a9aeb7")
+## Good for the town, gained.
+const GOOD := Color("#a8d890")
+## Loss, danger, can't.
+const DANGER := Color("#ff7a6a")
+## A problem this round the player can fix (alerts, the Elder).
+const EMBER := Color("#e0a050")
+## A moment: tier 3 and 4 banners only.
+const GOLD := Color("#ffd870")
+## Advice and the one button that moves the game on.
+const BONE := Color("#e6e1d3")
+## Night on the clock: a time of day, not a state.
+const NIGHT := Color("#8fa8ff")
+const HINT_COLOR := DIM
+const HEADING_COLOR := INK
+const RECOMMEND_COLOR := BONE
+
+## The six text sizes (cards keep their own, CardView.SHAPE), plus the run's banner.
+const CAPTION := 11
+const BODY := 13
+const STRONG := 15
+const TITLE := 18
+const HEADING := 24
+## Tier 3 moments (the last kill, a new age).
+const BANNER := 32
+## Tier 4: victory, the fire going out.
+const BANNER_RUN := 44
+
+
+## A colour as a BBCode tag's value ("#ff7a6a").
+static func hex(c: Color) -> String:
+	return "#" + c.to_html(false)
+
+
+## Text in a colour, as BBCode.
+static func tint(text: String, c: Color) -> String:
+	return "[color=%s]%s[/color]" % [hex(c), text]
+
+
+## One story line as BBCode in its emphasis tier (RunState.AMBIENT .. RUN): routine dim, notices plain, problems in
+## red, moments and the run's end in bold gold. A round's opening line stays bold so the log reads in rounds.
+static func story_line(line: String, tier: int) -> String:
+	match tier:
+		RunState.AMBIENT:
+			return tint(line, DIM)
+		RunState.PROBLEM:
+			return tint(line, DANGER.lerp(INK, 0.35))
+		RunState.MOMENT, RunState.RUN:
+			return "[b]%s[/b]" % tint(line, GOLD)
+	return "[b]%s[/b]" % line if line.begins_with("Round ") else line
 
 
 static func heading(parent: Control, text: String) -> void:
@@ -34,7 +82,7 @@ static func rich(parent: Control, min_height: int) -> RichTextLabel:
 
 
 ## A wrapped line of small text, grey unless a colour is given.
-static func note(parent: Control, text: String, font_size := 12, color := HINT_COLOR) -> Label:
+static func note(parent: Control, text: String, font_size := BODY, color := HINT_COLOR) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -58,7 +106,7 @@ static func fade_if_disabled(btn: Button, why := "") -> void:
 	l.text = why
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.add_theme_font_size_override("font_size", 11)
+	l.add_theme_font_size_override("font_size", CAPTION)
 	l.add_theme_color_override("font_color", Color("#ffd8d0"))
 	var strip := StyleBoxFlat.new()
 	strip.bg_color = Color(0.5, 0.14, 0.12, 0.92)
@@ -75,11 +123,11 @@ static func fade_if_disabled(btn: Button, why := "") -> void:
 ## An empty cost reads "Free".
 static func cost_text(stock: Dictionary, cost: Dictionary) -> String:
 	if cost.is_empty():
-		return "[color=#a8d890]Free[/color]"
+		return tint("Free", GOOD)
 	var parts := PackedStringArray()
 	for r: String in cost:
 		var short := int(stock.get(r, 0)) < int(cost[r])
-		parts.append("[color=%s]%d %s[/color]" % ["#ff7a6a" if short else "#f0f0f0", cost[r], r])
+		parts.append(tint("%d %s" % [cost[r], r], DANGER if short else INK))
 	return ", ".join(parts)
 
 
@@ -94,7 +142,7 @@ static func shortfall(stock: Dictionary, cost: Dictionary) -> String:
 
 
 ## The look of the one button that moves the game on (Begin round, Resume): solid bone, dark text.
-static func primary(btn: Button, font_size := 17) -> Button:
+static func primary(btn: Button, font_size := TITLE) -> Button:
 	btn.add_theme_font_size_override("font_size", font_size)
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	btn.focus_mode = Control.FOCUS_NONE
@@ -117,7 +165,7 @@ static func primary(btn: Button, font_size := 17) -> Button:
 
 ## The look of a second choice (Skip, Nobody today, Redraw): outlined, so it reads as a button but
 ## doesn't compete with the cards or the main button.
-static func secondary(btn: Button, font_size := 14) -> Button:
+static func secondary(btn: Button, font_size := STRONG) -> Button:
 	btn.add_theme_font_size_override("font_size", font_size)
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	btn.focus_mode = Control.FOCUS_NONE

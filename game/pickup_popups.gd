@@ -13,7 +13,7 @@ const RISE_PX := 34.0
 const MAX_LIVE := 3
 ## At most this many goods per popup; the rest are summed into "+N more".
 const MAX_LINES := 4
-const FONT_SIZE := 15
+const FONT_SIZE := UiKit.STRONG
 const LINE_PX := 16.0
 
 var _world: World

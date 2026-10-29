@@ -77,6 +77,8 @@ var outmatched := false
 var glory := false
 ## Plain-language story of what happened, newest last.
 var story: Array[String] = []
+## Each story line's emphasis tier (AMBIENT to RUN), beside `story`.
+var story_tiers: Array[int] = []
 ## The last night's report, shown at the next decision (see World.night_report).
 var last_night := {}
 ## Price level per stall kind ("cheap", "fair" or "dear"; see data/recipes.json), set while building.
@@ -347,7 +349,7 @@ func choose_charter(id: String) -> void:
 	charters_due -= 1
 	if id in offered:
 		paths[id] = path_tier(id) + 1
-		tell("A charter for the %s path: %s" % [content.paths["paths"][id]["name"].to_lower(), content.paths["paths"][id]["tiers"][path_tier(id) - 1]["text"]])
+		tell("A charter for the %s path: %s" % [content.paths["paths"][id]["name"].to_lower(), content.paths["paths"][id]["tiers"][path_tier(id) - 1]["text"]], MOMENT)
 		# Heroes' stats and the market's prizes read mod(), so they take the new tier at once.
 		for hero in living_heroes():
 			world.hero_ai.apply_hero_stats(hero)
@@ -501,7 +503,7 @@ func choose_pedlar(id: String) -> void:
 	record.note_value("pedlar_offer", pedlar_offer.map(func(o: Dictionary) -> String: return o["id"]))
 	record.note_action({"kind": "pedlar", "pedlar": pedlar})
 	if pedlar != "":
-		tell("You send word to the %s." % content.pedlars["pedlars"][pedlar]["name"].to_lower())
+		tell("You send word to the %s." % content.pedlars["pedlars"][pedlar]["name"].to_lower(), AMBIENT)
 
 
 ## The offered pedlar the player invited ({id, pos}), or {}.
@@ -579,7 +581,7 @@ func on_building_done(type: String) -> void:
 		charters_due += 1
 		world.town.lay_hearth_ground(next_age)
 		open_ring()
-		tell("The %s is raised. The %s begins: %s." % [def["name"], content.age_name(age), content.ages["ages"][age].get("begins", "")])
+		tell("The %s is raised. The %s begins: %s." % [def["name"], content.age_name(age), content.ages["ages"][age].get("begins", "")], MOMENT)
 
 
 # --- Rings ---------------------------------------------------
@@ -670,7 +672,7 @@ func choose_pick(index: int) -> void:
 			var hero: Unit = card["hero"]
 			people.add_hero(hero)
 			taken = "hero:" + hero.type_id
-			tell("%s arrives and sleeps in %s." % [describe(hero), world.hero_ai.bed_name(hero.lodging)])
+			tell("%s arrives and sleeps in %s." % [describe(hero), world.hero_ai.bed_name(hero.lodging)], AMBIENT)
 		elif card["kind"] == "promote":
 			people.promote(card)
 			taken = people.card_label(card)
@@ -684,7 +686,7 @@ func choose_pick(index: int) -> void:
 		elif card["kind"] == "family":
 			var arrived := people.settle_family(card)
 			taken = "family"
-			tell("A family of %d comes to settle." % arrived)
+			tell("A family of %d comes to settle." % arrived, AMBIENT)
 		else:
 			var leaning: String = card.get("leaning", "")
 			var newcomer := world.folk_ai.add_folk(card["role"], leaning)
@@ -692,9 +694,9 @@ func choose_pick(index: int) -> void:
 			taken = card["role"]
 			if card.has("roll"):
 				tell("A %s joins the town: %s." % [folk_name(card["role"], leaning).to_lower(),
-					"; ".join(CardRoll.lines(content, card)).to_lower()])
+					"; ".join(CardRoll.lines(content, card)).to_lower()], AMBIENT)
 			else:
-				tell("A %s joins the town." % folk_name(card["role"], leaning).to_lower())
+				tell("A %s joins the town." % folk_name(card["role"], leaning).to_lower(), AMBIENT)
 			var extra := CardRoll.extra_people(content, card)
 			for i in extra:
 				world.folk_ai.add_folk(card["role"], leaning)
@@ -739,7 +741,7 @@ func choose_pick(index: int) -> void:
 	hunger_turned_away = ""
 	phase = Phase.SIM
 	world.resume()
-	tell("Day %d dawns." % (world.day_index() + 1))
+	tell("Day %d dawns." % (world.day_index() + 1), AMBIENT)
 	world.hero_ai.roll_whims()
 
 
@@ -842,7 +844,7 @@ func daily_upkeep() -> void:
 		world.folk.erase(leaver)
 		world.night_report["left"].append(leaver.display_name)
 		record.note_count("left_hungry", 1)
-		tell("Hunger: a %s walks away into the wilds." % leaver.display_name.to_lower())
+		tell("Hunger: a %s walks away into the wilds." % leaver.display_name.to_lower(), PROBLEM)
 		if content.balance.get("hunger_turns_folk_away", false):
 			hunger_turned_away = leaver.type_id
 
@@ -937,7 +939,7 @@ func _finish_round() -> void:
 		tell("Nobody died this round: the ancestors' bones lend the hearth strength.")
 	if round_number >= content.int_num("rounds_to_win"):
 		phase = Phase.WON
-		tell("The people endured all %d rounds!" % round_number)
+		tell("The people endured all %d rounds!" % round_number, RUN)
 		record.end_round()
 		return
 	people.heal_between_rounds()
@@ -959,9 +961,9 @@ func _lose() -> void:
 	people.bury_heroes()
 	world.release()
 	if world.hearth_hp <= 0.0:
-		tell("The hearth is trampled and goes dark in round %d." % round_number)
+		tell("The hearth is trampled and goes dark in round %d." % round_number, RUN)
 	else:
-		tell("No one is left to tend the fire in round %d." % round_number)
+		tell("No one is left to tend the fire in round %d." % round_number, RUN)
 	record.note_value("deaths", world.deaths.duplicate())
 	record.end_round()
 
@@ -973,7 +975,7 @@ func choose_relic(relic_id: String) -> void:
 		_take_spoils()
 	elif relic_id != "" and relic_id in relic_offer:
 		_gain_relic(relic_id)
-		tell("Relic taken: %s." % content.relics[relic_id]["name"])
+		tell("Relic taken: %s." % content.relics[relic_id]["name"], MOMENT)
 		# Broken crown, Starfall idol: more relics at once, drawn from the ordinary ones.
 		var gifts := int(content.relics[relic_id]["effects"].get("gain_relics", 0))
 		if gifts > 0:
@@ -1006,7 +1008,7 @@ func choose_relic(relic_id: String) -> void:
 		if interest > 0:
 			stock["shells"] = int(stock["shells"]) + interest
 			relic_fired("interest", interest)
-			tell("Shells lent out come back with %d more." % interest)
+			tell("Shells lent out come back with %d more." % interest, AMBIENT)
 	world.earth.shift()
 	if has_effect("earth_turns"):
 		relic_fired("earth_turns")
@@ -1023,12 +1025,12 @@ func _enter_build() -> void:
 	next_wave = waves.plan(round_number)
 	camp_joined = world.enemy_ai.make_camp(held_back)
 	if wave_eased > 0:
-		tell("Scouts say the warband holds back %d of its number: your town looks too weak to be worth them all." % wave_eased)
+		tell("Scouts say the warband holds back %d of its number: your town looks too weak to be worth them all." % wave_eased, PROBLEM)
 	if camp_joined > 0:
-		tell("%d of them make a war camp out in the wilds. Gatherers can't work near it, and next round they march with the attack unless heroes break the camp first." % camp_joined)
+		tell("%d of them make a war camp out in the wilds. Gatherers can't work near it, and next round they march with the attack unless heroes break the camp first." % camp_joined, PROBLEM)
 	var due := waves.camp_due().size()
 	if due > 0:
-		tell("The war camp's %d raider%s march with this round's attack unless heroes break the camp first." % [due, "" if due == 1 else "s"])
+		tell("The war camp's %d raider%s march with this round's attack unless heroes break the camp first." % [due, "" if due == 1 else "s"], PROBLEM)
 	world.roll_wave_sides()
 	pedlar = ""
 	pedlar_offer = world.pedlar.roll_offer() if world.pedlar.is_pedlar_round(round_number) else ([] as Array[Dictionary])
@@ -1076,8 +1078,18 @@ func peek_id() -> int:
 	return _next_id
 
 
-func tell(line: String) -> void:
+## How loud a story line is (docs/TEXT_STYLE.md, emphasis tiers): routine life, worth knowing (the default), a
+## problem costing this round, a moment the run remembers, the run's end. The log shows each tier its own way.
+const AMBIENT := 0
+const NOTICE := 1
+const PROBLEM := 2
+const MOMENT := 3
+const RUN := 4
+
+
+func tell(line: String, tier := NOTICE) -> void:
 	story.append(line)
+	story_tiers.append(tier)
 
 
 ## Owns a relic and applies what happens the moment it is taken (a free hero, a stronger hearth, warriors' stats).
@@ -1123,7 +1135,7 @@ func _roll_relic_offer() -> Array[String]:
 	glory = not outmatched and content.int_num("glory_relic_choices") > 0
 	if glory:
 		choices += content.int_num("glory_relic_choices")
-		tell("Glory: the warband came at full strength and your people held. One more relic to choose from.")
+		tell("Glory: the warband came at full strength and your people held. One more relic to choose from.", MOMENT)
 		record.note_value("glory", true)
 	var pool := _relic_pool(is_pact_round())
 	var offer: Array[String] = []
@@ -1196,4 +1208,4 @@ func _take_spoils() -> void:
 	# Spoils with lasting effects are kept like relics; the rest are only what they bring now.
 	if not content.relics[id]["effects"].is_empty():
 		_gain_relic(id)
-	tell("Spoils taken: %s." % content.relics[id]["name"])
+	tell("Spoils taken: %s." % content.relics[id]["name"], MOMENT)

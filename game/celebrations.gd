@@ -12,7 +12,7 @@ const CARD_FADE_MS := 600.0
 ## How long the raised building and the new resources stay highlighted.
 const HIGHLIGHT_MS := 14000.0
 const HALO_MS := 2600.0
-const GOLD := Color("#ffd870")
+const GOLD := UiKit.GOLD
 
 var _world: World
 var _age := ""
@@ -193,13 +193,13 @@ func draw_top(view: CanvasItem, size: Vector2, font: Font, now_ms: float, to_scr
 	view.draw_line(band.position, band.position + Vector2(size.x, 0), Color(GOLD, 0.8 * a), 2.0)
 	view.draw_line(band.end - Vector2(size.x, 0), band.end, Color(GOLD, 0.8 * a), 2.0)
 	var y := top + 46.0
-	_centred(view, font, str(age_up["title"]), y, 34, Color(GOLD, a), size.x, a)
+	_centred(view, font, str(age_up["title"]), y, UiKit.BANNER, Color(GOLD, a), size.x, a)
 	y += 28.0
 	if str(age_up["subtitle"]) != "":
-		_centred(view, font, str(age_up["subtitle"]), y, 17, Color(0.95, 0.92, 0.84, a), size.x, a)
+		_centred(view, font, str(age_up["subtitle"]), y, UiKit.TITLE, Color(0.95, 0.92, 0.84, a), size.x, a)
 	for line: String in lines:
 		y += 20.0
-		_centred(view, font, line, y, 14, Color(0.82, 0.8, 0.72, a), size.x, a)
+		_centred(view, font, line, y, UiKit.STRONG, Color(0.82, 0.8, 0.72, a), size.x, a)
 
 
 func _centred(view: CanvasItem, font: Font, text: String, y: float, font_size: int, c: Color, width: float, a: float) -> void:

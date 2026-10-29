@@ -39,19 +39,19 @@ func _init() -> void:
 	_title.bbcode_enabled = true
 	_title.fit_content = true
 	_title.scroll_active = false
-	_title.add_theme_font_size_override("normal_font_size", 13)
-	_title.add_theme_font_size_override("bold_font_size", 13)
+	_title.add_theme_font_size_override("normal_font_size", UiKit.BODY)
+	_title.add_theme_font_size_override("bold_font_size", UiKit.BODY)
 	box.add_child(_title)
-	_ways = UiKit.note(box, "", 11)
+	_ways = UiKit.note(box, "", UiKit.CAPTION)
 	_ways.autowrap_mode = TextServer.AUTOWRAP_WORD
 	# The verdict is what decides how to spend the round, so it comes first and biggest.
-	_verdict = UiKit.note(box, "", 17)
+	_verdict = UiKit.note(box, "", UiKit.TITLE)
 	_bar = UiKit.bar(box, 0.5, Color("#7fb0e0"), 8.0)
 	(_bar as ColorRect).color = Color("#c05040")
-	_numbers = UiKit.note(box, "", 11)
+	_numbers = UiKit.note(box, "", UiKit.CAPTION)
 	_eased = Label.new()
 	_eased.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_eased.add_theme_font_size_override("font_size", 12)
+	_eased.add_theme_font_size_override("font_size", UiKit.CAPTION)
 	_eased.add_theme_color_override("font_color", Color("#1a1408"))
 	var gold := StyleBoxFlat.new()
 	gold.bg_color = UiKit.RECOMMEND_COLOR
@@ -60,7 +60,7 @@ func _init() -> void:
 	_eased.add_theme_stylebox_override("normal", gold)
 	box.add_child(_eased)
 	# Shown when fit folded something away.
-	_more = UiKit.note(self, "More on hover", 10)
+	_more = UiKit.note(self, "More on hover", UiKit.CAPTION)
 	_more.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	# The ways (which den, across which near plate) fold last.
 	_foldable = [_eased, _ways]
@@ -73,15 +73,15 @@ func refresh() -> void:
 	var town := roundi(float(Power.town(w)["total"]))
 	var attack := roundi(Power.wave(content, run.waves.attack()))
 	if building or not w.wave_spawned:
-		_title.text = "[b]Night %d attack[/b] from the [color=#ff7060]%s[/color]" % [content.int_num("days_per_round"), " and ".join(w.side_names())]
+		_title.text = "[b]Night %d attack[/b] from the %s" % [content.int_num("days_per_round"), UiKit.tint(" and ".join(w.side_names()), UiKit.DANGER)]
 	else:
 		var left := w.enemies.filter(func(e: Unit) -> bool: return e.alive and e.den_index < 0).size()
-		_title.text = "[b]The attack is here[/b]  [color=#ff7060]%d left[/color]" % left
+		_title.text = "[b]The attack is here[/b]  " + UiKit.tint("Raiders left %d" % left, UiKit.DANGER)
 	UiKit.set_bar(_bar, float(town) / maxf(1.0, town + attack))
 	_numbers.text = "Your town %d   vs   the attack %d" % [town, attack]
 	var ratio := float(attack) / maxf(1.0, town)
 	_verdict.text = "They outmatch you" if ratio > OUTMATCHED else ("An even fight" if ratio > EVEN else "You should hold")
-	_verdict.add_theme_color_override("font_color", Color("#ff7060") if ratio > OUTMATCHED else (Color("#e0c070") if ratio > EVEN else Color("#a8d890")))
+	_verdict.add_theme_color_override("font_color", UiKit.DANGER if ratio > OUTMATCHED else (UiKit.INK if ratio > EVEN else UiKit.GOOD))
 	_eased.text = "\n".join(loan_lines(run))
 	_wanted[_eased] = _eased.text != "" and (building or not w.wave_spawned)
 	_ways.text = "\n".join(EarthReport.ways(run))

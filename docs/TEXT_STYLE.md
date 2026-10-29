@@ -26,11 +26,12 @@ Who is speaking decides the grammar.
 
 ## Sizes
 
-Six sizes (cards keep their own, `CardView`): caption 11 (footers, hover detail), body 13 (log, alerts, the Elder), strong 15 (the top bar, summary lines), title 18, heading 24 (pop-up titles), banner 44+ (tier 3 and 4 only).
+Six sizes as `UiKit` constants (cards keep their own, `CardView`), never a number in a screen's code:
+`CAPTION` 11 (footers, hover detail, eyebrows), `BODY` 13 (log, alerts, the Elder, the top bar), `STRONG` 15 (summary lines, popups over the map), `TITLE` 18 (verdicts, subtitles), `HEADING` 24 (pop-up titles), and for moments only `BANNER` 32 (tier 3) and `BANNER_RUN` 44 (tier 4). The title screen's logo is the one exception.
 
 ## Colour
 
-Each colour means one thing. Text that doesn't carry the meaning is ink or dim.
+Each colour means one thing: `UiKit.INK`, `DIM`, `GOOD`, `DANGER`, `EMBER`, `GOLD`, `BONE` (and `NIGHT` for the clock). BBCode goes through `UiKit.tint`, never a hand-written `[color=#...]`. Text that doesn't carry a meaning is ink or dim.
 
 | Colour | Means |
 |---|---|
@@ -43,11 +44,11 @@ Each colour means one thing. Text that doesn't carry the meaning is ink or dim.
 | Bone | Advice, the main button |
 | The four rarities | Card frames, pips, plaques, relic names in hover; nowhere else |
 
-Resources show their colour in their icon, never on the number.
+Numbers on the top bar are ink; only a state ("runs out tonight") takes a colour. Eyebrow labels are dim, not ember.
 
 ## Emphasis tiers
 
-Every message gets one tier; the tier sets its size, colour, motion and whether time pauses. Higher tiers are rarer.
+Every message gets one tier; the tier sets its size, colour, motion and whether time pauses. Higher tiers are rarer. Story lines pass theirs to `RunState.tell(line, tier)` (`AMBIENT`, `NOTICE` by default, `PROBLEM`, `MOMENT`, `RUN`) and the log styles them through `UiKit.story_line`; alerts carry a `tier` in `Alerts.active`.
 
 0. **Ambient** (a hut is finished, deals are laid out): log only, dim.
 1. **Notice** (goods carried in, a relic dealt, the earth turns): log in ink, a small popup on the map.

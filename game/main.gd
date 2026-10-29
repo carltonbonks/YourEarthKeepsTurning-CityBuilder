@@ -520,8 +520,8 @@ func _build_ui() -> void:
 	_clock_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_clock_label.scroll_active = false
 	_clock_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_clock_label.add_theme_font_size_override("normal_font_size", 15)
-	_clock_label.add_theme_font_size_override("bold_font_size", 15)
+	_clock_label.add_theme_font_size_override("normal_font_size", UiKit.STRONG)
+	_clock_label.add_theme_font_size_override("bold_font_size", UiKit.STRONG)
 	_corner.add_child(_clock_label)
 	_alerts = Alerts.new()
 	_corner.add_child(_alerts)

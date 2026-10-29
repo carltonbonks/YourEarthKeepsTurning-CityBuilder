@@ -168,7 +168,7 @@ func finish_craft(index: int, crafter: Unit = null) -> void:
 		w.buildings[s]["goods"].append(good)
 	if good.has("item"):
 		w.run.tell("The %s finishes a %s for the %s." % [w.content.buildings[b["type"]]["name"].to_lower(),
-			Loot.describe(w.content, good["item"]), w.content.buildings[w.buildings[s]["type"]]["name"].to_lower() if s >= 0 else "market"])
+			Loot.describe(w.content, good["item"]), w.content.buildings[w.buildings[s]["type"]]["name"].to_lower() if s >= 0 else "market"], RunState.AMBIENT)
 
 
 ## Rebuilds the posted prizes from the finished buildings; World.step() calls this every tick.
@@ -299,7 +299,7 @@ func outposts_tick() -> void:
 			b["work_left"] = float(w.content.buildings[b["type"]]["work"]) * float(post["rebuild_share"])
 			w.run.record.note_count("outposts_wrecked", 1, b["type"])
 			w.run.tell("A %s wrecks the %s out by the %s." % [foe.display_name.to_lower(),
-				w.content.buildings[b["type"]]["name"].to_lower(), w.content.world["nodes"][w.nodes[int(b["node"])]["type"]]["name"].to_lower()])
+				w.content.buildings[b["type"]]["name"].to_lower(), w.content.world["nodes"][w.nodes[int(b["node"])]["type"]]["name"].to_lower()], RunState.PROBLEM)
 
 
 ## At dawn each standing outpost brings in goods from its node. One whose node was worked out (or is gone) moves to the next free node of its kind and must be raised again.
@@ -321,7 +321,7 @@ func outposts_dawn() -> void:
 			b["work_left"] = float(w.content.buildings[b["type"]]["work"])
 			w.run.record.note_count("outposts_moved", 1, b["type"])
 			w.run.tell("The %s's %s is gone; it must be raised again by another." % [name.to_lower(),
-				w.content.world["nodes"][node["type"]]["name"].to_lower()])
+				w.content.world["nodes"][node["type"]]["name"].to_lower()], RunState.PROBLEM)
 			continue
 		if float(b["work_left"]) > 0.0:
 			continue

@@ -35,14 +35,14 @@ func _init() -> void:
 	_caption = Label.new()
 	_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_caption.add_theme_font_size_override("font_size", 24)
+	_caption.add_theme_font_size_override("font_size", UiKit.HEADING)
 	_caption.add_theme_color_override("font_color", Color("#f2e8d6"))
 	_caption.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	_caption.add_theme_constant_override("shadow_offset_y", 2)
 	add_child(_caption)
 	_hint = Label.new()
 	_hint.text = "Click or Space to skip"
-	_hint.add_theme_font_size_override("font_size", 13)
+	_hint.add_theme_font_size_override("font_size", UiKit.BODY)
 	_hint.add_theme_color_override("font_color", Color("#9a9080"))
 	add_child(_hint)
 	hide()

@@ -25,7 +25,7 @@ const RING_MS := 750.0
 const RING_LAG_MS := 160.0
 ## How dark the rest of the map goes while the kill is held.
 const VIGNETTE := 0.35
-const GOLD := Color(1.0, 0.86, 0.4)
+const GOLD := UiKit.GOLD
 
 ## When the beat began (ms), or -1 when none is playing.
 var _from_ms := -1.0
@@ -201,10 +201,10 @@ func draw_top(layer: CanvasItem, view: ArenaView, font: Font) -> void:
 	var ms := elapsed()
 	var a := clampf(ms / 150.0, 0.0, 1.0) * clampf((BEAT_MS - ms) / 400.0, 0.0, 1.0)
 	var over := view._to_screen(Vector2(kill["pos"])) - Vector2(0.0, 46.0 + 14.0 * ms / BEAT_MS)
-	_centred(layer, font, over, headline(), 24, Color(GOLD, a), a)
+	_centred(layer, font, over, headline(), UiKit.BANNER, Color(GOLD, a), a)
 	var by := byline()
 	if by != "":
-		_centred(layer, font, over + Vector2(0.0, 22.0), by, 15, Color(1, 0.95, 0.85, a), a)
+		_centred(layer, font, over + Vector2(0.0, 22.0), by, UiKit.STRONG, Color(1, 0.95, 0.85, a), a)
 
 
 static func _centred(layer: CanvasItem, font: Font, at: Vector2, text: String, font_size: int, c: Color, a: float) -> void:

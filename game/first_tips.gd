@@ -121,8 +121,8 @@ func _init() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
 	_note.add_child(box)
-	_kicker = UiKit.note(box, "", 11, Color("#5a4500"))
-	_text = UiKit.note(box, "", 16, INK)
+	_kicker = UiKit.note(box, "", UiKit.CAPTION, Color("#5a4500"))
+	_text = UiKit.note(box, "", UiKit.STRONG, INK)
 	_text.custom_minimum_size.x = WIDTH - 24.0
 	var row := HBoxContainer.new()
 	box.add_child(row)
@@ -132,7 +132,7 @@ func _init() -> void:
 	off.focus_mode = Control.FOCUS_NONE
 	off.add_theme_color_override("font_color", Color("#5a4500"))
 	off.add_theme_color_override("font_hover_color", INK)
-	off.add_theme_font_size_override("font_size", 13)
+	off.add_theme_font_size_override("font_size", UiKit.BODY)
 	off.pressed.connect(func() -> void:
 		settings.tips = false
 		settings.save()

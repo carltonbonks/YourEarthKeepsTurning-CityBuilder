@@ -432,7 +432,7 @@ func occupy(k: int, b: int) -> void:
 			lifted[pathing.ground[i]] = int(lifted.get(pathing.ground[i], 0)) + 1
 	refund_roads(lifted)
 	if not lifted.is_empty():
-		w.run.tell("The stones under the new %s are lifted and stacked." % w.content.buildings[w.buildings[b]["type"]]["name"].to_lower())
+		w.run.tell("The stones under the new %s are lifted and stacked." % w.content.buildings[w.buildings[b]["type"]]["name"].to_lower(), RunState.AMBIENT)
 	# Trails and paths are simply built over.
 	for i in plots[k]["cells"]:
 		pathing.set_ground(i, Pathing.PLAIN)

@@ -31,12 +31,12 @@ func hero_tick(hero: Unit) -> void:
 		if hero.hound:
 			hero.hound = false
 			apply_hero_stats(hero)
-			w.run.tell("%s's hound bolts for home." % hero.display_name)
+			w.run.tell("%s's hound bolts for home." % hero.display_name, RunState.AMBIENT)
 		hero.resting = false
 		hero.target = null
 		if w.wave_spawned:
 			w.wave_stats["retreats"] = int(w.wave_stats["retreats"]) + 1
-		w.run.tell("%s is badly hurt and falls back to the hearth." % hero.display_name)
+		w.run.tell("%s is badly hurt and falls back to the hearth." % hero.display_name, RunState.PROBLEM)
 	# A hurt hero who has sent for a poultice waits for it where they are, unless something is coming for them.
 	if hero.retreating and runner_coming(hero) and w.nearest_enemy(hero.pos, w.content.num("supply_wait_safe")) == null:
 		hero.intent = "waiting for a runner with a poultice"
@@ -59,7 +59,7 @@ func hero_tick(hero: Unit) -> void:
 	if hero.energy <= float(t.get("tired_at", 25)) and hero.pos.length() > w.content.num("settlement_radius"):
 		_use_provision(hero, "energy")
 	if was_awake and hero.energy <= 0.0:
-		w.run.tell("%s is exhausted and fights weakly until they rest." % hero.display_name)
+		w.run.tell("%s is exhausted and fights weakly until they rest." % hero.display_name, RunState.PROBLEM)
 
 	var whim: Dictionary = w.content.whims.get(hero.whim, {})
 	var wilds := float(whim.get("wilds", t["wilds"]))
@@ -192,7 +192,7 @@ func rest_tick(hero: Unit) -> void:
 		hero.resting = false
 		if w.is_night() and hero.woke_night != w.night_key():
 			hero.woke_night = w.night_key()
-			w.run.tell("%s wakes in %s to fight a %s." % [hero.display_name, bed_name(bed), danger.display_name.to_lower()])
+			w.run.tell("%s wakes in %s to fight a %s." % [hero.display_name, bed_name(bed), danger.display_name.to_lower()], RunState.AMBIENT)
 		return
 	var def := lodging_def(bed)
 	var rate := w.content.num("energy_rest") * (float(def["rest"]) if not def.is_empty() else w.content.num("energy_rest_rough"))
@@ -223,7 +223,7 @@ func _on_lie_down(hero: Unit, bed: int) -> void:
 	if _carousing(hero) and hero.caroused != w.night_key():
 		hero.caroused = w.night_key()
 		var spent := _pay_town(hero, int(w.content.whims["carouse"].get("spend", 0)), "carousing")
-		w.run.tell("%s settles in at %s and drinks %d shells' worth." % [hero.display_name, bed_name(bed), spent])
+		w.run.tell("%s settles in at %s and drinks %d shells' worth." % [hero.display_name, bed_name(bed), spent], RunState.AMBIENT)
 
 
 ## Takes up to `amount` shells from a hero into the settlement's stock. Returns what was paid.
@@ -330,7 +330,7 @@ func roll_whims() -> void:
 		if hero.whim != "none":
 			notes.append("%s is %s" % [hero.display_name, w.content.whims[hero.whim]["name"]])
 	if not notes.is_empty():
-		w.run.tell("Today %s." % ", ".join(notes))
+		w.run.tell("Today %s." % ", ".join(notes), RunState.AMBIENT)
 
 
 ## Scores every reachable enemy from this hero's point of view and picks the best.
@@ -407,7 +407,7 @@ func give_item(hero: Unit, item: Dictionary) -> void:
 		w.run.tell("%s finds a %s and takes it up." % [hero.display_name, Loot.describe(w.content, item)])
 	else:
 		hero.spares.append(item)
-		w.run.tell("%s finds a %s and keeps it to sell." % [hero.display_name, Loot.describe(w.content, item)])
+		w.run.tell("%s finds a %s and keeps it to sell." % [hero.display_name, Loot.describe(w.content, item)], RunState.AMBIENT)
 	w.run.record.note_loot(hero, item, equip)
 	_trim_spares(hero)
 
@@ -471,7 +471,7 @@ func count_trophy(hero: Unit) -> void:
 	if every > 0 and hero.kills % every == 0:
 		apply_hero_stats(hero)
 		w.run.relic_fired("trophy_every")
-		w.run.tell("%s adds a trophy to their belt (%d kills)." % [hero.display_name, hero.kills])
+		w.run.tell("%s adds a trophy to their belt (%d kills)." % [hero.display_name, hero.kills], RunState.AMBIENT)
 
 
 ## Mourning bell: a fallen hero's XP, all of it, is shared among the living heroes.
@@ -488,7 +488,7 @@ func mourn(fallen: Unit) -> void:
 	for h: Unit in living:
 		h.xp += total * share / living.size()
 	w.run.relic_fired("mourning_share")
-	w.run.tell("The bell tolls for %s; what they learned passes to the others." % fallen.display_name)
+	w.run.tell("The bell tolls for %s; what they learned passes to the others." % fallen.display_name, RunState.MOMENT)
 
 
 ## How much a hero wants a good on a stall (0 or less: not at all).
@@ -572,10 +572,10 @@ func _buy(hero: Unit, pick: Dictionary) -> void:
 			_trim_spares(hero)
 		hero.items[slot] = item
 		apply_hero_stats(hero)
-		w.run.tell("%s buys a %s at the %s for %d shells." % [hero.display_name, Loot.describe(w.content, item), where, price])
+		w.run.tell("%s buys a %s at the %s for %d shells." % [hero.display_name, Loot.describe(w.content, item), where, price], RunState.AMBIENT)
 	else:
 		hero.pack.append(good["recipe"])
-		w.run.tell("%s buys %s at the %s for %d shells." % [hero.display_name, w.content.recipe_name(good["recipe"]), where, price])
+		w.run.tell("%s buys %s at the %s for %d shells." % [hero.display_name, w.content.recipe_name(good["recipe"]), where, price], RunState.AMBIENT)
 
 
 ## Uses one provision from the pack that has `effect` ("energy" or "heal"). True if one was used.
@@ -588,10 +588,10 @@ func _use_provision(hero: Unit, effect: String) -> bool:
 		hero.pack.remove_at(k)
 		if effect == "energy":
 			hero.energy = minf(w.content.num("hero_energy_max"), hero.energy + float(p["energy"]))
-			w.run.tell("%s eats %s and keeps going." % [hero.display_name, p["name"]])
+			w.run.tell("%s eats %s and keeps going." % [hero.display_name, p["name"]], RunState.AMBIENT)
 		else:
 			hero.hp = minf(hero.max_hp, hero.hp + float(p["heal"]))
-			w.run.tell("%s presses a %s to their wounds." % [hero.display_name, p["name"]])
+			w.run.tell("%s presses a %s to their wounds." % [hero.display_name, p["name"]], RunState.AMBIENT)
 		return true
 	return false
 
@@ -643,7 +643,7 @@ func on_supplied(hero: Unit, effect: String) -> void:
 		var retreat_at := float(w.content.traits[hero.trait_id]["retreat_at"]) + w.run.mod("retreat_shift")
 		if hero.hp_fraction() >= retreat_at + 0.1:
 			hero.retreating = false
-			w.run.tell("%s is patched up and turns back to the hunt." % hero.display_name)
+			w.run.tell("%s is patched up and turns back to the hunt." % hero.display_name, RunState.AMBIENT)
 
 
 ## A node out in the wilds near a hero worth fetching from (obsidian, cassiterite), or -1.
@@ -690,7 +690,7 @@ func sell_shards(hero: Unit) -> void:
 	w.run.record.note_economy(hero.carrying, n)
 	w.run.record.impact_key(hero)
 	w.run.record.note_impact("heroes", hero.display_name, "goods", n, hero.carrying)
-	w.run.tell("%s brings back %d %s and sells it for %d shells." % [hero.display_name, n, hero.carrying, pay])
+	w.run.tell("%s brings back %d %s and sells it for %d shells." % [hero.display_name, n, hero.carrying, pay], RunState.AMBIENT)
 
 
 # --- Hero-shaping buildings (data/buildings.json: drills, hounds, duels) ------------------------------
@@ -746,7 +746,7 @@ func kennel_dawn() -> void:
 		hero.hound = true
 		apply_hero_stats(hero)
 		w.run.record.note_count("hounds_given", 1)
-		w.run.tell("%s takes a hound from the kennel." % hero.display_name)
+		w.run.tell("%s takes a hound from the kennel." % hero.display_name, RunState.AMBIENT)
 
 
 ## At dawn heroes carrying the duelling ring's tag spar in pairs: both learn from it, the loser is hurt.
@@ -772,4 +772,4 @@ func duels_dawn() -> void:
 		b.xp += float(duels["xp"])
 		loser.hp = maxf(1.0, loser.hp - loser.max_hp * float(duels["hurt"]))
 		w.run.record.note_count("duels", 1)
-		w.run.tell("%s beats %s in the duelling ring; both learn from it." % [winner.display_name, loser.display_name])
+		w.run.tell("%s beats %s in the duelling ring; both learn from it." % [winner.display_name, loser.display_name], RunState.AMBIENT)

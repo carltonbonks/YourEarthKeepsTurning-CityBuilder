@@ -526,7 +526,7 @@ func _draw_building(bi: int, font: Font) -> void:
 				Color(col.lightened(0.2), 0.4 + 0.6 * whole))
 		draw_line(_to_screen(pos - across * half / s * 0.35), _to_screen(pos + across * half / s * 0.35), Color("#e8d9a8", 0.35), 1.0)
 		if whole < 1.0:
-			_bar(p + Vector2(-half, half + 3), half * 2.0, whole, Color("#e0a050"))
+			_bar(p + Vector2(-half, half + 3), half * 2.0, whole, UiKit.EMBER)
 	elif work_left <= 0.0:
 		# A broken tower is drawn dark until it is mended at dawn; a hurt one shows its health.
 		var tower_hp := float(def.get("tower_hp", 0.0))

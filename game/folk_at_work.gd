@@ -215,7 +215,7 @@ static func build(parent: Control, run: RunState) -> void:
 		legend.add_child(swatch)
 		var l := Label.new()
 		l.text = {"work": "Own work", "fallback": "Fallback", "idle": "Idle", "down": "Down"}[k]
-		l.add_theme_font_size_override("font_size", 11)
+		l.add_theme_font_size_override("font_size", UiKit.CAPTION)
 		l.add_theme_color_override("font_color", UiKit.HINT_COLOR)
 		legend.add_child(l)
 	var any := false
@@ -234,12 +234,12 @@ static func build(parent: Control, run: RunState) -> void:
 		var who := Label.new()
 		who.text = "%s (%d)" % [run.content.townsfolk[role]["name"], run.count_role(role)]
 		who.custom_minimum_size.x = 150
-		who.add_theme_font_size_override("font_size", 14)
+		who.add_theme_font_size_override("font_size", UiKit.STRONG)
 		row.add_child(who)
 		var tag := Label.new()
 		tag.text = word_name(word)
 		tag.custom_minimum_size.x = 80
-		tag.add_theme_font_size_override("font_size", 13)
+		tag.add_theme_font_size_override("font_size", UiKit.BODY)
 		tag.add_theme_color_override("font_color", word_tint(word))
 		var advice := word_advice(role, word)
 		tag.tooltip_text = advice[0].to_upper() + advice.substr(1) + "."
@@ -252,7 +252,7 @@ static func build(parent: Control, run: RunState) -> void:
 		row.add_child(bar)
 		var out := Label.new()
 		out.text = output_text(run, role, impact_for(run, b["from"]))
-		out.add_theme_font_size_override("font_size", 12)
+		out.add_theme_font_size_override("font_size", UiKit.CAPTION)
 		out.add_theme_color_override("font_color", UiKit.HINT_COLOR)
 		row.add_child(out)
 		for g: Dictionary in groups(run, role, this_round):
@@ -267,7 +267,7 @@ static func build(parent: Control, run: RunState) -> void:
 			var label := Label.new()
 			label.text = g["label"] if int(g["count"]) == 1 else "%s (%d)" % [g["label"], g["count"]]
 			label.custom_minimum_size.x = 206
-			label.add_theme_font_size_override("font_size", 12)
+			label.add_theme_font_size_override("font_size", UiKit.CAPTION)
 			label.add_theme_color_override("font_color", UiKit.HINT_COLOR)
 			sub.add_child(label)
 			var gbar := make_bar(g["kinds"], 280.0, 7.0)
@@ -278,8 +278,8 @@ static func build(parent: Control, run: RunState) -> void:
 			if int(g["brought"]) > 0:
 				var got := Label.new()
 				got.text = "brought home %s each" % _each(float(g["brought"]) / float(g["count"]))
-				got.add_theme_font_size_override("font_size", 11)
+				got.add_theme_font_size_override("font_size", UiKit.CAPTION)
 				got.add_theme_color_override("font_color", UiKit.HINT_COLOR)
 				sub.add_child(got)
 	if not any:
-		UiKit.note(box, "Nothing to show yet: this fills in as the round plays.", 13)
+		UiKit.note(box, "Nothing to show yet: this fills in as the round plays.", UiKit.BODY)

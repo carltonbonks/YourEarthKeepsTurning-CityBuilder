@@ -27,7 +27,7 @@ const HOP := 1.5
 const HOP_SPEED := 0.0075
 const CONFETTI := 160
 const COLORS := ["#ffd870", "#e05a4f", "#5fb0ff", "#7fd06a", "#f5f0e6", "#e58ad0", "#ffa040"]
-const GOLD := Color("#ffd870")
+const GOLD := UiKit.GOLD
 
 ## When the ending began (ms), or -1 before a win.
 var born := -1.0
@@ -184,9 +184,9 @@ func draw_top(view: CanvasItem, size: Vector2, font: Font, now_ms: float) -> voi
 	view.draw_rect(band, Color(0.05, 0.04, 0.02, 0.65 * a))
 	view.draw_line(band.position, band.position + Vector2(size.x, 0), Color(GOLD, 0.8 * a), 2.0)
 	view.draw_line(band.end - Vector2(size.x, 0), band.end, Color(GOLD, 0.8 * a), 2.0)
-	_centred(view, font, "Victory!", band.position.y + 54.0, 44, Color(GOLD, a), size.x, a)
-	_centred(view, font, "The people endured all %d rounds." % _rounds, band.position.y + 84.0, 18, Color(0.95, 0.92, 0.84, a), size.x, a)
-	_centred(view, font, "Click to carry on", band.position.y + 106.0, 12, Color(0.75, 0.73, 0.66, a), size.x, a)
+	_centred(view, font, "Victory!", band.position.y + 54.0, UiKit.BANNER_RUN, Color(GOLD, a), size.x, a)
+	_centred(view, font, "The people endured all %d rounds." % _rounds, band.position.y + 84.0, UiKit.TITLE, Color(0.95, 0.92, 0.84, a), size.x, a)
+	_centred(view, font, "Click to carry on", band.position.y + 106.0, UiKit.CAPTION, Color(0.75, 0.73, 0.66, a), size.x, a)
 
 
 func _centred(view: CanvasItem, font: Font, text: String, y: float, font_size: int, c: Color, width: float, a: float) -> void:

@@ -25,7 +25,8 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-## The problems worth an alert right now: [{id, text}], most urgent first.
+## The problems worth an alert right now: [{id, text, tier}], most urgent first. A problem costing this round is
+## RunState.PROBLEM (ember, docs/TEXT_STYLE.md); news and suggestions are RunState.NOTICE (a plain note).
 static func active(r: RunState) -> Array[Dictionary]:
 	var content := r.content
 	var w := r.world
@@ -47,17 +48,20 @@ static func active(r: RunState) -> Array[Dictionary]:
 		if hero.mood <= content.num("mood_grumble_at"):
 			out.append({"id": "mood:" + hero.display_name, "text": "%s is unhappy and may leave town." % hero.display_name})
 	if r.phase == RunState.Phase.BUILD and r.wave_eased > 0:
-		out.append({"id": "eased:%d" % r.round_number, "text": "The warband holds back %d raider%s this round." % [
+		out.append({"id": "eased:%d" % r.round_number, "tier": RunState.NOTICE, "text": "The warband holds back %d raider%s this round." % [
 			r.wave_eased, "" if r.wave_eased == 1 else "s"]})
 	if r.phase == RunState.Phase.BUILD and w.camp_index() >= 0:
 		out.append({"id": "camp:%d" % r.round_number, "text": "A war camp of %d raiders holds land in the wilds: it marches with the attack unless heroes break it." % [
 			w.enemy_ai.camp_raiders().size()]})
 	if w.pedlar.is_open():
 		var pedlar: String = content.pedlars["pedlars"][w.pedlar.camp["id"]]["name"]
-		out.append({"id": "pedlar:%d" % r.round_number, "text": "The %s has camped %s of town (the gold tent): heroes walk out to trade." % [
+		out.append({"id": "pedlar:%d" % r.round_number, "tier": RunState.NOTICE, "text": "The %s has camped %s of town (the gold tent): heroes walk out to trade." % [
 			pedlar.to_lower(), World.compass(Vector2(w.pedlar.camp["pos"]).angle())]})
 	if r.phase == RunState.Phase.BUILD and w.pathing.count_ground(Pathing.PATH) > 0 and not w.town.can_pave():
-		out.append({"id": "paving", "text": "Worn paths could be paved: build a %s." % w.town.paver_name()})
+		out.append({"id": "paving", "tier": RunState.NOTICE, "text": "Worn paths could be paved: build a %s." % w.town.paver_name()})
+	for a in out:
+		if not a.has("tier"):
+			a["tier"] = RunState.PROBLEM
 	return out
 
 
@@ -72,7 +76,7 @@ func refresh() -> void:
 			continue
 		if not _seen.has(a["id"]):
 			_seen[a["id"]] = 0.0
-			_add(a["id"], a["text"])
+			_add(a["id"], a["text"], int(a["tier"]))
 	for id: String in _seen.keys():
 		if not now.has(id):
 			_seen.erase(id)
@@ -118,18 +122,19 @@ func _process(delta: float) -> void:
 			label.modulate.a = (SHOW_SECONDS - age) / FADE_SECONDS
 
 
-func _add(id: String, text: String) -> void:
+func _add(id: String, text: String, tier := RunState.PROBLEM) -> void:
 	var l := Label.new()
 	l.text = text
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
 	l.custom_minimum_size.x = WIDTH
 	# Sized now, so fit can measure its wrapped height before the screen lays it out.
 	l.size.x = WIDTH
-	l.add_theme_font_size_override("font_size", 13)
-	l.add_theme_color_override("font_color", Color("#ffe0b0"))
+	var problem := tier >= RunState.PROBLEM
+	l.add_theme_font_size_override("font_size", UiKit.BODY)
+	l.add_theme_color_override("font_color", Color("#ffe0b0") if problem else UiKit.INK)
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.35, 0.16, 0.08, 0.9)
-	style.border_color = Color("#e0a050")
+	style.bg_color = Color(0.35, 0.16, 0.08, 0.9) if problem else Color(0.14, 0.15, 0.18, 0.9)
+	style.border_color = UiKit.EMBER if problem else Color("#4a4f5a")
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(4)
 	style.set_content_margin_all(6)
@@ -141,6 +146,11 @@ func _add(id: String, text: String) -> void:
 			_drop(id))
 	add_child(l)
 	_labels[id] = l
+	if problem:
+		# One pulse as it appears (tier 2), then still.
+		var tw := l.create_tween()
+		tw.tween_property(l, "self_modulate", Color(1.35, 1.2, 1.0), 0.18)
+		tw.tween_property(l, "self_modulate", Color.WHITE, 0.5)
 	fit(_max_height)
 
 
