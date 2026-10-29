@@ -95,7 +95,7 @@ func test_a_plates_hover_names_what_changes_it() -> void:
 	var run := _run()
 	run.relics.append("bog_drowners_stake")
 	var lines: Array = Tooltips.plate(run, "fen")["lines"]
-	check(lines.any(func(l: String) -> bool: return l.contains("Bog-drowner's Stake")), "the Fen's hover names the stake")
+	check(lines.any(func(l: String) -> bool: return l.contains("Bog-drowner's stake")), "the Fen's hover names the stake")
 	var other: Array = Tooltips.plate(run, "barrow")["lines"]
 	check(not other.any(func(l: String) -> bool: return l.begins_with("Changed by")), "the Barrow's doesn't")
 	run.dispose()

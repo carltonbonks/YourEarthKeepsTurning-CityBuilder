@@ -72,7 +72,7 @@ static func report(runs: Array) -> PackedStringArray:
 	if items_found > 0:
 		out.append("Loot: %d items found, %d%% worn, the rest sold" % [items_found, roundi(100.0 * items_kept / items_found)])
 	if hero_spent + sale_cut > 0.0:
-		out.append("Shells heroes paid the settlement: %d (lodging, drink and stalls %d, of which stalls %d; cut of loot sales %d)" % [
+		out.append("Shells heroes paid the town: %d (lodging, drink and stalls %d, of which stalls %d; cut of loot sales %d)" % [
 			hero_spent + sale_cut, hero_spent, market_spent, sale_cut])
 	if not bought.is_empty():
 		out.append("Bought at stalls: %s" % _counts(bought))

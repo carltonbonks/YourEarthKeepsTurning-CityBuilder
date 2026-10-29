@@ -18,7 +18,7 @@ var _claimed := {}
 var _inbound := {}
 ## The town's wants this step (RunState.resource_wants), worked out the first time someone plans a trip.
 var _wants := {}
-## Living townsfolk whose role stands and fights (tag fighter), counted each step (Horde Drum).
+## Living townsfolk whose role stands and fights (tag fighter), counted each step (Horde drum).
 var fighters := 0
 ## Living townsfolk per role and leaning ("role/leaning" -> count), counted each step: a band's size (band_tier).
 var leaning_counts := {}
@@ -256,7 +256,7 @@ func _folk_act(unit: Unit) -> void:
 		_worker_tick(unit)
 
 
-## Levy Horn: on the warned night tribespeople fight like warriors (so does the Warband path's muster, more weakly).
+## Levy horn: on the warned night tribespeople fight like warriors (so does the Warband path's muster, more weakly).
 func levied(unit: Unit) -> bool:
 	return unit.type_id == "tribesperson" and w.is_wave_night() and (w.run.has_effect("levy") or w.run.has_effect("muster"))
 
@@ -266,8 +266,8 @@ func levy_share() -> float:
 	return 1.0 if w.run.has_effect("levy") else w.run.mod("muster")
 
 
-## A townsperson's blow after relics: Horde Drum (fighters hit harder the more of them there are)
-## and Levy Horn (levied tribespeople hit as hard as warriors; mustered ones with levy_share of a warrior's blow).
+## A townsperson's blow after relics: Horde drum (fighters hit harder the more of them there are)
+## and Levy horn (levied tribespeople hit as hard as warriors; mustered ones with levy_share of a warrior's blow).
 func relic_damage(unit: Unit, amount: float) -> float:
 	if levied(unit):
 		amount = maxf(amount, float(w.content.townsfolk["warrior"]["attack"]) * levy_share() * amount / maxf(1.0, unit.attack))
@@ -320,7 +320,7 @@ func _warrior_tick(unit: Unit) -> void:
 	# A tight patrol round a young town still goes for foes as far out as patrol_watch (data/townsfolk.json).
 	var threat := w.nearest_enemy(unit.pos, 220.0, maxf(patrol, float(def["patrol_watch"])) + 60.0)
 	if threat != null:
-		unit.intent = "defending the camp"
+		unit.intent = "defending the town"
 		unit.activity = "fight"
 		w.fight(unit, threat)
 		return

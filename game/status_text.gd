@@ -263,7 +263,7 @@ static func clock(run: RunState) -> String:
 		("   [color=#ff7060]Attack tonight from the %s[/color]" % " and ".join(w.side_names())) if wave_night and not w.wave_spawned else ""]
 	if w.wave_spawned:
 		var left := w.enemies.filter(func(e: Unit) -> bool: return e.alive and e.den_index < 0).size()
-		text += "   [color=#ff7060]Attackers left: %d[/color]" % left
+		text += "   [color=#ff7060]Raiders left %d[/color]" % left
 	if w.cold_tonight:
 		text += "   [color=#8fd0ff]No fuel: a cold night[/color]"
 	return text

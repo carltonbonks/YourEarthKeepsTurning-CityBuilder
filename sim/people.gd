@@ -753,7 +753,7 @@ func heroes_sell_finds() -> void:
 				"affixes": item["affixes"].duplicate(), "value": v, "town_cut": cut})
 		hero.gold += total - tax
 		run.stock["shells"] = int(run.stock["shells"]) + tax
-		run.tell("%s sells %d found item%s %s for %d shells; the settlement keeps %d." % [hero.display_name,
+		run.tell("%s sells %d found item%s %s for %d shells; the town keeps %d." % [hero.display_name,
 			hero.spares.size(), "" if hero.spares.size() == 1 else "s", where, total, tax])
 		hero.spares.clear()
 

@@ -36,7 +36,7 @@ func test_bold_heroes_meet_the_attack_on_the_plate_it_crosses() -> void:
 	var crossed := String(w.earth.kind_def(w.earth.crossing(0.0))["name"]).to_lower()
 	check_eq(bold.intent, "waiting for the attack on the %s" % crossed, "a bold hero names the plate the attack crosses")
 	check(bold.pos.x > 20.0 and absf(bold.pos.angle()) < 0.3, "and walks out along the way it comes in")
-	check_eq(careful.intent, "guarding the camp", "a cautious hero stays by the hearth")
+	check_eq(careful.intent, "guarding the town", "a cautious hero stays by the hearth")
 	run.dispose()
 
 

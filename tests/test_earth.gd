@@ -117,7 +117,7 @@ func test_stillstone_holds_the_ring_and_the_lodestone_wheel_turns_it_two_plates(
 	check_eq(earth.turn_of(0, 1), 0.0, "Stillstone: the ring stays put")
 	run.relics.clear()
 	run.relics.append("lodestone_wheel")
-	check(is_equal_approx(earth.turn_of(0, 1), step * 2.0), "the Lodestone Wheel: two plates at a turn")
+	check(is_equal_approx(earth.turn_of(0, 1), step * 2.0), "the Lodestone wheel: two plates at a turn")
 	run.dispose()
 
 

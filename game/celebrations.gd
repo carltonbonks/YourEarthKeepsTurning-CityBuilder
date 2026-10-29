@@ -62,7 +62,7 @@ static func card(run: RunState, age_id: String) -> Dictionary:
 		counts[name] = int(counts.get(name, 0)) + 1
 	var found: Array[String] = []
 	for name: String in counts:
-		found.append("%s x%d" % [name, counts[name]] if int(counts[name]) > 1 else name)
+		found.append("%s ×%d" % [name, counts[name]] if int(counts[name]) > 1 else name)
 	var lines: Array[String] = []
 	var begins: String = content.ages["ages"][age_id].get("begins", "")
 	if begins != "":

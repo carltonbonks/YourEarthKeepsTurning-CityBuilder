@@ -295,7 +295,7 @@ func step() -> void:
 				hearth_hp -= e.attack * 3.0
 				e.alive = false
 			if not wave_left.is_empty():
-				run.tell("The last raiders loot the edge of the camp and slip away.")
+				run.tell("The last raiders loot the edge of town and slip away.")
 			_finish_round()
 
 
@@ -658,7 +658,7 @@ func hit(attacker: Unit, victim: Unit) -> void:
 			amount *= hero_ai.relic_damage_mult(attacker)
 		elif attacker.is_folk():
 			amount = folk_ai.relic_damage(attacker, amount)
-		# Relics keyed on the victim's tags (foe_damage), e.g. Grave Salt on undead.
+		# Relics keyed on the victim's tags (foe_damage), e.g. Grave salt on undead.
 		var bane := run.tag_mod("foe_damage", content.unit_tags(victim))
 		if bane != 0.0:
 			amount *= 1.0 + bane

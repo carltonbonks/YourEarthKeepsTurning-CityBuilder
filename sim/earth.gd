@@ -154,7 +154,7 @@ func sight_at(p: Vector2) -> float:
 
 
 ## How far ring ri turns on shift n, in radians: a whole plate's width on its clicks, else none. Stillstone holds
-## it still; the Lodestone Wheel turns it further (earth_turns).
+## it still; the Lodestone wheel turns it further (earth_turns).
 func turn_of(ri: int, n: int) -> float:
 	if w.run.has_effect("still_ring"):
 		return 0.0

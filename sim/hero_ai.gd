@@ -119,7 +119,7 @@ func hero_tick(hero: Unit) -> void:
 		w.walk_toward(hero, Vector2.from_angle(side) * w.content.num("meet_attack_at"), 6.0)
 		return
 	if w.is_dusk():
-		hero.intent = "guarding the camp"
+		hero.intent = "guarding the town"
 		w.walk_toward(hero, Vector2.from_angle(index * 1.7 + 0.4) * (w.content.num("settlement_radius") * 0.6), 4.0)
 		return
 	# A training yard drills idle heroes harder than the hearth does.
@@ -362,7 +362,7 @@ func _choose_target(hero: Unit, t: Dictionary, reach: float, trophy := false) ->
 		if score > best_score:
 			best_score = score
 			best = enemy
-			reason = "hunting for glory" if glory >= duty and enemy.den_index >= 0 else ("defending the camp" if duty >= 3.0 else "fighting")
+			reason = "hunting for glory" if glory >= duty and enemy.den_index >= 0 else ("defending the town" if duty >= 3.0 else "fighting")
 	if best != null:
 		hero.intent = "%s (%s)" % [reason, best.display_name]
 	return best
@@ -375,7 +375,7 @@ func apply_hero_stats(hero: Unit) -> void:
 		+ Loot.total(w.content, hero, "hp", w.run.gear_bonus()) + w.run.mod("hero_hp"))
 	hero.attack = float(c["attack"]) + (hero.level - 1) * w.content.num("level_attack") \
 		+ Loot.total(w.content, hero, "attack", w.run.gear_bonus()) + w.run.mod("hero_attack")
-	# Trophy Belt: damage for every so many kills. Witch's Thread: cursed gear's HP penalty is lifted.
+	# Trophy belt: damage for every so many kills. Witch's thread: cursed gear's HP penalty is lifted.
 	if w.run.has_effect("trophy_every"):
 		hero.attack += w.run.mod("trophy_damage") * (hero.kills / int(w.run.mod("trophy_every")))
 	if w.run.has_effect("curse_lift"):
@@ -432,13 +432,13 @@ func maybe_drop(hero: Unit, victim: Unit) -> void:
 
 # --- Relics on heroes ----------------------------------------------------------
 
-## Lone Wolf's Pelt: the town has few enough heroes for it to work.
+## Lone wolf's pelt: the town has few enough heroes for it to work.
 func _lone() -> bool:
 	return w.run.has_effect("lone_heroes") and w.run.living_heroes().size() <= int(w.run.mod("lone_heroes"))
 
 
-## How much harder a hero hits from relics that depend on the moment: few heroes (Lone Wolf's Pelt),
-## another hero close by (Blood-brother Knot), night or day (Owl Eyes).
+## How much harder a hero hits from relics that depend on the moment: few heroes (Lone wolf's pelt),
+## another hero close by (Blood-brother knot), night or day (Owl eyes).
 func relic_damage_mult(hero: Unit) -> float:
 	var mult := 1.0
 	if _lone():
@@ -453,7 +453,7 @@ func relic_damage_mult(hero: Unit) -> float:
 	return maxf(0.1, mult)
 
 
-## Chosen One's Brand: extra XP share for the town's highest-level hero (most XP, then the longest here, breaks ties),
+## Chosen one's brand: extra XP share for the town's highest-level hero (most XP, then the longest here, breaks ties),
 ## less for the rest.
 func chosen_xp(hero: Unit) -> float:
 	if not w.run.has_effect("chosen_xp"):
@@ -465,7 +465,7 @@ func chosen_xp(hero: Unit) -> float:
 	return w.run.mod("chosen_xp") if chosen == hero else w.run.mod("others_xp")
 
 
-## Trophy Belt: a hero who reaches another milestone of kills grows stronger at once.
+## Trophy belt: a hero who reaches another milestone of kills grows stronger at once.
 func count_trophy(hero: Unit) -> void:
 	var every := int(w.run.mod("trophy_every"))
 	if every > 0 and hero.kills % every == 0:
@@ -474,7 +474,7 @@ func count_trophy(hero: Unit) -> void:
 		w.run.tell("%s adds a trophy to their belt (%d kills)." % [hero.display_name, hero.kills])
 
 
-## Mourning Bell: a fallen hero's XP, all of it, is shared among the living heroes.
+## Mourning bell: a fallen hero's XP, all of it, is shared among the living heroes.
 func mourn(fallen: Unit) -> void:
 	var share := w.run.mod("mourning_share")
 	if share <= 0.0:

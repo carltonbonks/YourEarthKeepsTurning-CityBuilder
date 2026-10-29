@@ -52,7 +52,7 @@ func test_fire_relics_set_tower_shots_alight() -> void:
 	var w := run.world
 	check(not Lighting.fire_shots(run), "no fire relic, no burning shots")
 	run.relics.append("fire_arrows")
-	check(Lighting.fire_shots(run), "Fire Arrows carries the fire tag")
+	check(Lighting.fire_shots(run), "Fire arrows carries the fire tag")
 	var raider := w.enemy_ai.make_enemy("raider", Vector2(30, 0), 0.0)
 	raider.hp = 999.0
 	w.enemies.append(raider)
