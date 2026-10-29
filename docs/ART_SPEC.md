@@ -41,7 +41,13 @@ Commit the model, the manifest row, the PNG, its `.import` file and `index.json`
 - **Tall pieces** (towers, the keep, two-storey houses, the old oak) use a taller frame such as 256 by 384; the camera's scale always spans the frame's width, so a tall frame shows more sky, not a smaller building.
 - **The land:** resource nodes (shrink as they are worked, fade when worked out), dens, the hearth (burning, and cold on a cold night), the pedlar's camp and the plots' obstacles all have sprites. The turning ring's plates are dressed with props (`plate_<kind>`: reeds and pools, trees, stones, graves) that `game/ground_props.gd` scatters over each plate and turns with it.
 - **Looks in one sheet:** a row with `variants: n` renders its model's `build(kit, variant)` n times into the columns of one sheet (the plates' props, the hearth's burning and cold looks).
-- **Kinds** (the manifest's `kind`, checked against data by `tests/test_art.gd`): building, townsfolk, hero, enemy, node, den, obstacle, plate (`plate_` + a kind in data/plates.json) and scenery (barricade, pedlar_camp, hearth).
+- **Kinds** (the manifest's `kind`, checked against data by `tests/test_art.gd`): building, townsfolk, hero, enemy, node, den, obstacle, plate (`plate_` + a kind in data/plates.json), scenery (barricade, pedlar_camp, hearth) and icon (relic_icons, item_icons).
+
+## Cards (slice 4)
+
+- **A picture strip under the band** on every card that has art (`CardView.set_picture`): buildings, upgrades and crafts show their building (a craft its workshop, a tradition its first blueprint), people their role, heroes their class, promotions what they become, the pedlar its camp, relics and spoils their trinket. A card without art keeps its old look.
+- **Cut from the map sprites:** `SpriteBook.card_texture(id, look)` crops a sprite's idle frame (walkers' second facing, turned a little toward the viewer) to its figure, using `card_boxes` that `tools/render_art.py` writes into index.json for every look. Nothing is drawn twice, so bought art for the map shows on cards too.
+- **Relic and item icons** are their own sheets (kind `icon`): `relic_icons` (one column per look) and `item_icons` (one per item base), built from `art/lib/trinkets.py`. `art/card_art.json` maps each relic to a look (several relics may share one) and lists item bases in column order; `tests/test_art.gd` fails if a relic or item base has no picture. A legend's card shows its gear as small item icons.
 
 ## Bought or commissioned art
 

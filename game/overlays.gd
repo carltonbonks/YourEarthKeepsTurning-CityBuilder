@@ -235,6 +235,7 @@ func show_traditions(chosen: Array = []) -> void:
 		var picked := chosen.has(id)
 		var btn := CardView.new(CardView.Size.LARGE, "tradition", "Chosen" if picked else "Tradition", t["name"])
 		btn.custom_minimum_size.x = 210
+		btn.set_picture(SpriteBook.shared().card_texture(_tradition_building(t)))
 		btn.set_selected(picked).set_body(t["text"], CardView.TEXT)
 		var start: Dictionary = t.get("start", {})
 		if not start.is_empty():
@@ -370,6 +371,7 @@ func show_pedlars() -> void:
 		var where := "%s, %s" % [reach, World.compass(pos.angle())]
 		var sells: String = slots.get(d["slot"], d["slot"])
 		var btn := CardView.new(CardView.Size.LARGE, "trade", "Pedlar · %s" % d["camp"], d["name"])
+		btn.set_picture(SpriteBook.shared().card_texture("pedlar_camp"))
 		btn.custom_minimum_size.x = 220
 		btn.add_chip("sells " + sells)
 		btn.add_chip("tier %d" % run.world.pedlar.ware_tier(id))
@@ -423,10 +425,13 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 			# The hero's own colour, as on the hero strip under the map, as a dot: a gold class colour on the
 			# name would read as a rarity.
 			btn.add_title_dot(Color(c["color"]))
+			btn.set_picture(SpriteBook.shared().card_texture(hero.type_id))
 			btn.set_price(run.stock, {"shells": card["cost"]})
 			btn.add_chip("Lv %d" % hero.level)
 			btn.add_chip("You have %d" % run.living_heroes().size())
 			btn.add_chip(content.traits[hero.trait_id]["name"])
+			if legend != "":
+				btn.add_pictures(hero.items.values().map(func(it: Dictionary) -> Texture2D: return SpriteBook.shared().item_texture(it["base"])))
 			btn.set_body(legend if legend != "" else _wilds_line(hero.trait_id))
 			btn.set_footer("Sleeps in " + beds)
 			btn.tooltip_text = "%s, %s %s\nHealth %d, damage %d%s\n%sLikes to sleep in: %s\n%s\n%s." % [hero.display_name,
@@ -440,6 +445,7 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 			for role: String in who:
 				parts.append("%d %s" % [who[role], content.townsfolk[role]["name"].to_lower() if who[role] == 1 else FolkAtWork.plural(run, role)])
 			btn = CardView.new(sz, "folk", "Family", "A family")
+			btn.set_picture(SpriteBook.shared().card_texture(card["roles"][0]))
 			btn.set_price(run.stock, {})
 			var roles: Array = card["roles"].duplicate()
 			for i in CardRoll.extra_people(content, card):
@@ -469,6 +475,7 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 				var level := run.world.folk_ai.band_level(card["role"], card["leaning"], size)
 				var grows := run.world.folk_ai.band_level(card["role"], card["leaning"], size + 1) > level
 				btn = CardView.new(sz, "folk", def["name"], lean["name"])
+				btn.set_picture(SpriteBook.shared().card_texture(card["role"]))
 				if grows:
 					btn.set_advice("Forms a band" if level == 0 else "Band grows stronger")
 				btn.set_price(run.stock, {})
@@ -483,6 +490,7 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 					Tooltips.band_line(run, card["role"], card["leaning"], true), eats] + _work_lines(card["role"])
 			else:
 				btn = CardView.new(sz, "folk", "Townsperson", def["name"])
+				btn.set_picture(SpriteBook.shared().card_texture(card["role"]))
 				btn.set_price(run.stock, {})
 				btn.add_people(roles)
 				_doll_chip(btn, doll)
@@ -529,12 +537,21 @@ func _work_lines(role: String) -> String:
 	return "" if lines.is_empty() else "\n" + "\n".join(lines)
 
 
+## The building a tradition's first blueprint raises, for its card's picture (a craft shows its workshop).
+func _tradition_building(t: Dictionary) -> String:
+	var key: String = t.get("blueprint", "")
+	if key.begins_with("craft:"):
+		return run.content.crafts[key.trim_prefix("craft:")]["workshop"]
+	return key
+
+
 ## A trades guild: the band at its top tier learns a practice that keeps its nodes from running dry, and keeps to its trade.
 func _guild_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 	var leaning: String = card["leaning"]
 	var g := run.people.guild_def(leaning)
 	var size := int(run.world.folk_ai.count_leanings().get("tribesperson/" + leaning, 0))
 	var btn := CardView.new(sz, "guild", "Trades guild", g["name"])
+	btn.set_picture(SpriteBook.shared().card_texture("tribesperson"))
 	btn.set_price(run.stock, {})
 	btn.add_chip(g["practice"], "", CardView.GOOD)
 	btn.add_chip("Band of %d" % size)
@@ -554,6 +571,7 @@ func _venture_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 	var losing := "%d" % lose[0] if lose[0] == lose[1] else "%d-%d" % [lose[0], lose[1]]
 	var brings := ", ".join(terms["goods"].keys().map(func(g: String) -> String: return "%d %s" % [terms["goods"][g], g.replace("_", " ")]))
 	var btn := CardView.new(sz, "venture", "Venture · send %d" % terms["send"], v["name"])
+	btn.set_picture(SpriteBook.shared().card_texture("tribesperson"))
 	# One figure per person sent, crossed out red for those who won't come back.
 	btn.add_control(VentureFigures.make(terms["send"], lose[0], lose[1] - lose[0], 16.0))
 	btn.add_chip("%s won't come back" % losing, "", CardView.DANGER)
@@ -603,6 +621,7 @@ func _promote_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 			var hero: Unit = card["hero"]
 			var cls: String = content.hero_classes[hero.type_id]["name"]
 			btn = CardView.new(sz, "promote", "Promote a veteran warrior", hero.display_name)
+			btn.set_picture(SpriteBook.shared().card_texture(hero.type_id))
 			btn.add_chip("%d kills" % u.kills)
 			btn.add_chip("→ %s %s" % [content.traits[hero.trait_id]["name"].to_lower(), cls.to_lower()], "", CardView.GOOD)
 			btn.set_footer("Needs a bed like any hero")
@@ -612,6 +631,7 @@ func _promote_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 			var hero: Unit = card["hero"]
 			var knight: String = content.hero_classes[content.promotions["champion"]["becomes"]]["name"]
 			btn = CardView.new(sz, "promote", "Knight a champion", hero.display_name)
+			btn.set_picture(SpriteBook.shared().card_texture(content.promotions["champion"]["becomes"]))
 			btn.add_chip("Lv %d" % hero.level)
 			btn.add_chip("You have %d" % run.living_heroes().size())
 			btn.add_chip("→ " + knight.to_lower(), "", CardView.GOOD)
@@ -622,6 +642,7 @@ func _promote_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 			var t: Dictionary = content.promotions["craftsperson"]["traits"][card["trait"]]
 			var effects := Tooltips.master_effects(content, card["trait"], card["workshop"])
 			btn = CardView.new(sz, "promote", "Promote a craftsperson", card["name"])
+			btn.set_picture(SpriteBook.shared().card_texture("craftsperson"))
 			btn.add_chip("%s master of the %s" % [t["name"], shop], "", CardView.GOOD)
 			btn.set_body(", ".join(Tooltips.master_effects(content, card["trait"], card["workshop"], true)) + ".", CardView.TEXT)
 			btn.tooltip_text = "A craftsperson who made %d goods at the %s becomes %s, master of the %s.\n%s: %s\n%s.\nA master goes to their own bench before any other." % [
@@ -718,6 +739,7 @@ func _relic_card(id: String) -> CardView:
 		kind = "Spoils of the %s" % str(content.balance.get("spoils_kinds", {}).get(run.spoils["kind"], run.spoils["kind"]))
 	var btn := CardView.new(CardView.Size.LARGE, "spoils" if is_spoils else "relic", kind, r["name"])
 	btn.custom_minimum_size.x = 206
+	btn.set_picture(SpriteBook.shared().relic_texture(id))
 	btn.set_roll(content, content.rarity_of("relic", id), "white", [])
 	btn.set_body(text, CardView.TEXT)
 	for key: String in RunState.TAG_EFFECTS:

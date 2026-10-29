@@ -197,6 +197,15 @@ def render(sprite_id, row, out_dir, tmp_dir):
     for anim, n in anims:
         info["anims"][anim] = [col, n]
         col += n
+    # Where each look sits in its frame as a card shows it (facing the viewer, standing still): [x, y, w, h] in
+    # pixels of the frame, so a card can crop the picture to the figure.
+    card_row = 1 if facings > 1 else 0
+    info["card_boxes"] = []
+    start, n = info["anims"]["idle"]
+    for col in range(start, start + n):
+        cell = sheet.crop((w * col, h * card_row, w * (col + 1), h * (card_row + 1)))
+        box = cell.getchannel("A").point(lambda v: 255 if v > 24 else 0).getbbox() or (0, 0, w, h)
+        info["card_boxes"].append([box[0], box[1], box[2] - box[0], box[3] - box[1]])
     for key in ("world_per_unit", "height_r", "variants"):
         if key in row:
             info[key] = row[key]

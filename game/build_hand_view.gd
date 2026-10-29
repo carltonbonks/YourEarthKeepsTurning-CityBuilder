@@ -340,6 +340,7 @@ func _card(type: String, need: String, kind: String, offer := {}) -> CardView:
 	elif drafting and "outpost" in tags:
 		band = "Outpost"
 	var btn := CardView.new(CardView.Size.MEDIUM if drafting else CardView.Size.SMALL, "building", band, def["name"])
+	btn.set_picture(SpriteBook.shared().card_texture(type))
 	if kind == "age":
 		btn.set_band_icon("up")
 	elif band == "Outpost":
@@ -406,6 +407,7 @@ func _upgrade_card(offer: Dictionary) -> CardView:
 	var up: Dictionary = run.content.upgrades[id]
 	var building: String = run.content.buildings[up["building"]]["name"]
 	var btn := CardView.new(CardView.Size.MEDIUM, "building", "Upgrade", up["name"]).set_band_icon("hammer")
+	btn.set_picture(SpriteBook.shared().card_texture(up["building"]))
 	var have := run.world.count_buildings(up["building"])
 	btn.set_advice("Changes your %s" % building.to_lower() if have == 1 else "Changes your %d %s" % [have, plural(building).to_lower()])
 	btn.add_chip("No new building", "", CardView.BONE)
@@ -432,6 +434,7 @@ func _craft_card(offer: Dictionary) -> CardView:
 	var craft: Dictionary = content.crafts[id]
 	var adds := run.hand.craft_adds(id)
 	var btn := CardView.new(CardView.Size.MEDIUM, "building", "Craft", craft["name"]).set_band_icon("hammer")
+	btn.set_picture(SpriteBook.shared().card_texture(craft["workshop"]))
 	btn.set_advice(recommendation(craft["workshop"], offer["need"]) if offer["need"] != "ageing" else "Needed to age up")
 	var names := PackedStringArray(adds.map(func(t: String) -> String: return content.buildings[t]["name"]))
 	btn.add_chip(" + ".join(names), "house", CardView.TEXT, btn.family_color())
@@ -499,6 +502,7 @@ func _tool_cards(parent: HBoxContainer) -> void:
 		if run.tools.has(id) or not content.age_reached(run.age, def.get("age", "")):
 			continue
 		var btn := CardView.new(CardView.Size.SMALL, "building", "Tool set", def["name"]).set_band_icon("hammer")
+		btn.set_picture(SpriteBook.shared().card_texture(def["role"]))
 		btn.set_price(run.stock, def["cost"])
 		btn.add_chip("for %ss" % content.townsfolk[def["role"]]["name"].to_lower(), "folk", CardView.TEXT, CardView.FAMILIES["folk"]["color"])
 		btn.tooltip_text = "%s\nOnce only. Every ingot spent here is one the smiths can't turn into hero gear.\nYou have %d bronze%s." % [
