@@ -121,6 +121,8 @@ func _init() -> void:
 			if run.phase == RunState.Phase.PICK:
 				run.choose_pick(bot.pick(run))
 			run.step()
+			# The view watches who falls once a frame; stepping many times a frame, it is told after each step.
+			main._arena.fallen.update(run.world, run.heroes, main._arena.motion, main._arena._has_art, Time.get_ticks_msec())
 			if lk.watch(main._arena, run.world) and (args["lastkill"] == "1" or lk.kill["ends"]):
 				break
 		main._set_speed(0)

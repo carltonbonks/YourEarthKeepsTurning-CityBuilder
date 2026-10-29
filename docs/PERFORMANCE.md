@@ -34,12 +34,27 @@ All of these give the same results as before: 96 seeded bot runs across four sty
 
 - Past about 1,000 people the cheapest route is design, not tuning: CLAUDE.md already says townsfolk are handled in aggregate. Simulate distant or idle townsfolk as crews (one unit standing for several people), and keep heroes individual.
 - Per-unit GDScript work (about 30 microseconds) is the floor. Moving `Pathing` or the folk tick to C# or a GDExtension would cut it several times over, at the cost of a second language in the project.
-- Drawing (`game/arena_view.gd`) has not been measured at these sizes. Measure it before relying on the numbers above for the web build.
+- Drawing: see "Drawing the map" below.
+
+## Drawing the map (2026-10-29, rendered art slice 5)
+
+`tools/draw_probe.gd` times `ArenaView._draw` itself (`draw_usec`: the script's work, not the graphics card's) on the same padded round-8 town, paused, at the tilted view's usual zoom, with the rendered art on and off. Measured in a cloud container under xvfb (slow CPU, like the step numbers above); the web build is slower again.
+
+| People | Art on (ms, avg / worst) | Art off | Art on before slice 5's fixes |
+| --- | --- | --- | --- |
+| 60 | 12.3 / 32 | 11.6 / 26 | 16.5 / 37 |
+| 175 | 18.0 / 38 | 16.5 / 30 | 22.6 / 46 |
+| 400 | 26.9 / 74 | 23.5 / 68 | 35.3 / 55 |
+
+Budget (docs/ART_SPEC.md): the art may add at most a quarter to the map's drawing; it adds about 1 to 3.5 ms (6 to 14%). Slice 5's fixes: `_scale()` and the ground rings' screen offsets are worked out once instead of thousands of times a frame, the nodes this age shows and the standing obstacles are listed once (`_refresh_standing`), and the plates' props remember which stand clear of nodes (`GroundProps._clear`).
+
+What costs time now: townsfolk, at about 30 microseconds each per frame with or without art (spot, shadow, marker, bars), so 175 people take about 5.5 ms. A 60 fps frame has 16.7 ms, so towns past about 150 people drop below 60 fps on the web. Next steps if that shows in play: draw townsfolk far from the camera as plain dots, skip bars for the unhurt, or batch the shadows into one polygon list.
 
 ## How to measure
 
 ```sh
 ~/godot/godot --headless --path . -s res://tools/perf_probe.gd -- people=60,175,400,850 seed=4821 round=8
+xvfb-run -a ~/godot/godot --path . -s res://tools/draw_probe.gd -- people=60,175,400
 ```
 
 To show that an optimisation changes nothing, compare seeded bot records before and after, for example by running `OUT=<dir> LABEL=x tools/balance.sh 24` in a worktree of `main` and on your branch, then `cmp` the `.jsonl` files.

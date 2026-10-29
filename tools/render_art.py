@@ -90,21 +90,29 @@ def light_and_camera(row):
 
 
 ## Animations every walker gets, in the order they sit along each row of its sheet, and their frames.
-ANIMS = [("idle", 1), ("walk", 6), ("attack", 4)]
+ANIMS = [("idle", 1), ("walk", 6), ("attack", 4), ("fall", 4), ("cheer", 2)]
 ## How an attack swings, frame by frame: the weapon arm (radians round the left-right axis: + is up and
 ## back, - forward), the other arm, and how far a beast lunges (model units along its facing).
 ATTACK_ARM = [1.4, 2.5, -0.6, -1.0]
 ATTACK_OFF_ARM = [-0.3, -0.4, 0.3, 0.2]
 ATTACK_LUNGE = [0.0, -0.08, 0.22, 0.12]
 STRIDE = 0.5  ## How far legs swing at mid-stride, radians.
+## How far over a falling walker has tipped, frame by frame (radians: a person falls on its back, a beast or a
+## ram rolls on its side), and how a cheer raises both arms (radians, as ATTACK_ARM) and lifts the figure.
+FALL_TILT = [0.45, 1.0, 1.45, 1.57]
+CHEER_ARMS = [2.5, 2.9]
+CHEER_LIFT = [0.0, 0.06]
 
 
-def pose(rig, anim, t, n, joints, pivot, facing_angle):
-    """Sets the joints (and the whole figure's lean) for frame t of n of an animation."""
+def pose(rig, anim, t, n, joints, pivot, facing_angle, height=1.0):
+    """Sets the joints (and the whole figure's lean) for frame t of n of an animation. `height` is how tall the
+    figure stands (model units), so a fallen one lies across the spot it stood on and stays inside its frame."""
     for j in joints.values():
         j.rotation_euler = (0, 0, 0)
     pivot.location = (0, 0, 0)
+    pivot.rotation_euler = (0, 0, -facing_angle)
     swing = {}
+    ahead = (math.cos(-facing_angle), math.sin(-facing_angle))
     if anim == "walk":
         p = math.sin(2 * math.pi * t / n)
         if rig == "humanoid":
@@ -123,6 +131,27 @@ def pose(rig, anim, t, n, joints, pivot, facing_angle):
             pivot.location = (lunge * math.cos(-facing_angle), lunge * math.sin(-facing_angle), 0)
             if rig == "quadruped":
                 swing = {"leg_fl": -2.0 * ATTACK_LUNGE[t], "leg_fr": -2.4 * ATTACK_LUNGE[t]}
+    elif anim == "fall":
+        tilt = FALL_TILT[t]
+        done = math.sin(tilt)
+        if rig == "humanoid":
+            # Backwards onto its back, arms flung out and legs giving way; the body's middle ends on its spot.
+            pivot.rotation_euler = (0, -tilt, -facing_angle)
+            shift = 0.5 * height * done
+            pivot.location = (ahead[0] * shift, ahead[1] * shift, 0.04 * done)
+            swing = {"arm_r": 1.6 * done, "arm_l": 1.2 * done, "leg_l": 0.5 * done, "leg_r": 0.2 * done}
+        elif rig == "none":
+            # A siege engine doesn't topple: it slumps to one side and sinks as it breaks.
+            pivot.rotation_euler = (0.3 * done, 0, -facing_angle)
+            pivot.location = (0, 0, -0.12 * done)
+        else:
+            pivot.rotation_euler = (tilt, 0, -facing_angle)
+            if rig == "quadruped":
+                swing = {"leg_fl": 0.4 * done, "leg_fr": -0.3 * done, "leg_bl": 0.3 * done, "leg_br": -0.4 * done}
+    elif anim == "cheer":
+        pivot.location = (0, 0, CHEER_LIFT[t] if rig != "none" else 0.0)
+        if rig == "humanoid":
+            swing = {"arm_r": CHEER_ARMS[t], "arm_l": CHEER_ARMS[1 - t]}
     for name, angle in swing.items():
         if name in joints:
             joints[name].rotation_euler = (0, angle, 0)
@@ -146,6 +175,17 @@ def build_scene(row, variant):
     return pivot, joints
 
 
+def figure_height():
+    """How tall the model stands, in model units (the top of its highest part)."""
+    bpy.context.view_layer.update()
+    top = 0.0
+    for obj in bpy.data.objects:
+        if obj.type == "MESH":
+            for corner in obj.bound_box:
+                top = max(top, (obj.matrix_world @ Vector(corner)).z)
+    return top or 1.0
+
+
 def render(sprite_id, row, out_dir, tmp_dir):
     facings = int(row["facings"])
     rig = row.get("rig", "")
@@ -158,6 +198,7 @@ def render(sprite_id, row, out_dir, tmp_dir):
     top = h
     for v in range(variants):
         pivot, joints = build_scene(row, v)
+        height = figure_height()
         sc, cam = light_and_camera(row)
         for i in range(facings):
             angle = math.radians(360.0 / facings * i)
@@ -168,7 +209,7 @@ def render(sprite_id, row, out_dir, tmp_dir):
                     if variants > 1 and t != v:
                         col += 1
                         continue
-                    pose(rig, anim, t, n, joints, pivot, angle)
+                    pose(rig, anim, t, n, joints, pivot, angle, height)
                     path = os.path.join(tmp_dir, "%s_%d_%d.png" % (sprite_id, i, col))
                     sc.render.filepath = path
                     bpy.ops.render.render(write_still=True)

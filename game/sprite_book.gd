@@ -80,10 +80,13 @@ func height_at(id: String, scale: float) -> float:
 	return float(_sprites[id]["figure_px"]) * scale
 
 
-## Which frame of `anim` (idle, walk, attack: see tools/render_art.py ANIMS) a walker shows: {"anim", "frame"}.
-## The walk steps with the ground walked, so legs keep pace at any speed; a blow plays through once.
+## Which frame of `anim` (idle, walk, attack, cheer: see tools/render_art.py ANIMS) a walker shows: {"anim", "frame"}.
+## The walk steps with the ground walked, so legs keep pace at any speed; a blow plays through once; a walker
+## told to cheer (look["cheer"], the frame) does so when standing still.
 func walker_frame(id: String, look: Dictionary) -> Dictionary:
 	var anims: Dictionary = _sprites[id].get("anims", {})
+	if look.has("cheer") and anims.has("cheer") and float(look.get("attack", -1.0)) < 0.0 and not look.get("walking", false):
+		return {"anim": "cheer", "frame": int(look["cheer"])}
 	if float(look.get("attack", -1.0)) >= 0.0 and anims.has("attack"):
 		return {"anim": "attack", "frame": int(float(look["attack"]) * int(anims["attack"][1]))}
 	if look.get("walking", false) and anims.has("walk"):

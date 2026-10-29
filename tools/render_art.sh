@@ -18,5 +18,10 @@ test -f art/sprites/index.json
 godot=${GODOT:-~/godot/godot}
 if [ -x "$godot" ]; then
   "$godot" --headless --path . --import >/dev/null 2>&1 || true
+  # Sprites ship as lossy WebP (quality 0.9), less than half the download of lossless (docs/ART_SPEC.md budget).
+  if grep -l "^compress/mode=0" art/sprites/*.png.import >/dev/null 2>&1; then
+    sed -i 's/^compress\/mode=0/compress\/mode=1/; s/^compress\/lossy_quality=.*/compress\/lossy_quality=0.9/' art/sprites/*.png.import
+    "$godot" --headless --path . --import >/dev/null 2>&1 || true
+  fi
 fi
 echo "Sprites in art/sprites/."

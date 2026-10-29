@@ -15,6 +15,11 @@ const EDGE := 10.0
 ## Props in each plate's own terms ([along 0..1, radius, look, size]) by plate index, made once per world.
 var _layout := {}
 var _world: World = null
+## Which props stand clear of nodes and dens (by plate index, a bool per prop), worked out again only when the
+## nodes standing or the plates change (a node worked out, a new age's nodes, a turn): checking every prop against every node each
+## frame cost more than drawing them.
+var _clear := {}
+var _clear_key := []
 
 
 ## Every prop to draw: [world position, sprite id, look (column), size] for the near ring as it lies, its plates
@@ -27,7 +32,17 @@ func props(w: World, slide: float, has_art: Callable) -> Array:
 	if w != _world:
 		_world = w
 		_layout.clear()
+		_clear.clear()
+		_clear_key = []
+	var standing := 0
+	for node in w.nodes:
+		if w.node_active(node):
+			standing += 1
 	var near: Dictionary = earth.rings[0]
+	var key := [standing, w.dens.size(), near["seams"][0] if not near["seams"].is_empty() else 0.0]
+	if key != _clear_key:
+		_clear_key = key
+		_clear.clear()
 	var seams: Array = near["seams"]
 	var r0 := float(near["r0"])
 	var r1 := float(near["r1"])
@@ -40,10 +55,16 @@ func props(w: World, slide: float, has_art: Callable) -> Array:
 		var width := fposmod(float(seams[(k + 1) % seams.size()]) - float(seams[k]), TAU)
 		if not _layout.has(k):
 			_layout[k] = _lay_out(k, width, r0, r1)
-		for p: Array in _layout[k]:
-			var at := Vector2.from_angle(a0 + width * float(p[0])) * float(p[1])
-			if _crowded(w, at):
+		var laid: Array = _layout[k]
+		if not _clear.has(k):
+			# Judged where the props lie now, between turns (slide 0), so a prop doesn't blink as its plate slides.
+			_clear[k] = laid.map(func(p: Array) -> bool:
+				return not _crowded(w, Vector2.from_angle(float(seams[k]) + width * float(p[0])) * float(p[1])))
+		for i in laid.size():
+			if not _clear[k][i]:
 				continue
+			var p: Array = laid[i]
+			var at := Vector2.from_angle(a0 + width * float(p[0])) * float(p[1])
 			out.append([at, id, p[2], p[3]])
 	return out
 
