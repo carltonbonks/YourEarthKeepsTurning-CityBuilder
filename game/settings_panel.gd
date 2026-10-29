@@ -39,7 +39,13 @@ static func fill(box: VBoxContainer, settings: GameSettings, on_change: Callable
 		settings.ui_scale = GameSettings.UI_SCALES[i]
 		changed.call())
 	_row(screen, "Interface size", scale)
-	UiKit.note(screen, "Interface size makes the cards and text bigger or smaller. V tilts the map in play.", UiKit.CAPTION).custom_minimum_size.x = 260
+	var art := CheckBox.new()
+	art.button_pressed = settings.art
+	art.toggled.connect(func(on: bool) -> void:
+		settings.art = on
+		changed.call())
+	_row(screen, "Rendered art", art)
+	UiKit.note(screen, "Interface size makes the cards and text bigger or smaller. Rendered art off draws everything as plain shapes. V tilts the map in play (the flat map is always shapes).", UiKit.CAPTION).custom_minimum_size.x = 260
 
 	var play := _column(cols, "Play")
 	var speed := OptionButton.new()

@@ -13,3 +13,6 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
+
+# Python caches from tools/render_art.py
+__pycache__/
