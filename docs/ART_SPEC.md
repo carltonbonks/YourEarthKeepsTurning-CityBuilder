@@ -30,7 +30,7 @@ Commit the model, the manifest row, the PNG, its `.import` file and `index.json`
 
 - **8 facings.** Facing 0 looks along +x on the sim's map, and each next one turns 45 degrees toward +y. The renderer turns the model for each facing.
 - **Animations (slice 2):** `idle`, `walk`, `work` (gather or carry), `attack` and `fall`, each 4 to 8 frames. Rigged characters use one humanoid rig with Mixamo-style bone names, so bought characters and animations share a skeleton. Beasts get their own rig per kind.
-- **Size on the map:** `height_r` in the manifest says how tall the figure stands, in multiples of the placeholder circle's radius (people 3.6, wolves 2.6).
+- **Size on the map:** `height_r` in the manifest says how tall the figure stands, in multiples of the placeholder circle's radius (townsfolk 2.9, wolves 2.2; heroes will use about 2.3 of their larger circle, so a hero stands a little taller than a townsperson, Yusuf 2026-10-29).
 
 ## Buildings
 

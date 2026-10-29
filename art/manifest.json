@@ -16,7 +16,7 @@
 			"frame": [96, 96],
 			"ortho": 2.4,
 			"facings": 8,
-			"height_r": 3.6,
+			"height_r": 2.9,
 			"licence": "Own work, built in code (art/models/tribesperson.py)"
 		},
 		"wolf": {
@@ -25,7 +25,7 @@
 			"frame": [96, 96],
 			"ortho": 2.4,
 			"facings": 8,
-			"height_r": 2.6,
+			"height_r": 2.2,
 			"licence": "Own work, built in code (art/models/wolf.py)"
 		}
 	}

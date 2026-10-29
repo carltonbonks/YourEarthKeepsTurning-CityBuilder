@@ -29,7 +29,7 @@
 			],
 			"px_per_unit": 40.0,
 			"figure_px": 65.29,
-			"height_r": 3.6
+			"height_r": 2.9
 		},
 		"wolf": {
 			"kind": "enemy",
@@ -44,7 +44,7 @@
 			],
 			"px_per_unit": 40.0,
 			"figure_px": 44.29,
-			"height_r": 2.6
+			"height_r": 2.2
 		}
 	}
 }
