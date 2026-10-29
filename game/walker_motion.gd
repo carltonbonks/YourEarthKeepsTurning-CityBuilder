@@ -69,3 +69,8 @@ func look(u: Unit, raw: Vector2, facings: int, now: float) -> Dictionary:
 		"attack": swing if swing >= 0.0 and swing < 1.0 else -1.0,
 		"tint": Color.WHITE.lerp(HIT_TINT, flash),
 	}
+
+
+## Where a walker was last drawn and which way it faced ({"at", "facing", ...}), or {} if it never was.
+func last(u: Unit) -> Dictionary:
+	return _seen.get(u.get_instance_id(), {})

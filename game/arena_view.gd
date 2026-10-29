@@ -17,6 +17,8 @@ const HERO_RADIUS := 9.0
 const FOLK_RADIUS := 5.5
 const ENEMY_RADIUS := 7.0
 const BOSS_RADIUS := 15.0
+## How long the town cheers when it reaches a new age, and a hero as they level up (real ms).
+const CHEER_MS := 2600.0
 const MIN_ZOOM := 1.0
 const MAX_ZOOM := 4.0
 const PAVE_GLOW_SECONDS := 6.0
@@ -37,7 +39,7 @@ const INVADER_GLOW_DAY := 0.08
 const INVADER_GLOW_NIGHT := 0.3
 const INVADER_RED := Color(1.0, 0.18, 0.12)
 ## What each kind of standing thing is, for the back-to-front pass.
-enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO, PEDLAR, OBSTACLE, PROP }
+enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO, PEDLAR, OBSTACLE, PROP, BODY }
 
 ## A won run's ending has played out (or was clicked past): the end screen can open.
 signal victory_done
@@ -76,6 +78,17 @@ var sprites := SpriteBook.new()
 var art := true
 ## How each walker's sprite moves, faces, swings and flashes between sim steps.
 var motion := WalkerMotion.new()
+var fallen := Fallen.new()
+## How long the last frame's drawing took (microseconds), for tools/draw_probe.gd.
+var draw_usec := 0
+## _scale's last answer and what it was for ([zoom, size, iso, run]); _ground_ring's unit rings on screen.
+var _scale_at := 1.0
+var _scale_for: Array = [-1.0, Vector2.ZERO, false, null]
+var _ring_dirs := {}
+## What _refresh_standing last worked out, and for what.
+var _standing_key := []
+var _age_nodes: Array = []
+var _obstacles: Array = []
 var ground_props := GroundProps.new()
 var _light_layer: Control
 var _top_layer: Control
@@ -167,6 +180,7 @@ func _process(delta: float) -> void:
 		pickups.update(run.world, Time.get_ticks_msec())
 		supplies.update(run.world, Time.get_ticks_msec())
 		celebrations.update(run, Time.get_ticks_msec())
+		fallen.update(run.world, run.heroes, motion, _has_art, Time.get_ticks_msec())
 		if victory.update(self, Time.get_ticks_msec()):
 			victory_done.emit()
 	queue_redraw()
@@ -221,9 +235,14 @@ func _notification(what: int) -> void:
 func _scale() -> float:
 	if run == null:
 		return 1.0
+	# Asked for thousands of times a frame, so kept until the zoom, the view's size or the tilt changes.
+	if zoom == _scale_for[0] and size == _scale_for[1] and iso == _scale_for[2] and run == _scale_for[3]:
+		return _scale_at
 	# Tilted, the map is half as tall as it is wide, so it can fill more of a wide screen.
 	var fit := minf(size.x, size.y / ISO_SQUASH) * 0.8 if iso else minf(size.x, size.y)
-	return fit / (run.content.num("world_radius") * 2.1) * zoom
+	_scale_at = fit / (run.content.num("world_radius") * 2.1) * zoom
+	_scale_for = [zoom, size, iso, run]
+	return _scale_at
 
 
 ## A world offset as a screen offset before zooming: turned 45 degrees and squashed when tilted.
@@ -264,6 +283,7 @@ func _lift(height: float) -> float:
 func _draw() -> void:
 	if run == null:
 		return
+	var started := Time.get_ticks_usec()
 	var content := run.content
 	var w := run.world
 	var s := _scale()
@@ -299,15 +319,15 @@ func _draw() -> void:
 	# The flat view keeps the old layers (resources, dens, buildings, hearth, townsfolk, enemies, heroes).
 	var things: Array = []
 	var keys := PackedInt64Array()
-	for node in w.nodes:
-		if w.node_active(node):
+	_refresh_standing(w)
+	for node: Dictionary in _age_nodes:
+		if not node.get("gone", false):
 			_queue(things, keys, Kind.NODE, node, node["pos"])
 	for den in w.dens:
 		_queue(things, keys, Kind.DEN, den, den["pos"])
 	# With rendered art, obstacles stand up off their plots and the turning ring's plates carry their own look.
-	for k in w.town.plots.size():
-		var plot: Dictionary = w.town.plots[k]
-		if plot["obstacle"] != "" and int(plot["building"]) < 0 and w.town.ring_open(plot) and _has_art(plot["obstacle"]):
+	for plot: Dictionary in _obstacles:
+		if _has_art(plot["obstacle"]):
 			_queue(things, keys, Kind.OBSTACLE, plot, plot["pos"])
 	for prop: Array in ground_props.props(w, _slide_angle(0), _has_art):
 		_queue(things, keys, Kind.PROP, prop, prop[0])
@@ -317,6 +337,8 @@ func _draw() -> void:
 		_queue(things, keys, Kind.PEDLAR, null, w.pedlar.camp["pos"])
 	_queue(things, keys, Kind.HEARTH, null, Vector2.ZERO)
 	var now := float(Time.get_ticks_msec())
+	for body: Dictionary in fallen.bodies:
+		_queue(things, keys, Kind.BODY, body, body["at"])
 	for u in w.folk:
 		if u.alive:
 			_queue(things, keys, Kind.FOLK, u, victory.place(u, now))
@@ -349,6 +371,8 @@ func _draw() -> void:
 			Kind.OBSTACLE:
 				var plot: Dictionary = thing[1]
 				sprites.draw(self, plot["obstacle"], _to_screen(plot["pos"]), sprites.building_scale(plot["obstacle"], _scale()))
+			Kind.BODY:
+				_draw_body(thing[1], now)
 			Kind.PROP:
 				var prop: Array = thing[1]
 				sprites.draw(self, prop[1], _to_screen(prop[0]), sprites.building_scale(prop[1], _scale()) * float(prop[3]), 0,
@@ -371,6 +395,20 @@ func _draw() -> void:
 		func(bi: int) -> Vector2: return _to_screen(w.buildings[bi]["pos"]) - Vector2(0.0, _building_lift(bi)))
 	celebrations.draw_highlights(self, size, Time.get_ticks_msec(), _to_screen, main_color)
 	last_kill.draw(self)
+	draw_usec = Time.get_ticks_usec() - started
+
+
+## The nodes this age shows and the obstacles still standing on open plots, worked out again only when the age,
+## the buildings or the open rings change (and every few seconds, for plots cleared): checking every node's age and every plot each frame cost more than
+## drawing them.
+func _refresh_standing(w: World) -> void:
+	var key := [w, run.age, w.nodes.size(), w.buildings.size(), run.rings_open, int(w.time / 5.0)]
+	if key == _standing_key:
+		return
+	_standing_key = key
+	_age_nodes = w.nodes.filter(func(n: Dictionary) -> bool: return run.content.age_reached(run.age, n.get("age", "")))
+	_obstacles = w.town.plots.filter(func(p: Dictionary) -> bool:
+		return p["obstacle"] != "" and int(p["building"]) < 0 and w.town.ring_open(p))
 
 
 ## Shots fly at chest height.
@@ -662,6 +700,9 @@ func _draw_folk(u: Unit) -> void:
 	if _has_art(u.type_id):
 		look = _look(u, at, u.type_id, now)
 		at = look["at"]
+		var cheer := _cheer(u, now)
+		if cheer >= 0:
+			look["cheer"] = cheer
 	var p := _stand(at, r) - Vector2(0.0, victory.hop(u, now) * r)
 	_shadow(at, r)
 	if u.sergeant:
@@ -729,6 +770,39 @@ func _draw_enemy(e: Unit) -> void:
 	_bar(top + Vector2(-r, -5), r * 2.0, e.hp_fraction(), Color("#e05050"))
 
 
+## Someone who fell (Fallen): their fall frames where they stood, a little darker, fading at the end; a hero's
+## ring spreads round them as they go down.
+func _draw_body(b: Dictionary, now: float) -> void:
+	var id: String = b["id"]
+	if not _has_art(id) or not sprites.info(id).get("anims", {}).has("fall"):
+		return
+	var r := (HERO_RADIUS if b["hero"] else (BOSS_RADIUS if b["boss"] else ENEMY_RADIUS) if b["enemy"] else FOLK_RADIUS) * maxf(1.0, zoom * 0.7)
+	var spread := fallen.ring(b, now)
+	if not spread.is_empty():
+		var tint := Color(run.content.hero_classes[id]["color"]) if run.content.hero_classes.has(id) else UiKit.GOLD
+		draw_polyline(_closed(_ground_ring(b["at"], r * float(spread[0]) / _scale(), 32)), Color(tint, 0.8 * float(spread[1])), 2.5)
+	var frames := int(sprites.info(id)["anims"]["fall"][1])
+	sprites.draw(self, id, _to_screen(b["at"]), sprites.walker_scale(id, r), int(b["facing"]),
+		Color(0.78, 0.74, 0.72, fallen.opacity(b, now)), "fall", fallen.frame(b, frames, now))
+
+
+## Whether someone cheers this frame and with which cheer frame, or -1: everyone home round the hearth after a
+## win (arms up at the top of each jump), the whole town for a moment when it reaches a new age, a hero as they
+## level up.
+func _cheer(u: Unit, now: float) -> int:
+	if victory.active():
+		var hop := victory.hop(u, now)
+		return -1 if hop <= 0.0 else (1 if hop > Victory.HOP * 0.5 else 0)
+	var beat := -1.0
+	if not celebrations.age_up.is_empty():
+		beat = now - float(celebrations.age_up["born"])
+	elif u.is_hero() and celebrations.halos.has(u.id):
+		beat = now - float(celebrations.halos[u.id]["born"])
+	if beat < 0.0 or beat > CHEER_MS:
+		return -1
+	return int(beat / 260.0 + u.get_instance_id() % 3) % 2
+
+
 ## True when `id` is drawn as its rendered sprite (tilted view, Rendered art on, and art exists for it).
 func _has_art(id: String) -> bool:
 	return art and iso and sprites.has(id)
@@ -761,9 +835,20 @@ func _ground_circle(p: Vector2, radius: float, color: Color, points: int) -> voi
 
 
 func _ground_ring(p: Vector2, radius: float, points: int) -> PackedVector2Array:
+	# The ring's points sit at fixed screen offsets from its middle, so they are worked out once per number of points.
+	var key := points * 2 + (1 if iso else 0)
+	if not _ring_dirs.has(key):
+		var dirs := PackedVector2Array()
+		for k in points:
+			dirs.append(_project(Vector2.from_angle(TAU * k / points)))
+		_ring_dirs[key] = dirs
+	var mid := _to_screen(p)
+	var reach := radius * _scale()
 	var out := PackedVector2Array()
+	out.resize(points)
+	var dirs: PackedVector2Array = _ring_dirs[key]
 	for k in points:
-		out.append(_to_screen(p + Vector2.from_angle(TAU * k / points) * radius))
+		out[k] = mid + dirs[k] * reach
 	return out
 
 
@@ -913,6 +998,9 @@ func _draw_hero(hero: Unit, font: Font) -> void:
 func _draw_hero_sprite(hero: Unit, place: Vector2, r: float, color: Color, font: Font, now: float) -> void:
 	var look := _look(hero, place, hero.type_id, now)
 	var at: Vector2 = look["at"]
+	var cheer := _cheer(hero, now)
+	if cheer >= 0:
+		look["cheer"] = cheer
 	var feet := _to_screen(at) - Vector2(0.0, victory.hop(hero, now) * r)
 	_shadow(at, r)
 	var ring := _closed(_ground_ring(at, r * 0.9 / _scale(), 18))

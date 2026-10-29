@@ -29,7 +29,7 @@ Commit the model, the manifest row, the PNG, its `.import` file and `index.json`
 ## Walkers
 
 - **8 facings.** Facing 0 looks along +x on the sim's map, and each next one turns 45 degrees toward +y. The renderer turns the model for each facing.
-- **Animations (slice 2):** `idle` (1 frame), `walk` (6) and `attack` (4), posed by `tools/render_art.py` from a simple joint rig: our script models hang their arms and legs on empties named `arm_l`, `arm_r`, `leg_l`, `leg_r` (humanoid) or `leg_fl`, `leg_fr`, `leg_bl`, `leg_br` (quadruped); `rig: none` only bobs and lunges. `work` (gather or carry) and `fall` come later. Bought rigged characters should use one humanoid rig with Mixamo-style bone names, so they and their animations share a skeleton; the renderer will play their clips into the same columns. Beasts get their own rig per kind.
+- **Animations (slices 2 and 5):** `idle` (1 frame), `walk` (6), `attack` (4), `fall` (4) and `cheer` (2), posed by `tools/render_art.py` from a simple joint rig: our script models hang their arms and legs on empties named `arm_l`, `arm_r`, `leg_l`, `leg_r` (humanoid) or `leg_fl`, `leg_fr`, `leg_bl`, `leg_br` (quadruped); `rig: none` only bobs, lunges and slumps. A person falls on its back across the spot it stood on (so it stays in its frame), a beast rolls on its side; a cheer raises both arms with a little jump. `work` (gather or carry) comes later. Bought rigged characters should use one humanoid rig with Mixamo-style bone names, so they and their animations share a skeleton; the renderer will play their clips into the same columns. Beasts get their own rig per kind.
 - **How they move on the map:** `game/walker_motion.gd` glides each sprite between the sim's steps, turns it the way it walks, steps the walk with the ground covered, plays a blow when it strikes (facing its target) and flashes it when hit.
 - **Size on the map:** `height_r` in the manifest says how tall the figure stands, in multiples of the placeholder circle's radius (townsfolk 2.9, wolves 2.2; heroes about 2.25 to 2.4 of their larger circle, so a hero stands a little taller than a townsperson, Yusuf 2026-10-29).
 
@@ -48,6 +48,16 @@ Commit the model, the manifest row, the PNG, its `.import` file and `index.json`
 - **A picture strip under the band** on every card that has art (`CardView.set_picture`): buildings, upgrades and crafts show their building (a craft its workshop, a tradition its first blueprint), people their role, heroes their class, promotions what they become, the pedlar its camp, relics and spoils their trinket. A card without art keeps its old look.
 - **Cut from the map sprites:** `SpriteBook.card_texture(id, look)` crops a sprite's idle frame (walkers' second facing, turned a little toward the viewer) to its figure, using `card_boxes` that `tools/render_art.py` writes into index.json for every look. Nothing is drawn twice, so bought art for the map shows on cards too.
 - **Relic and item icons** are their own sheets (kind `icon`): `relic_icons` (one column per look) and `item_icons` (one per item base), built from `art/lib/trinkets.py`. `art/card_art.json` maps each relic to a look (several relics may share one) and lists item bases in column order; `tests/test_art.gd` fails if a relic or item base has no picture. A legend's card shows its gear as small item icons.
+
+## Landing moments (slice 5)
+
+- **Deaths:** `game/fallen.gd` notices each walker killed in a fight and leaves its body where it was last drawn: the `fall` frames play once (0.42 s real time), it lies 7 s (a hero 16 s, with a ring in the class's colour spreading round them as they fall) and fades over 1.5 s. At most 150 bodies; raiders who slip away and people who leave town leave none.
+- **Cheering:** at a win everyone home round the hearth throws their arms up at the top of each jump; when the town reaches a new age everyone cheers for 2.6 s, and a hero does as they level up (ArenaView `_cheer`).
+
+## Budget (slice 5)
+
+- **Download:** sprites ship as lossy WebP at quality 0.9 (`compress/mode=1` in each `.import`; `tools/render_art.sh` sets it), which took the web build's data from 15.3 MB to 6.6 MB. The source PNGs stay under 14 MB (`tests/test_art.gd`; 11 MB now). Bought art must fit the same frame sizes so the budget holds.
+- **Frame rate:** the art may add at most a quarter to the map's drawing time (`tools/draw_probe.gd`; numbers in [PERFORMANCE.md](PERFORMANCE.md)). It adds 6 to 14% today.
 
 ## Bought or commissioned art
 

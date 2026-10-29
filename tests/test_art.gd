@@ -6,6 +6,8 @@ extends TestCase
 ## Kinds of art and the content table their ids come from (scenery has a fixed list: things with no table of their own).
 const WALKERS := ["townsfolk", "hero", "enemy"]
 const SCENERY := ["barricade", "pedlar_camp", "hearth"]
+## The sprites' source PNGs may take this much of the repository (docs/ART_SPEC.md budget).
+const SPRITE_BUDGET_MB := 14
 
 
 func _json(path: String) -> Dictionary:
@@ -88,6 +90,7 @@ func test_every_row_is_rendered_and_every_sprite_has_a_row() -> void:
 			"%s's sheet holds a row per facing and a column per animation frame" % id)
 		if info["kind"] in WALKERS:
 			check(info["anims"].has("walk") and info["anims"].has("attack"), "%s walks and strikes" % id)
+			check(info["anims"].has("fall") and info["anims"].has("cheer"), "%s falls and cheers" % id)
 		else:
 			check_eq(int(info["anims"]["idle"][1]), int(info.get("variants", 1)), "%s has a column per look" % id)
 		check(float(info["figure_px"]) > 0.0, "%s stands above its feet" % id)
@@ -144,6 +147,12 @@ func test_walkers_glide_walk_strike_and_flash() -> void:
 	check_eq(book.walker_frame("tribesperson", struck)["anim"], "attack", "a swing shows the attack frames")
 	check_eq(book.walker_frame("tribesperson", moved)["anim"], "walk", "a walker shows the walk frames")
 	check_eq(book.walker_frame("tribesperson", later)["anim"], "idle", "a stander stands")
+	var glad := later.duplicate()
+	glad["cheer"] = 1
+	check_eq(book.walker_frame("tribesperson", glad), {"anim": "cheer", "frame": 1}, "a stander told to cheer cheers")
+	var busy := struck.duplicate()
+	busy["cheer"] = 1
+	check_eq(book.walker_frame("tribesperson", busy)["anim"], "attack", "but a blow comes first")
 
 
 func test_plates_carry_their_own_look_and_turn_with_the_ring() -> void:
@@ -202,3 +211,51 @@ func test_cards_show_their_picture_under_the_band() -> void:
 	check(plain.find_child("Picture", true, false) == null, "a card without art keeps its old look")
 	card.free()
 	plain.free()
+
+
+func test_the_fallen_fall_lie_and_fade() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	var w := run.world
+	var fallen := Fallen.new()
+	var motion := WalkerMotion.new()
+	var art := func(_id: String) -> bool: return true
+	var folk: Unit = w.folk[0]
+	var hero: Unit = run.heroes[0]
+	motion.look(folk, Vector2(40, 0), 8, 0.0)
+	fallen.update(w, run.heroes, motion, art, 0.0)
+	check(fallen.bodies.is_empty(), "nobody has fallen yet")
+	folk.alive = false
+	folk.hp = 0.0
+	w.folk.erase(folk)
+	hero.alive = false
+	hero.hp = 0.0
+	fallen.update(w, run.heroes, motion, art, 100.0)
+	check_eq(fallen.bodies.size(), 2, "a townsperson and a hero fell, even once the town has let them go")
+	var body: Dictionary = fallen.bodies[0] if not fallen.bodies[0]["hero"] else fallen.bodies[1]
+	check_eq(Vector2(body["at"]), Vector2(40, 0), "a body lies where its walker was last drawn")
+	check_eq(int(body["facing"]), 4, "facing the way it last faced")
+	check_eq(fallen.frame(body, 4, 100.0), 0, "the fall starts at its first frame")
+	check_eq(fallen.frame(body, 4, 100.0 + Fallen.FALL_MS * 2.0), 3, "and lies on the last")
+	check_eq(fallen.opacity(body, 100.0 + Fallen.LIE_MS * 0.5), 1.0, "it lies a while")
+	check(fallen.opacity(body, 100.0 + Fallen.LIE_MS + Fallen.FADE_MS * 0.5) < 1.0, "then fades")
+	var hero_body: Dictionary = fallen.bodies[0] if fallen.bodies[0]["hero"] else fallen.bodies[1]
+	check(not fallen.ring(hero_body, 200.0).is_empty(), "a fallen hero's ring spreads")
+	check(fallen.ring(body, 200.0).is_empty(), "a townsperson's doesn't")
+	fallen.update(w, run.heroes, motion, art, 100.0 + Fallen.LIE_MS + Fallen.FADE_MS + 1.0)
+	check_eq(fallen.bodies.size(), 1, "a faded body is gone; a hero lies longer")
+	var leaver: Unit = w.folk[0]
+	fallen.update(w, run.heroes, motion, art, 200.0)
+	leaver.alive = false
+	fallen.update(w, run.heroes, motion, art, 300.0)
+	check_eq(fallen.bodies.size(), 1, "someone gone without a killing blow (hp left) leaves no body")
+
+
+func test_sprites_fit_the_download_budget() -> void:
+	# docs/ART_SPEC.md: sprites ship as lossy WebP at quality 0.9, and their sources stay under the budget.
+	var total := 0
+	for f in DirAccess.get_files_at("res://art/sprites"):
+		if f.ends_with(".png"):
+			total += FileAccess.get_file_as_bytes("res://art/sprites/" + f).size()
+			var imported := FileAccess.get_file_as_string("res://art/sprites/" + f + ".import")
+			check(imported.contains("compress/mode=1"), "%s ships as lossy WebP (tools/render_art.sh sets it)" % f)
+	check(total <= SPRITE_BUDGET_MB * 1024 * 1024, "sprites take %.1f MB of the %d MB budget" % [total / 1048576.0, SPRITE_BUDGET_MB])
