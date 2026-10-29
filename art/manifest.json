@@ -1,5 +1,5 @@
 {
-	"_note": "Every piece of map art, by content id (the id in data/*.json it draws). tools/render_art.sh renders each one from its model into art/sprites/<id>.png (one row per facing, one column per animation frame: idle, walk, attack) plus art/sprites/index.json, which the game reads (game/sprite_book.gd); an id with no row here is drawn as its placeholder shape. kind = building, townsfolk, hero, enemy, node, den, obstacle, plate (plate_<kind>, the turning ring's props) or scenery (barricade, pedlar_camp, hearth): the content table the id is checked against (tests/test_art.gd). model = the source: a Blender Python script under art/models/ with a build(kit) function, or later a .glb file (see docs/ART_SPEC.md). frame = [width, height] in pixels of one rendered frame. ortho = how many model units the frame spans across (the camera's orthographic scale), so pixels per unit = frame width / ortho. rig = how a walker moves for its animations (humanoid, quadruped, or none for things like the ram that only rock and lunge; tools/render_art.py poses it), left out for buildings. variants = how many looks a prop comes in (its build(kit, variant) is rendered once per column). facings = 1 for buildings (the camera never turns), 8 for gates and barricades (turned across the way through) or 8 for anything that walks (facing 0 looks along +x in the sim, each next one 45 degrees round toward +y). Buildings: world_per_unit = sim world units per model unit, so the sprite is drawn at the map's own scale. Walkers: height_r = how tall the figure stands on screen, in multiples of the placeholder circle's radius it replaces. licence = where the art comes from and the terms it is used under (CC0 packs, own work, bought); a credits screen is built from these lines.",
+	"_note": "Every piece of map art, by content id (the id in data/*.json it draws). tools/render_art.sh renders each one from its model into art/sprites/<id>.png (one row per facing, one column per animation frame: idle, walk, attack) plus art/sprites/index.json, which the game reads (game/sprite_book.gd); an id with no row here is drawn as its placeholder shape. kind = building, townsfolk, hero, enemy, node, den, obstacle, plate (plate_<kind>, the turning ring's props) scenery (barricade, pedlar_camp, hearth) or icon (relic_icons, item_icons: the cards' relic and item pictures, one column per look in art/card_art.json): the content table the id is checked against (tests/test_art.gd). model = the source: a Blender Python script under art/models/ with a build(kit) function, or later a .glb file (see docs/ART_SPEC.md). frame = [width, height] in pixels of one rendered frame. ortho = how many model units the frame spans across (the camera's orthographic scale), so pixels per unit = frame width / ortho. rig = how a walker moves for its animations (humanoid, quadruped, or none for things like the ram that only rock and lunge; tools/render_art.py poses it), left out for buildings. variants = how many looks a prop comes in (its build(kit, variant) is rendered once per column). facings = 1 for buildings (the camera never turns), 8 for gates and barricades (turned across the way through) or 8 for anything that walks (facing 0 looks along +x in the sim, each next one 45 degrees round toward +y). Buildings: world_per_unit = sim world units per model unit, so the sprite is drawn at the map's own scale. Walkers: height_r = how tall the figure stands on screen, in multiples of the placeholder circle's radius it replaces. licence = where the art comes from and the terms it is used under (CC0 packs, own work, bought); a credits screen is built from these lines.",
 	"sprites": {
 		"hut": {
 			"kind": "building",
@@ -851,6 +851,26 @@
 			"variants": 2,
 			"world_per_unit": 9.0,
 			"licence": "Own work, built in code (art/models/hearth.py)"
+		},
+		"relic_icons": {
+			"kind": "icon",
+			"model": "art/models/relic_icons.py",
+			"frame": [128, 128],
+			"ortho": 1.25,
+			"facings": 1,
+			"variants": 36,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/relic_icons.py, art/lib/trinkets.py)"
+		},
+		"item_icons": {
+			"kind": "icon",
+			"model": "art/models/item_icons.py",
+			"frame": [128, 128],
+			"ortho": 1.25,
+			"facings": 1,
+			"variants": 24,
+			"world_per_unit": 9.0,
+			"licence": "Own work, built in code (art/models/item_icons.py, art/lib/trinkets.py)"
 		}
 	}
 }

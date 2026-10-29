@@ -60,6 +60,8 @@ var _price: HBoxContainer
 var _gives: HFlowContainer
 var _plaques: VBoxContainer
 var _body: Label
+## The picture under the band (set_picture), or null.
+var _picture: TextureRect = null
 var _footer: Label
 var _selected := false
 ## How many lines the body may take when there is room (set_body_lines), and whether it has text to show.
@@ -165,6 +167,64 @@ func _init(sz := Size.LARGE, fam := "folk", kind := "", title := "") -> void:
 	_apply_frame()
 
 
+## How tall a card's picture strip is, by size (rendered art slice 4).
+const PICTURE_HEIGHT := {Size.LARGE: 78.0, Size.MEDIUM: 62.0, Size.SMALL: 40.0}
+## A picture squeezed shorter than this is left out.
+const MIN_PICTURE := 20.0
+
+
+## A picture under the band (rendered art slice 4): the person, building or thing the card is about, from
+## SpriteBook.card_texture. Null leaves the card as it was.
+func set_picture(tex: Texture2D) -> CardView:
+	if tex == null:
+		return self
+	var strip := PanelContainer.new()
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var st := StyleBoxFlat.new()
+	st.bg_color = FACE.darkened(0.45)
+	st.border_color = Color(family_color(), 0.25)
+	st.border_width_bottom = 1
+	st.content_margin_top = 3
+	st.content_margin_bottom = 3
+	strip.add_theme_stylebox_override("panel", st)
+	var pic := TextureRect.new()
+	pic.name = "Picture"
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pic.texture = tex
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	pic.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	pic.custom_minimum_size = Vector2(0, PICTURE_HEIGHT[card_size])
+	strip.add_child(pic)
+	_picture = pic
+	_box.add_child(strip)
+	_box.move_child(strip, 1)
+	return self
+
+
+
+## Small pictures in the gives row (a legend's gear), skipping any without art.
+func add_pictures(texs: Array) -> CardView:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 2)
+	for tex: Texture2D in texs:
+		if tex == null:
+			continue
+		var pic := TextureRect.new()
+		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pic.texture = tex
+		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		pic.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		pic.custom_minimum_size = Vector2(26, 26)
+		row.add_child(pic)
+	if row.get_child_count() > 0:
+		_gives.add_child(row)
+	else:
+		row.free()
+	return self
+
 ## A coloured dot before the name (a hero's class colour).
 func add_title_dot(tint: Color) -> CardView:
 	var dot := CardIcon.make("dot", tint, 12.0)
@@ -196,6 +256,16 @@ func _fit() -> void:
 	# room the rest of the card leaves and one line's height, not by trimming and measuring again (which ran a long
 	# body down to nothing: the craftsperson's dawn card showed no words).
 	_body.visible = false
+	# Then the picture shrinks, and goes when too small to read, so the card keeps its shape (a small hand card
+	# with an advice ribbon).
+	if _picture != null:
+		_picture.custom_minimum_size.y = PICTURE_HEIGHT[card_size]
+		_picture.get_parent().visible = true
+		var over: float = _box.get_combined_minimum_size().y + 4.0 - SHAPE[card_size].y
+		if over > 0.0:
+			var h: float = PICTURE_HEIGHT[card_size] - over
+			_picture.custom_minimum_size.y = maxf(h, 0.0)
+			_picture.get_parent().visible = h >= MIN_PICTURE
 	var room: float = SHAPE[card_size].y - _box.get_combined_minimum_size().y - 4.0
 	var step := float(_body.get_line_height()) + float(_body.get_theme_constant("line_spacing"))
 	var lines := mini(_body_lines, floori((room + float(_body.get_theme_constant("line_spacing"))) / step)) if step > 0.0 else 0

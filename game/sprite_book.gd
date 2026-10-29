@@ -7,8 +7,20 @@ extends RefCounted
 
 const INDEX := "res://art/sprites/index.json"
 
+const CARD_ART := "res://art/card_art.json"
+
 ## id -> what index.json says about it, plus "texture".
 var _sprites := {}
+## art/card_art.json: which column of the icon sheets each item base and relic shows.
+var _card_art := {}
+static var _shared: SpriteBook = null
+
+
+## One book for the whole game (cards ask for pictures often; the sheets load once).
+static func shared() -> SpriteBook:
+	if _shared == null:
+		_shared = SpriteBook.new()
+	return _shared
 
 
 func _init() -> void:
@@ -25,6 +37,10 @@ func _init() -> void:
 		var info: Dictionary = sprites[id].duplicate()
 		info["texture"] = tex
 		_sprites[id] = info
+	if FileAccess.file_exists(CARD_ART):
+		var art: Variant = JSON.parse_string(FileAccess.get_file_as_string(CARD_ART))
+		if art is Dictionary:
+			_card_art = art
 
 
 func has(id: String) -> bool:
@@ -93,3 +109,38 @@ func draw(canvas: CanvasItem, id: String, feet: Vector2, scale: float, facing :=
 func draw_walker(canvas: CanvasItem, id: String, feet: Vector2, scale: float, look: Dictionary, tint := Color.WHITE) -> void:
 	var f := walker_frame(id, look)
 	draw(canvas, id, feet, scale, int(look["facing"]), tint * Color(look["tint"]), f["anim"], f["frame"])
+
+
+## A card's picture of `id` (rendered art slice 4): look `look` (a column of its idle frames) seen as a card shows
+## it, cropped to the figure with a little room round it. Null when `id` has no art.
+func card_texture(id: String, look := 0) -> Texture2D:
+	if not _sprites.has(id):
+		return null
+	var s: Dictionary = _sprites[id]
+	var frame := Vector2(s["frame"][0], s["frame"][1])
+	var span: Array = s["anims"]["idle"]
+	var col := int(span[0]) + clampi(look, 0, int(span[1]) - 1)
+	var row := 1 if int(s["facings"]) > 1 else 0
+	var boxes: Array = s.get("card_boxes", [])
+	var box := Rect2(Vector2.ZERO, frame)
+	if look < boxes.size():
+		var b: Array = boxes[look]
+		box = Rect2(b[0], b[1], b[2], b[3]).grow(maxf(2.0, 0.06 * maxf(b[2], b[3]))).intersection(Rect2(Vector2.ZERO, frame))
+	var tex := AtlasTexture.new()
+	tex.atlas = s["texture"]
+	tex.region = Rect2(Vector2(frame.x * col, frame.y * row) + box.position, box.size)
+	return tex
+
+
+## The picture for an item base (data/items.json), or null.
+func item_texture(base: String) -> Texture2D:
+	var at: int = _card_art.get("items", []).find(base)
+	return card_texture("item_icons", at) if at >= 0 else null
+
+
+## The picture for a relic (data/relics.json): the look art/card_art.json gives it, or null.
+func relic_texture(relic_id: String) -> Texture2D:
+	var look: String = _card_art.get("relics", {}).get(relic_id, "")
+	var at: int = _card_art.get("relic_looks", []).find(look)
+	return card_texture("relic_icons", at) if at >= 0 else null
+
