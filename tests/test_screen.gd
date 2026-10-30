@@ -9,7 +9,8 @@ func test_screen_shows_every_phase_of_a_run() -> void:
 	# Built outside the scene tree (the test runner has no frames), so _ready is called by hand.
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
-	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	(screen.get("settings") as GameSettings).intro_seen = true  # No tour here.
+	(screen.get("settings") as GameSettings).tour = false
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	var bot := AutoPlayer.new()
@@ -58,7 +59,8 @@ func test_every_kind_of_card_shows() -> void:
 	# and every tool set and some caravan deals in the building hand.
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
-	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	(screen.get("settings") as GameSettings).intro_seen = true  # No tour here.
+	(screen.get("settings") as GameSettings).tour = false
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	run.age = "medieval"
@@ -98,7 +100,8 @@ func test_every_kind_of_card_shows() -> void:
 func test_the_draft_is_a_pick_to_answer_before_building() -> void:
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
-	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	(screen.get("settings") as GameSettings).intro_seen = true  # No tour here.
+	(screen.get("settings") as GameSettings).tour = false
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	run.choose_traditions([])
@@ -142,7 +145,8 @@ func test_the_draft_is_a_pick_to_answer_before_building() -> void:
 func test_night_closes_in_on_the_town_and_keeps_the_speed() -> void:
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
-	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	(screen.get("settings") as GameSettings).intro_seen = true  # No tour here.
+	(screen.get("settings") as GameSettings).tour = false
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	var arena: ArenaView = screen.get("_arena")
@@ -217,7 +221,8 @@ func test_the_attack_night_frames_the_way_it_comes_in() -> void:
 func test_a_won_run_celebrates_round_the_hearth_before_the_end_screen() -> void:
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
-	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	(screen.get("settings") as GameSettings).intro_seen = true  # No tour here.
+	(screen.get("settings") as GameSettings).tour = false
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	var arena: ArenaView = screen.get("_arena")
@@ -255,7 +260,8 @@ func test_a_won_run_celebrates_round_the_hearth_before_the_end_screen() -> void:
 func test_a_click_skips_to_the_end_screen() -> void:
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
-	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	(screen.get("settings") as GameSettings).intro_seen = true  # No tour here.
+	(screen.get("settings") as GameSettings).tour = false
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	var arena: ArenaView = screen.get("_arena")
@@ -283,7 +289,8 @@ func test_victory_places_everyone_in_rings_round_the_hearth() -> void:
 func test_the_earth_turning_pulls_the_camera_out_and_can_be_skipped() -> void:
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
-	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	(screen.get("settings") as GameSettings).intro_seen = true  # No tour here.
+	(screen.get("settings") as GameSettings).tour = false
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	var arena: ArenaView = screen.get("_arena")
@@ -315,7 +322,8 @@ func test_the_earth_turning_pulls_the_camera_out_and_can_be_skipped() -> void:
 func test_a_venture_shows_its_dead_as_red_crosses() -> void:
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
-	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	(screen.get("settings") as GameSettings).intro_seen = true  # No tour here.
+	(screen.get("settings") as GameSettings).tour = false
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	AutoPlayer.new().build(run)
@@ -351,7 +359,8 @@ func test_two_picks_a_dawn_keeps_the_pick_open() -> void:
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.set("save_runs", false)
 	screen.call("_ready")
-	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	(screen.get("settings") as GameSettings).intro_seen = true  # No tour here.
+	(screen.get("settings") as GameSettings).tour = false
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	run.choose_traditions([])
@@ -383,7 +392,8 @@ func test_a_pedlar_round_opens_on_the_pedlar_choice_after_the_relic() -> void:
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.set("save_runs", false)
 	screen.call("_ready")
-	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	(screen.get("settings") as GameSettings).intro_seen = true  # No tour here.
+	(screen.get("settings") as GameSettings).tour = false
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	run.choose_traditions([])
@@ -409,7 +419,8 @@ func test_pick_screens_wait_for_the_earth_to_turn() -> void:
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.set("save_runs", false)
 	screen.call("_ready")
-	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	(screen.get("settings") as GameSettings).intro_seen = true  # No tour here.
+	(screen.get("settings") as GameSettings).tour = false
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	run.choose_traditions([])
@@ -446,7 +457,8 @@ func test_the_nights_last_kill_slows_time_and_holds_the_pick() -> void:
 
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
-	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	(screen.get("settings") as GameSettings).intro_seen = true  # No tour here.
+	(screen.get("settings") as GameSettings).tour = false
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	var arena: ArenaView = screen.get("_arena")
