@@ -32,7 +32,7 @@ var trade_reserve := 30
 ## balance_run.gd sets these with gates= and gate_round=.
 var gates := 2
 var gate_round := 3
-## Whether it founds the town on its style's traditions (TRADITIONS) or on none (balance_run.gd traditions=0).
+## Whether it founds the town on its style's traditions (TRADITIONS, when offered; Random otherwise) or on none (balance_run.gd traditions=0).
 var traditions := true
 const TRADITIONS := {"balanced": ["hunters"], "workers": ["stoneworkers"], "heroes": ["hunters"],
 	"market": ["traders"], "bronze": ["smiths"], "medieval": ["woodfolk"]}
@@ -73,10 +73,22 @@ func play_run(run: RunState) -> void:
 				run.choose_relic(pick_relic(run))
 
 
+## Founds the town on its style's tradition when the run offers it, else leaves it to chance for the bonus goods.
+func _found(run: RunState) -> void:
+	if not traditions:
+		run.choose_traditions([])
+		return
+	var wanted: Array = TRADITIONS.get(style, []).filter(func(id: String) -> bool: return run.tradition_offer().has(id))
+	if wanted.is_empty():
+		run.choose_random_tradition()
+	else:
+		run.choose_traditions(wanted)
+
+
 ## Orders what it can, drafts blueprints for what it wanted and couldn't, then orders again.
 func build(run: RunState) -> void:
 	if run.awaiting_traditions():
-		run.choose_traditions(TRADITIONS.get(style, []) if traditions else [])
+		_found(run)
 	while run.awaiting_charter():
 		run.choose_charter(charter(run))
 	if run.awaiting_pedlar():

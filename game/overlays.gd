@@ -208,8 +208,10 @@ func show_pick() -> void:
 	show()
 
 
-## Before round 1: pick the founding tradition as a card (click to choose, again to drop; with one to pick, another
-## click swaps it), then found the town, or leave it to chance for a few goods (Yusuf, 2026-10-25).
+## Before round 1: pick the founding tradition as a card from the run's offered few, or the Random card that leaves it
+## to chance among them all for a few goods (Yusuf, 2026-10-30). Click to choose, again to drop; with one to pick,
+## another click swaps it. Then found the town.
+const RANDOM_TRADITION := "random"
 func show_traditions(chosen: Array = []) -> void:
 	var content := run.content
 	var to_pick := content.int_num("traditions_to_pick")
@@ -221,15 +223,15 @@ func show_traditions(chosen: Array = []) -> void:
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	note.custom_minimum_size.x = 640
 	_box.add_child(note)
-	var ids := content.traditions.keys()
-	ids.sort()
+	var ids: Array = run.tradition_offer()
 	var grid := GridContainer.new()
-	grid.columns = 3
+	grid.columns = ids.size() + 1
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 10)
 	var center := CenterContainer.new()
 	center.add_child(grid)
 	_box.add_child(center)
+	var by_chance := chosen.has(RANDOM_TRADITION)
 	for id: String in ids:
 		var t: Dictionary = content.traditions[id]
 		var picked := chosen.has(id)
@@ -247,7 +249,7 @@ func show_traditions(chosen: Array = []) -> void:
 			var path: Dictionary = content.paths["paths"][t["path"]]
 			btn.add_chip("Path: " + path["name"], "flag", CardView.TEXT, btn.family_color())
 			btn.tooltip_text += "\nStarts you on the %s path (%s): %s" % [path["name"], path["short"].to_lower(), path["tiers"][0]["text"]]
-		btn.disabled = not picked and chosen.size() >= to_pick and to_pick > 1
+		btn.disabled = by_chance or (not picked and chosen.size() >= to_pick and to_pick > 1)
 		btn.pressed.connect(func() -> void:
 			var next := chosen.duplicate()
 			if picked:
@@ -258,18 +260,27 @@ func show_traditions(chosen: Array = []) -> void:
 				next.append(id)
 			show_traditions(next))
 		grid.add_child(btn)
+	# The Random card: always there, drawing from every tradition, not only these.
+	var chance := CardView.new(CardView.Size.LARGE, "tradition", "Chosen" if by_chance else "Random", "Let fate choose")
+	chance.custom_minimum_size.x = 210
+	chance.set_selected(by_chance).set_body("One of all %d traditions, not only these, drawn as you found the town, and a little more to start with." % content.traditions.size(), CardView.TEXT)
+	chance.add_goods(content.balance.get("tradition_random_bonus", {}))
+	var all_ids: Array = content.traditions.keys()
+	all_ids.sort()
+	chance.add_pictures(all_ids.map(func(id: String) -> Texture2D: return SpriteBook.shared().card_texture(_tradition_building(content.traditions[id]))))
+	chance.tooltip_text = "Let fate choose your people's tradition from all of them, and start with a little more for it."
+	chance.pressed.connect(func() -> void: show_traditions([] if by_chance else [RANDOM_TRADITION]))
+	grid.add_child(chance)
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 10)
 	_box.add_child(row)
-	var found := UiKit.primary(UiKit.button(row, "Found the town", func() -> void: traditions_chosen.emit(chosen)))
-	found.disabled = chosen.size() < to_pick
-	var bonus: Dictionary = content.balance.get("tradition_random_bonus", {})
-	var gifts := PackedStringArray()
-	for good: String in bonus:
-		gifts.append("+%d %s" % [int(bonus[good]), good])
-	var chance := UiKit.button(row, "Random (%s)" % ", ".join(gifts), func() -> void: random_tradition_chosen.emit())
-	chance.tooltip_text = "Let fate choose your people's tradition, and start with a little more for it."
+	var found := UiKit.primary(UiKit.button(row, "Found the town", func() -> void:
+		if by_chance:
+			random_tradition_chosen.emit()
+		else:
+			traditions_chosen.emit(chosen)))
+	found.disabled = not by_chance and chosen.size() < to_pick
 	UiKit.button(row, "No tradition" if to_pick == 1 else "No traditions", func() -> void: traditions_chosen.emit([]))
 	show()
 

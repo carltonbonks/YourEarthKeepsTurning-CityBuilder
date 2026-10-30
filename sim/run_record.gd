@@ -165,7 +165,8 @@ extends RefCounted
 ##     level, item), "sergeants" (warriors made sergeant), "aura_blows" (legend/sergeant -> warrior blows they lifted),
 ##     "masterworks" (blue/yellow -> workshop gear rolled up) and "curios" (relics bought from the curio dealer; the
 ##     deal's "deals" entry names the relic).
-const RECORD_FORMAT := 59
+## 60: three traditions offered (Yusuf, 2026-10-30): top-level "tradition_offer" (the ids dealt before round 1).
+const RECORD_FORMAT := 60
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -215,6 +216,7 @@ func to_record() -> Dictionary:
 		"pool": run.hand.pool().duplicate(),
 		"traditions": run.traditions.duplicate(),
 		"tradition_random": run.tradition_random,
+		"tradition_offer": run.tradition_offer(),
 		"paths": run.paths.duplicate(),
 		"guilds": run.guilds.duplicate(),
 		"gentle": run.gentle,

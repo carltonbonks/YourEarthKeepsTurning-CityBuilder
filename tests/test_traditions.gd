@@ -20,6 +20,31 @@ func test_only_one_known_tradition() -> void:
 	check_eq(run.traditions, ["hunters"] as Array[String], "one known tradition (Yusuf, 2026-10-25)")
 
 
+func test_three_traditions_are_offered() -> void:
+	var run := _run()
+	var offer := run.tradition_offer()
+	check_eq(offer.size(), 3, "three of the traditions are offered (Yusuf, 2026-10-30)")
+	var unique := {}
+	for id in offer:
+		check(run.content.traditions.has(id), "%s is a tradition" % id)
+		unique[id] = true
+	check_eq(unique.size(), 3, "all different")
+	check_eq(_run().tradition_offer(), offer, "the same seed offers the same three")
+	check_eq(run.to_record()["tradition_offer"], offer, "the record keeps the offer")
+	var seen := {}
+	var outside := false
+	for s in 30:
+		var r := RunState.new(Content.load_default(), 100 + s)
+		var o := r.tradition_offer()
+		for id in o:
+			seen[id] = true
+		r.choose_random_tradition()
+		outside = outside or not o.has(r.traditions[0])
+		r.dispose()
+	check_eq(seen.size(), run.content.traditions.size(), "every tradition turns up in some run's offer")
+	check(outside, "Random draws from every tradition, not only the offered ones")
+
+
 func test_random_tradition_brings_a_bonus() -> void:
 	var run := _run()
 	var before := run.stock.duplicate()
