@@ -67,7 +67,7 @@ func _ready() -> void:
 	settings.apply(get_window() if is_inside_tree() else null)
 	_build_ui()
 	var url_seed := _url_seed()
-	# A playtest link with ?seed= goes straight into that run (and its tour, the first time).
+	# A playtest link with ?seed= goes straight into that run (and its tour).
 	_new_run(url_seed if url_seed >= 0 else _random_seed(), url_seed >= 0)
 	if url_seed < 0:
 		_show_title()
@@ -152,7 +152,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # --- Flow ------------------------------------------------------------------
 
-## Starts a run. A player's first (until the tour has played) opens on the tour when `tour` is on, and starts gently.
+## Starts a run. When `tour` is on it opens on the tour: every run while the Opening tour setting is on (Yusuf,
+## 2026-10-30, in place of the round screen), and always a player's first. Only the first starts gently.
 func _new_run(seed_value: int, tour := true) -> void:
 	if run != null:
 		run.dispose()
@@ -170,10 +171,11 @@ func _new_run(seed_value: int, tour := true) -> void:
 	_held_for_turn = false
 	_held_for_kill = false
 	_title_screen.hide()
-	# The first run's tour shows what the round screen tells; every later run opens on that screen.
-	_overlays.welcome_pending = settings.intro_seen
+	# The tour shows what the round screen tells; a run without it opens on that screen (but never a first run).
+	var tour_now := tour and (settings.tour or not settings.intro_seen)
+	_overlays.welcome_pending = settings.intro_seen and not tour_now
 	_set_speed(settings.start_speed)
-	if tour and not settings.intro_seen:
+	if tour_now:
 		_start_tour()
 		return
 	_refresh()

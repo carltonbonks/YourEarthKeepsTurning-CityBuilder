@@ -39,6 +39,8 @@ var tips_seen: Array = []
 var advisor := "urgent"
 ## The first-run camera tour has played (IntroTour); until it has, a new run opens on it and starts gently.
 var intro_seen := false
+## Every new run opens on the camera tour (skippable), not the round screen (Yusuf, 2026-10-30).
+var tour := true
 var keys := DEFAULT_KEYS.duplicate()
 ## Off in tests, so they never write the player's settings.
 var persist := true
@@ -58,6 +60,7 @@ static func load_saved() -> GameSettings:
 	s.advisor = str(cfg.get_value("play", "advisor", s.advisor))
 	s.tips_seen = Array(cfg.get_value("play", "tips_seen", []))
 	s.intro_seen = bool(cfg.get_value("play", "intro_seen", false))
+	s.tour = bool(cfg.get_value("play", "tour", s.tour))
 	# Format 1's tips were paper notes; the highlights that replaced them start fresh, with the tour.
 	if int(cfg.get_value("meta", "format", 1)) < 2:
 		s.tips_seen = []
@@ -80,6 +83,7 @@ func save() -> void:
 	cfg.set_value("play", "advisor", advisor)
 	cfg.set_value("play", "tips_seen", tips_seen)
 	cfg.set_value("play", "intro_seen", intro_seen)
+	cfg.set_value("play", "tour", tour)
 	for action: String in ACTIONS:
 		cfg.set_value("keys", action, keys[action])
 	cfg.save(PATH)

@@ -57,7 +57,8 @@ func test_alerts_that_dont_fit_wait_their_turn() -> void:
 func test_a_crowded_hand_shrinks_to_fit_instead_of_scrolling() -> void:
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.call("_ready")
-	(screen.get("settings") as GameSettings).intro_seen = true  # No first-run tour here.
+	(screen.get("settings") as GameSettings).intro_seen = true  # No tour here.
+	(screen.get("settings") as GameSettings).tour = false
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	for id: String in ["tin_bundle", "sellswords", "relic_dealer"]:

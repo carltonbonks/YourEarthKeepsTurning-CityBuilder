@@ -63,6 +63,12 @@ static func fill(box: VBoxContainer, settings: GameSettings, on_change: Callable
 		settings.night_camera = on
 		changed.call())
 	_row(play, "Bring the camera in at night", cam)
+	var tour := CheckBox.new()
+	tour.button_pressed = settings.tour
+	tour.toggled.connect(func(on: bool) -> void:
+		settings.tour = on
+		changed.call())
+	_row(play, "Open each run on the tour", tour)
 	var tips := CheckBox.new()
 	tips.button_pressed = settings.tips
 	tips.toggled.connect(func(on: bool) -> void:
