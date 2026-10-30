@@ -217,6 +217,20 @@ func awaiting_traditions() -> bool:
 	return not traditions_settled and round_number == 1 and phase == Phase.BUILD
 
 
+## The founding traditions offered before round 1 (Yusuf, 2026-10-30): traditions_offered of them, drawn from the
+## run's seed. Random (choose_random_tradition) still draws from them all.
+func tradition_offer() -> Array[String]:
+	var left: Array = content.traditions.keys()
+	left.sort()
+	var rng := SeededRng.stream(run_seed, "tradition_offer")
+	var out: Array[String] = []
+	while not left.is_empty() and out.size() < content.int_num("traditions_offered"):
+		var id: String = rng.pick(left)
+		left.erase(id)
+		out.append(id)
+	return out
+
+
 ## Founds the town on up to traditions_to_pick traditions (an empty list founds it on none). Their start goods
 ## arrive, their blueprint is drafted in place of one of round 1's drafts, their effects apply and round 1's
 ## building hand is dealt again with their buildings favoured.
@@ -247,7 +261,7 @@ func choose_traditions(ids: Array) -> void:
 
 
 ## Founds the town on one tradition drawn from the run's seed, plus tradition_random_bonus goods for leaving it to
-## chance (Yusuf, 2026-10-25).
+## chance (Yusuf, 2026-10-25). It draws from every tradition, not only the offered ones (Yusuf, 2026-10-30).
 func choose_random_tradition() -> void:
 	var ids: Array = content.traditions.keys()
 	ids.sort()

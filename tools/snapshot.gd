@@ -38,9 +38,10 @@ extends SceneTree
 ## hungry=1 empties the food store so the Elder speaks up (Advisor); showme=1 also presses its Show me;
 ## hearth=<share> sets the hearth's health to that share of its max; raiders=<n> adds n raiders to the round's attack.
 ## reeve=1 raises a Reeve's hut once the bot has played to the round; people=1 shows the People panel (needs reeve=1).
+## traditions=1 (with round=1) shows the founding traditions pick; chose=<id> (or random) shows that card chosen.
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0", "charter": "0", "guild": "", "path": "", "hungry": "0", "showme": "0", "hearth": "", "raiders": "0"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0", "charter": "0", "guild": "", "path": "", "hungry": "0", "showme": "0", "hearth": "", "raiders": "0", "traditions": "0", "chose": ""}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -54,6 +55,7 @@ func _init() -> void:
 	main.settings.tips = args["tips"] == "1"
 	main.settings.tips_seen = Array(args["seen"].split(",", false))
 	main.settings.intro_seen = true
+	main.settings.tour = false
 	if args["intro"] == "1":
 		main.settings.intro_seen = false
 		main._new_run(int(args["seed"]))
@@ -150,6 +152,8 @@ func _init() -> void:
 		run._roll_charter()
 		main._refresh()
 		main._overlays.show_for_phase()
+	if args["traditions"] == "1" and run.awaiting_traditions():
+		main._overlays.show_traditions([args["chose"]] if args["chose"] != "" else [])
 	if args["pedlars"] == "1" and run.awaiting_pedlar():
 		main._refresh()
 		main._overlays.show_for_phase()

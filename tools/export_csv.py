@@ -90,6 +90,7 @@ def main(raw_folder, out_folder):
             "relics_taken": len(r.get("relics", [])), "upgrades_taken": len(r.get("upgrades", [])), "pool_size": len(r.get("pool", [])), "pool": " ".join(r.get("pool", [])),
             "crafts": " ".join(r.get("crafts", [])),
             "traditions": " ".join(r.get("traditions", [])), "tradition_random": 1 if r.get("tradition_random") else 0,
+            "tradition_offer": " ".join(r.get("tradition_offer", [])),
             "gentle": 1 if r.get("gentle") else 0,
             "paths": " ".join("%s:%d" % (k, v) for k, v in sorted(r.get("paths", {}).items())),
             "guilds": " ".join(sorted(r.get("guilds", {}))),
