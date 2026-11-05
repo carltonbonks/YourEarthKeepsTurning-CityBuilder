@@ -39,7 +39,7 @@ const INVADER_GLOW_DAY := 0.08
 const INVADER_GLOW_NIGHT := 0.3
 const INVADER_RED := Color(1.0, 0.18, 0.12)
 ## What each kind of standing thing is, for the back-to-front pass.
-enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO, PEDLAR, OBSTACLE, PROP, BODY, STAND_IN, CARAVAN }
+enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO, PEDLAR, OBSTACLE, PROP, BODY, STAND_IN, CARAVAN, GHOST }
 
 ## A won run's ending has played out (or was clicked past): the end screen can open.
 signal victory_done
@@ -72,6 +72,8 @@ var victory := Victory.new()
 var muster := DawnMuster.new()
 ## The southern caravan's wagons by the town (CaravanCamp): lit by the deal hovered in the hand.
 var caravan := CaravanCamp.new()
+## The blueprint draft as a scene over the town (DraftStage): ghosts on plots, leader lines up to the cards.
+var draft := DraftStage.new()
 var upgrade_glow := UpgradeGlow.new()
 var last_kill := LastKill.new()
 var raider_route := RaiderRoute.new()
@@ -98,6 +100,8 @@ var _light_layer: Control
 var _top_layer: Control
 ## The plot the hovered building card would go on, blinked on the map; -1 for none.
 var preview_plot := -1
+## The building the hovered hand card would build there, drawn as a ghost on that plot ("" for none).
+var preview_type := ""
 
 
 func reset_camera() -> void:
@@ -108,6 +112,7 @@ func reset_camera() -> void:
 	victory = Victory.new()
 	muster = DawnMuster.new()
 	caravan = CaravanCamp.new()
+	draft = DraftStage.new()
 	last_kill.reset()
 
 
@@ -144,6 +149,24 @@ func start_muster(plan: Dictionary) -> void:
 	turn.release()
 	last_kill.release()
 	muster.start(run, self, plan, Time.get_ticks_msec())
+
+
+## The blueprint draft's scene: the camera's way to the whole town and each offer's place (DraftStage).
+func start_draft(places: Array, z: float, p: Vector2) -> void:
+	night.release()
+	turn.release()
+	last_kill.release()
+	draft.start(self, places, z, p, Time.get_ticks_msec())
+
+
+## Where ground point `g` would be on screen with the camera at zoom `z` looking at `p`.
+func screen_at(g: Vector2, z: float, p: Vector2) -> Vector2:
+	return size / 2.0 + _project(g - p) * (_scale() / zoom * z)
+
+
+## How many screen pixels a ground unit spans at zoom 1 (the scenes fit the camera with it).
+func scale_per_zoom() -> float:
+	return _scale() / zoom
 
 
 ## The ground point under screen point `s` with the camera at zoom `z` looking at `p` (DawnMuster plans its scene
@@ -202,6 +225,8 @@ func _process(delta: float) -> void:
 		# The night camera waits while the last kill is held, and picks up from where the beat leaves it.
 		if muster.active():
 			muster.update(self, Time.get_ticks_msec())
+		elif draft.active():
+			draft.update(self, Time.get_ticks_msec())
 		elif last_kill.playing():
 			last_kill.update(self)
 		elif night_camera:
@@ -365,6 +390,9 @@ func _draw() -> void:
 		_queue(things, keys, Kind.BUILDING, bi, w.buildings[bi]["pos"])
 	if w.pedlar.is_open():
 		_queue(things, keys, Kind.PEDLAR, null, w.pedlar.camp["pos"])
+	for a: Dictionary in draft.anchors:
+		if a["ghost"] != "" or int(a["plot"]) >= 0:
+			_queue(things, keys, Kind.GHOST, a, a["at"])
 	if CaravanCamp.here(run):
 		_queue(things, keys, Kind.CARAVAN, null, CaravanCamp.spot(run))
 	_queue(things, keys, Kind.HEARTH, null, Vector2.ZERO)
@@ -404,6 +432,8 @@ func _draw() -> void:
 				_draw_pedlar(font)
 			Kind.CARAVAN:
 				caravan.draw(self, run, font, now)
+			Kind.GHOST:
+				draft.draw_ghost(self, thing[1], now)
 			Kind.OBSTACLE:
 				var plot: Dictionary = thing[1]
 				sprites.draw(self, plot["obstacle"], _to_screen(plot["pos"]), sprites.building_scale(plot["obstacle"], _scale()))
@@ -418,6 +448,8 @@ func _draw() -> void:
 
 	if muster.active():
 		_draw_muster_front(font, now)
+	if draft.active():
+		draft.draw_front(self, now)
 
 	# Shots fly at chest height.
 	var chest := _chest()
@@ -1145,6 +1177,11 @@ func _draw_preview() -> void:
 	var shape := _screen_poly(run.world.town.plot_outline(preview_plot))
 	draw_colored_polygon(shape, Color(1.0, 0.85, 0.35, 0.2 + 0.35 * pulse))
 	draw_polyline(_closed(shape), Color(1.0, 0.9, 0.5, 0.55 + 0.45 * pulse), 2.5)
+	# A ghost of the building it would be (picks in the town, slice 3).
+	if _has_art(preview_type):
+		var at: Vector2 = run.world.town.plots[preview_plot]["pos"]
+		sprites.draw(self, preview_type, _to_screen(at), sprites.building_scale(preview_type, _scale()),
+			SpriteBook.facing_of(at, int(sprites.info(preview_type)["facings"])), Color(1.0, 0.95, 0.8, 0.4 + 0.2 * pulse))
 
 
 ## The near plates, tinted faintly by kind with the kind's name across each, and faint lines at their edges.
