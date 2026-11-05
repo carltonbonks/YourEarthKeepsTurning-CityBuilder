@@ -55,6 +55,14 @@ var arena: ArenaView
 var mustering := false
 var _stage: Control
 var _muster_size := CardView.Size.LARGE
+## The hand whose draft is up (to lay the draft scene out again when the map changes size).
+var _hand: BuildHandView
+
+
+## Closing a scene's screen gives the camera back (DraftStage).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_VISIBILITY_CHANGED and not visible and arena != null:
+		arena.draft.finish(Time.get_ticks_msec())
 
 
 func _init() -> void:
@@ -97,8 +105,9 @@ func panel_rect() -> Rect2:
 		return Rect2()
 	var rect := _panel.get_global_rect()
 	if mustering:
-		for card in _pick_buttons:
-			rect = rect.merge(card.get_global_rect())
+		for card in _stage.get_children():
+			if card is CardView and not card.is_queued_for_deletion():
+				rect = rect.merge(card.get_global_rect())
 	return rect
 
 
@@ -156,12 +165,15 @@ func show_for_phase() -> void:
 ## draft or lets the build begin.
 func show_draft(hand: BuildHandView) -> void:
 	_clear()
+	_hand = hand
 	showing_draft = true
 	_title(hand.draft_title() + " to start building")
 	var sub := UiKit.note(_box, "It joins Your blueprints in the hand and stays on offer for the whole run.", UiKit.STRONG)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub.tooltip_text = BuildHandView.pool_line(run)
 	sub.mouse_filter = Control.MOUSE_FILTER_PASS
+	if _draft_scene(hand, sub):
+		return
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -273,10 +285,95 @@ func _muster(sz: CardView.Size) -> bool:
 	return true
 
 
-## The map changed size while the muster is up (a window resized): the scene is laid out again.
+## The blueprint draft as a scene over the town (DraftStage), when the setting is on and the cards fit at
+## DraftStage.MIN_SCALE or more: the header (title, the line under it and the reroll) at the map's top, the offers in
+## a row under it, each over where it would go, and the camera pulled out to the whole town below them. False leaves
+## the classic pop-up to be built.
+func _draft_scene(hand: BuildHandView, sub: Label) -> bool:
+	if arena == null or settings == null or not settings.picks_in_town or not arena.is_visible_in_tree() \
+			or arena.size.x <= 0.0 or not is_inside_tree():
+		return false
+	var entries := hand.draft_entries()
+	var shape: Vector2 = CardView.SHAPE[CardView.Size.MEDIUM]
+	# A short header, so the town keeps its room under the cards: the title with the reroll beside it, and the line
+	# under the title on the title's hover.
+	var title: Control = _box.get_children().filter(func(c: Node) -> bool: return not c.is_queued_for_deletion())[0]
+	var line := HBoxContainer.new()
+	line.alignment = BoxContainer.ALIGNMENT_CENTER
+	line.add_theme_constant_override("separation", 16)
+	_box.add_child(line)
+	_box.move_child(line, title.get_index())
+	title.reparent(line)
+	title.tooltip_text = sub.text + "\n" + sub.tooltip_text
+	title.mouse_filter = Control.MOUSE_FILTER_PASS
+	sub.visible = false
+	var reroll := hand.reroll_button()
+	reroll.text = reroll.text.replace("\n", " ")
+	reroll.custom_minimum_size = Vector2(0, 30)
+	reroll.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.add_child(reroll)
+	var header := _header_height() + 2.0 * HEADER_GAP
+	# The map the hand along the screen's foot leaves showing.
+	var area := Vector2(arena.size.x, minf(arena.size.y, hand.get_global_rect().position.y - arena.get_global_rect().position.y)) \
+		if hand.is_visible_in_tree() else arena.size
+	var s := DraftStage.card_scale(entries.size(), shape, area, header)
+	var places: Array = entries.map(func(e: Array) -> Dictionary: return DraftStage.anchor(run, e[1]))
+	if s <= 0.0:
+		_unscene(line, title, sub, entries)
+		return false
+	# The town fills the map under the cards: as big as fits, the hearth in the middle of what's left.
+	var top := header + shape.y * s + DraftStage.LEAD
+	var r := DraftStage.reach(run, places)
+	var room := area.y - top - DraftStage.EDGE
+	var k := minf(room * DraftStage.SPILL / (2.0 * r * ArenaView.ISO_SQUASH), (area.x - 2.0 * DraftStage.EDGE) / (2.0 * r))
+	var z := clampf(k / arena.scale_per_zoom(), DraftStage.FAR_ZOOM, ArenaView.MAX_ZOOM)
+	# The hearth sits so the town's near edge meets the bottom of the room.
+	var near := r * ArenaView.ISO_SQUASH * k
+	var pan := -arena.world_under(Vector2(area.x / 2.0, area.y - DraftStage.EDGE - near), z, Vector2.ZERO)
+	var want: Array = places.map(func(a: Dictionary) -> float:
+		return arena.screen_at(a["at"], z, pan).x if a["placed"] else area.x / 2.0)
+	var xs := DraftStage.spread(want, shape.x * s, area.x)
+	if xs.is_empty():
+		_unscene(line, title, sub, entries)
+		return false
+	mustering = true
+	self_modulate.a = 0.0
+	_muster_size = CardView.Size.MEDIUM
+	if not arena.resized.is_connected(_on_arena_resized):
+		arena.resized.connect(_on_arena_resized)
+	var at := _arena_origin()
+	arena.start_draft(places, z, pan)
+	for i in entries.size():
+		var btn: CardView = entries[i][0]
+		_stage.add_child(btn)
+		btn.size = shape
+		btn.scale = Vector2(s, s)
+		btn.position = at + Vector2(float(xs[i]) - shape.x * s / 2.0, header)
+		btn.modulate.a = 0.0
+		create_tween().tween_property(btn, "modulate:a", 1.0, 0.35).set_delay(0.05 * i)
+		arena.draft.feet.append(Vector2(float(xs[i]), header + shape.y * s))
+	show()
+	_place_header()
+	return true
+
+
+## The draft scene won't fit: its header goes back to the classic pop-up's.
+func _unscene(line: HBoxContainer, title: Control, sub: Label, entries: Array) -> void:
+	title.reparent(_box)
+	_box.move_child(title, line.get_index())
+	title.tooltip_text = ""
+	sub.visible = true
+	line.queue_free()
+	for e: Array in entries:
+		(e[0] as Node).queue_free()
+
+
+## The map changed size while a scene is up (a window resized): it is laid out again.
 func _on_arena_resized() -> void:
 	if visible and mustering and run.phase == RunState.Phase.PICK:
 		show_pick()
+	elif visible and mustering and showing_draft and _hand != null:
+		show_draft(_hand)
 
 
 ## Keeps the muster's cards to their one shape: a new card measures tall until it knows its width.
@@ -286,8 +383,8 @@ func _process(_delta: float) -> void:
 	if arena.muster.homecoming():
 		var now := float(Time.get_ticks_msec())
 		_panel.visible = arena.muster.home_back(now)
-	for card in _pick_buttons:
-		if card.size != CardView.SHAPE[_muster_size]:
+	for card in _stage.get_children():
+		if card is CardView and not card.is_queued_for_deletion() and card.size != CardView.SHAPE[_muster_size]:
 			card.size = CardView.SHAPE[_muster_size]
 
 
@@ -1178,6 +1275,8 @@ func _clear() -> void:
 	_peek(null)
 	for child in _box.get_children():
 		child.queue_free()
+	if arena != null:
+		arena.draft.finish(Time.get_ticks_msec())
 	mustering = false
 	self_modulate.a = 1.0
 	_panel.visible = true

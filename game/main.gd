@@ -135,6 +135,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _overlays.visible and _overlays.mustering and event.is_action_pressed("pause"):
 		# Space skips the dawn muster's glide in.
 		_arena.muster.skip(Time.get_ticks_msec())
+		_arena.draft.skip(Time.get_ticks_msec())
 		get_viewport().set_input_as_handled()
 	elif _title_screen.visible or _overlays.visible:
 		return
@@ -389,6 +390,7 @@ func _show_draft() -> void:
 ## A building card is hovered: the map blinks the plot it would go on ("" clears it).
 func _preview_building(type: String) -> void:
 	_arena.preview_plot = run.world.town.choose_plot(type) if type != "" else -1
+	_arena.preview_type = type
 
 
 ## Parts that change while the sim runs.

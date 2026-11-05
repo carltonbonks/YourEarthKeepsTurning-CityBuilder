@@ -237,18 +237,29 @@ func draft_title() -> String:
 ## The draft's offers and the reroll, into the draft screen's row: the offer that builds on what the town has
 ## first, then the crafts and new buildings, the ring offer and any other upgrade.
 func fill_draft(row: Container) -> void:
-	var cards: Array[CardView] = []
-	var deep: Array[CardView] = []
+	for entry: Array in draft_entries():
+		row.add_child(entry[0])
+	row.add_child(reroll_button())
+
+
+## The draft's offers in the order the draft shows them, each [its card, what it would add: {building}, {craft},
+## {upgrade} or {ring}] (DraftStage finds each one's place in the town).
+func draft_entries() -> Array:
+	var cards: Array = []
+	var deep: Array = []
 	for card: Dictionary in run.hand.cards:
-		(deep if card.has("deep") else cards).append(_card(card["building"], card["need"], "draft", card))
+		(deep if card.has("deep") else cards).append([_card(card["building"], card["need"], "draft", card), {"building": card["building"]}])
 	for card: Dictionary in run.hand.crafts:
-		(deep if card.has("deep") else cards).append(_craft_card(card))
+		(deep if card.has("deep") else cards).append([_craft_card(card), {"craft": card["craft"]}])
 	if run.hand.ring_offer():
-		cards.append(_ring_card())
+		cards.append([_ring_card(), {"ring": true}])
 	for card: Dictionary in run.hand.upgrade_offers:
-		(deep if card.has("deep") else cards).append(_upgrade_card(card))
-	for btn in deep + cards:
-		row.add_child(btn)
+		(deep if card.has("deep") else cards).append([_upgrade_card(card), {"upgrade": card["upgrade"]}])
+	return deep + cards
+
+
+## The draft's reroll: once a round, a fresh draw of offers.
+func reroll_button() -> Button:
 	var redraw := UiKit.secondary(Button.new(), 13)
 	redraw.text = "Reroll\n%d shells" % run.hand.redraw_cost() if run.hand.redraws == 0 else "Rerolled\nthis round"
 	redraw.custom_minimum_size = Vector2(86, 120)
@@ -256,7 +267,7 @@ func fill_draft(row: Container) -> void:
 	redraw.disabled = not run.hand.can_redraw()
 	redraw.tooltip_text = "Once a round: swap these offers for a fresh draw."
 	redraw.pressed.connect(_act.bind(run.hand.redraw))
-	row.add_child(redraw)
+	return redraw
 
 
 ## What a building adds to the dawn picks once it stands ("" if nothing): heroes it lodges or draws,
