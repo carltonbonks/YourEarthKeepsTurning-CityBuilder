@@ -8,6 +8,8 @@ extends RefCounted
 ## moves the camera. View only: nothing here is placed or saved.
 
 const GLIDE_MS := 900.0
+## A scene started again within this long of finishing is the same screen laid out again (a refresh), not a new one.
+const REBUILT_MS := 50.0
 const LEAVE_MS := 600.0
 ## The gap between neighbouring cards and the map's sides (px).
 const GAP := 12.0
@@ -96,6 +98,11 @@ static func anchor(run: RunState, target: Dictionary) -> Dictionary:
 	return out
 
 
+## A pedlar's place: the camp spot it would take out past the town, with a ghost of the camp.
+static func camp(pos: Vector2) -> Dictionary:
+	return {"at": pos, "ghost": "pedlar_camp", "plot": -1, "lit": "", "ring": 0.0, "placed": true, "far": false}
+
+
 ## How far out the scene must show: the open rings and every offer's place but an outpost's (out in the wilds, its
 ## line points the way off the map instead of shrinking the town to fit it).
 static func reach(run: RunState, places: Array) -> float:
@@ -150,6 +157,11 @@ static func spread(want: Array, w: float, width: float) -> Array:
 func start(view: ArenaView, places: Array, zoom: float, pan: Vector2, now_ms: float) -> void:
 	# The draft is laid out again on every refresh (and for a second blueprint): the scene carries on from where it is.
 	if not active():
+		_from_zoom = view.zoom
+		_from_pan = view.pan
+		born = now_ms
+	elif ended >= 0.0 and now_ms - ended > REBUILT_MS:
+		# A new pick while the last one's camera is still going back (the draft after a pedlar): glide on from here.
 		_from_zoom = view.zoom
 		_from_pan = view.pan
 		born = now_ms
@@ -210,11 +222,14 @@ func draw_ghost(view: ArenaView, a: Dictionary, now_ms: float) -> void:
 		var shape := view._screen_poly(view.run.world.town.plot_outline(int(a["plot"])))
 		view.draw_colored_polygon(shape, Color(GOLD, (0.18 + 0.14 * pulse) * s))
 		view.draw_polyline(view._closed(shape), Color(GOLD, (0.6 + 0.3 * pulse) * s), 2.0)
+	else:
+		# Off the plots (a pedlar's camp spot): a gold ring on the ground.
+		view.draw_polyline(view._closed(view._ground_ring(at, 14.0, 24)), Color(GOLD, (0.6 + 0.3 * pulse) * s), 2.0)
 	var type: String = a["ghost"]
-	if view._has_art(type):
+	if type != "" and view._has_art(type):
 		view.sprites.draw(view, type, view._to_screen(at), view.sprites.building_scale(type, view._scale()),
 			SpriteBook.facing_of(at, int(view.sprites.info(type)["facings"])), Color(1.0, 0.95, 0.8, (0.45 + 0.15 * pulse) * s))
-	elif int(a["plot"]) < 0:
+	elif int(a["plot"]) < 0 and type != "":
 		view.draw_circle(view._to_screen(at), 6.0, Color(GOLD, 0.7 * s))
 
 

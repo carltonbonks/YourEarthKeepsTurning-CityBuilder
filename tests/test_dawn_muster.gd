@@ -178,3 +178,25 @@ func test_the_caravan_camps_outside_the_town_by_its_moot() -> void:
 	check_eq(camp.risings.size(), 1, "a deal taken rises from the wagons")
 	check(str(camp.risings[0]["text"]) != "", "saying what it brings")
 	run.dispose()
+
+
+func test_the_founders_stand_round_the_campfire_by_their_traditions_paths() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	var ids: Array = ["stoneworkers", "smiths", "hunters"]
+	var groups := DawnMuster.tradition_groups(run, ids)
+	check_eq(groups.size(), 4, "one group per tradition and one for the Random card")
+	for g: Dictionary in groups.slice(0, 3):
+		check_eq(g["stand_ins"].size(), 3, "three founders stand by each tradition")
+	check(groups[0]["stand_ins"].all(func(s: Dictionary) -> bool: return s["id"] == "warrior"), "a warband tradition's founders are warriors")
+	check_eq(groups[1]["kit"], "guild", "a guilds tradition's craftspeople carry the guild kit")
+	check(groups[2]["stand_ins"][0]["hero"], "a heroes tradition's banner is held by a hero")
+	var stranger: Dictionary = groups[3]["stand_ins"][0]
+	check(groups[3]["stand_ins"].size() == 1 and stranger.has("tint"), "the Random card is one hooded stranger")
+	run.dispose()
+
+
+func test_a_footer_can_be_kept_small_when_the_buttons_go_up_top() -> void:
+	var shape: Vector2 = CardView.SHAPE[CardView.Size.MEDIUM]
+	var plan := DawnMuster.layout(4, shape, Vector2(1264, 405), 80.0, 8.0)
+	check(not plan.is_empty(), "four medium cards fit over the map above the build hand")
+	check(float(plan["hearth_y"]) < 405.0, "with the hearth on the map")

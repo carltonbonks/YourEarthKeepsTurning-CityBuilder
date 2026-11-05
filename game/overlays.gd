@@ -55,8 +55,14 @@ var arena: ArenaView
 var mustering := false
 var _stage: Control
 var _muster_size := CardView.Size.LARGE
-## The hand whose draft is up (to lay the draft scene out again when the map changes size).
-var _hand: BuildHandView
+## The build hand along the screen's foot (main sets it): picks over the town keep above it.
+var hand_view: BuildHandView
+## The scene up now laid out again (the map changed size), or empty.
+var _reshow := Callable()
+## Set just before a muster is laid out again in place (a tradition clicked): its people stay where they stand.
+var mustering_kept := false
+## Set to build the next screen as the classic pop-up (its scene didn't fit).
+var _classic_once := false
 
 
 ## Closing a scene's screen gives the camera back (DraftStage).
@@ -165,7 +171,8 @@ func show_for_phase() -> void:
 ## draft or lets the build begin.
 func show_draft(hand: BuildHandView) -> void:
 	_clear()
-	_hand = hand
+	hand_view = hand
+	_reshow = show_draft.bind(hand)
 	showing_draft = true
 	_title(hand.draft_title() + " to start building")
 	var sub := UiKit.note(_box, "It joins Your blueprints in the hand and stays on offer for the whole run.", UiKit.STRONG)
@@ -223,6 +230,7 @@ func show_pick() -> void:
 			.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	# A crowded dawn uses medium cards so the row fits the screen.
 	var sz := CardView.Size.LARGE if run.pick_offer.size() <= 4 else CardView.Size.MEDIUM
+	_reshow = show_pick
 	if _muster(sz):
 		return
 	var row := HBoxContainer.new()
@@ -252,13 +260,67 @@ func _dawn_card(i: int, sz: CardView.Size) -> CardView:
 ## MIN_SCALE or more: the header (already in the box) goes to the map's top, the cards stand in a row over their
 ## groups, "Nobody today" under the hearth. False leaves the classic pop-up to be built.
 func _muster(sz: CardView.Size) -> bool:
-	if arena == null or settings == null or not settings.picks_in_town or not arena.is_visible_in_tree() \
-			or arena.size.x <= 0.0 or not is_inside_tree():
+	if not _scenes_on():
 		return false
+	var cards: Array = []
+	for i in run.pick_offer.size():
+		cards.append(_dawn_card(i, sz))
+	if not _muster_with(cards, [], sz, [["Nobody today", func() -> void: pick_taken.emit(-1)]]):
+		_pick_buttons.clear()
+		return false
+	showing_pick = true
+	return true
+
+
+## The map the build hand along the screen's foot leaves showing (all of it while the hand is away).
+func _map_area() -> Vector2:
+	if hand_view == null or not hand_view.is_visible_in_tree():
+		return arena.size
+	return Vector2(arena.size.x, minf(arena.size.y, hand_view.get_global_rect().position.y - arena.get_global_rect().position.y))
+
+
+## True when a pick may play as a scene in the town: the setting is on and the map is up.
+func _scenes_on() -> bool:
+	return arena != null and settings != null and settings.picks_in_town and arena.is_visible_in_tree() \
+		and arena.size.x > 0.0 and is_inside_tree()
+
+
+## A muster round the hearth (DawnMuster): `cards` in a row over the map under the header, each over its group
+## (`groups`, or the dawn's own when empty), and `footer` buttons ([text, on press]) in a row under the hearth.
+## False (the cards freed) when they'd shrink past DawnMuster's MIN_SCALE: the caller builds the classic pop-up.
+func _muster_with(cards: Array, groups: Array, sz: CardView.Size, footer: Array) -> bool:
+	# Over the hand (the founding before round 1) the map is short: the buttons go beside the title instead.
+	var in_header := hand_view != null and hand_view.is_visible_in_tree()
+	var line: HBoxContainer = null
+	var title: Control = null
+	if in_header:
+		title = _box.get_children().filter(func(c: Node) -> bool: return not c.is_queued_for_deletion() and (c as Control).visible)[0]
+		line = HBoxContainer.new()
+		line.alignment = BoxContainer.ALIGNMENT_CENTER
+		line.add_theme_constant_override("separation", 12)
+		_box.add_child(line)
+		_box.move_child(line, title.get_index())
+		title.reparent(line)
+		for f: Array in footer:
+			var b := UiKit.button(line, f[0], f[1])
+			b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			if f.size() > 2:
+				b.disabled = f[2]
+			if f.size() > 3 and f[3]:
+				UiKit.primary(b)
 	var header := _header_height() + 2.0 * HEADER_GAP
-	var plan := DawnMuster.layout(run.pick_offer.size(), CardView.SHAPE[sz], arena.size, header)
+	var area := _map_area()
+	var plan := DawnMuster.layout(cards.size(), CardView.SHAPE[sz], area, header, HEADER_GAP if in_header else DawnMuster.FOOTER)
 	if plan.is_empty():
+		if in_header:
+			title.reparent(_box)
+			_box.move_child(title, line.get_index())
+			line.queue_free()
+		for c: Node in cards:
+			c.queue_free()
 		return false
+	var again := mustering_kept
+	mustering_kept = false
 	mustering = true
 	self_modulate.a = 0.0
 	_muster_size = sz
@@ -267,21 +329,31 @@ func _muster(sz: CardView.Size) -> bool:
 	var at := _arena_origin()
 	var s: float = plan["scale"]
 	var xs: Array = plan["xs"]
-	for i in run.pick_offer.size():
-		var btn := _dawn_card(i, sz)
+	for i in cards.size():
+		var btn: CardView = cards[i]
 		_stage.add_child(btn)
 		btn.size = CardView.SHAPE[sz]
 		btn.scale = Vector2(s, s)
 		btn.position = at + Vector2(float(xs[i]) - CardView.SHAPE[sz].x * s / 2.0, plan["card_top"])
-		btn.modulate.a = 0.0
-		create_tween().tween_property(btn, "modulate:a", 1.0, 0.35).set_delay(0.05 * i)
-	var skip := UiKit.button(_stage, "Nobody today", func() -> void: pick_taken.emit(-1))
-	skip.size = Vector2(220, 36)
-	skip.position = at + Vector2(arena.size.x / 2.0 - 110.0, arena.size.y - DawnMuster.FOOTER + 8.0)
-	showing_pick = true
+		if not again:
+			btn.modulate.a = 0.0
+			create_tween().tween_property(btn, "modulate:a", 1.0, 0.35).set_delay(0.05 * i)
+	if not in_header:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		_stage.add_child(row)
+		for f: Array in footer:
+			var b := UiKit.button(row, f[0], f[1])
+			b.custom_minimum_size = Vector2(200, 36)
+			if f.size() > 2:
+				b.disabled = f[2]
+			if f.size() > 3 and f[3]:
+				UiKit.primary(b)
+		row.reset_size()
+		row.position = at + Vector2((area.x - row.size.x) / 2.0, area.y - DawnMuster.FOOTER + 8.0)
 	show()
 	_place_header()
-	arena.start_muster(plan)
+	arena.start_muster(plan, groups, again)
 	return true
 
 
@@ -290,13 +362,22 @@ func _muster(sz: CardView.Size) -> bool:
 ## a row under it, each over where it would go, and the camera pulled out to the whole town below them. False leaves
 ## the classic pop-up to be built.
 func _draft_scene(hand: BuildHandView, sub: Label) -> bool:
-	if arena == null or settings == null or not settings.picks_in_town or not arena.is_visible_in_tree() \
-			or arena.size.x <= 0.0 or not is_inside_tree():
+	if not _scenes_on():
 		return false
 	var entries := hand.draft_entries()
+	var reroll := hand.reroll_button()
+	reroll.text = reroll.text.replace("\n", " ")
+	return _over_town(entries.map(func(e: Array) -> CardView: return e[0]),
+		entries.map(func(e: Array) -> Dictionary: return DraftStage.anchor(run, e[1])), sub, reroll)
+
+
+## A pick laid over the town (DraftStage: the blueprint draft, the pedlars): a short header (the title with `extra`
+## beside it, and `sub`, the line under the title, on the title's hover), `cards` in a row under it, each over its
+## place (`places`, DraftStage anchors) on a line down to it, and the camera pulled out so the town and the places
+## fill the map above the hand. False (cards and `extra` freed, the header as it was) when the cards would shrink
+## past DraftStage.MIN_SCALE: the caller builds the classic pop-up.
+func _over_town(cards: Array, places: Array, sub: Label, extra: Control) -> bool:
 	var shape: Vector2 = CardView.SHAPE[CardView.Size.MEDIUM]
-	# A short header, so the town keeps its room under the cards: the title with the reroll beside it, and the line
-	# under the title on the title's hover.
 	var title: Control = _box.get_children().filter(func(c: Node) -> bool: return not c.is_queued_for_deletion())[0]
 	var line := HBoxContainer.new()
 	line.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -304,37 +385,39 @@ func _draft_scene(hand: BuildHandView, sub: Label) -> bool:
 	_box.add_child(line)
 	_box.move_child(line, title.get_index())
 	title.reparent(line)
-	title.tooltip_text = sub.text + "\n" + sub.tooltip_text
+	title.tooltip_text = sub.text + ("\n" + sub.tooltip_text if sub.tooltip_text != "" else "")
 	title.mouse_filter = Control.MOUSE_FILTER_PASS
 	sub.visible = false
-	var reroll := hand.reroll_button()
-	reroll.text = reroll.text.replace("\n", " ")
-	reroll.custom_minimum_size = Vector2(0, 30)
-	reroll.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	line.add_child(reroll)
+	if extra is Button:
+		(extra as Button).custom_minimum_size = Vector2(0, 30)
+	extra.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.add_child(extra)
 	var header := _header_height() + 2.0 * HEADER_GAP
-	# The map the hand along the screen's foot leaves showing.
-	var area := Vector2(arena.size.x, minf(arena.size.y, hand.get_global_rect().position.y - arena.get_global_rect().position.y)) \
-		if hand.is_visible_in_tree() else arena.size
-	var s := DraftStage.card_scale(entries.size(), shape, area, header)
-	var places: Array = entries.map(func(e: Array) -> Dictionary: return DraftStage.anchor(run, e[1]))
-	if s <= 0.0:
-		_unscene(line, title, sub, entries)
-		return false
-	# The town fills the map under the cards: as big as fits, the hearth in the middle of what's left.
-	var top := header + shape.y * s + DraftStage.LEAD
-	var r := DraftStage.reach(run, places)
-	var room := area.y - top - DraftStage.EDGE
-	var k := minf(room * DraftStage.SPILL / (2.0 * r * ArenaView.ISO_SQUASH), (area.x - 2.0 * DraftStage.EDGE) / (2.0 * r))
-	var z := clampf(k / arena.scale_per_zoom(), DraftStage.FAR_ZOOM, ArenaView.MAX_ZOOM)
-	# The hearth sits so the town's near edge meets the bottom of the room.
-	var near := r * ArenaView.ISO_SQUASH * k
-	var pan := -arena.world_under(Vector2(area.x / 2.0, area.y - DraftStage.EDGE - near), z, Vector2.ZERO)
-	var want: Array = places.map(func(a: Dictionary) -> float:
-		return arena.screen_at(a["at"], z, pan).x if a["placed"] else area.x / 2.0)
-	var xs := DraftStage.spread(want, shape.x * s, area.x)
+	var area := _map_area()
+	var s := DraftStage.card_scale(cards.size(), shape, area, header)
+	var xs: Array = []
+	var z := 1.0
+	var pan := Vector2.ZERO
+	if s > 0.0:
+		# The town fills the map under the cards: as big as fits, its near edge at the bottom of the room.
+		var top := header + shape.y * s + DraftStage.LEAD
+		var r := DraftStage.reach(run, places)
+		var room := area.y - top - DraftStage.EDGE
+		var k := minf(room * DraftStage.SPILL / (2.0 * r * ArenaView.ISO_SQUASH), (area.x - 2.0 * DraftStage.EDGE) / (2.0 * r))
+		z = clampf(k / arena.scale_per_zoom(), DraftStage.FAR_ZOOM, ArenaView.MAX_ZOOM)
+		var near := r * ArenaView.ISO_SQUASH * k
+		pan = -arena.world_under(Vector2(area.x / 2.0, area.y - DraftStage.EDGE - near), z, Vector2.ZERO)
+		var want: Array = places.map(func(a: Dictionary) -> float:
+			return arena.screen_at(a["at"], z, pan).x if a["placed"] else area.x / 2.0)
+		xs = DraftStage.spread(want, shape.x * s, area.x)
 	if xs.is_empty():
-		_unscene(line, title, sub, entries)
+		title.reparent(_box)
+		_box.move_child(title, line.get_index())
+		title.tooltip_text = ""
+		sub.visible = true
+		line.queue_free()
+		for c: Node in cards:
+			c.queue_free()
 		return false
 	mustering = true
 	self_modulate.a = 0.0
@@ -343,8 +426,8 @@ func _draft_scene(hand: BuildHandView, sub: Label) -> bool:
 		arena.resized.connect(_on_arena_resized)
 	var at := _arena_origin()
 	arena.start_draft(places, z, pan)
-	for i in entries.size():
-		var btn: CardView = entries[i][0]
+	for i in cards.size():
+		var btn: CardView = cards[i]
 		_stage.add_child(btn)
 		btn.size = shape
 		btn.scale = Vector2(s, s)
@@ -357,23 +440,10 @@ func _draft_scene(hand: BuildHandView, sub: Label) -> bool:
 	return true
 
 
-## The draft scene won't fit: its header goes back to the classic pop-up's.
-func _unscene(line: HBoxContainer, title: Control, sub: Label, entries: Array) -> void:
-	title.reparent(_box)
-	_box.move_child(title, line.get_index())
-	title.tooltip_text = ""
-	sub.visible = true
-	line.queue_free()
-	for e: Array in entries:
-		(e[0] as Node).queue_free()
-
-
 ## The map changed size while a scene is up (a window resized): it is laid out again.
 func _on_arena_resized() -> void:
-	if visible and mustering and run.phase == RunState.Phase.PICK:
-		show_pick()
-	elif visible and mustering and showing_draft and _hand != null:
-		show_draft(_hand)
+	if visible and mustering and _reshow.is_valid():
+		_reshow.call()
 
 
 ## Keeps the muster's cards to their one shape: a new card measures tall until it knows its width.
@@ -433,6 +503,12 @@ func show_traditions(chosen: Array = []) -> void:
 	note.custom_minimum_size.x = 640
 	_box.add_child(note)
 	var ids: Array = run.tradition_offer()
+	_reshow = show_traditions.bind(chosen)
+	var classic := _classic_once
+	_classic_once = false
+	# Round the campfire the cards are medium, so they and the founders fit above the hand.
+	var in_town := _scenes_on() and not classic
+	var tsz := CardView.Size.MEDIUM if in_town else CardView.Size.LARGE
 	var grid := GridContainer.new()
 	grid.columns = ids.size() + 1
 	grid.add_theme_constant_override("h_separation", 10)
@@ -444,7 +520,7 @@ func show_traditions(chosen: Array = []) -> void:
 	for id: String in ids:
 		var t: Dictionary = content.traditions[id]
 		var picked := chosen.has(id)
-		var btn := CardView.new(CardView.Size.LARGE, "tradition", "Chosen" if picked else "Tradition", t["name"])
+		var btn := CardView.new(tsz, "tradition", "Chosen" if picked else "Tradition", t["name"])
 		btn.custom_minimum_size.x = 210
 		btn.set_picture(SpriteBook.shared().card_texture(_tradition_building(t)))
 		btn.set_selected(picked).set_body(t["text"], CardView.TEXT)
@@ -467,10 +543,11 @@ func show_traditions(chosen: Array = []) -> void:
 				next = [id]
 			else:
 				next.append(id)
+			mustering_kept = mustering
 			show_traditions(next))
 		grid.add_child(btn)
 	# The Random card: always there, drawing from every tradition, not only these.
-	var chance := CardView.new(CardView.Size.LARGE, "tradition", "Chosen" if by_chance else "Random", "Let fate choose")
+	var chance := CardView.new(tsz, "tradition", "Chosen" if by_chance else "Random", "Let fate choose")
 	chance.custom_minimum_size.x = 210
 	chance.set_selected(by_chance).set_body("One of all %d traditions, not only these, drawn as you found the town, and a little more to start with." % content.traditions.size(), CardView.TEXT)
 	chance.add_goods(content.balance.get("tradition_random_bonus", {}))
@@ -478,8 +555,35 @@ func show_traditions(chosen: Array = []) -> void:
 	all_ids.sort()
 	chance.add_pictures(all_ids.map(func(id: String) -> Texture2D: return SpriteBook.shared().card_texture(_tradition_building(content.traditions[id]))))
 	chance.tooltip_text = "Let fate choose your people's tradition from all of them, and start with a little more for it."
-	chance.pressed.connect(func() -> void: show_traditions([] if by_chance else [RANDOM_TRADITION]))
+	chance.pressed.connect(func() -> void:
+		mustering_kept = mustering
+		show_traditions([] if by_chance else [RANDOM_TRADITION]))
 	grid.add_child(chance)
+	# Round the campfire (picks in the town, slice 4): each tradition's founders hold up its card, the Random card's
+	# hooded stranger last.
+	var can_found := by_chance or chosen.size() >= to_pick
+	var found_it := func() -> void:
+		if by_chance:
+			random_tradition_chosen.emit()
+		else:
+			traditions_chosen.emit(chosen)
+	if in_town:
+		var cards: Array = grid.get_children()
+		for c: Control in cards:
+			grid.remove_child(c)
+			c.custom_minimum_size.x = 0
+		note.visible = false
+		_box.get_children().filter(func(c: Node) -> bool: return not c.is_queued_for_deletion())[0].tooltip_text = note.text
+		center.queue_free()
+		center.visible = false
+		if _muster_with(cards, DawnMuster.tradition_groups(run, ids), tsz,
+				[["Found the town", found_it, not can_found, true],
+				["No tradition" if to_pick == 1 else "No traditions", func() -> void: traditions_chosen.emit([])]]):
+			return
+		# It won't fit (the cards are freed): the classic pop-up, built afresh.
+		_classic_once = true
+		show_traditions(chosen)
+		return
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 10)
@@ -600,6 +704,24 @@ func show_pedlars() -> void:
 		btn.tooltip_text = "%s\nSells %s, about tier %d.\n%s.\n%s" % [d["text"], sells, run.world.pedlar.ware_tier(id), where, footer]
 		btn.pressed.connect(func() -> void: pedlar_chosen.emit(id))
 		row.add_child(btn)
+	# Over the land (picks in the town, slice 4): each card on a line down to the spot where that pedlar would camp.
+	_reshow = show_pedlars
+	var classic := _classic_once
+	_classic_once = false
+	if _scenes_on() and not classic:
+		var cards: Array = row.get_children()
+		for c: Control in cards:
+			row.remove_child(c)
+			c.custom_minimum_size.x = 0
+		row.queue_free()
+		var none := UiKit.secondary(Button.new(), 13)
+		none.text = "No pedlar"
+		none.pressed.connect(func() -> void: pedlar_chosen.emit(""))
+		if _over_town(cards, run.pedlar_offer.map(func(o: Dictionary) -> Dictionary: return DraftStage.camp(o["pos"])), note, none):
+			return
+		_classic_once = true
+		show_pedlars()
+		return
 	_skip_button("No pedlar", func() -> void: pedlar_chosen.emit(""))
 	show()
 
@@ -1277,6 +1399,7 @@ func _clear() -> void:
 		child.queue_free()
 	if arena != null:
 		arena.draft.finish(Time.get_ticks_msec())
+	_reshow = Callable()
 	mustering = false
 	self_modulate.a = 1.0
 	_panel.visible = true

@@ -229,6 +229,8 @@ func _apply_settings() -> void:
 
 
 func _found(ids: Array) -> void:
+	# Round the campfire: the chosen tradition's founders cheer and everyone goes back (DawnMuster).
+	_arena.muster.finish(run.tradition_offer().find(ids[0]) if ids.size() == 1 else -1, Time.get_ticks_msec())
 	run.choose_traditions(ids)
 	_overlays.hide()
 	_refresh()
@@ -236,6 +238,7 @@ func _found(ids: Array) -> void:
 
 
 func _found_by_chance() -> void:
+	_arena.muster.finish(run.tradition_offer().size(), Time.get_ticks_msec())
 	run.choose_random_tradition()
 	_overlays.hide()
 	_refresh()
@@ -615,6 +618,7 @@ func _build_ui() -> void:
 		_new_run(_random_seed()))
 	_overlays.settings = settings
 	_overlays.arena = _arena
+	_overlays.hand_view = _hand_view
 
 	# The title screen covers the game; the menu's screens (Run history, Settings) open over it.
 	_title_screen = TitleScreen.new()
