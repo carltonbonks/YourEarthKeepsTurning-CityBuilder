@@ -76,6 +76,10 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _tour.playing():
 		return
+	# The dawn muster's cards stand over the map: the clock, alerts and attack card step aside meanwhile.
+	var hush := 0.0 if _overlays.visible and _overlays.mustering else 1.0
+	_threat.modulate.a = hush
+	_corner.modulate.a = hush
 	if _held_for_turn and not _arena.turn_pending():
 		_held_for_turn = false
 		_refresh()
@@ -127,6 +131,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			_overlays.hide()
 		else:
 			_close_menu() if _menu_open else _open_menu()
+		get_viewport().set_input_as_handled()
+	elif _overlays.visible and _overlays.mustering and event.is_action_pressed("pause"):
+		# Space skips the dawn muster's glide in.
+		_arena.muster.skip(Time.get_ticks_msec())
 		get_viewport().set_input_as_handled()
 	elif _title_screen.visible or _overlays.visible:
 		return
@@ -277,6 +285,8 @@ func _on_pause() -> void:
 
 
 func _take_pick(index: int) -> void:
+	# The dawn muster: the chosen group cheers and everyone goes back (DawnMuster).
+	_arena.muster.finish(index, Time.get_ticks_msec())
 	run.choose_pick(index)
 	_overlays.hide()
 	_refresh()
@@ -588,6 +598,7 @@ func _build_ui() -> void:
 		settings.save()
 		_new_run(_random_seed()))
 	_overlays.settings = settings
+	_overlays.arena = _arena
 
 	# The title screen covers the game; the menu's screens (Run history, Settings) open over it.
 	_title_screen = TitleScreen.new()
@@ -611,6 +622,9 @@ func _build_ui() -> void:
 	_advisor.build_card_rect = _hand_view.card_rect
 	_advisor.pick_card_rect = _overlays.pick_card_rect
 	_advisor.anchor_rect = func() -> Rect2:
+		# At the dawn muster the Elder takes the map's top-left corner (the clock steps aside meanwhile).
+		if _overlays.visible and _overlays.mustering:
+			return Rect2(_arena.get_global_rect().position + Vector2(0.0, Advisor.PORTRAIT + 2.0 * Advisor.GAP), Vector2.ONE)
 		if _overlays.visible and _overlays.showing_pick:
 			return _overlays.panel_rect()
 		return _hand_view.get_global_rect() if _hand_view.visible else Rect2()

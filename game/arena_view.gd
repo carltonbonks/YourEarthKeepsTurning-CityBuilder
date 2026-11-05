@@ -39,7 +39,7 @@ const INVADER_GLOW_DAY := 0.08
 const INVADER_GLOW_NIGHT := 0.3
 const INVADER_RED := Color(1.0, 0.18, 0.12)
 ## What each kind of standing thing is, for the back-to-front pass.
-enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO, PEDLAR, OBSTACLE, PROP, BODY }
+enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO, PEDLAR, OBSTACLE, PROP, BODY, STAND_IN }
 
 ## A won run's ending has played out (or was clicked past): the end screen can open.
 signal victory_done
@@ -68,6 +68,8 @@ var pickups := PickupPopups.new()
 var supplies := SupplyPopups.new()
 var celebrations := Celebrations.new()
 var victory := Victory.new()
+## The dawn pick as a scene round the hearth (DawnMuster): the camera, the groups and their banners' poles.
+var muster := DawnMuster.new()
 var upgrade_glow := UpgradeGlow.new()
 var last_kill := LastKill.new()
 var raider_route := RaiderRoute.new()
@@ -102,6 +104,7 @@ func reset_camera() -> void:
 	night = NightCamera.new()
 	turn = TurnCamera.new()
 	victory = Victory.new()
+	muster = DawnMuster.new()
 	last_kill.reset()
 
 
@@ -130,6 +133,28 @@ func last_kill_playing() -> bool:
 ## Ends the last kill's beat at once (Space).
 func skip_last_kill() -> void:
 	last_kill.skip(self)
+
+
+## The dawn pick plays as a scene round the hearth (DawnMuster), laid out by `plan` (DawnMuster.layout).
+func start_muster(plan: Dictionary) -> void:
+	night.release()
+	turn.release()
+	last_kill.release()
+	muster.start(run, self, plan, Time.get_ticks_msec())
+
+
+## The ground point under screen point `s` with the camera at zoom `z` looking at `p` (DawnMuster plans its scene
+## for where the camera will be, not where it is).
+func world_under(s: Vector2, z: float, p: Vector2) -> Vector2:
+	return _unproject((s - size / 2.0) / (_scale() / zoom * z)) + p
+
+
+## Where a person is drawn this frame: at their place round the hearth after a win (Victory) or in their group at
+## the dawn muster (DawnMuster), else where they are.
+func _place(u: Unit, now: float) -> Vector2:
+	if victory.active():
+		return victory.place(u, now)
+	return muster.place(u, now)
 
 
 ## Points the view at a ground point, zooming in a little if the view is wide.
@@ -172,7 +197,9 @@ func _layer(draw_with: Callable) -> Control:
 func _process(delta: float) -> void:
 	if run != null:
 		# The night camera waits while the last kill is held, and picks up from where the beat leaves it.
-		if last_kill.playing():
+		if muster.active():
+			muster.update(self, Time.get_ticks_msec())
+		elif last_kill.playing():
 			last_kill.update(self)
 		elif night_camera:
 			night.update(self, delta)
@@ -341,13 +368,15 @@ func _draw() -> void:
 		_queue(things, keys, Kind.BODY, body, body["at"])
 	for u in w.folk:
 		if u.alive:
-			_queue(things, keys, Kind.FOLK, u, victory.place(u, now))
+			_queue(things, keys, Kind.FOLK, u, _place(u, now))
 	for e in w.enemies:
 		if e.alive and e.spawned:
 			_queue(things, keys, Kind.ENEMY, e, e.pos)
 	for hero in run.heroes:
 		if hero.alive:
-			_queue(things, keys, Kind.HERO, hero, victory.place(hero, now))
+			_queue(things, keys, Kind.HERO, hero, _place(hero, now))
+	for st: Dictionary in muster.stand_ins:
+		_queue(things, keys, Kind.STAND_IN, st, st["spot"])
 	keys.sort()
 	for key in keys:
 		var thing: Array = things[key & 0xFFFF]
@@ -373,10 +402,15 @@ func _draw() -> void:
 				sprites.draw(self, plot["obstacle"], _to_screen(plot["pos"]), sprites.building_scale(plot["obstacle"], _scale()))
 			Kind.BODY:
 				_draw_body(thing[1], now)
+			Kind.STAND_IN:
+				_draw_stand_in(thing[1], font, now)
 			Kind.PROP:
 				var prop: Array = thing[1]
 				sprites.draw(self, prop[1], _to_screen(prop[0]), sprites.building_scale(prop[1], _scale()) * float(prop[3]), 0,
 					Color.WHITE, "idle", int(prop[2]))
+
+	if muster.active():
+		_draw_muster_front(font, now)
 
 	# Shots fly at chest height.
 	var chest := _chest()
@@ -477,7 +511,8 @@ func _draw_top() -> void:
 	celebrations.draw_top(_top_layer, size, font, Time.get_ticks_msec(), _to_screen, run.heroes, HERO_RADIUS * maxf(1.0, zoom * 0.7))
 	victory.draw_top(_top_layer, size, font, Time.get_ticks_msec())
 	last_kill.draw_top(_top_layer, self, font)
-	raider_route.draw_labels(_top_layer, self, run, font, Time.get_ticks_msec(), _slide_angle(0))
+	if not muster.active():
+		raider_route.draw_labels(_top_layer, self, run, font, Time.get_ticks_msec(), _slide_angle(0))
 	quick_defences.draw_top(_top_layer, self, run, font)
 	if _mouse.x >= 0.0 and not _dragging:
 		var tip := hovered(_mouse)
@@ -695,11 +730,12 @@ func _draw_hearth() -> void:
 func _draw_folk(u: Unit) -> void:
 	var r := FOLK_RADIUS * maxf(1.0, zoom * 0.7)
 	var now := float(Time.get_ticks_msec())
-	var at := victory.place(u, now)
+	var at := _place(u, now)
 	var look := {}
 	if _has_art(u.type_id):
 		look = _look(u, at, u.type_id, now)
 		at = look["at"]
+		muster.pose(u, look, now)
 		var cheer := _cheer(u, now)
 		if cheer >= 0:
 			look["cheer"] = cheer
@@ -801,6 +837,65 @@ func _cheer(u: Unit, now: float) -> int:
 	if beat < 0.0 or beat > CHEER_MS:
 		return -1
 	return int(beat / 260.0 + u.get_instance_id() % 3) % 2
+
+
+## A newcomer or offered hero standing in a dawn muster group (DawnMuster): its sprite facing the viewer, holding up
+## the banner or cheering, fading in and out with the scene; a hero in its class-coloured ring.
+func _draw_stand_in(st: Dictionary, font: Font, now: float) -> void:
+	var a := muster.stand_in_alpha(now)
+	if a <= 0.0:
+		return
+	var id: String = st["id"]
+	var hero: bool = st["hero"]
+	var r := (HERO_RADIUS if hero else FOLK_RADIUS) * maxf(1.0, zoom * 0.7)
+	var at: Vector2 = st["spot"]
+	var color: Color = st["color"]
+	_shadow(at, r)
+	if hero:
+		draw_polyline(_closed(_ground_ring(at, r * 0.9 / _scale(), 18)), Color(color, a), 2.0)
+	if _has_art(id):
+		var anim: Array = muster.stand_in_anim(st, now)
+		if not sprites.info(id).get("anims", {}).has(anim[0]):
+			anim = ["cheer", 1] if anim[0] == "raise" and sprites.info(id).get("anims", {}).has("cheer") else ["idle", 0]
+		sprites.draw(self, id, _to_screen(at), sprites.walker_scale(id, r), 1, Color(1, 1, 1, a), anim[0], anim[1])
+	else:
+		draw_circle(_stand(at, r), r, Color(color, a))
+		if hero:
+			draw_arc(_stand(at, r), r, 0, TAU, 24, Color(1, 1, 1, a), 1.5)
+
+
+## The dawn muster stands out: the map dims a little and the groups are drawn again over it, back to front, then
+## their poles, packs, tools and marks (DawnMuster.draw).
+func _draw_muster_front(font: Font, now: float) -> void:
+	var a := muster.stand_in_alpha(now)
+	if a > 0.0:
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.03, 0.03, 0.05, DawnMuster.WASH * a))
+		var front: Array = []
+		for st: Dictionary in muster.stand_ins:
+			front.append([_to_screen(st["spot"]).y, st])
+		for g: Dictionary in muster.groups:
+			for u: Unit in g["members"]:
+				if u.alive:
+					front.append([_to_screen(_place(u, now)).y, u])
+		front.sort_custom(func(x: Array, y: Array) -> bool: return x[0] < y[0])
+		for f: Array in front:
+			if f[1] is Unit:
+				var u: Unit = f[1]
+				if u.is_hero():
+					_draw_hero(u, font)
+				else:
+					_draw_folk(u)
+			else:
+				_draw_stand_in(f[1], font, now)
+	muster.draw(self, now, _figure)
+
+
+## Where a figure stands on screen and how tall it is ({at: feet, height: px}), for the dawn muster's poles and kit.
+func _figure(id: String, hero: bool, spot: Vector2) -> Dictionary:
+	var r := (HERO_RADIUS if hero else FOLK_RADIUS) * maxf(1.0, zoom * 0.7)
+	if _has_art(id):
+		return {"at": _to_screen(spot), "height": sprites.height_at(id, sprites.walker_scale(id, r))}
+	return {"at": _stand(spot, r) + Vector2(0.0, r), "height": 2.0 * r}
 
 
 ## True when `id` is drawn as its rendered sprite (tilted view, Rendered art on, and art exists for it).
@@ -969,7 +1064,7 @@ func main_color(resource: String) -> String:
 func _draw_hero(hero: Unit, font: Font) -> void:
 	var r := HERO_RADIUS * maxf(1.0, zoom * 0.7)
 	var now := float(Time.get_ticks_msec())
-	var at := victory.place(hero, now)
+	var at := _place(hero, now)
 	var color := Color(run.content.hero_classes[hero.type_id]["color"])
 	if _has_art(hero.type_id):
 		_draw_hero_sprite(hero, at, r, color, font, now)
@@ -998,6 +1093,7 @@ func _draw_hero(hero: Unit, font: Font) -> void:
 func _draw_hero_sprite(hero: Unit, place: Vector2, r: float, color: Color, font: Font, now: float) -> void:
 	var look := _look(hero, place, hero.type_id, now)
 	var at: Vector2 = look["at"]
+	muster.pose(hero, look, now)
 	var cheer := _cheer(hero, now)
 	if cheer >= 0:
 		look["cheer"] = cheer

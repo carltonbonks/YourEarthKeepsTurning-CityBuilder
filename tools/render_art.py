@@ -90,7 +90,7 @@ def light_and_camera(row):
 
 
 ## Animations every walker gets, in the order they sit along each row of its sheet, and their frames.
-ANIMS = [("idle", 1), ("walk", 6), ("attack", 4), ("fall", 4), ("cheer", 2)]
+ANIMS = [("idle", 1), ("walk", 6), ("attack", 4), ("fall", 4), ("cheer", 2), ("raise", 1)]
 ## How an attack swings, frame by frame: the weapon arm (radians round the left-right axis: + is up and
 ## back, - forward), the other arm, and how far a beast lunges (model units along its facing).
 ATTACK_ARM = [1.4, 2.5, -0.6, -1.0]
@@ -102,6 +102,9 @@ STRIDE = 0.5  ## How far legs swing at mid-stride, radians.
 FALL_TILT = [0.45, 1.0, 1.45, 1.57]
 CHEER_ARMS = [2.5, 2.9]
 CHEER_LIFT = [0.0, 0.06]
+## How a walker holds up a banner at the dawn muster (game/dawn_muster.gd): the right arm straight up (the game draws
+## the pole and the card above the hand), the left arm a little out.
+RAISE_ARMS = (3.05, -0.25)
 
 
 def pose(rig, anim, t, n, joints, pivot, facing_angle, height=1.0):
@@ -152,6 +155,9 @@ def pose(rig, anim, t, n, joints, pivot, facing_angle, height=1.0):
         pivot.location = (0, 0, CHEER_LIFT[t] if rig != "none" else 0.0)
         if rig == "humanoid":
             swing = {"arm_r": CHEER_ARMS[t], "arm_l": CHEER_ARMS[1 - t]}
+    elif anim == "raise":
+        if rig == "humanoid":
+            swing = {"arm_r": RAISE_ARMS[0], "arm_l": RAISE_ARMS[1]}
     for name, angle in swing.items():
         if name in joints:
             joints[name].rotation_euler = (0, angle, 0)

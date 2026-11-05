@@ -1,6 +1,8 @@
 class_name Overlays
 extends PanelContainer
 ## The dimmed pop-ups over the screen: the blueprint draft, the dawn pick and the relic pick (as cards, detail on hover),
+## (the dawn pick plays as a scene in the town when it can, DawnMuster: its cards stand in a row over the map,
+## the header at the top, and the map shows through),
 ## the end of a run, the menu (Esc), the full story log, Run history and the dev tuning panel. Choices go back to the screen
 ## as signals; nothing here changes the run directly. A pop-up taller or wider than the screen shrinks
 ## to fit (`_fit_panel`) rather than running off it.
@@ -46,6 +48,13 @@ var showing_pick := false
 var _pick_buttons: Array[CardView] = []
 var _box: VBoxContainer
 var _panel: PanelContainer
+## The map, for the dawn muster (DawnMuster): the scene plays on it and the cards stand over it.
+var arena: ArenaView
+## The dawn pick is up as a scene in the town, not the pop-up: the cards stand in `_stage`, the header (the pop-up's
+## box, without cards) sits at the map's top and nothing is dimmed.
+var mustering := false
+var _stage: Control
+var _muster_size := CardView.Size.LARGE
 
 
 func _init() -> void:
@@ -76,12 +85,21 @@ func _init() -> void:
 	_box = VBoxContainer.new()
 	_box.add_theme_constant_override("separation", 8)
 	margin.add_child(_box)
+	_stage = Control.new()
+	_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_stage)
 	hide()
 
 
 ## Where the pop-up is on screen, or an empty rect when none is up.
 func panel_rect() -> Rect2:
-	return _panel.get_global_rect() if visible else Rect2()
+	if not visible:
+		return Rect2()
+	var rect := _panel.get_global_rect()
+	if mustering:
+		for card in _pick_buttons:
+			rect = rect.merge(card.get_global_rect())
+	return rect
 
 
 ## Where dawn card `index` is on screen, or an empty rect when the dawn pick isn't up.
@@ -95,6 +113,9 @@ func pick_card_rect(index: int) -> Rect2:
 func _fit_panel() -> void:
 	var area := (_panel.get_parent() as Control).size
 	if area.x <= 0.0:
+		return
+	if mustering:
+		_place_header()
 		return
 	_panel.reset_size()
 	var want := _panel.size
@@ -188,24 +209,112 @@ func show_pick() -> void:
 		var role: String = content.townsfolk[run.hunger_turned_away]["name"].to_lower()
 		UiKit.note(_box, "Word has spread that a %s left hungry: no %s will join today." % [role, role], UiKit.STRONG, UiKit.EMBER) \
 			.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# A crowded dawn uses medium cards so the row fits the screen.
+	var sz := CardView.Size.LARGE if run.pick_offer.size() <= 4 else CardView.Size.MEDIUM
+	if _muster(sz):
+		return
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_box.add_child(row)
-	# A crowded dawn uses medium cards so the row fits the screen.
-	var sz := CardView.Size.LARGE if run.pick_offer.size() <= 4 else CardView.Size.MEDIUM
 	for i in run.pick_offer.size():
-		var card := run.pick_offer[i]
-		var btn := _pick_card(card, sz)
-		btn.set_roll(run.content, CardRoll.roll_of(card), run.people.card_rarity(card), CardRoll.mods_of(card))
-		btn.disabled = not run.can_take_pick(i)
-		UiKit.fade_if_disabled(btn, _why_not_pick(card))
-		btn.pressed.connect(func() -> void: pick_taken.emit(i))
-		row.add_child(btn)
-		_pick_buttons.append(btn)
+		row.add_child(_dawn_card(i, sz))
 	_skip_button("Nobody today", func() -> void: pick_taken.emit(-1))
 	showing_pick = true
 	show()
+
+
+## Dawn card `index` as a card to click, remembered for the Elder and the highlights.
+func _dawn_card(i: int, sz: CardView.Size) -> CardView:
+	var card := run.pick_offer[i]
+	var btn := _pick_card(card, sz)
+	btn.set_roll(run.content, CardRoll.roll_of(card), run.people.card_rarity(card), CardRoll.mods_of(card))
+	btn.disabled = not run.can_take_pick(i)
+	UiKit.fade_if_disabled(btn, _why_not_pick(card))
+	btn.pressed.connect(func() -> void: pick_taken.emit(i))
+	_pick_buttons.append(btn)
+	return btn
+
+
+## The dawn pick as a scene in the town (DawnMuster), when the setting is on and the cards fit over the map at
+## MIN_SCALE or more: the header (already in the box) goes to the map's top, the cards stand in a row over their
+## groups, "Nobody today" under the hearth. False leaves the classic pop-up to be built.
+func _muster(sz: CardView.Size) -> bool:
+	if arena == null or settings == null or not settings.picks_in_town or not arena.is_visible_in_tree() \
+			or arena.size.x <= 0.0 or not is_inside_tree():
+		return false
+	var header := _header_height() + 2.0 * HEADER_GAP
+	var plan := DawnMuster.layout(run.pick_offer.size(), CardView.SHAPE[sz], arena.size, header)
+	if plan.is_empty():
+		return false
+	mustering = true
+	self_modulate.a = 0.0
+	_muster_size = sz
+	if not arena.resized.is_connected(_on_arena_resized):
+		arena.resized.connect(_on_arena_resized)
+	var at := _arena_origin()
+	var s: float = plan["scale"]
+	var xs: Array = plan["xs"]
+	for i in run.pick_offer.size():
+		var btn := _dawn_card(i, sz)
+		_stage.add_child(btn)
+		btn.size = CardView.SHAPE[sz]
+		btn.scale = Vector2(s, s)
+		btn.position = at + Vector2(float(xs[i]) - CardView.SHAPE[sz].x * s / 2.0, plan["card_top"])
+		btn.modulate.a = 0.0
+		create_tween().tween_property(btn, "modulate:a", 1.0, 0.35).set_delay(0.05 * i)
+	var skip := UiKit.button(_stage, "Nobody today", func() -> void: pick_taken.emit(-1))
+	skip.size = Vector2(220, 36)
+	skip.position = at + Vector2(arena.size.x / 2.0 - 110.0, arena.size.y - DawnMuster.FOOTER + 8.0)
+	showing_pick = true
+	show()
+	_place_header()
+	arena.start_muster(plan)
+	return true
+
+
+## The map changed size while the muster is up (a window resized): the scene is laid out again.
+func _on_arena_resized() -> void:
+	if visible and mustering and run.phase == RunState.Phase.PICK:
+		show_pick()
+
+
+## Keeps the muster's cards to their one shape: a new card measures tall until it knows its width.
+func _process(_delta: float) -> void:
+	if not (visible and mustering):
+		return
+	for card in _pick_buttons:
+		if card.size != CardView.SHAPE[_muster_size]:
+			card.size = CardView.SHAPE[_muster_size]
+
+
+## The gap kept round the muster's header at the map's top.
+const HEADER_GAP := 6.0
+
+
+## How tall the pop-up's box is with what is in it now (children on their way out don't count, as the box's own
+## minimum size would until the next frame): the margins, the border and each line with the gaps between.
+func _header_height() -> float:
+	var h := 0.0
+	var n := 0
+	for child in _box.get_children():
+		if child.is_queued_for_deletion() or not (child as Control).visible:
+			continue
+		h += (child as Control).get_combined_minimum_size().y
+		n += 1
+	return h + maxi(0, n - 1) * _box.get_theme_constant("separation") + 2.0 * 16.0 + 4.0
+
+
+## Where the map's top-left corner is in this overlay.
+func _arena_origin() -> Vector2:
+	return arena.get_global_rect().position - get_global_rect().position
+
+
+## The muster's header (the pop-up's box: title, last night, warnings) centred at the map's top, full size.
+func _place_header() -> void:
+	_panel.reset_size()
+	_panel.scale = Vector2.ONE
+	_panel.position = (_arena_origin() + Vector2((arena.size.x - _panel.size.x) / 2.0, HEADER_GAP)).floor()
 
 
 ## Before round 1: pick the founding tradition as a card from the run's offered few, or the Random card that leaves it
@@ -1058,6 +1167,10 @@ func _clear() -> void:
 	_pick_buttons.clear()
 	_peek(null)
 	for child in _box.get_children():
+		child.queue_free()
+	mustering = false
+	self_modulate.a = 1.0
+	for child in _stage.get_children():
 		child.queue_free()
 
 
