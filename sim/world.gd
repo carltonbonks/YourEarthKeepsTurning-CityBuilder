@@ -347,6 +347,7 @@ func _dawn() -> void:
 		if regrows(node):
 			node["amount"] = mini(int(node["max"]), int(node["amount"]) + content.int_num("node_regrow_per_day"))
 	_tend_nodes()
+	folk_ai.spread_marks()
 	earth.dawn()
 	pathing.wear_trails()
 	town.clear_barricades()
@@ -747,8 +748,15 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 	var e: Dictionary = content.enemies[victim.type_id]
 	attacker.kills += 1
 	attacker.xp += float(e["xp"]) * (1.0 + run.mod("xp_mult") + hero_ai.chosen_xp(attacker)
-		+ (content.num("hearty_xp") if attacker.well_fed else 0.0) + market.prize_xp(victim.type_id))
+		+ (content.num("hearty_xp") if attacker.well_fed else 0.0) + market.prize_xp(victim.type_id)
+		+ run.tag_mod("foe_xp", content.unit_tags(victim)))
 	var earned := int(e["loot"]) + int(run.mod("loot_shells")) + int(Loot.total(content, attacker, "loot", run.gear_bonus()))
+	# Glory-hound's banner (plate_loot): heroes with the tag earn more for kills on the near ring.
+	if earth.kind_at(victim.pos) != "":
+		var more := run.tag_mod("plate_loot", content.unit_tags(attacker))
+		if more > 0.0:
+			earned += int(round(earned * more))
+			run.relic_fired("plate_loot")
 	var tithe := int(earned * run.mod("hero_tithe"))
 	if tithe > 0:
 		run.stock["shells"] = int(run.stock["shells"]) + tithe
@@ -787,6 +795,7 @@ func _relic_kill(victim: Unit) -> void:
 	if run.has_effect("kill_fuel") and victim.pos.length() <= content.num("kiln_reach"):
 		run.stock["fuel"] = int(run.stock["fuel"]) + int(run.mod("kill_fuel"))
 		run.relic_fired("kill_fuel", int(run.mod("kill_fuel")))
+	run.add_glory(run.tag_sums("foe_glory", content.unit_tags(victim)))
 	var spoils := run.tag_sums("foe_spoils", content.unit_tags(victim))
 	for good: String in spoils:
 		run.stock[good] = int(run.stock.get(good, 0)) + int(spoils[good])

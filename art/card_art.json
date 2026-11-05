@@ -65,6 +65,16 @@
 		"wheel"
 	],
 	"relics": {
+		"trophy_wall": "skull",
+		"bloodied_banner": "banner",
+		"glory_hounds_banner": "banner",
+		"taunting_drum": "drum",
+		"swiftfoot_anklet": "feather",
+		"elders_whetstone": "flint",
+		"wild_hunt_horn": "horn",
+		"mother_tree_seed": "bough",
+		"mountain_heart": "stones",
+		"trophy_kings_crown": "crown",
 		"ancestor_bones": "skull",
 		"ancestor_mask": "mask",
 		"ancestors_horn": "horn",

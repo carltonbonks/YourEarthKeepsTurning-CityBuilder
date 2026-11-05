@@ -58,6 +58,8 @@ var tradition_random := false
 var spoils := {}
 ## Max hearth HP the town has earned for good (Ancestor bones).
 var bonus_hearth_hp := 0.0
+## What foes falling has added for good through foe_glory relics (Trophy wall, Trophy-king's crown): stat -> amount.
+var glory_stats := {}
 ## Dawn cards still to take this dawn (Twin fires gives two), and townsfolk cards taken this run (Hearth-mother's doll).
 var picks_left := 1
 var folk_cards_taken := 0
@@ -157,7 +159,8 @@ func mod(key: String) -> float:
 
 
 ## Relic effects keyed on tags ({tag: ...}), read through tag_mod, tag_sums and gear_bonus.
-const TAG_EFFECTS := ["foe_damage", "foe_spoils", "gear_bonus", "node_yield", "plate_knobs"]
+const TAG_EFFECTS := ["foe_damage", "foe_spoils", "gear_bonus", "node_yield", "node_regrow", "plate_knobs", "foe_xp", "foe_glory",
+	"tower_grudge", "plate_loot", "mark_bonus"]
 
 
 ## The effects of everything owned that has effects: relics, then traditions.
@@ -402,6 +405,24 @@ func has_effect(key: String) -> bool:
 
 ## Counts a relic's rule firing in the round record ("relic_effects": effect key -> times). Between rounds
 ## (interest, the earth's turns) there is no round entry yet, so the count waits for the next one.
+## foe_glory: a fallen foe's lasting gifts. hearth_max_hp raises the hearth (and heals it as much); hero_attack is added
+## to every hero for good (HeroAI.apply_hero_stats).
+func add_glory(gifts: Dictionary) -> void:
+	if gifts.is_empty():
+		return
+	for stat: String in gifts:
+		var amount := float(gifts[stat])
+		if stat == "hearth_max_hp":
+			bonus_hearth_hp += amount
+			world.hearth_hp += amount
+		else:
+			glory_stats[stat] = float(glory_stats.get(stat, 0.0)) + amount
+	if gifts.has("hero_attack"):
+		for hero in living_heroes():
+			world.hero_ai.apply_hero_stats(hero)
+	relic_fired("foe_glory")
+
+
 func relic_fired(effect: String, times := 1) -> void:
 	if record.entry.is_empty():
 		_effects_between_rounds[effect] = int(_effects_between_rounds.get(effect, 0)) + times

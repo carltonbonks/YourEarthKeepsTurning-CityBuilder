@@ -143,3 +143,91 @@ func test_node_regrow_relic_regrows_tagged_nodes_at_dawn() -> void:
 	w._tend_nodes()
 	check(int(w.nodes[berries]["amount"]) >= 1, "and do so at dawn")
 	run.dispose()
+
+
+func test_foe_xp_gives_heroes_more_from_tagged_foes() -> void:
+	var run := _run()
+	var hero := run.heroes[0]
+	var xp := hero.xp
+	run.world.damage(hero, _enemy(run, "raider"), 99999.0)
+	var plain := hero.xp - xp
+	run._gain_relic("bloodied_banner")
+	xp = hero.xp
+	run.world.damage(hero, _enemy(run, "raider"), 99999.0)
+	check(hero.xp - xp > plain + 0.01, "more XP from a human")
+	xp = hero.xp
+	run.world.damage(hero, _enemy(run, "wolf"), 99999.0)
+	var wolf_xp := hero.xp - xp
+	run.relics.erase("bloodied_banner")
+	xp = hero.xp
+	run.world.damage(hero, _enemy(run, "wolf"), 99999.0)
+	check(is_equal_approx(hero.xp - xp, wolf_xp), "no more from a beast")
+	run.dispose()
+
+
+func test_foe_glory_lasts_after_a_trophy_falls() -> void:
+	var run := _run()
+	var hero := run.heroes[0]
+	run._gain_relic("trophy_kings_crown")
+	var attack := hero.attack
+	var hearth := run.hearth_max_hp()
+	run.world.damage(null, _enemy(run, "wolf"), 99999.0)
+	check_eq(hero.attack, attack, "a wolf is no trophy")
+	run.world.damage(null, _enemy(run, "cave_bear"), 99999.0)
+	check_eq(hero.attack, attack + 1.0, "a cave bear makes every hero hit harder")
+	check_eq(run.hearth_max_hp(), hearth + 5.0, "and the hearth stronger")
+	run.world.hero_ai.apply_hero_stats(hero)
+	check_eq(hero.attack, attack + 1.0, "for good")
+	run.dispose()
+
+
+func test_mark_bonus_reaches_marked_townsfolk() -> void:
+	var run := _run()
+	var folk := run.world.folk_ai
+	var swift := folk.add_folk("tribesperson")
+	swift.mark = "swift"
+	var plain := folk.add_folk("tribesperson")
+	plain.mark = ""
+	check_eq(folk.unit_mod(swift, "carry"), 0.0, "no bonus yet")
+	run._gain_relic("swiftfoot_anklet")
+	check_eq(folk.unit_mod(swift, "carry"), 1.0, "a swift townsperson carries 1 more")
+	check_eq(folk.unit_mod(plain, "carry"), 0.0, "an unmarked one doesn't")
+	run.dispose()
+
+
+func test_whetstone_spreads_marks_at_dawn() -> void:
+	var run := _run()
+	var folk := run.world.folk_ai
+	for u in run.world.folk:
+		u.mark = ""
+	var teacher := folk.add_folk("tribesperson")
+	teacher.mark = "hardy"
+	for i in 4:
+		folk.add_folk("tribesperson").mark = ""
+	folk.spread_marks()
+	check_eq(run.world.folk.filter(func(u: Unit) -> bool: return u.mark == "hardy").size(), 1, "nothing without the whetstone")
+	run._gain_relic("elders_whetstone")
+	folk.spread_marks()
+	check_eq(run.world.folk.filter(func(u: Unit) -> bool: return u.mark == "hardy").size(), 3, "two learn it in a dawn")
+	run.dispose()
+
+
+func test_glory_hounds_banner_pays_bold_heroes_on_the_ring() -> void:
+	var run := _run()
+	var w := run.world
+	var hero := run.heroes[0]
+	hero.trait_id = "brave"
+	run._gain_relic("glory_hounds_banner")
+	var ring := Vector2.ZERO
+	for r in range(200, 800, 10):
+		if w.earth.kind_at(Vector2(r, 0)) != "":
+			ring = Vector2(r, 0)
+			break
+	check(ring != Vector2.ZERO, "the turning ring is on the map")
+	var gold := hero.gold
+	w.damage(hero, _enemy(run, "raider", Vector2(790, 0)), 99999.0)
+	var off_ring := hero.gold - gold
+	gold = hero.gold
+	w.damage(hero, _enemy(run, "raider", ring), 99999.0)
+	check(hero.gold - gold > off_ring, "a bold hero earns more on the ring (%d vs %d)" % [hero.gold - gold, off_ring])
+	run.dispose()

@@ -1140,9 +1140,14 @@ func _relic_card(id: String, sz := CardView.Size.LARGE) -> CardView:
 	btn.set_picture(SpriteBook.shared().relic_texture(id))
 	btn.set_roll(content, content.rarity_of("relic", id), "white", [])
 	btn.set_body(text, CardView.TEXT)
+	# One chip per tag the relic keys on, however many of its effects name it (an affinity names one tag several times).
+	var chips: Array[String] = []
 	for key: String in RunState.TAG_EFFECTS:
 		for tag: String in r.get("effects", {}).get(key, {}):
-			btn.add_chip(tag.replace("_", " "), "spark", CardView.TEXT, btn.family_color())
+			if not chips.has(tag):
+				chips.append(tag)
+	for tag in chips:
+		btn.add_chip(tag.replace("_", " "), "spark", CardView.TEXT, btn.family_color())
 	var footer := _relic_footer(r)
 	if is_spoils:
 		var now := run.spoils_now()
