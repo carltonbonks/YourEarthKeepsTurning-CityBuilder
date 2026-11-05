@@ -487,9 +487,9 @@ func venture_score(run: RunState, card: Dictionary) -> float:
 
 ## Relics it likes most first, ranked by how often bot runs that held them won (40 runs x 3 styles,
 ## blind picks, 2026-10-20). Anything not listed ranks after these; ties keep the offer's order.
-const RELIC_RANK := ["ancestors_horn", "first_hearth_ember", "lone_wolf_pelt", "horde_drum", "broken_crown", "levy_horn", "ram_thorn_stakes", "tithe_bowl",
+const RELIC_RANK := ["ancestors_horn", "first_hearth_ember", "lone_wolf_pelt", "horde_drum", "broken_crown", "levy_horn", "tithe_bowl",
 	"smith_gods_hammer", "blood_mark", "kinslayers_brand", "ancestor_mask", "owl_eyes", "sacred_spring", "witchs_thread", "chieftains_torc", "elders_tale",
-	"turncoats_torc", "fire_arrows", "bone_flute", "moneylenders_knot", "hollow_drum", "bear_tooth_charm",
+	"turncoats_torc", "fire_arrows", "ram_thorn_stakes", "bone_flute", "moneylenders_knot", "hollow_drum", "bear_tooth_charm",
 	"blood_brother_knot", "wanderers_fire", "oxhide_sledges", "seed_cache",
 	# Affinities: their node and gear halves pay every round, their plate half only when the attack crosses their kind.
 	"cairn_wardens_cord", "thorn_witchs_veil", "barrow_kings_lamp", "bog_drowners_stake",
