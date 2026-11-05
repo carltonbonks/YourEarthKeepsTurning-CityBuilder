@@ -497,3 +497,15 @@ func test_ancestor_bones_after_a_round_without_deaths() -> void:
 	else:
 		check_eq(run.hearth_max_hp(), base, "not after a round with deaths")
 	run.dispose()
+
+
+func test_taunting_drum_keeps_sentient_raiders_on_the_tower() -> void:
+	var run := _run()
+	var w := run.world
+	var base := w.content.num("tower_grudge_seconds")
+	check_eq(run.tag_mod("tower_grudge", w.content.unit_tags(_enemy(run, "raider"))), 0.0, "no drum, no taunt")
+	_give(run, "taunting_drum")
+	check_eq(run.tag_mod("tower_grudge", w.content.unit_tags(_enemy(run, "raider"))), 1.0, "a raider stays twice as long")
+	check_eq(run.tag_mod("tower_grudge", w.content.unit_tags(_enemy(run, "battering_ram"))), 0.0, "a ram is not sentient")
+	check(base > 0.0, "towers hold a grudge at all")
+	run.dispose()

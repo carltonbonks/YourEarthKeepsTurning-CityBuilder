@@ -376,7 +376,8 @@ func apply_hero_stats(hero: Unit) -> void:
 	hero.max_hp = maxf(1.0, float(c["hp"]) + (hero.level - 1) * w.content.num("level_hp") \
 		+ Loot.total(w.content, hero, "hp", w.run.gear_bonus()) + w.run.mod("hero_hp"))
 	hero.attack = float(c["attack"]) + (hero.level - 1) * w.content.num("level_attack") \
-		+ Loot.total(w.content, hero, "attack", w.run.gear_bonus()) + w.run.mod("hero_attack")
+		+ Loot.total(w.content, hero, "attack", w.run.gear_bonus()) + w.run.mod("hero_attack") \
+		+ float(w.run.glory_stats.get("hero_attack", 0.0))
 	# Trophy belt: damage for every so many kills. Witch's thread: cursed gear's HP penalty is lifted.
 	if w.run.has_effect("trophy_every"):
 		hero.attack += w.run.mod("trophy_damage") * (hero.kills / int(w.run.mod("trophy_every")))

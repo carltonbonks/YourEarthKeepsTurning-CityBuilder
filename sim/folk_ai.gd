@@ -195,6 +195,9 @@ func unit_mod(unit: Unit, key: String) -> float:
 	if unit.mark == "" and unit.boons.is_empty():
 		return 0.0
 	var total := float(w.content.marks[unit.mark].get(key, 0.0)) if unit.mark != "" else 0.0
+	# Relics keyed on the mark's tags (mark_bonus, e.g. Swiftfoot anklet on swift).
+	if unit.mark != "":
+		total += float(w.run.tag_sums("mark_bonus", w.content.tags_of("mark", unit.mark)).get(key, 0.0))
 	for id in unit.boons:
 		total += float(w.content.card_mods[id].get(key, 0.0))
 	return total
@@ -456,6 +459,35 @@ func grant_mark(unit: Unit, hero: Unit) -> void:
 	w.run.record.note_count("marks_earned", 1, mark)
 	w.run.tell("A %s who drilled beside %s is now %s: %s." % [w.content.townsfolk[unit.type_id]["name"].to_lower(),
 		unit.mark_from, m["name"].to_lower(), m["text"]])
+
+
+## Elder's whetstone (mark_spread): at dawn, up to that many unmarked townsfolk learn the mark of a marked one of
+## their role (a mark only goes to the roles it can come on, data/marks.json roles).
+func spread_marks() -> void:
+	var left := int(w.run.mod("mark_spread"))
+	if left <= 0:
+		return
+	var rng := SeededRng.stream(w.run.run_seed, "mark_spread", w.run.round_number * 10 + w.day_index())
+	for teacher: Unit in w.folk.duplicate():
+		if left <= 0:
+			break
+		if not teacher.alive or teacher.mark == "":
+			continue
+		var roles: Array = w.content.marks[teacher.mark].get("roles", [])
+		if not roles.is_empty() and not roles.has(teacher.type_id):
+			continue
+		var pupils := w.folk.filter(func(u: Unit) -> bool: return u.alive and u.mark == "" and u.type_id == teacher.type_id)
+		if pupils.is_empty():
+			continue
+		var pupil: Unit = pupils[rng.randi_range(0, pupils.size() - 1)]
+		pupil.mark = teacher.mark
+		pupil.mark_from = "another %s" % w.content.townsfolk[teacher.type_id]["name"].to_lower()
+		var before := pupil.max_hp
+		apply_folk_stats(pupil)
+		pupil.hp = minf(pupil.max_hp, pupil.hp + pupil.max_hp - before)
+		left -= 1
+		w.run.relic_fired("mark_spread")
+		w.run.record.note_count("marks_earned", 1, teacher.mark)
 
 
 ## Tribespeople and craftspeople: gather, haul, build, repair, and go home at dusk.

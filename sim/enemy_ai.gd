@@ -293,7 +293,8 @@ func towers_tick() -> void:
 					and not w.content.unit_has_tag(target, "siege"):
 				target.target = null
 				target.target_tower = w.buildings.find(b)
-				target.grudge_until = w.time + w.content.num("tower_grudge_seconds")
+				target.grudge_until = w.time + w.content.num("tower_grudge_seconds") \
+					* (1.0 + w.run.tag_mod("tower_grudge", w.content.unit_tags(target)))
 
 
 ## The town spots raiders coming for it (not den wanderers): a townsperson or hero near one, or the hearth or a
