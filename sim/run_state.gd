@@ -34,6 +34,9 @@ var fallen_folk := 0
 var relics: Array[String] = []
 var relic_acquired_round := {}
 var relic_offer: Array[String] = []
+## Relics charters brought into this run's pool on top of the dealt ones (relic_pool).
+var relic_pool_added: Array[String] = []
+var _relic_deck: Array[String] = []
 ## Founding traditions chosen before round 1 (data/traditions.json), and whether that choice is made (or skipped).
 var traditions: Array[String] = []
 ## Run paths (data/paths.json): path id -> tier held. A founding tradition's path starts at 1; each age-up brings a
@@ -243,6 +246,8 @@ func choose_traditions(ids: Array) -> void:
 	for id: String in ids:
 		if content.traditions.has(id) and not traditions.has(id) and traditions.size() < content.int_num("traditions_to_pick"):
 			traditions.append(id)
+	# The relic pool leans toward the founding traditions' paths, so it is dealt again once they are known.
+	_relic_deck = []
 	for id in traditions:
 		var start: Dictionary = content.traditions[id].get("start", {})
 		for good: String in start:
@@ -367,6 +372,7 @@ func choose_charter(id: String) -> void:
 	if id in offered:
 		paths[id] = path_tier(id) + 1
 		tell("A charter for the %s path: %s" % [content.paths["paths"][id]["name"].to_lower(), content.paths["paths"][id]["tiers"][path_tier(id) - 1]["text"]], MOMENT)
+		_charter_relics(id)
 		# Heroes' stats and the market's prizes read mod(), so they take the new tier at once.
 		for hero in living_heroes():
 			world.hero_ai.apply_hero_stats(hero)
@@ -1016,6 +1022,8 @@ func choose_relic(relic_id: String) -> void:
 		if gifts > 0:
 			var rng := SeededRng.stream(run_seed, "relic_gifts", round_number)
 			var pool := _relic_pool(false)
+			if pool.size() < gifts:
+				pool = _relic_pool(false, true)
 			var gifted: Array[String] = []
 			for i in gifts:
 				if pool.is_empty():
@@ -1149,13 +1157,87 @@ func is_pact_round() -> bool:
 	return content.balance.get("pact_rounds", []).any(func(r: float) -> bool: return int(r) == round_number)
 
 
-## Relics not yet owned that can be offered now: pacts or the rest, in a fixed order.
-func _relic_pool(pacts: bool) -> Array:
+## Relics not yet owned that can be offered now: pacts or the rest, in a fixed order. Ordinary relics come from
+## this run's relic pool unless `whole` (a top-up once the pool runs dry).
+func _relic_pool(pacts: bool, whole := false) -> Array:
+	var run_pool := [] if pacts or whole else relic_pool()
 	var pool: Array = content.relics.keys().filter(func(id: String) -> bool:
 		return not relics.has(id) and content.has_tag("relic", id, "pact") == pacts and not content.has_tag("relic", id, "spoils") \
-			and int(content.relics[id].get("from_round", 0)) <= round_number)
+			and int(content.relics[id].get("from_round", 0)) <= round_number and (run_pool.is_empty() or run_pool.has(id)))
 	pool.sort()
 	return pool
+
+
+## The ordinary relics (not pacts or spoils) in a fixed order.
+func ordinary_relics() -> Array:
+	var ids: Array = content.relics.keys().filter(func(id: String) -> bool:
+		return not content.has_tag("relic", id, "pact") and not content.has_tag("relic", id, "spoils"))
+	ids.sort()
+	return ids
+
+
+## The relic tag of a path's relics (relic_tag in data/paths.json), or "".
+func path_relic_tag(path: String) -> String:
+	return str(content.paths["paths"].get(path, {}).get("relic_tag", ""))
+
+
+## This run's relic pool (Yusuf, 2026-11-05), sorted: the ordinary relics this run can offer, like the blueprint
+## pool. relic_pool_size of them are dealt from the run's seed: up to relic_pool_lean_share from the founding
+## traditions' paths' relics, at least relic_pool_mythics orange ones, the rest from all; charters add more
+## (relic_pool_added). Owned relics stay in it.
+func relic_pool() -> Array[String]:
+	if _relic_deck.is_empty():
+		_relic_deck = _deal_relic_pool()
+	var out: Array[String] = _relic_deck.duplicate()
+	for id in relic_pool_added:
+		if not out.has(id):
+			out.append(id)
+	out.sort()
+	return out
+
+
+func _deal_relic_pool() -> Array[String]:
+	var all := ordinary_relics()
+	var size := mini(content.int_num("relic_pool_size"), all.size())
+	var rng := SeededRng.stream(run_seed, "relic_pool")
+	var keep: Array[String] = []
+	var tags: Array[String] = []
+	for id in traditions:
+		var tag := path_relic_tag(str(content.traditions[id].get("path", "")))
+		if tag != "" and not tags.has(tag):
+			tags.append(tag)
+	var leaning := all.filter(func(id: String) -> bool: return tags.any(func(t: String) -> bool: return content.has_tag("relic", id, t)))
+	_draw_relics(rng, leaning, roundi(size * content.num("relic_pool_lean_share")), keep)
+	var mythics := all.filter(func(id: String) -> bool: return content.rarity_of("relic", id) == "orange" and not keep.has(id))
+	var have := keep.filter(func(id: String) -> bool: return content.rarity_of("relic", id) == "orange").size()
+	_draw_relics(rng, mythics, content.int_num("relic_pool_mythics") - have, keep)
+	_draw_relics(rng, all.filter(func(id: String) -> bool: return not keep.has(id)), size - keep.size(), keep)
+	keep.sort()
+	return keep
+
+
+## Moves up to `count` relics drawn evenly from `from` into `into`.
+func _draw_relics(rng: SeededRng, from: Array, count: int, into: Array[String]) -> void:
+	var left := from.duplicate()
+	for i in maxi(0, count):
+		if left.is_empty():
+			return
+		into.append(left.pop_at(rng.randi_range(0, left.size() - 1)))
+
+
+## A charter brings relic_pool_charter more of its path's relics (not yet in the pool) within reach.
+func _charter_relics(path: String) -> void:
+	var tag := path_relic_tag(path)
+	if tag == "":
+		return
+	var pool := relic_pool()
+	var left := ordinary_relics().filter(func(id: String) -> bool: return content.has_tag("relic", id, tag) and not pool.has(id))
+	var drawn: Array[String] = []
+	_draw_relics(SeededRng.stream(run_seed, "relic_pool_charter", round_number), left, content.int_num("relic_pool_charter"), drawn)
+	if drawn.is_empty():
+		return
+	relic_pool_added.append_array(drawn)
+	tell("New relics can now come up: %s." % ", ".join(drawn.map(func(id: String) -> String: return content.relics[id]["name"])))
 
 
 ## How likely a relic is to be drawn this round, by its rarity.
@@ -1178,8 +1260,11 @@ func _roll_relic_offer() -> Array[String]:
 		var pick: String = rng.pick_by(pool, _relic_odds)
 		pool.erase(pick)
 		offer.append(pick)
-	if offer.size() < choices and is_pact_round():
-		pool = _relic_pool(false)
+	# Too few: ordinary relics top it up, from this run's pool and then, once that runs dry, from all of them.
+	for whole: bool in [false, true]:
+		if offer.size() >= choices:
+			break
+		pool = _relic_pool(false, whole).filter(func(id: String) -> bool: return not offer.has(id))
 		while offer.size() < choices and not pool.is_empty():
 			var pick: String = rng.pick_by(pool, _relic_odds)
 			pool.erase(pick)
