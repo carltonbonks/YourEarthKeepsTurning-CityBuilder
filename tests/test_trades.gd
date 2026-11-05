@@ -101,8 +101,8 @@ func test_a_barter_needs_its_goods_and_the_scales_sweeten_it() -> void:
 	run.stock["hides"] = 20
 	check(run.caravan.need("tin_for_furs") != "", "held twice over, the town wants to barter them")
 	var plain := int(run.caravan.gets("tin_for_furs")["tin"])
-	run.relics.append("hagglers_scales")
-	check(int(run.caravan.gets("tin_for_furs")["tin"]) > plain, "Haggler's scales: barters bring more")
+	run.relics.append("caravan_seal")
+	check(int(run.caravan.gets("tin_for_furs")["tin"]) > plain, "Caravan seal: barters bring more")
 	check_eq(int(run.caravan.gets("tin_bundle")["tin"]), 4, "but not bulk buys")
 	check(run.caravan.take(i), "bartered")
 	check_eq(int(run.stock["hides"]), 14, "the hides go south")

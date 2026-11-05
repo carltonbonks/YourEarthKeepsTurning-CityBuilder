@@ -116,10 +116,10 @@ Descriptive tags no rule reads yet are fine: they show in tooltips by name and g
 | --- | --- | --- |
 | `sentient` | `World.damage`, `EnemyAI.towers_tick` | turns on whoever hits it for a while, towers (`tower_hp`) included |
 | `fighter` | `Power.town`, `FolkAI.begin_step` | a townsfolk role that counts toward the town's power level; Horde drum counts fighters |
-| `beast` | the hunting lodge's `prize` in `data/buildings.json`, used by `Market`; `EnemyAI.enemy_tick` | the lodge pays shells and extra hides per kill; Wolf-mother's skull keeps beasts off townsfolk |
+| `beast` | the hunting lodge's `prize` in `data/buildings.json`, used by `Market`; `EnemyAI.enemy_tick` | the lodge pays shells and extra hides per kill; Hunter's blood-mark keeps beasts off townsfolk |
 | `human` | `World._relic_kill` | Turncoat's torc may turn a fallen human raider into a warrior |
-| `undead` | the chapel's `prize`, the reliquary's `bane` in `data/items.json` (`Loot.bane`), `World.hit` | the chapel pays per kill; reliquaries hit them harder; Grave salt doubles damage |
-| `siege` | `EnemyAI.enemy_tick`, `World._batter` | ignores people, goes for gates and the hearth (battering rams); Ram-thorn stakes hurt it |
+| `undead` | the chapel's `prize`, the reliquary's `bane` in `data/items.json` (`Loot.bane`), `World.hit` | the chapel pays per kill; reliquaries hit them harder; Barrow-king's lamp doubles damage |
+| `siege` | `EnemyAI.enemy_tick`, `World._batter` | ignores people, goes for gates and the hearth (battering rams) |
 | `pact` (relics) | `RunState._relic_pool` | a strong relic with a cost, offered only on `pact_rounds` |
 | `spoils` (relics) | `RunState._relic_pool`, `RunState._roll_spoils` | the spoils of a beaten attack: never in the ordinary pool, one added to the relic offer for the enemy tag (`spoils_of`) the attack was made of |
 | `bold` (traits) | the duelling ring's `duels` in `data/buildings.json`, used by `HeroAI.duels_dawn` | brave and greedy heroes spar each dawn: XP for both, the loser hurt |

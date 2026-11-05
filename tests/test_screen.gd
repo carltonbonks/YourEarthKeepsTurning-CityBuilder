@@ -354,7 +354,7 @@ func test_a_venture_shows_its_dead_as_red_crosses() -> void:
 
 
 func test_two_picks_a_dawn_keeps_the_pick_open() -> void:
-	# Twin fires and Antler crown take two newcomers a dawn: after the first, the pick must show again
+	# Twin fires takes two newcomers a dawn: after the first, the pick must show again
 	# (it used to hide, leaving neither the cards nor the Begin round button).
 	var screen: Control = load("res://game/main.tscn").instantiate()
 	screen.set("save_runs", false)
@@ -364,7 +364,7 @@ func test_two_picks_a_dawn_keeps_the_pick_open() -> void:
 	screen.call("_new_run", 4821)
 	var run: RunState = screen.get("run")
 	run.choose_traditions([])
-	run.call("_gain_relic", "antler_crown")
+	run.call("_gain_relic", "twin_fires")
 	AutoPlayer.new().build(run)
 	screen.call("_begin_round")
 	var overlays: Overlays = screen.get("_overlays")

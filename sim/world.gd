@@ -367,6 +367,12 @@ func _dawn() -> void:
 ## Nodes a trades guild works ("guild_tend", FolkAI._guild_drain) regrow their share too, until full.
 func _tend_nodes() -> void:
 	for node in nodes:
+		var grown := relic_regrowth(node)
+		if grown > 0 and int(node["amount"]) < int(node["max"]):
+			var was := int(node["amount"])
+			node["amount"] = mini(int(node["max"]), was + grown)
+			run.relic_fired("node_regrow", int(node["amount"]) - was)
+	for node in nodes:
 		var share := float(node.get("guild_tend", 0.0))
 		if share <= 0.0:
 			continue
@@ -409,7 +415,15 @@ func node_regrowth(node: Dictionary) -> int:
 		var tends := tending(b["type"])
 		if not tends.is_empty() and float(b["work_left"]) <= 0.0 and tends_node(tends, b["pos"], node):
 			total += maxi(1, roundi(float(node["max"]) * float(tends["share"])))
-	return total
+	return total + relic_regrowth(node)
+
+
+## How much an owned relic makes a node regrow each dawn by its tags (node_regrow {tag: share of full}, data/relics.json).
+func relic_regrowth(node: Dictionary) -> int:
+	if not regrows(node) or not node_active(node):
+		return 0
+	var share := run.tag_mod("node_regrow", content.tags_of("node", node["type"]))
+	return maxi(1, roundi(float(node["max"]) * share)) if share > 0.0 else 0
 
 
 ## How full the nodes carrying a tag are, 0 to 1 (1 when there are none).
@@ -612,7 +626,7 @@ func _batter(unit: Unit, square: int) -> void:
 	shots.append({"from": unit.pos, "to": pathing.center(square), "ranged": false, "time": time})
 	if content.unit_has_tag(unit, "siege"):
 		run.record.note_count("siege_damage", roundi(unit.attack * enemy_ai.war_chant()))
-		enemy_ai.thorns(unit)
+	enemy_ai.thorns(unit)
 	if pathing.hit_wall(square, unit.attack * enemy_ai.war_chant()):
 		if barricade_square.has(square):
 			var b: Dictionary = barricades[barricade_square[square]]
@@ -658,7 +672,7 @@ func hit(attacker: Unit, victim: Unit) -> void:
 			amount *= hero_ai.relic_damage_mult(attacker)
 		elif attacker.is_folk():
 			amount = folk_ai.relic_damage(attacker, amount)
-		# Relics keyed on the victim's tags (foe_damage), e.g. Grave salt on undead.
+		# Relics keyed on the victim's tags (foe_damage), e.g. Barrow-king's lamp on undead.
 		var bane := run.tag_mod("foe_damage", content.unit_tags(victim))
 		if bane != 0.0:
 			amount *= 1.0 + bane
@@ -700,8 +714,7 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 	if victim.risen:
 		return
 	if not victim.is_enemy():
-		if victim.is_hero():
-			hero_ai.mourn(victim)
+		hero_ai.mourn(victim)
 		var killer := attacker.type_id if attacker != null else ""
 		var death := {"name": victim.display_name, "role": victim.type_id, "hero": victim.is_hero(),
 			"killer": killer, "day": day_index() + 1, "night": is_night()}
@@ -771,7 +784,7 @@ func _relic_kill(victim: Unit) -> void:
 	if run.has_effect("kill_shells"):
 		run.stock["shells"] = int(run.stock["shells"]) + int(run.mod("kill_shells"))
 		run.relic_fired("kill_shells", int(run.mod("kill_shells")))
-	if run.has_effect("kill_fuel") and victim.pos.length() <= content.num("settlement_radius"):
+	if run.has_effect("kill_fuel") and victim.pos.length() <= content.num("kiln_reach"):
 		run.stock["fuel"] = int(run.stock["fuel"]) + int(run.mod("kill_fuel"))
 		run.relic_fired("kill_fuel", int(run.mod("kill_fuel")))
 	var spoils := run.tag_sums("foe_spoils", content.unit_tags(victim))

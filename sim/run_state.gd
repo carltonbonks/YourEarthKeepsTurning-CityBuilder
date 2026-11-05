@@ -990,7 +990,7 @@ func choose_relic(relic_id: String) -> void:
 	elif relic_id != "" and relic_id in relic_offer:
 		_gain_relic(relic_id)
 		tell("Relic taken: %s." % content.relics[relic_id]["name"], MOMENT)
-		# Broken crown, Starfall idol: more relics at once, drawn from the ordinary ones.
+		# Broken crown: more relics at once, drawn from the ordinary ones.
 		var gifts := int(content.relics[relic_id]["effects"].get("gain_relics", 0))
 		if gifts > 0:
 			var rng := SeededRng.stream(run_seed, "relic_gifts", round_number)

@@ -9,6 +9,9 @@
 
 	"world_radius": 800,
 	"settlement_radius": 180,
+	"kiln_reach": 330,
+	"vengeance_reach": 160,
+	"_relic_reach_note": "Relic reaches: kiln_reach = how far from the hearth a fallen foe still burns for Carrion kiln fuel (about the settlement plus a watch post's bowshot); vengeance_reach = how near a hero must be to a fallen townsperson or hero to gain Mourning bell's vengeance XP.",
 	"hearth_max_hp": 150,
 	"hearth_attack": 3,
 	"hearth_range": 160,

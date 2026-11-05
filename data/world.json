@@ -8,7 +8,7 @@
 		"flint_pit": {"tags": ["stone"], "name": "Flint pit", "gives": "flint", "amount": 12, "count": 2, "color": "#5a6a7a"},
 		"obsidian": {"tags": ["stone"], "name": "Obsidian outcrop", "gives": "obsidian", "amount": 9, "count": 2, "color": "#2a1a3a", "heroes_only": true, "buyer": "knapper", "price": 2, "buy_until": 12, "min_distance": 480, "max_distance": 640},
 		"copper_seam": {"tags": ["ore"], "name": "Copper seam", "gives": "copper", "amount": 16, "count": 3, "color": "#b87333", "age": "bronze", "min_distance": 340, "max_distance": 460},
-		"iron_bog": {"tags": ["ore"], "name": "Bog-iron pool", "gives": "bog_iron", "amount": 14, "count": 3, "color": "#6a4a2a", "age": "medieval", "min_distance": 300, "max_distance": 440},
+		"iron_bog": {"tags": ["ore", "wet"], "name": "Bog-iron pool", "gives": "bog_iron", "amount": 14, "count": 3, "color": "#6a4a2a", "age": "medieval", "min_distance": 300, "max_distance": 440},
 		"cassiterite": {"tags": ["ore"], "name": "Cassiterite vein", "gives": "cassiterite", "amount": 10, "count": 2, "color": "#3a3030", "age": "bronze", "wild": true, "near_dens": true, "buyer": "smelter", "price": 2, "buy_until": 10}
 	},
 	"wild_safe_radius": 260,

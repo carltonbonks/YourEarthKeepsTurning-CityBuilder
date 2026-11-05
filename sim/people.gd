@@ -425,6 +425,16 @@ func go_venturing(card: Dictionary) -> Dictionary:
 		run.world.folk.erase(gone)
 	for good: String in terms["goods"]:
 		run.stock[good] = int(run.stock.get(good, 0)) + int(terms["goods"][good])
+	# Pathfinder's cord: those who come home have learned the paths and are swift for good (if they have no mark yet).
+	if run.has_effect("venture_swift"):
+		var home := tribe.filter(func(u: Unit) -> bool: return u.mark == "")
+		for i in mini(int(terms["send"]) - lost, home.size()):
+			var walker: Unit = home[rng.randi_range(0, home.size() - 1)]
+			home.erase(walker)
+			walker.mark = "swift"
+			walker.mark_from = "a venture"
+			run.world.folk_ai.apply_folk_stats(walker)
+			run.relic_fired("venture_swift")
 	for effect: String in ["venture_safety", "venture_bonus"]:
 		if run.has_effect(effect):
 			run.relic_fired(effect)

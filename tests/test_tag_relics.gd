@@ -36,9 +36,9 @@ func test_foe_damage_strikes_only_its_tag_harder() -> void:
 
 func test_foe_damage_adds_up_across_relics() -> void:
 	var run := _run()
-	run._gain_relic("grave_salt")
+	run._gain_relic("barrow_kings_lamp")
 	run._gain_relic("bone_ward")
-	check_eq(run.tag_mod("foe_damage", ["undead", "sentient"]), 1.5, "Grave salt and Bone ward both count")
+	check_eq(run.tag_mod("foe_damage", ["undead", "sentient"]), 1.5, "Barrow-king's lamp and Bone ward both count")
 	check_eq(run.tag_mod("foe_damage", ["beast"]), 0.0, "neither reaches beasts")
 	run.dispose()
 
@@ -51,7 +51,7 @@ func test_foe_spoils_from_tagged_kills() -> void:
 	run.world.damage(null, _enemy(run, "wolf"), 99999.0)
 	var plain_food := int(run.stock["food"]) - food
 	var plain_hides := int(run.stock.get("hides", 0)) - hides
-	run._gain_relic("skinning_knife")
+	run._gain_relic("blood_mark")
 	food = int(run.stock["food"])
 	hides = int(run.stock.get("hides", 0))
 	run.world.damage(null, _enemy(run, "wolf"), 99999.0)
@@ -70,7 +70,7 @@ func test_gear_bonus_strengthens_tagged_gear_and_heroes_favour_it() -> void:
 	var blade := Loot.make("flint_blade", 2)
 	var likes := {"attack": 1.0}
 	var spear_before := Loot.score(c, spear, likes, run.gear_bonus())
-	run._gain_relic("bone_readers_rite")
+	run._gain_relic("barrow_kings_lamp")
 	check_eq(Loot.stat(c, spear, "attack", run.gear_bonus()), Loot.stat(c, spear, "attack") + 2.0, "+1 a tier on bone")
 	check_eq(Loot.stat(c, blade, "attack", run.gear_bonus()), Loot.stat(c, blade, "attack"), "nothing on stone")
 	check(Loot.score(c, spear, likes, run.gear_bonus()) > spear_before, "heroes rate bone gear higher")
@@ -78,7 +78,7 @@ func test_gear_bonus_strengthens_tagged_gear_and_heroes_favour_it() -> void:
 	hero.items = {"weapon": spear}
 	run.world.hero_ai.apply_hero_stats(hero)
 	var with_rite := hero.attack
-	run.relics.erase("bone_readers_rite")
+	run.relics.erase("barrow_kings_lamp")
 	run.world.hero_ai.apply_hero_stats(hero)
 	check_eq(with_rite, hero.attack + 2.0, "a hero with a bone spear hits harder")
 	run.dispose()
@@ -91,8 +91,8 @@ func test_node_yield_brings_more_from_tagged_ground() -> void:
 	unit.leaning = ""
 	var rocks := folk.carry_of(unit, "stone", "rocks")
 	var grove := folk.carry_of(unit, "wood", "grove")
-	run._gain_relic("quarry_spirit")
-	check_eq(folk.carry_of(unit, "stone", "rocks"), int(rocks * 1.5), "half again from rocks")
+	run._gain_relic("cairn_wardens_cord")
+	check_eq(folk.carry_of(unit, "stone", "rocks"), int(rocks * 1.4), "40% more from rocks")
 	check_eq(folk.carry_of(unit, "wood", "grove"), grove, "groves are not stony")
 	run.dispose()
 
@@ -104,4 +104,42 @@ func test_tooltips_name_tags_and_the_relics_acting_on_them() -> void:
 	run._gain_relic("blood_mark")
 	var notes := " ".join(PackedStringArray(Tooltips.tag_notes(run, "enemy", "wolf")))
 	check(notes.contains("Hunter's blood-mark"), "a wolf's beast tag names the owned relic")
+	run.dispose()
+
+
+func test_affinity_reaches_foes_gear_nodes_and_plates() -> void:
+	var run := _run()
+	var c := run.content
+	run._gain_relic("cairn_wardens_cord")
+	check_eq(Loot.stat(c, Loot.make("flint_blade", 2), "attack", run.gear_bonus()), Loot.stat(c, Loot.make("flint_blade", 2), "attack") + 2.0, "stone gear +1 a tier")
+	check(run.tag_mod("node_yield", c.tags_of("node", "flint_pit")) > 0.0, "stony nodes yield more")
+	check(not run.tag_sums("plate_knobs", ["stone"]).is_empty(), "the Stonefield's numbers change")
+	run.dispose()
+
+
+func test_wet_affinity_reaches_bog_iron() -> void:
+	var run := _run()
+	run._gain_relic("bog_drowners_stake")
+	check_eq(run.tag_mod("node_yield", run.content.tags_of("node", "iron_bog")), 1.0, "twice as much bog iron")
+	run.dispose()
+
+
+func test_node_regrow_relic_regrows_tagged_nodes_at_dawn() -> void:
+	var run := _run()
+	var w := run.world
+	var berries := -1
+	var rocks := -1
+	for i in w.nodes.size():
+		if w.nodes[i]["type"] == "berries" and berries < 0:
+			berries = i
+		if w.nodes[i]["type"] == "rocks" and rocks < 0:
+			rocks = i
+	check(berries >= 0 and rocks >= 0, "the map has berries and rocks")
+	check_eq(w.relic_regrowth(w.nodes[berries]), 0, "nothing without the veil")
+	run._gain_relic("thorn_witchs_veil")
+	w.nodes[berries]["amount"] = 0
+	check(w.relic_regrowth(w.nodes[berries]) >= 1, "berries regrow with it")
+	check_eq(w.relic_regrowth(w.nodes[rocks]), 0, "rocks don't")
+	w._tend_nodes()
+	check(int(w.nodes[berries]["amount"]) >= 1, "and do so at dawn")
 	run.dispose()
