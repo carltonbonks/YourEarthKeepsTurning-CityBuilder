@@ -625,7 +625,6 @@ func show_settings() -> void:
 ## After an age-up: a charter, one of a few run paths (data/paths.json) to take up or raise a tier. Each card says
 ## what the tier does, and its hover which buildings the path favours in the draft.
 func show_charter() -> void:
-	var content := run.content
 	_clear()
 	_title("A new age, a new charter. Which way does your town grow?")
 	var note := Label.new()
@@ -636,32 +635,44 @@ func show_charter() -> void:
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	note.custom_minimum_size.x = 640
 	_box.add_child(note)
+	_reshow = show_charter
+	# At the shrine by the hearth (picks in the town, slice 5), each path's card over its own stone.
+	if _shrine([note], func(sz: CardView.Size) -> Array: return run.charter_offer.map(func(id: String) -> CardView: return _charter_card(id, sz)),
+			DawnMuster.shrine_groups(run.charter_offer, "path"), []):
+		return
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_box.add_child(row)
 	for id: String in run.charter_offer:
-		var path: Dictionary = content.paths["paths"][id]
-		var tier := run.path_tier(id) + 1
-		var text: String = run.next_path_tier(id).get("text", "")
-		var btn := CardView.new(CardView.Size.LARGE, "path", "Charter · tier %s" % StatusText.roman(tier), path["name"])
+		var btn := _charter_card(id, CardView.Size.LARGE)
 		btn.custom_minimum_size.x = 220
-		btn.add_chip(path["short"])
-		if tier >= content.paths["paths"][id]["tiers"].size():
-			btn.set_advice("Capstone")
-		elif tier > 1:
-			btn.set_advice("Deepens your path")
-		# A tier II's cost goes on its own red line (data/paths.json texts end "Cost: ...").
-		var parts := text.split(" Cost: ", true, 1)
-		btn.set_body(parts[0], CardView.TEXT).set_footer(path["text"])
-		if parts.size() > 1:
-			btn.add_cost_line("Cost: " + parts[1])
-		var favoured: Array = path.get("buildings", []).filter(func(b: String) -> bool: return content.buildings.has(b))
-		btn.tooltip_text = "%s\n%s\nIts buildings come up %s times as often in the blueprint draft: %s." % [path["text"], text,
-			str(content.int_num("path_card_weight")), ", ".join(favoured.map(func(b: String) -> String: return content.buildings[b]["name"]))]
-		btn.pressed.connect(func() -> void: charter_chosen.emit(id))
 		row.add_child(btn)
 	show()
+
+
+## One charter card: the path, the tier it brings and what that does (a tier II's cost on its own red line).
+func _charter_card(id: String, sz: CardView.Size) -> CardView:
+	var content := run.content
+	var path: Dictionary = content.paths["paths"][id]
+	var tier := run.path_tier(id) + 1
+	var text: String = run.next_path_tier(id).get("text", "")
+	var btn := CardView.new(sz, "path", "Charter · tier %s" % StatusText.roman(tier), path["name"])
+	btn.add_chip(path["short"])
+	if tier >= content.paths["paths"][id]["tiers"].size():
+		btn.set_advice("Capstone")
+	elif tier > 1:
+		btn.set_advice("Deepens your path")
+	# A tier II's cost goes on its own red line (data/paths.json texts end "Cost: ...").
+	var parts := text.split(" Cost: ", true, 1)
+	btn.set_body(parts[0], CardView.TEXT).set_footer(path["text"])
+	if parts.size() > 1:
+		btn.add_cost_line("Cost: " + parts[1])
+	var favoured: Array = path.get("buildings", []).filter(func(b: String) -> bool: return content.buildings.has(b))
+	btn.tooltip_text = "%s\n%s\nIts buildings come up %s times as often in the blueprint draft: %s." % [path["text"], text,
+		str(content.int_num("path_card_weight")), ", ".join(favoured.map(func(b: String) -> String: return content.buildings[b]["name"]))]
+	btn.pressed.connect(func() -> void: charter_chosen.emit(id))
+	return btn
 
 
 ## On a pedlar round: invite one pedlar (or none). Each card says what it sells, how far out it camps and
@@ -1052,8 +1063,12 @@ func _impact_line() -> void:
 	line.alignment = BoxContainer.ALIGNMENT_CENTER
 	line.add_theme_constant_override("separation", 10)
 	_box.add_child(line)
-	var label := UiKit.note(line, ImpactView.headline(run, shown["impact"]), UiKit.BODY, UiKit.HEADING_COLOR)
-	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	# One line, never wrapped (a label made to wrap and then unwrapped keeps its tall wrapped size a frame).
+	var label := Label.new()
+	label.text = ImpactView.headline(run, shown["impact"])
+	label.add_theme_font_size_override("font_size", UiKit.BODY)
+	label.add_theme_color_override("font_color", UiKit.HEADING_COLOR)
+	line.add_child(label)
 	var open := Button.new()
 	open.text = "Who did what"
 	UiKit.secondary(open, 12)
@@ -1066,6 +1081,11 @@ func show_relic_pick() -> void:
 	_title(("Round %d survived! Choose a pact" if run.is_pact_round() else "Round %d survived! Choose a relic") % run.round_number)
 	_night_summary()
 	_impact_line()
+	_reshow = show_relic_pick
+	# At the shrine by the hearth (picks in the town, slice 5): the Elder presents the cards over standing stones.
+	if _shrine([], func(sz: CardView.Size) -> Array: return run.relic_offer.map(func(id: String) -> CardView: return _relic_card(id, sz)),
+			DawnMuster.shrine_groups(run.relic_offer, "relic"), [["Skip the relic", func() -> void: relic_picked.emit("")]]):
+		return
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1076,9 +1096,37 @@ func show_relic_pick() -> void:
 	show()
 
 
+## A pick at the shrine by the hearth (picks in the town, slice 5: relics, pacts, spoils, glory and charters): the
+## cards (`cards`, freed here when it can't be) in a row over standing stones (`groups`, DawnMuster.shrine_groups)
+## with the Elder presenting them, `footer` buttons as `_muster_with`. Over the build hand the cards are medium and
+## `notes` (lines under the title) go to the title's hover. False when the setting is off or the cards won't fit:
+## the caller builds the classic pop-up.
+func _shrine(notes: Array, make: Callable, groups: Array, footer: Array) -> bool:
+	var classic := _classic_once
+	_classic_once = false
+	if classic or not _scenes_on():
+		return false
+	var over_hand := hand_view != null and hand_view.is_visible_in_tree()
+	var sz := CardView.Size.MEDIUM if over_hand or groups.size() > 4 else CardView.Size.LARGE
+	var cards: Array = make.call(sz)
+	for c: CardView in cards:
+		c.custom_minimum_size.x = 0
+	if over_hand and not notes.is_empty():
+		var title: Control = _box.get_children().filter(func(c: Node) -> bool: return not c.is_queued_for_deletion())[0]
+		title.tooltip_text = "\n".join(notes.map(func(n: Label) -> String: return n.text))
+		title.mouse_filter = Control.MOUSE_FILTER_PASS
+		for n: Label in notes:
+			n.visible = false
+	if _muster_with(cards, groups, sz, footer):
+		return true
+	for n: Label in notes:
+		n.visible = true
+	return false
+
+
 ## One relic, pact or spoils card (CardView). Relics don't roll, so the frame is the relic's own rarity. Chips name
 ## the tags a tag-keyed relic acts on; spoils show what taking them brings now.
-func _relic_card(id: String) -> CardView:
+func _relic_card(id: String, sz := CardView.Size.LARGE) -> CardView:
 	var content := run.content
 	var r: Dictionary = content.relics[id]
 	var is_spoils: bool = id == run.spoils.get("id", "")
@@ -1086,8 +1134,9 @@ func _relic_card(id: String) -> CardView:
 	var text: String = r["text"]
 	if is_spoils:
 		kind = "Spoils of the %s" % str(content.balance.get("spoils_kinds", {}).get(run.spoils["kind"], run.spoils["kind"]))
-	var btn := CardView.new(CardView.Size.LARGE, "spoils" if is_spoils else "relic", kind, r["name"])
-	btn.custom_minimum_size.x = 206
+	var btn := CardView.new(sz, "spoils" if is_spoils else "relic", kind, r["name"])
+	if sz == CardView.Size.LARGE:
+		btn.custom_minimum_size.x = 206
 	btn.set_picture(SpriteBook.shared().relic_texture(id))
 	btn.set_roll(content, content.rarity_of("relic", id), "white", [])
 	btn.set_body(text, CardView.TEXT)

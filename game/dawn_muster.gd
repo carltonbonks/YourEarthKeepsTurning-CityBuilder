@@ -47,6 +47,15 @@ const POLE_COLOR := Color("#5a4028")
 const X_COLOR := Color("#ff4a3a")
 const PACK_COLOR := Color("#6b4f33")
 const TOOL_COLOR := Color("#b9a27a")
+## The shrine (slice 5): each relic, pact, spoils or charter card stands over a standing stone with its picture on
+## top, and the one taken rises off its stone in a gold flare. Sizes in pixels.
+const STONE_W := 20.0
+const STONE_H := 34.0
+const ICON := 30.0
+const RISE := 60.0
+const STONE := Color("#8d877c")
+const STONE_DARK := Color("#4e4a43")
+const GOLD := Color(1.0, 0.85, 0.35)
 
 ## When the scene began (ms), or -1 when there is none.
 var born := -1.0
@@ -171,6 +180,17 @@ static func tradition_groups(run: RunState, ids: Array) -> Array:
 	return out
 
 
+## The shrine by the hearth (picks in the town, slice 5): one standing stone per relic, pact or spoils card (`key`
+## "relic") or charter card (`key` "path"), in the cards' order. Nobody stands by them but the Elder, who `start`
+## puts in front of the stones, presenting them.
+static func shrine_groups(offers: Array, key: String) -> Array:
+	var out: Array = []
+	for id: String in offers:
+		out.append({"kind": "shrine", "id": "", "members": [], "stand_ins": [], "kit": "shrine", "lose": [0, 0], "more": 0,
+			key: id})
+	return out
+
+
 static func _folk_stand_in(content: Content, role: String) -> Dictionary:
 	return {"id": role, "hero": false, "color": Color(content.townsfolk[role]["color"])}
 
@@ -265,6 +285,13 @@ func start(run: RunState, view: ArenaView, plan: Dictionary, now_ms: float, give
 			var spot := view.world_under(foot + formation(k, figures - 1, room), _to_zoom, _to_pan)
 			_spots[u.get_instance_id()] = {"spot": spot, "group": gi, "index": k}
 			k += 1
+	# At the shrine the Elder (in the age's robe, Advisor.look) stands in front of the stones, arms raised.
+	if not groups.is_empty() and groups[0]["kind"] == "shrine":
+		var robe := Color(Advisor.look(run)["robe"])
+		var mid := (float(xs[0]) + float(xs[xs.size() - 1])) / 2.0
+		stand_ins.append({"id": "tribesperson", "hero": false, "color": robe, "group": -1, "index": 0, "bearer": true,
+			"elder": true, "spot": view.world_under(Vector2(mid, float(plan["feet_y"]) + ROWS * 1.4), _to_zoom, _to_pan),
+			"tint": robe.lerp(Color.WHITE, 0.45)})
 
 
 ## A card was taken (`index`, or -1 for nobody): that group cheers and everyone goes back.
@@ -456,7 +483,7 @@ func stand_in_anim(st: Dictionary, now_ms: float) -> Array:
 			return ["cheer", int((now_ms - home_from) / 200.0) % 2]
 		return ["walk", int(now_ms / 120.0) % 4]
 	if ended >= 0.0:
-		if int(st["group"]) == chosen:
+		if int(st["group"]) == chosen or (st.get("elder", false) and chosen >= 0):
 			return ["cheer", int((now_ms - ended) / 200.0) % 2]
 		return ["idle", 0]
 	return ["raise", 0] if st["bearer"] else ["idle", 0]
@@ -507,6 +534,49 @@ func draw(view: ArenaView, now_ms: float, figure: Callable) -> void:
 			view.draw_string_outline(font, at, "+%d more" % g["more"], HORIZONTAL_ALIGNMENT_LEFT, -1, UiKit.CAPTION, 3,
 				Color(0, 0, 0, 0.7 * a))
 			view.draw_string(font, at, "+%d more" % g["more"], HORIZONTAL_ALIGNMENT_LEFT, -1, UiKit.CAPTION, Color(0.95, 0.9, 0.8, a))
+
+
+## The shrine's standing stones (drawn under the figures, so the Elder stands in front): each with its card's
+## picture glowing on top and a thin gold line up to the card; the one taken rises off its stone in a flare as
+## the others fade.
+func draw_shrine(view: ArenaView, now_ms: float) -> void:
+	if not active():
+		return
+	var a := shown(now_ms)
+	var pulse := 0.5 + 0.5 * sin(now_ms * 0.005)
+	for gi in groups.size():
+		var g: Dictionary = groups[gi]
+		if g["kind"] != "shrine":
+			continue
+		var t := 0.0
+		var k := a
+		if ended >= 0.0 and gi == chosen:
+			t = clampf((now_ms - ended) / LEAVE_MS, 0.0, 1.0)
+			k = 1.0 - smoothstep(0.7, 1.0, t)
+		if k <= 0.0:
+			continue
+		var foot: Vector2 = g["foot"]
+		var top := foot - Vector2(0.0, STONE_H)
+		view.draw_colored_polygon(PackedVector2Array([foot + Vector2(-STONE_W * 0.9, 3.0), foot + Vector2(STONE_W * 0.9, 3.0),
+			foot + Vector2(STONE_W * 0.7, -2.0), foot + Vector2(-STONE_W * 0.7, -2.0)]), Color(0, 0, 0, 0.35 * k))
+		var slab := PackedVector2Array([foot + Vector2(-STONE_W / 2.0, 0.0), top + Vector2(-STONE_W * 0.4, 0.0),
+			top + Vector2(0.0, -4.0), top + Vector2(STONE_W * 0.4, 0.0), foot + Vector2(STONE_W / 2.0, 0.0)])
+		view.draw_colored_polygon(slab, Color(STONE, k))
+		view.draw_polyline(view._closed(slab), Color(STONE_DARK, k), 1.5)
+		var icon_at := top - Vector2(0.0, 6.0 + ICON / 2.0 + RISE * smoothstep(0.0, 0.8, t))
+		var glow := (0.25 + 0.15 * pulse + 0.6 * t) * k
+		view.draw_circle(icon_at, ICON * (0.62 + 0.5 * t), Color(GOLD, glow * 0.45))
+		view.draw_circle(icon_at, ICON * (0.42 + 0.3 * t), Color(GOLD, glow * 0.6))
+		var tex: Texture2D = SpriteBook.shared().relic_texture(g["relic"]) if g.has("relic") else null
+		if tex != null:
+			view.draw_texture_rect(tex, Rect2(icon_at - Vector2(ICON, ICON) / 2.0, Vector2(ICON, ICON)), false, Color(1, 1, 1, k))
+		else:
+			# A charter: a flame on the stone.
+			view.draw_circle(icon_at + Vector2(0.0, 3.0), ICON * 0.2, Color(UiKit.EMBER, k))
+			view.draw_circle(icon_at, ICON * 0.13, Color(1.0, 0.95, 0.7, k))
+		if ended < 0.0:
+			var banner: Vector2 = g["banner"]
+			view.draw_line(Vector2(icon_at.x, banner.y), icon_at - Vector2(0.0, ICON * 0.6), Color(GOLD, 0.5 * a), 1.5)
 
 
 ## A venture's party carries packs and spears, with a bold red X over each sure loss and a faint one over each

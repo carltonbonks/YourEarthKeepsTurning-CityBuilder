@@ -246,6 +246,8 @@ func _found_by_chance() -> void:
 
 
 func _take_charter(id: String) -> void:
+	# At the shrine: the path's stone flares and the Elder cheers as everyone goes back (DawnMuster).
+	_arena.muster.finish(run.charter_offer.find(id), Time.get_ticks_msec())
 	run.choose_charter(id)
 	_overlays.hide()
 	_refresh()
@@ -313,6 +315,7 @@ func _take_pick(index: int) -> void:
 
 
 func _pick_relic(relic_id: String) -> void:
+	_arena.muster.finish(run.relic_offer.find(relic_id), Time.get_ticks_msec())
 	run.choose_relic(relic_id)
 	_save()
 	_refresh()
