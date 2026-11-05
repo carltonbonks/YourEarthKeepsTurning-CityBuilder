@@ -107,3 +107,74 @@ func test_the_scene_moves_people_on_screen_only_and_ends_after_a_pick() -> void:
 	check(is_equal_approx(view.zoom, 1.2), "with the camera back where it was")
 	view.free()
 	run.dispose()
+
+
+func test_a_venture_party_walks_out_and_comes_home_short_of_who_was_lost() -> void:
+	var run := _dawn([])
+	for i in 8:
+		run.world.folk_ai.add_folk("tribesperson")
+	var venture: String = run.content.ventures.keys()[0]
+	run.pick_offer = [{"kind": "venture", "role": "venture", "cost": 0, "venture": venture},
+		{"kind": "folk", "role": "tribesperson", "cost": 0}]
+	var view := ArenaView.new()
+	view.run = run
+	view.size = Vector2(1264, 585)
+	var plan := DawnMuster.layout(2, CardView.SHAPE[CardView.Size.LARGE], view.size, 150.0)
+	var m := DawnMuster.new()
+	m.start(run, view, plan, 1000.0)
+	var party: Array = m.groups[0]["members"].duplicate()
+	var sent: int = party.size() + m.groups[0]["stand_ins"].size()
+	m.come_home(0, 2, 3000.0)
+	check(m.homecoming() and not m.choosing(), "the party sets off and the choosing is over")
+	check(party.all(func(u: Unit) -> bool: return m.hides(u)), "the party's own people are drawn as the party meanwhile")
+	var ours := m.stand_ins.filter(func(st: Dictionary) -> bool: return int(st["group"]) == 0)
+	check_eq(ours.size(), sent, "everyone sent walks out")
+	check_eq(ours.filter(func(st: Dictionary) -> bool: return st.get("lost", false)).size(), 2, "and two will not come back")
+	var st: Dictionary = ours[0]
+	check(m.stand_in_place(st, 3000.0 + DawnMuster.HOME_OUT_MS).length() > Vector2(st["spot"]).length() + 1.0,
+		"out of the town, away from the hearth")
+	var lost: Dictionary = ours.filter(func(s: Dictionary) -> bool: return s.get("lost", false))[0]
+	check_eq(m.stand_in_fade(lost, 3000.0 + DawnMuster.HOME_OUT_MS + DawnMuster.HOME_AWAY_MS), 0.0, "the lost never come back")
+	var back := 3000.0 + DawnMuster.HOME_OUT_MS + DawnMuster.HOME_AWAY_MS + DawnMuster.HOME_BACK_MS
+	check(m.home_back(back), "the rest come home")
+	check_eq(m.stand_in_place(st, back), st["spot"], "to their places")
+	var newcomer: Dictionary = m.stand_ins.filter(func(s: Dictionary) -> bool: return int(s["group"]) == 1)[0]
+	check(m.stand_in_fade(newcomer, back) < 0.01, "the other groups have gone back to work")
+	m.finish(-1, back + 500.0)
+	check(not m.homecoming() and not m.hides(party[0]), "Carry on sends the party back to work as themselves")
+	m.update(view, back + 500.0 + DawnMuster.LEAVE_MS)
+	check(not m.active(), "and the scene ends")
+	view.free()
+	run.dispose()
+
+
+func test_the_caravan_camps_outside_the_town_by_its_moot() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	run.choose_traditions([])
+	check(not CaravanCamp.here(run), "no wagons before the caravan comes")
+	run.stock["wood"] = 999
+	run.stock["stone"] = 999
+	run.stock["shells"] = 999
+	for i in 8:
+		run.build("hut")
+	for b in run.world.buildings:
+		b["work_left"] = 0.0
+	for i in maxi(0, 12 - run.population()):
+		run.world.folk_ai.add_folk("tribesperson")
+	for type in ["market", "bronze_moot"]:
+		check(run.build(type), "can order a %s" % type)
+		run.world.buildings.back()["work_left"] = 0.0
+		run.on_building_done(type)
+	check(CaravanCamp.here(run), "the wagons come with the moot")
+	var moot: Vector2 = run.world.buildings.back()["pos"]
+	var at := CaravanCamp.spot(run)
+	check(at.length() > moot.length(), "outside the moot")
+	check(signf(at.x) == signf(moot.x) or absf(moot.x) < 1.0, "on its side of the town")
+	check(at.y < 0.0, "on the far half, clear of the build hand")
+	check(at.length() >= run.world.town.patrol_radius(at.angle()), "past the town's edge")
+	run.caravan.lay_out()
+	var camp := CaravanCamp.new()
+	camp.traded(run, 0, 100.0)
+	check_eq(camp.risings.size(), 1, "a deal taken rises from the wagons")
+	check(str(camp.risings[0]["text"]) != "", "saying what it brings")
+	run.dispose()

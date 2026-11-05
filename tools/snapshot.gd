@@ -15,6 +15,7 @@ extends SceneTree
 ## ageup=1 plays on from that round until the town reaches a new age and shows the celebration (style=bronze or
 ## medieval gets there); levelup=1 levels up the first hero so the halo shows.
 ## deals=<id,id,...> lays out those caravan trade cards (data/trades.json) in the build hand; id:roll:mod:mod rolls one.
+## trading=<index> lights the caravan's wagons as pointing at that deal does; traded=<index> sends what it brings up.
 ## drafts=<type:roll:mod,...> lays out those blueprint offers in the draft; upgrade.<id>:roll:mod offers an upgrade (as the deepening offer), craft.<id> a craft.
 ## rolled=1 (with pick=1) deals rolled townsfolk cards: a magic warrior, a powerful forager and a mythic tribesperson;
 ## rolled=2 a magic family, a mythic venture and a powerful hero.
@@ -43,7 +44,7 @@ extends SceneTree
 ## long in real time before the picture (default 1400 with pick=1, so the muster's camera has glided in).
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0", "charter": "0", "guild": "", "path": "", "hungry": "0", "showme": "0", "hearth": "", "raiders": "0", "traditions": "0", "chose": "", "classic": "0", "wait_ms": ""}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0", "charter": "0", "guild": "", "path": "", "hungry": "0", "showme": "0", "hearth": "", "raiders": "0", "traditions": "0", "chose": "", "classic": "0", "wait_ms": "", "trading": "-1", "traded": "-1"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -228,6 +229,9 @@ func _init() -> void:
 	if args["drafted"] == "1" and run.phase == RunState.Phase.BUILD:
 		run.hand.picks = 0
 	main._refresh()
+	main._arena.caravan.hovered = int(args["trading"])
+	if int(args["traded"]) >= 0:
+		main._arena.caravan.traded(run, int(args["traded"]), Time.get_ticks_msec())
 	main._arena.upgrade_glow.hover_type = args["glow"]
 	if args["glow"] != "":
 		var lit := func(node: Node, find: Callable) -> Node:

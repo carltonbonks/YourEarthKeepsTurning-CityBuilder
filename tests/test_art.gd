@@ -5,7 +5,7 @@ extends TestCase
 
 ## Kinds of art and the content table their ids come from (scenery has a fixed list: things with no table of their own).
 const WALKERS := ["townsfolk", "hero", "enemy"]
-const SCENERY := ["barricade", "pedlar_camp", "hearth"]
+const SCENERY := ["barricade", "pedlar_camp", "hearth", "caravan"]
 ## The sprites' source PNGs may take this much of the repository (docs/ART_SPEC.md budget).
 const SPRITE_BUDGET_MB := 14
 

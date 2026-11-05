@@ -39,7 +39,7 @@ const INVADER_GLOW_DAY := 0.08
 const INVADER_GLOW_NIGHT := 0.3
 const INVADER_RED := Color(1.0, 0.18, 0.12)
 ## What each kind of standing thing is, for the back-to-front pass.
-enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO, PEDLAR, OBSTACLE, PROP, BODY, STAND_IN }
+enum Kind { NODE, DEN, BUILDING, HEARTH, FOLK, ENEMY, HERO, PEDLAR, OBSTACLE, PROP, BODY, STAND_IN, CARAVAN }
 
 ## A won run's ending has played out (or was clicked past): the end screen can open.
 signal victory_done
@@ -70,6 +70,8 @@ var celebrations := Celebrations.new()
 var victory := Victory.new()
 ## The dawn pick as a scene round the hearth (DawnMuster): the camera, the groups and their banners' poles.
 var muster := DawnMuster.new()
+## The southern caravan's wagons by the town (CaravanCamp): lit by the deal hovered in the hand.
+var caravan := CaravanCamp.new()
 var upgrade_glow := UpgradeGlow.new()
 var last_kill := LastKill.new()
 var raider_route := RaiderRoute.new()
@@ -105,6 +107,7 @@ func reset_camera() -> void:
 	turn = TurnCamera.new()
 	victory = Victory.new()
 	muster = DawnMuster.new()
+	caravan = CaravanCamp.new()
 	last_kill.reset()
 
 
@@ -362,12 +365,14 @@ func _draw() -> void:
 		_queue(things, keys, Kind.BUILDING, bi, w.buildings[bi]["pos"])
 	if w.pedlar.is_open():
 		_queue(things, keys, Kind.PEDLAR, null, w.pedlar.camp["pos"])
+	if CaravanCamp.here(run):
+		_queue(things, keys, Kind.CARAVAN, null, CaravanCamp.spot(run))
 	_queue(things, keys, Kind.HEARTH, null, Vector2.ZERO)
 	var now := float(Time.get_ticks_msec())
 	for body: Dictionary in fallen.bodies:
 		_queue(things, keys, Kind.BODY, body, body["at"])
 	for u in w.folk:
-		if u.alive:
+		if u.alive and not muster.hides(u):
 			_queue(things, keys, Kind.FOLK, u, _place(u, now))
 	for e in w.enemies:
 		if e.alive and e.spawned:
@@ -376,7 +381,7 @@ func _draw() -> void:
 		if hero.alive:
 			_queue(things, keys, Kind.HERO, hero, _place(hero, now))
 	for st: Dictionary in muster.stand_ins:
-		_queue(things, keys, Kind.STAND_IN, st, st["spot"])
+		_queue(things, keys, Kind.STAND_IN, st, muster.stand_in_place(st, now))
 	keys.sort()
 	for key in keys:
 		var thing: Array = things[key & 0xFFFF]
@@ -397,6 +402,8 @@ func _draw() -> void:
 				_draw_hero(thing[1], font)
 			Kind.PEDLAR:
 				_draw_pedlar(font)
+			Kind.CARAVAN:
+				caravan.draw(self, run, font, now)
 			Kind.OBSTACLE:
 				var plot: Dictionary = thing[1]
 				sprites.draw(self, plot["obstacle"], _to_screen(plot["pos"]), sprites.building_scale(plot["obstacle"], _scale()))
@@ -842,13 +849,13 @@ func _cheer(u: Unit, now: float) -> int:
 ## A newcomer or offered hero standing in a dawn muster group (DawnMuster): its sprite facing the viewer, holding up
 ## the banner or cheering, fading in and out with the scene; a hero in its class-coloured ring.
 func _draw_stand_in(st: Dictionary, font: Font, now: float) -> void:
-	var a := muster.stand_in_alpha(now)
+	var a := muster.stand_in_fade(st, now)
 	if a <= 0.0:
 		return
 	var id: String = st["id"]
 	var hero: bool = st["hero"]
 	var r := (HERO_RADIUS if hero else FOLK_RADIUS) * maxf(1.0, zoom * 0.7)
-	var at: Vector2 = st["spot"]
+	var at: Vector2 = muster.stand_in_place(st, now)
 	var color: Color = st["color"]
 	_shadow(at, r)
 	if hero:
@@ -867,15 +874,15 @@ func _draw_stand_in(st: Dictionary, font: Font, now: float) -> void:
 ## The dawn muster stands out: the map dims a little and the groups are drawn again over it, back to front, then
 ## their poles, packs, tools and marks (DawnMuster.draw).
 func _draw_muster_front(font: Font, now: float) -> void:
-	var a := muster.stand_in_alpha(now)
+	var a := muster.wash(now)
 	if a > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.03, 0.03, 0.05, DawnMuster.WASH * a))
 		var front: Array = []
 		for st: Dictionary in muster.stand_ins:
-			front.append([_to_screen(st["spot"]).y, st])
+			front.append([_to_screen(muster.stand_in_place(st, now)).y, st])
 		for g: Dictionary in muster.groups:
 			for u: Unit in g["members"]:
-				if u.alive:
+				if u.alive and not muster.hides(u):
 					front.append([_to_screen(_place(u, now)).y, u])
 		front.sort_custom(func(x: Array, y: Array) -> bool: return x[0] < y[0])
 		for f: Array in front:

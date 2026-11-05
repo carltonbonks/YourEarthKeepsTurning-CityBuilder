@@ -283,6 +283,9 @@ func _on_arena_resized() -> void:
 func _process(_delta: float) -> void:
 	if not (visible and mustering):
 		return
+	if arena.muster.homecoming():
+		var now := float(Time.get_ticks_msec())
+		_panel.visible = arena.muster.home_back(now)
 	for card in _pick_buttons:
 		if card.size != CardView.SHAPE[_muster_size]:
 			card.size = CardView.SHAPE[_muster_size]
@@ -729,6 +732,13 @@ func show_venture_result() -> void:
 	_box.add_child(center)
 	UiKit.primary(UiKit.button(center, "Carry on", func() -> void: closed.emit())).custom_minimum_size = Vector2(220, 36)
 	show()
+	# At the dawn muster the party is walking home on the map: the result waits at the map's top, undimmed, and
+	# shows once they are back (DawnMuster.homecoming).
+	if arena != null and arena.muster.homecoming():
+		mustering = true
+		self_modulate.a = 0.0
+		_panel.visible = false
+		_place_header()
 
 
 ## A promotion: who, what they become (before and after), and the price.
@@ -1170,6 +1180,7 @@ func _clear() -> void:
 		child.queue_free()
 	mustering = false
 	self_modulate.a = 1.0
+	_panel.visible = true
 	for child in _stage.get_children():
 		child.queue_free()
 

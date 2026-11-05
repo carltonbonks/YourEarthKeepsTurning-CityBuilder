@@ -22,6 +22,10 @@ signal previewing(type: String)
 signal highlighting(type: String)
 signal upgraded(type: String)
 signal begin_pressed
+## The caravan deal being pointed at (index into run.caravan.offers, -1 for none): its wagons light up on the map.
+signal trading(index: int)
+## A caravan deal was just taken: what it brings rises from the wagons.
+signal traded(index: int)
 
 ## The height the hand keeps for its small cards (their fixed shape, CardView), so the strip doesn't jump as cards change.
 const HAND_HEIGHT: float = CardView.SHAPE[CardView.Size.SMALL].y
@@ -76,6 +80,7 @@ func _init() -> void:
 
 func refresh() -> void:
 	previewing.emit("")
+	trading.emit(-1)
 	_begin.text = "Begin round %d" % run.round_number
 	for child in _row.get_children():
 		_row.remove_child(child)
@@ -565,7 +570,11 @@ func _deal_card(index: int) -> CardView:
 	btn.disabled = not run.caravan.can_take(index)
 	var blocked := run.caravan.blocker(index)
 	UiKit.fade_if_disabled(btn, blocked if blocked != "" else UiKit.shortfall(run.stock, give))
-	btn.pressed.connect(_act.bind(run.caravan.take.bind(index)))
+	btn.mouse_entered.connect(func() -> void: trading.emit(index))
+	btn.mouse_exited.connect(func() -> void: trading.emit(-1))
+	btn.pressed.connect(_act.bind(func() -> void:
+		if run.caravan.take(index):
+			traded.emit(index)))
 	return btn
 
 

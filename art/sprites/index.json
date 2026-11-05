@@ -677,6 +677,35 @@
 			],
 			"world_per_unit": 9.0
 		},
+		"caravan": {
+			"kind": "scenery",
+			"frame": [
+				256,
+				256
+			],
+			"facings": 1,
+			"anims": {
+				"idle": [
+					0,
+					1
+				]
+			},
+			"anchor": [
+				128.0,
+				176.77
+			],
+			"px_per_unit": 55.6522,
+			"figure_px": 112.77,
+			"card_boxes": [
+				[
+					53,
+					64,
+					191,
+					146
+				]
+			],
+			"world_per_unit": 15.0
+		},
 		"cassiterite": {
 			"kind": "node",
 			"frame": [
