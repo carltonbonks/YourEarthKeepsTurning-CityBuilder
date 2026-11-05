@@ -22,9 +22,13 @@ func _tags_read_in_code() -> Dictionary:
 	return found
 
 
-## Tags buildings key on in their data: a prize's tag, the tag of the nodes a building tends, and who duels.
+## Tags buildings key on in their data: a prize's tag, the tag of the nodes a building tends, and who duels; and
+## the run paths' relic tags (the relic pool leans on them).
 func _prize_tags(c: Content) -> Array:
 	var out := []
+	for path: String in c.paths["paths"]:
+		if c.paths["paths"][path].has("relic_tag"):
+			out.append(c.paths["paths"][path]["relic_tag"])
 	for id: String in c.buildings:
 		for key in ["prize", "tends", "duels"]:
 			var rule: Dictionary = c.buildings[id].get(key, {})
