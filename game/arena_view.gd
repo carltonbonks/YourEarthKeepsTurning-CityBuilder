@@ -144,11 +144,11 @@ func skip_last_kill() -> void:
 
 
 ## The dawn pick plays as a scene round the hearth (DawnMuster), laid out by `plan` (DawnMuster.layout).
-func start_muster(plan: Dictionary) -> void:
+func start_muster(plan: Dictionary, groups: Array = [], again := false) -> void:
 	night.release()
 	turn.release()
 	last_kill.release()
-	muster.start(run, self, plan, Time.get_ticks_msec())
+	muster.start(run, self, plan, Time.get_ticks_msec(), groups, again)
 
 
 ## The blueprint draft's scene: the camera's way to the whole town and each offer's place (DraftStage).
@@ -896,7 +896,7 @@ func _draw_stand_in(st: Dictionary, font: Font, now: float) -> void:
 		var anim: Array = muster.stand_in_anim(st, now)
 		if not sprites.info(id).get("anims", {}).has(anim[0]):
 			anim = ["cheer", 1] if anim[0] == "raise" and sprites.info(id).get("anims", {}).has("cheer") else ["idle", 0]
-		sprites.draw(self, id, _to_screen(at), sprites.walker_scale(id, r), 1, Color(1, 1, 1, a), anim[0], anim[1])
+		sprites.draw(self, id, _to_screen(at), sprites.walker_scale(id, r), 1, Color(st.get("tint", Color.WHITE), a), anim[0], anim[1])
 	else:
 		draw_circle(_stand(at, r), r, Color(color, a))
 		if hero:

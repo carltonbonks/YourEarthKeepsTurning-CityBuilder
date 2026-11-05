@@ -144,6 +144,33 @@ static func _group(run: RunState, card: Dictionary, taken: Dictionary) -> Dictio
 	return g
 
 
+## The founding traditions round the campfire before round 1 (picks in the town, slice 4): for each tradition card,
+## three founders dressed for its path (heroes: a hero and two tribespeople, warband: warriors, guilds: craftspeople
+## with tools, trade: tribespeople packed for the road), and last the Random card's hooded stranger, alone.
+static func tradition_groups(run: RunState, ids: Array) -> Array:
+	var content := run.content
+	var out: Array = []
+	for id: String in ids:
+		var path: String = content.traditions[id].get("path", "")
+		var g := {"kind": "tradition", "id": "tribesperson", "members": [], "stand_ins": [], "kit": "", "lose": [0, 0], "more": 0}
+		var roles: Array = {"warband": ["warrior", "warrior", "warrior"], "guilds": ["craftsperson", "craftsperson", "craftsperson"]} \
+			.get(path, ["tribesperson", "tribesperson", "tribesperson"])
+		for role: String in roles:
+			g["stand_ins"].append(_folk_stand_in(content, role))
+		if path == "heroes":
+			var classes: Array = content.hero_classes.keys()
+			classes.sort()
+			var cls: String = classes[0]
+			g["stand_ins"][0] = {"id": cls, "hero": true, "color": Color(content.hero_classes[cls]["color"])}
+		g["kit"] = {"guilds": "guild", "trade": "venture"}.get(path, "")
+		g["id"] = g["stand_ins"][0]["id"]
+		out.append(g)
+	var stranger := _folk_stand_in(content, "tribesperson")
+	stranger["tint"] = Color(0.32, 0.3, 0.36)
+	out.append({"kind": "tradition", "id": "tribesperson", "members": [], "stand_ins": [stranger], "kit": "", "lose": [0, 0], "more": 0})
+	return out
+
+
 static func _folk_stand_in(content: Content, role: String) -> Dictionary:
 	return {"id": role, "hero": false, "color": Color(content.townsfolk[role]["color"])}
 
@@ -167,11 +194,11 @@ static func _band_size(run: RunState, role: String, leaning: String) -> int:
 ## Where `n` cards of size `card` and their groups go on a map of size `area`, under a header `header` pixels tall:
 ## {scale (of the cards), xs (each card's middle), card_top, card_bottom, feet_y (where the banner holders stand),
 ## hearth_y}, or {} when the cards would have to shrink below MIN_SCALE (the classic pop-up shows instead).
-static func layout(n: int, card: Vector2, area: Vector2, header: float) -> Dictionary:
+static func layout(n: int, card: Vector2, area: Vector2, header: float, footer := FOOTER) -> Dictionary:
 	if n <= 0 or area.x <= 0.0 or area.y <= 0.0:
 		return {}
 	var wide := (area.x - 2.0 * EDGE - (n - 1) * GAP) / (n * card.x)
-	var tall := (area.y - header - POLE - FIGURE - ROWS - HEARTH - FOOTER) / card.y
+	var tall := (area.y - header - POLE - FIGURE - ROWS - HEARTH - footer) / card.y
 	var s := minf(1.0, minf(wide, tall))
 	if s < MIN_SCALE:
 		return {}
@@ -199,19 +226,22 @@ static func formation(k: int, others: int, room: float) -> Vector2:
 
 
 ## Begins the scene: the camera's way in, and a place for everyone in each card's group under that card's slot.
-func start(run: RunState, view: ArenaView, plan: Dictionary, now_ms: float) -> void:
+## `given` replaces the dawn's groups (the founding traditions' founders, `tradition_groups`); `again` keeps everyone
+## where they stand when the same scene is laid out again (a tradition clicked).
+func start(run: RunState, view: ArenaView, plan: Dictionary, now_ms: float, given: Array = [], again := false) -> void:
 	# A second pick the same dawn (Twin fires) starts again from where the first scene's camera came from.
 	if not active():
 		_from_zoom = view.zoom
 		_from_pan = view.pan
-	born = now_ms
+	if not (again and choosing()):
+		born = now_ms
 	ended = -1.0
 	home_from = -1.0
 	chosen = -1
 	_to_zoom = minf(ZOOM, ArenaView.MAX_ZOOM)
 	_to_pan = -view.world_under(Vector2(view.size.x / 2.0, plan["hearth_y"]), _to_zoom, Vector2.ZERO)
 	_run = run
-	groups = gather(run)
+	groups = given if not given.is_empty() else gather(run)
 	_folk_color = Color(run.content.townsfolk["tribesperson"]["color"])
 	_spots.clear()
 	stand_ins.clear()
@@ -229,7 +259,7 @@ func start(run: RunState, view: ArenaView, plan: Dictionary, now_ms: float) -> v
 		for st: Dictionary in g["stand_ins"]:
 			var spot := view.world_under(foot + formation(k, figures - 1, room), _to_zoom, _to_pan)
 			stand_ins.append({"id": st["id"], "hero": st["hero"], "color": st["color"], "group": gi, "index": k,
-				"bearer": k == 0, "spot": spot})
+				"bearer": k == 0, "spot": spot, "tint": st.get("tint", Color.WHITE)})
 			k += 1
 		for u: Unit in g["members"]:
 			var spot := view.world_under(foot + formation(k, figures - 1, room), _to_zoom, _to_pan)

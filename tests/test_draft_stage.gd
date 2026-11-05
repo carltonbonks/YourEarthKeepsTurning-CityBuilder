@@ -70,3 +70,9 @@ func test_the_camera_goes_to_the_town_and_back() -> void:
 		"screen_at agrees with the view at its own camera")
 	view.free()
 	run.dispose()
+
+
+func test_a_pedlar_points_at_its_camp_spot() -> void:
+	var c := DraftStage.camp(Vector2(120, -40))
+	check_eq(c["at"], Vector2(120, -40), "the card points at where the camp would stand")
+	check(c["ghost"] == "pedlar_camp" and int(c["plot"]) < 0 and c["placed"], "with a ghost of the camp, off the plots")
