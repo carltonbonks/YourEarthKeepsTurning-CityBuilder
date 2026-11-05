@@ -7,6 +7,8 @@ extends RefCounted
 ## venture's party packed for the trip (a red X over each who won't come back) or a band to charter as a guild.
 ## The cards themselves are Overlays' CardViews laid out in a row by `layout`; the groups stand under them.
 ## Picking one: that group cheers, everyone goes back to what they were doing and the camera eases back.
+## A venture taken here plays its homecoming (slice 2): the party sets off out of the town and comes back, those
+## who never came home marked by a red X where they stood, and the rest cheer once home.
 ## View only, like Victory: real townsfolk are drawn at their places (`place`), newcomers and offered heroes are
 ## stand-ins drawn here, and the sim never moves anyone. Timings are in real milliseconds.
 
@@ -14,6 +16,12 @@ extends RefCounted
 const GLIDE_MS := 900.0
 const GATHER_MS := 900.0
 const LEAVE_MS := 700.0
+## A venture's homecoming: how long the party takes to walk out of the town, the time it is away, how long it takes
+## to walk back, and how far out it goes (world units, away from the hearth).
+const HOME_OUT_MS := 900.0
+const HOME_AWAY_MS := 300.0
+const HOME_BACK_MS := 1100.0
+const HOME_REACH := 320.0
 ## How close the camera comes (ArenaView zoom), unless the view can't go that far.
 const ZOOM := 4.0
 ## The most figures a group shows; the rest of a band is counted beside it ("+5 more").
@@ -46,6 +54,8 @@ var born := -1.0
 var ended := -1.0
 ## The group whose card was taken, or -1 (none: "Nobody today").
 var chosen := -1
+## When a venture's party set off (ms; its group is `chosen`), or -1: the homecoming plays until `finish`.
+var home_from := -1.0
 ## The groups, in the cards' order (see `gather`), each with its screen slot and figures placed.
 var groups: Array = []
 ## Real people in the scene: unit instance id -> {spot, group, index (in the group: 0 holds the banner)}.
@@ -53,6 +63,9 @@ var _spots := {}
 ## Newcomers and offered heroes: {id, spot, hero, color, group, bearer}.
 var stand_ins: Array = []
 var _from_zoom := 1.0
+## A tribesperson's colour (a venture party's stand-ins without art).
+var _folk_color := Color.WHITE
+var _run: RunState
 var _from_pan := Vector2.ZERO
 var _to_zoom := 1.0
 var _to_pan := Vector2.ZERO
@@ -64,7 +77,12 @@ func active() -> bool:
 
 ## True while the player is choosing (the scene is up and no card has been taken).
 func choosing() -> bool:
-	return active() and ended < 0.0
+	return active() and ended < 0.0 and home_from < 0.0
+
+
+## True while a venture's party is out or home and the result is up (until `finish`).
+func homecoming() -> bool:
+	return active() and ended < 0.0 and home_from >= 0.0
 
 
 ## Who stands in each card's group, in pick_offer order: {kind, id (who holds the banner), members (real units),
@@ -188,10 +206,13 @@ func start(run: RunState, view: ArenaView, plan: Dictionary, now_ms: float) -> v
 		_from_pan = view.pan
 	born = now_ms
 	ended = -1.0
+	home_from = -1.0
 	chosen = -1
 	_to_zoom = minf(ZOOM, ArenaView.MAX_ZOOM)
 	_to_pan = -view.world_under(Vector2(view.size.x / 2.0, plan["hearth_y"]), _to_zoom, Vector2.ZERO)
+	_run = run
 	groups = gather(run)
+	_folk_color = Color(run.content.townsfolk["tribesperson"]["color"])
 	_spots.clear()
 	stand_ins.clear()
 	var xs: Array = plan["xs"]
@@ -207,7 +228,8 @@ func start(run: RunState, view: ArenaView, plan: Dictionary, now_ms: float) -> v
 		# people, or the one to be promoted, hold theirs.
 		for st: Dictionary in g["stand_ins"]:
 			var spot := view.world_under(foot + formation(k, figures - 1, room), _to_zoom, _to_pan)
-			stand_ins.append({"id": st["id"], "hero": st["hero"], "color": st["color"], "group": gi, "bearer": k == 0, "spot": spot})
+			stand_ins.append({"id": st["id"], "hero": st["hero"], "color": st["color"], "group": gi, "index": k,
+				"bearer": k == 0, "spot": spot})
 			k += 1
 		for u: Unit in g["members"]:
 			var spot := view.world_under(foot + formation(k, figures - 1, room), _to_zoom, _to_pan)
@@ -217,16 +239,73 @@ func start(run: RunState, view: ArenaView, plan: Dictionary, now_ms: float) -> v
 
 ## A card was taken (`index`, or -1 for nobody): that group cheers and everyone goes back.
 func finish(index: int, now_ms: float) -> void:
+	if homecoming():
+		# The party's own people walk back to work as themselves; the lost stay gone.
+		stand_ins = stand_ins.filter(func(st: Dictionary) -> bool: return not st.get("member", false) or st.get("lost", false))
+		ended = now_ms
+		return
 	if not choosing():
 		return
 	chosen = index
 	ended = now_ms
 
 
-## Skips the camera's glide (Space): the scene is there at once.
+## A venture card was taken (`index`) and `lost` never came home: its party sets off and comes back, the other groups
+## go back to work and the camera stays. The party is drawn as stand-ins meanwhile (the sim has already taken whoever
+## was lost from anywhere in the town, so who is missing here is only shown: the back of the party first, as its card
+## marked them). `finish` ends it (Carry on).
+func come_home(index: int, lost: int, now_ms: float) -> void:
+	if not choosing() or index < 0 or index >= groups.size():
+		return
+	chosen = index
+	home_from = now_ms
+	var party: Array = []
+	for st: Dictionary in stand_ins:
+		if int(st["group"]) == index:
+			party.append([int(st["index"]), st])
+	for u: Unit in groups[index]["members"]:
+		var s: Dictionary = _spots[u.get_instance_id()]
+		var st := {"id": u.type_id, "hero": false, "color": _folk_color, "group": index, "index": int(s["index"]),
+			"bearer": int(s["index"]) == 0, "spot": s["spot"], "member": true}
+		stand_ins.append(st)
+		party.append([int(s["index"]), st])
+	party.sort_custom(func(x: Array, y: Array) -> bool: return x[0] > y[0])
+	# Whoever the sim took is gone from every group.
+	var here := {}
+	for u: Unit in _run.world.folk:
+		here[u.get_instance_id()] = true
+	for g: Dictionary in groups:
+		g["members"] = g["members"].filter(func(u: Unit) -> bool: return u.is_hero() or here.has(u.get_instance_id()))
+	for i in mini(lost, party.size()):
+		party[i][1]["lost"] = true
+
+
+## True for a townsperson drawn as one of a venture's party (a stand-in) while it is out and home.
+func hides(u: Unit) -> bool:
+	return homecoming() and has(u) and int(_spots[u.get_instance_id()]["group"]) == chosen
+
+
+## How far a venture's party is from its places this frame: 0 there, 1 at the far point out of the town.
+func home_out(now_ms: float) -> float:
+	if home_from < 0.0:
+		return 0.0
+	var t := now_ms - home_from
+	if t < HOME_OUT_MS + HOME_AWAY_MS:
+		return smoothstep(0.0, HOME_OUT_MS, t)
+	return 1.0 - smoothstep(HOME_OUT_MS + HOME_AWAY_MS, HOME_OUT_MS + HOME_AWAY_MS + HOME_BACK_MS, t)
+
+
+## True once a venture's party is back in its places.
+func home_back(now_ms: float) -> bool:
+	return home_from >= 0.0 and now_ms - home_from >= HOME_OUT_MS + HOME_AWAY_MS + HOME_BACK_MS
+
+
+## Skips the camera's glide (Space), or a venture party's walk: the scene is there at once.
 func skip(now_ms: float) -> void:
 	if choosing():
 		born = minf(born, now_ms - maxf(GLIDE_MS, GATHER_MS))
+	elif homecoming():
+		home_from = minf(home_from, now_ms - HOME_OUT_MS - HOME_AWAY_MS - HOME_BACK_MS)
 
 
 ## Moves the camera for this frame, and ends the scene once everyone has gone back.
@@ -242,6 +321,7 @@ func update(view: ArenaView, now_ms: float) -> void:
 			groups.clear()
 			stand_ins.clear()
 			_spots.clear()
+			_run = null
 		return
 	var g := smoothstep(0.0, GLIDE_MS, now_ms - born)
 	view.zoom = lerpf(_from_zoom, _to_zoom, g)
@@ -249,12 +329,15 @@ func update(view: ArenaView, now_ms: float) -> void:
 
 
 ## How far everyone is toward their places: 0 before, 1 there, falling back to 0 as they go back.
-func _there(now_ms: float) -> float:
+func _there(now_ms: float, group := -1) -> float:
 	if not active():
 		return 0.0
 	var k := smoothstep(0.0, GATHER_MS, now_ms - born)
 	if ended >= 0.0:
 		k *= 1.0 - smoothstep(0.0, LEAVE_MS, now_ms - ended)
+	elif home_from >= 0.0 and group != chosen:
+		# The other groups go back to work while the venture's party is out.
+		k *= 1.0 - smoothstep(0.0, LEAVE_MS, now_ms - home_from)
 	return k
 
 
@@ -268,6 +351,18 @@ func shown(now_ms: float) -> float:
 	return k
 
 
+## Where a venture's party member stands this frame: out along the way from the hearth through their place.
+func _home_place(spot: Vector2, now_ms: float) -> Vector2:
+	return spot + spot.normalized() * HOME_REACH * home_out(now_ms)
+
+
+## Where a stand-in is drawn this frame: its place, or out and back with a venture's party.
+func stand_in_place(st: Dictionary, now_ms: float) -> Vector2:
+	if home_from >= 0.0 and int(st["group"]) == chosen and ended < 0.0:
+		return _home_place(st["spot"], now_ms)
+	return st["spot"]
+
+
 func has(u: Unit) -> bool:
 	return active() and _spots.has(u.get_instance_id())
 
@@ -277,15 +372,18 @@ func has(u: Unit) -> bool:
 func place(u: Unit, now_ms: float) -> Vector2:
 	if not has(u):
 		return u.pos
-	return u.pos.lerp(_spots[u.get_instance_id()]["spot"], _there(now_ms))
+	var s: Dictionary = _spots[u.get_instance_id()]
+	return u.pos.lerp(s["spot"], _there(now_ms, int(s["group"])))
 
 
 ## Sets how someone in the scene looks this frame: facing the viewer once there, the banner holder holding it up,
 ## and the chosen group cheering.
 func pose(u: Unit, look: Dictionary, now_ms: float) -> void:
-	if not has(u) or _there(now_ms) < 0.95:
+	if not has(u):
 		return
 	var s: Dictionary = _spots[u.get_instance_id()]
+	if _there(now_ms, int(s["group"])) < 0.95:
+		return
 	look["facing"] = 1
 	look["walking"] = false
 	if ended >= 0.0:
@@ -296,17 +394,37 @@ func pose(u: Unit, look: Dictionary, now_ms: float) -> void:
 
 
 ## How see-through a stand-in is: fading in as the camera glides, out once a card is taken.
-func stand_in_alpha(now_ms: float) -> float:
+func stand_in_alpha(now_ms: float, group := -1) -> float:
 	if not active():
 		return 0.0
 	var k := smoothstep(0.0, GATHER_MS, now_ms - born)
 	if ended >= 0.0:
 		k *= 1.0 - smoothstep(0.0, LEAVE_MS, now_ms - ended)
+	elif home_from >= 0.0 and group != chosen:
+		k *= 1.0 - smoothstep(0.0, LEAVE_MS, now_ms - home_from)
 	return k
+
+
+## How see-through stand-in `st` is: as `stand_in_alpha`, and one of a venture's party who never came home fades
+## while the party is out of sight.
+func stand_in_fade(st: Dictionary, now_ms: float) -> float:
+	var a := stand_in_alpha(now_ms, int(st["group"]))
+	if st.get("lost", false) and home_from >= 0.0:
+		a *= 1.0 - smoothstep(HOME_OUT_MS, HOME_OUT_MS + HOME_AWAY_MS, now_ms - home_from)
+	return a
+
+
+## How much the map is dimmed behind the scene (0 to 1 of WASH).
+func wash(now_ms: float) -> float:
+	return stand_in_alpha(now_ms, chosen if home_from >= 0.0 else -1)
 
 
 ## The animation a stand-in shows: holding the banner up, cheering when its card was taken, else standing.
 func stand_in_anim(st: Dictionary, now_ms: float) -> Array:
+	if home_from >= 0.0 and ended < 0.0 and int(st["group"]) == chosen:
+		if home_back(now_ms):
+			return ["cheer", int((now_ms - home_from) / 200.0) % 2]
+		return ["walk", int(now_ms / 120.0) % 4]
 	if ended >= 0.0:
 		if int(st["group"]) == chosen:
 			return ["cheer", int((now_ms - ended) / 200.0) % 2]
@@ -324,15 +442,28 @@ func draw(view: ArenaView, now_ms: float, figure: Callable) -> void:
 	for gi in groups.size():
 		var g: Dictionary = groups[gi]
 		var feet: Array = []
+		var home := home_from >= 0.0 and gi == chosen
+		if home_from >= 0.0 and not home:
+			continue
 		for st: Dictionary in stand_ins:
-			if int(st["group"]) == gi:
-				feet.append(figure.call(st["id"], st["hero"], st["spot"]))
+			if int(st["group"]) != gi:
+				continue
+			if st.get("lost", false):
+				# Where someone never came home: a red X on the ground where they stood, once the rest are back.
+				if home_back(now_ms):
+					_draw_lost(view, view._to_screen(st["spot"]),
+						clampf((now_ms - home_from - HOME_OUT_MS - HOME_AWAY_MS - HOME_BACK_MS) / 300.0, 0.0, 1.0) * a)
+				if stand_in_fade(st, now_ms) <= 0.0:
+					continue
+			feet.append(figure.call(st["id"], st["hero"], stand_in_place(st, now_ms)))
 		for u: Unit in g["members"]:
-			if u.alive:
+			if u.alive and not hides(u) and not (home and ended >= 0.0):
 				feet.append(figure.call(u.type_id, u.is_hero(), place(u, now_ms)))
 		if feet.is_empty():
 			continue
-		_draw_kit(view, g, feet, a)
+		_draw_kit(view, g, feet, a, not home)
+		if home:
+			continue
 		# The pole: from the holder's raised hand up to the card's foot.
 		var holder: Dictionary = feet[0]
 		var hand: Vector2 = holder["at"] - Vector2(-holder["height"] * 0.08, holder["height"] * 0.95)
@@ -350,7 +481,18 @@ func draw(view: ArenaView, now_ms: float, figure: Callable) -> void:
 
 ## A venture's party carries packs and spears, with a bold red X over each sure loss and a faint one over each
 ## maybe (the front rows first, so the banner holder is the last marked); a guild's band holds its tools.
-func _draw_kit(view: ArenaView, g: Dictionary, feet: Array, a: float) -> void:
+## Where someone never came home from a venture: a bold red X on the ground where they stood.
+func _draw_lost(view: ArenaView, at: Vector2, a: float) -> void:
+	if a <= 0.0:
+		return
+	var d := 7.0
+	view.draw_line(at + Vector2(-d, -d * 0.5), at + Vector2(d, d * 0.5), Color(0, 0, 0, 0.5 * a), 5.0)
+	view.draw_line(at + Vector2(-d, d * 0.5), at + Vector2(d, -d * 0.5), Color(0, 0, 0, 0.5 * a), 5.0)
+	view.draw_line(at + Vector2(-d, -d * 0.5), at + Vector2(d, d * 0.5), Color(X_COLOR, a), 3.0)
+	view.draw_line(at + Vector2(-d, d * 0.5), at + Vector2(d, -d * 0.5), Color(X_COLOR, a), 3.0)
+
+
+func _draw_kit(view: ArenaView, g: Dictionary, feet: Array, a: float, marks := true) -> void:
 	if g["kit"] == "":
 		return
 	var n := feet.size()
@@ -365,7 +507,7 @@ func _draw_kit(view: ArenaView, g: Dictionary, feet: Array, a: float) -> void:
 				view.draw_line(at + Vector2(h * 0.2, 0.0), at + Vector2(h * 0.32, -h * 1.15), Color(TOOL_COLOR, a), 1.5)
 			var from_back := n - 1 - i
 			var lose: Array = g["lose"]
-			if from_back < int(lose[1]):
+			if marks and from_back < int(lose[1]):
 				var bold := from_back < int(lose[0])
 				var over := at - Vector2(0.0, h + 7.0)
 				var d := 4.0

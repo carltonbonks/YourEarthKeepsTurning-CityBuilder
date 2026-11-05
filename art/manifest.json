@@ -775,6 +775,15 @@
 			"world_per_unit": 9.0,
 			"licence": "Own work, built in code (art/models/barricade.py)"
 		},
+		"caravan": {
+			"kind": "scenery",
+			"model": "art/models/caravan.py",
+			"frame": [256, 256],
+			"ortho": 4.6,
+			"facings": 1,
+			"world_per_unit": 15.0,
+			"licence": "Own work, built in code (art/models/caravan.py)"
+		},
 		"pedlar_camp": {
 			"kind": "scenery",
 			"model": "art/models/pedlar_camp.py",

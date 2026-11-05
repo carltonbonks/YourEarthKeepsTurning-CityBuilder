@@ -285,9 +285,18 @@ func _on_pause() -> void:
 
 
 func _take_pick(index: int) -> void:
-	# The dawn muster: the chosen group cheers and everyone goes back (DawnMuster).
-	_arena.muster.finish(index, Time.get_ticks_msec())
+	# The dawn muster: the chosen group cheers and everyone goes back (DawnMuster); a venture's party sets off and
+	# comes home first, and Carry on ends it (_close_menu).
+	var now := float(Time.get_ticks_msec())
+	var venture: bool = index >= 0 and index < run.pick_offer.size() and run.pick_offer[index]["kind"] == "venture" \
+		and _arena.muster.choosing()
+	if not venture:
+		_arena.muster.finish(index, now)
 	run.choose_pick(index)
+	if venture and not run.last_venture.is_empty():
+		_arena.muster.come_home(index, int(run.last_venture["lost"]), now)
+	elif venture:
+		_arena.muster.finish(index, now)
 	_overlays.hide()
 	_refresh()
 	# A venture holds the day for a moment to show who never came home; carrying on from it shows what
@@ -336,6 +345,9 @@ func _open_menu() -> void:
 ## The menu, the log or a dev panel closed: back to whatever the run is waiting on (or the title screen).
 func _close_menu() -> void:
 	_menu_open = false
+	# Carry on from a venture's homecoming: its party goes back to work.
+	if _arena.muster.homecoming():
+		_arena.muster.finish(-1, Time.get_ticks_msec())
 	if _title_screen.visible:
 		_overlays.hide()
 		return
@@ -547,6 +559,8 @@ func _build_ui() -> void:
 	_hand_view.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_hand_view.changed.connect(_refresh)
 	_hand_view.previewing.connect(_preview_building)
+	_hand_view.trading.connect(func(index: int) -> void: _arena.caravan.hovered = index)
+	_hand_view.traded.connect(func(index: int) -> void: _arena.caravan.traded(run, index, Time.get_ticks_msec()))
 	_hand_view.highlighting.connect(func(type: String) -> void: _arena.upgrade_glow.hover_type = type)
 	_hand_view.upgraded.connect(func(type: String) -> void:
 		_arena.upgrade_glow.hover_type = ""
