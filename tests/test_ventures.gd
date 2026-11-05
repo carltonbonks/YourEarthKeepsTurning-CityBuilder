@@ -90,6 +90,19 @@ func test_pathfinders_cord_makes_ventures_safer_and_richer() -> void:
 	check(int(after["goods"]["stone"]) > int(before["goods"]["stone"]), "more stone")
 	var calm := run.people.venture_terms("timber_float")
 	check_eq(int(calm["lose"][0]), 0, "never fewer than none")
+	run.dispose()
+
+
+func test_pathfinders_cord_sends_them_home_swift() -> void:
+	var run := _run(12)
+	run._gain_relic("pathfinders_cord")
+	for i in 8:
+		run.world.folk_ai.add_folk("tribesperson")
+	var plain := run.world.folk.filter(func(u: Unit) -> bool: return u.type_id == "tribesperson" and u.mark == "").size()
+	var went := run.people.go_venturing({"venture": "timber_float"})
+	var swift := run.world.folk.filter(func(u: Unit) -> bool: return u.type_id == "tribesperson" and u.mark == "swift").size()
+	check_eq(swift, mini(int(went["send"]) - int(went["lost"]), plain - int(went["lost"])), "everyone who came home is swift")
+	check(swift > 0, "at least one came home")
 
 
 func test_the_screen_learns_who_never_came_home() -> void:

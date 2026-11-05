@@ -139,9 +139,11 @@ func hero_tick(hero: Unit) -> void:
 			w.run.record.note_impact(key[0], key[1], "drilled", xp)
 
 
-## A bold hero goes out to meet the round's attack on the way it comes in, from the dusk before it.
+## A bold hero goes out to meet the round's attack on the way it comes in, from the dusk before it (with Beacon pyre,
+## one_side, every hero does).
 func _meets_attack(hero: Unit) -> bool:
-	return not w.wave_sides.is_empty() and w.day_index() == w.content.int_num("days_per_round") - 1 and w.content.unit_has_tag(hero, "bold")
+	return not w.wave_sides.is_empty() and w.day_index() == w.content.int_num("days_per_round") - 1 \
+		and (w.content.unit_has_tag(hero, "bold") or w.run.has_effect("one_side"))
 
 
 ## A hero guarding the pedlar's camp: fights anything near it, sleeps beside it, trades there once a day,
@@ -474,10 +476,20 @@ func count_trophy(hero: Unit) -> void:
 		w.run.tell("%s adds a trophy to their belt (%d kills)." % [hero.display_name, hero.kills], RunState.AMBIENT)
 
 
-## Mourning bell: a fallen hero's XP, all of it, is shared among the living heroes.
+## Mourning bell: when anyone of the town falls, living heroes within vengeance_reach gain vengeance_xp, and a fallen
+## hero's XP, all of it, is shared among the living heroes.
 func mourn(fallen: Unit) -> void:
+	var vengeance := w.run.mod("vengeance_xp")
+	if vengeance > 0.0:
+		var sworn := 0
+		for h: Unit in w.run.heroes:
+			if h.alive and h != fallen and h.pos.distance_to(fallen.pos) <= w.content.num("vengeance_reach"):
+				h.xp += vengeance
+				sworn += 1
+		if sworn > 0:
+			w.run.relic_fired("vengeance_xp", sworn)
 	var share := w.run.mod("mourning_share")
-	if share <= 0.0:
+	if share <= 0.0 or not fallen.is_hero():
 		return
 	var living := w.run.heroes.filter(func(h: Unit) -> bool: return h.alive and h != fallen)
 	if living.is_empty():

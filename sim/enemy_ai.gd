@@ -50,7 +50,7 @@ func enemy_tick(enemy: Unit) -> void:
 		enemy.target = null
 	elif not holding_grudge and (enemy.target == null or not enemy.target.alive or enemy.pos.distance_to(enemy.target.pos) > aggro * 3.0):
 		enemy.target = w.nearest_friend(enemy.pos, aggro)
-		# Wolf-mother's skull: beasts let townsfolk be unless one strikes them (a grudge).
+		# Hunter's blood-mark (beast_peace): beasts let townsfolk be unless one strikes them (a grudge).
 		if enemy.target != null and enemy.target.is_folk() and w.run.has_effect("beast_peace") and w.content.unit_has_tag(enemy, "beast"):
 			enemy.target = null
 	if enemy.target != null:
@@ -73,7 +73,7 @@ func enemy_tick(enemy: Unit) -> void:
 		var dmg := enemy.attack * war_chant()
 		if w.content.unit_has_tag(enemy, "siege"):
 			w.run.record.note_count("siege_damage", roundi(dmg))
-			thorns(enemy)
+		thorns(enemy)
 		w.run.record.note_impact("defences", "hearth", "taken", minf(dmg, maxf(0.0, w.hearth_hp)))
 		w.hearth_hp -= dmg
 		w.wave_stats["keep_damage"] = float(w.wave_stats["keep_damage"]) + dmg
@@ -221,12 +221,12 @@ func spawn_probe() -> void:
 		w.run.tell("Raiders probe the town from the %s." % ["east", "south", "west", "north"][int(round(side / (PI / 2.0))) % 4])
 
 
-## Ram-thorn stakes: a siege engine that strikes a gate or the hearth is hurt in turn.
+## Ram-thorn stakes: anything that strikes a gate, a barricade or the hearth is hurt in turn.
 func thorns(enemy: Unit) -> void:
-	var hurt := w.run.mod("siege_thorns")
+	var hurt := w.run.mod("gate_thorns")
 	if hurt > 0.0 and enemy.alive:
 		w.damage(null, enemy, hurt, "relic")
-		w.run.relic_fired("siege_thorns")
+		w.run.relic_fired("gate_thorns")
 
 
 func war_chant() -> float:

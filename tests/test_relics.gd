@@ -279,7 +279,7 @@ func test_the_doll_says_which_card_it_doubles_and_doubles_twins() -> void:
 	run.dispose()
 
 
-func test_carrion_kiln_burns_enemies_inside_the_settlement() -> void:
+func test_carrion_kiln_burns_enemies_within_bowshot() -> void:
 	var run := _run()
 	_give(run, "carrion_kiln")
 	var fuel := int(run.stock["fuel"])
@@ -287,6 +287,8 @@ func test_carrion_kiln_burns_enemies_inside_the_settlement() -> void:
 	check_eq(int(run.stock["fuel"]), fuel, "nothing from out in the wilds")
 	run.world.damage(null, _enemy(run, "raider", Vector2(80, 0)), 9999.0)
 	check_eq(int(run.stock["fuel"]), fuel + 1, "fuel from inside")
+	run.world.damage(null, _enemy(run, "raider", Vector2(run.content.num("kiln_reach") - 20.0, 0)), 9999.0)
+	check_eq(int(run.stock["fuel"]), fuel + 2, "and from just outside, within bowshot")
 	run.dispose()
 
 
@@ -319,11 +321,30 @@ func test_mourning_bell_shares_xp_without_grief() -> void:
 	fallen.level = 2
 	fallen.xp = 5.0
 	var other := run.heroes[1]
+	fallen.pos = Vector2(400, 0)
+	other.pos = Vector2(-400, 0)
 	run.world.damage(_enemy(run, "raider"), fallen, 9999.0)
 	check_eq(other.xp, 5.0 + run.content.num("xp_per_level"), "the other hero gets all the fallen's XP")
 	var mood := other.mood
 	run.people.update_moods()
 	check(other.mood >= mood - 5.0 - 0.01, "no grief")
+	run.dispose()
+
+
+func test_mourning_bell_vengeance_for_any_death_nearby() -> void:
+	var run := _run()
+	_give(run, "mourning_bell")
+	var near := run.heroes[0]
+	var far := run.heroes[1]
+	var worker := run.world.folk[0]
+	worker.pos = Vector2(100, 0)
+	near.pos = Vector2(150, 0)
+	far.pos = Vector2(-500, 0)
+	var near_xp := near.xp
+	var far_xp := far.xp
+	run.world.damage(_enemy(run, "raider"), worker, 9999.0)
+	check_eq(near.xp, near_xp + 15.0, "a hero nearby swears vengeance")
+	check_eq(far.xp, far_xp, "a hero far off doesn't")
 	run.dispose()
 
 
@@ -374,10 +395,10 @@ func test_owl_eyes_night_and_day() -> void:
 
 # --- Enemies and defence -----------------------------------------------------------
 
-func test_wolf_mothers_skull_beasts_leave_townsfolk_alone() -> void:
+func test_blood_mark_beasts_leave_townsfolk_alone() -> void:
 	var run := _run()
 	var w := run.world
-	_give(run, "wolf_mothers_skull")
+	_give(run, "blood_mark")
 	for hero in run.heroes:
 		hero.pos = Vector2(-700, 0)
 	var worker := w.folk[0]
@@ -396,9 +417,9 @@ func test_wolf_mothers_skull_beasts_leave_townsfolk_alone() -> void:
 	run.dispose()
 
 
-func test_grave_salt_doubles_damage_to_undead() -> void:
+func test_barrow_kings_lamp_doubles_damage_to_undead() -> void:
 	var run := _run()
-	_give(run, "grave_salt")
+	_give(run, "barrow_kings_lamp")
 	var hero := run.heroes[0]
 	hero.items = {}
 	run.world.hero_ai.apply_hero_stats(hero)
@@ -410,13 +431,24 @@ func test_grave_salt_doubles_damage_to_undead() -> void:
 	run.dispose()
 
 
-func test_ram_thorn_stakes_hurt_siege() -> void:
+func test_ram_thorn_stakes_hurt_whatever_strikes_the_hearth() -> void:
 	var run := _run()
+	var w := run.world
+	for u in w.folk + run.heroes:
+		u.pos = Vector2(-700, 0)
+	w._friend_grid.rebuild(w.folk + run.heroes)
+	w._friend_grid_ok = true
+	w.wave_stats["keep_damage"] = 0.0
+	var raider := _enemy(run, "raider", Vector2(10, 0))
+	raider.spawned = true
+	var hp := raider.hp
+	run.world.enemy_ai.enemy_tick(raider)
+	check_eq(raider.hp, hp, "no stakes, no harm")
 	_give(run, "ram_thorn_stakes")
-	var ram := _enemy(run, "battering_ram", Vector2(10, 0))
-	var hp := ram.hp
-	run.world.enemy_ai.thorns(ram)
-	check_eq(ram.hp, hp - 10.0, "the stakes bite")
+	raider.cooldown_left = 0.0
+	run.world.enemy_ai.enemy_tick(raider)
+	check_eq(raider.hp, hp - 4.0, "a plain raider striking the hearth is hurt too, not only rams")
+	w._friend_grid_ok = false
 	run.dispose()
 
 
@@ -426,6 +458,9 @@ func test_beacon_pyre_one_side() -> void:
 	run.round_number = 9
 	run.world.roll_wave_sides()
 	check_eq(run.world.wave_sides.size(), 1, "one side only")
+	var hero := run.heroes[0]
+	run.world.time = (run.content.int_num("days_per_round") - 1) * run.world.day_length() + 1.0
+	check(run.world.hero_ai._meets_attack(hero), "every hero, bold or not, goes out to meet it")
 	run.dispose()
 
 
