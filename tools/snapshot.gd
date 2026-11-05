@@ -39,9 +39,11 @@ extends SceneTree
 ## hearth=<share> sets the hearth's health to that share of its max; raiders=<n> adds n raiders to the round's attack.
 ## reeve=1 raises a Reeve's hut once the bot has played to the round; people=1 shows the People panel (needs reeve=1).
 ## traditions=1 (with round=1) shows the founding traditions pick; chose=<id> (or random) shows that card chosen.
+## classic=1 shows picks as the classic pop-ups, not in the town (the dawn muster, DawnMuster); wait_ms= waits that
+## long in real time before the picture (default 1400 with pick=1, so the muster's camera has glided in).
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0", "charter": "0", "guild": "", "path": "", "hungry": "0", "showme": "0", "hearth": "", "raiders": "0", "traditions": "0", "chose": ""}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0", "charter": "0", "guild": "", "path": "", "hungry": "0", "showme": "0", "hearth": "", "raiders": "0", "traditions": "0", "chose": "", "classic": "0", "wait_ms": ""}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -56,6 +58,7 @@ func _init() -> void:
 	main.settings.tips_seen = Array(args["seen"].split(",", false))
 	main.settings.intro_seen = true
 	main.settings.tour = false
+	main.settings.picks_in_town = args["classic"] != "1"
 	if args["intro"] == "1":
 		main.settings.intro_seen = false
 		main._new_run(int(args["seed"]))
@@ -318,6 +321,10 @@ func _init() -> void:
 	main._refresh_live()
 	_hold_last_kill(main, args)
 	await process_frame
+	var wait := int(args["wait_ms"]) if args["wait_ms"] != "" else (1400 if args["pick"] == "1" else 0)
+	var until := Time.get_ticks_msec() + wait
+	while Time.get_ticks_msec() < until:
+		await process_frame
 	if args["hover"] != "":
 		var cards := root.find_children("*", "Button", true, false).filter(
 			func(c: Node) -> bool: return c is CardView and c.is_visible_in_tree() and c.title_label.text == args["hover"])

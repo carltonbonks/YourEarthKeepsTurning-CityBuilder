@@ -41,6 +41,8 @@ var advisor := "urgent"
 var intro_seen := false
 ## Every new run opens on the camera tour (skippable), not the round screen (Yusuf, 2026-10-30).
 var tour := true
+## Picks play as scenes in the town (the dawn muster, DawnMuster; Yusuf, 2026-11-05); off shows the classic pop-ups.
+var picks_in_town := true
 var keys := DEFAULT_KEYS.duplicate()
 ## Off in tests, so they never write the player's settings.
 var persist := true
@@ -61,6 +63,7 @@ static func load_saved() -> GameSettings:
 	s.tips_seen = Array(cfg.get_value("play", "tips_seen", []))
 	s.intro_seen = bool(cfg.get_value("play", "intro_seen", false))
 	s.tour = bool(cfg.get_value("play", "tour", s.tour))
+	s.picks_in_town = bool(cfg.get_value("play", "picks_in_town", s.picks_in_town))
 	# Format 1's tips were paper notes; the highlights that replaced them start fresh, with the tour.
 	if int(cfg.get_value("meta", "format", 1)) < 2:
 		s.tips_seen = []
@@ -84,6 +87,7 @@ func save() -> void:
 	cfg.set_value("play", "tips_seen", tips_seen)
 	cfg.set_value("play", "intro_seen", intro_seen)
 	cfg.set_value("play", "tour", tour)
+	cfg.set_value("play", "picks_in_town", picks_in_town)
 	for action: String in ACTIONS:
 		cfg.set_value("keys", action, keys[action])
 	cfg.save(PATH)

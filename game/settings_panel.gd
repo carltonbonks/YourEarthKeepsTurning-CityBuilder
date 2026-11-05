@@ -69,6 +69,12 @@ static func fill(box: VBoxContainer, settings: GameSettings, on_change: Callable
 		settings.tour = on
 		changed.call())
 	_row(play, "Open each run on the tour", tour)
+	var in_town := CheckBox.new()
+	in_town.button_pressed = settings.picks_in_town
+	in_town.toggled.connect(func(on: bool) -> void:
+		settings.picks_in_town = on
+		changed.call())
+	_row(play, "Show dawn picks in the town (off: classic cards)", in_town)
 	var tips := CheckBox.new()
 	tips.button_pressed = settings.tips
 	tips.toggled.connect(func(on: bool) -> void:
