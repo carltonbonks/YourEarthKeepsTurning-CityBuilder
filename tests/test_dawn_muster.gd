@@ -200,3 +200,28 @@ func test_a_footer_can_be_kept_small_when_the_buttons_go_up_top() -> void:
 	var plan := DawnMuster.layout(4, shape, Vector2(1264, 405), 80.0, 8.0)
 	check(not plan.is_empty(), "four medium cards fit over the map above the build hand")
 	check(float(plan["hearth_y"]) < 405.0, "with the hearth on the map")
+
+
+func test_the_elder_presents_relics_and_charters_at_the_shrine() -> void:
+	var run := RunState.new(Content.load_default(), 4821)
+	run.choose_traditions([])
+	var relics: Array = run.content.relics.keys().slice(0, 3)
+	var groups := DawnMuster.shrine_groups(relics, "relic")
+	check_eq(groups.size(), 3, "one stone per card")
+	check(groups.all(func(g: Dictionary) -> bool: return g["stand_ins"].is_empty() and g["members"].is_empty()),
+		"nobody stands by the stones")
+	check_eq(groups[1]["relic"], relics[1], "each stone carries its card's relic")
+	check_eq(DawnMuster.shrine_groups(["heroes"], "path")[0]["path"], "heroes", "or its charter's path")
+	var view := ArenaView.new()
+	view.run = run
+	view.size = Vector2(1264, 585)
+	var plan := DawnMuster.layout(3, CardView.SHAPE[CardView.Size.LARGE], view.size, 150.0)
+	var m := DawnMuster.new()
+	m.start(run, view, plan, 1000.0, groups)
+	var elders: Array = m.stand_ins.filter(func(st: Dictionary) -> bool: return st.get("elder", false))
+	check_eq(elders.size(), 1, "the Elder stands at the shrine")
+	check_eq(m.stand_in_anim(elders[0], 1500.0)[0], "raise", "presenting the cards")
+	m.finish(2, 3000.0)
+	check_eq(m.stand_in_anim(elders[0], 3100.0)[0], "cheer", "and cheers when one is taken")
+	view.free()
+	run.dispose()

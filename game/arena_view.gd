@@ -909,6 +909,7 @@ func _draw_muster_front(font: Font, now: float) -> void:
 	var a := muster.wash(now)
 	if a > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.03, 0.03, 0.05, DawnMuster.WASH * a))
+		muster.draw_shrine(self, now)
 		var front: Array = []
 		for st: Dictionary in muster.stand_ins:
 			front.append([_to_screen(muster.stand_in_place(st, now)).y, st])
