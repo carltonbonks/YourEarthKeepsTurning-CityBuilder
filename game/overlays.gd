@@ -1079,6 +1079,9 @@ func _impact_line() -> void:
 func show_relic_pick() -> void:
 	_clear()
 	_title(("Round %d survived! Choose a pact" if run.is_pact_round() else "Round %d survived! Choose a relic") % run.round_number)
+	var title: Label = _box.get_child(_box.get_child_count() - 1)
+	title.tooltip_text = relic_pool_line(run)
+	title.mouse_filter = Control.MOUSE_FILTER_PASS
 	_night_summary()
 	_impact_line()
 	_reshow = show_relic_pick
@@ -1094,6 +1097,16 @@ func show_relic_pick() -> void:
 		row.add_child(_relic_card(id))
 	_skip_button("Skip the relic", func() -> void: relic_picked.emit(""))
 	show()
+
+
+## The relic pick title's hover: which relics this run can offer at all.
+static func relic_pool_line(r: RunState) -> String:
+	var pool := r.relic_pool()
+	var names: Array[String] = []
+	for id in pool:
+		names.append(r.content.relics[id]["name"] + (" (yours)" if r.relics.has(id) else ""))
+	return "This run's relics: %d of %d can come up (pacts and spoils aside). Another run deals a different set, leaning toward its paths, and each charter brings more of its path's relics.\n%s" \
+		% [pool.size(), r.ordinary_relics().size(), ", ".join(names)]
 
 
 ## A pick at the shrine by the hearth (picks in the town, slice 5: relics, pacts, spoils, glory and charters): the
