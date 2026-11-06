@@ -837,6 +837,7 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 				_have_chip(btn, card["role"])
 				for good: String in lean["goods"].slice(0, 2):
 					btn.add_good_label(good)
+				_busy_bar(btn, card["role"])
 				btn.set_body(lean["text"]).set_footer(eats)
 				btn.tooltip_text = "%s\n%s Still fetches anything the town is short of, but picks trips for %s first.\n%s\n%s." % [
 					def["text"], lean["text"], ", ".join(lean["goods"]).replace("_", " "),
@@ -848,6 +849,7 @@ func _pick_card(card: Dictionary, sz := CardView.Size.LARGE) -> CardView:
 				btn.add_people(roles)
 				_doll_chip(btn, doll)
 				_have_chip(btn, card["role"])
+				_busy_bar(btn, card["role"])
 				btn.set_body(def["text"]).set_footer(eats)
 				btn.tooltip_text = "%s\n%s." % [def["text"], eats] + _work_lines(card["role"])
 			var doll_line := _doll_line(roles.size(), doll)
@@ -882,6 +884,13 @@ func _have_chip(btn: CardView, role: String) -> void:
 	var word := run.people.busy_word(role)
 	if word != "":
 		btn.add_chip(FolkAtWork.word_name(word), "", FolkAtWork.word_tint(word))
+
+
+## What the role's time went on last round, as a bar with "Mostly …" under it (FolkAtWork.card_bar; free).
+func _busy_bar(btn: CardView, role: String) -> void:
+	var bar := FolkAtWork.card_bar(run, role, CardView.SHAPE[btn.card_size].x - 24.0)
+	if bar != null:
+		btn.add_control(bar)
 
 
 ## The townsfolk card's hover lines on how that role spent the round (FolkAtWork.card_lines), after a newline, or "".
@@ -1450,7 +1459,8 @@ func show_people() -> void:
 	var b := run.people.busy_of("tribesperson")
 	_title("Your people %s" % ("this round so far" if b["from"] == "this" else "last round"))
 	UiKit.note(_box, "How each kind of townsperson spent the round, and what came of it. Townsfolk count by day; " +
-		"warriors by night too. Stretched: another would earn their keep. Slack: another mostly adds upkeep.", 11)
+		"warriors by night too. Stretched: their own work fills the day, so another would earn their keep. Slack: " +
+		"they spent much of it idle or on others' work, so another mostly adds upkeep. Hover a bar for every task.", 11)
 	FolkAtWork.build(_box, run)
 	UiKit.button(_box, "Back", func() -> void: closed.emit())
 	show()
