@@ -21,7 +21,7 @@
 			}
 		],
 		"rounds_line": "Survive %d rounds. Raise the next age when you're ready: it costs a lot, and pays back.",
-		"earth_line": "Between rounds the ring of land past your town clicks round, so each round the attack crosses different ground: the attack card says which.",
+		"earth_line": "Each den's way crosses a different kind of ground past your town: the attack card says which. The land turns when you raise a new age.",
 		"ages_line": "Neolithic, then Bronze, then Medieval, at your pace",
 		"closing": "Try things. If the town falls, it is one more human story lost to time.",
 		"lost_line": "One more human story lost to time. Try something different next run."
@@ -81,7 +81,7 @@
 			"title": "The earth turned",
 			"target": "threat",
 			"ok": true,
-			"text": "The land past your town clicked round. The attack card says which ground the attack crosses this round."
+			"text": "With the new age the land past your town clicked round. The attack card says which ground each attack crosses now."
 		},
 		"first_age": {
 			"title": "A new age",

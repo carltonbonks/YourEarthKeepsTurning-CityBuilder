@@ -300,6 +300,7 @@ func test_the_earth_turning_pulls_the_camera_out_and_can_be_skipped() -> void:
 	check(not arena.turn_playing(), "showing a run for the first time is not a turn")
 	arena.zoom = 3.0
 	arena.pan = Vector2(150, 80)
+	run.world.earth.turn_due = 1  # An age-up's turn.
 	run.world.earth.shift()
 	arena.call("_watch_shift")
 	check(arena.turn_playing(), "a turn of the earth starts the beat")
@@ -429,6 +430,7 @@ func test_pick_screens_wait_for_the_earth_to_turn() -> void:
 	arena.size = Vector2(1280, 720)
 	arena.call("_watch_shift")
 	run.round_number = int(run.content.pedlars["every"]) - 1
+	run.world.earth.turn_due = 1  # The town aged up this round.
 	run.phase = RunState.Phase.RELIC
 	screen.call("_pick_relic", "")
 	var overlays: Overlays = screen.get("_overlays")

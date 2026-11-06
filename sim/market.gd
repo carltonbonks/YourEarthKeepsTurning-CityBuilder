@@ -283,7 +283,7 @@ func _outpost_pos(node: int) -> Vector2:
 	return at - at.normalized() * OUTPOST_OFFSET
 
 
-## Each step: an outpost rides its node across the shifting earth, and a standing outpost with an enemy close
+## Each step: an outpost stays by its node, and a standing outpost with an enemy close
 ## by is wrecked: it brings nothing until craftspeople raise it again.
 func outposts_tick() -> void:
 	for i in w.buildings.size():

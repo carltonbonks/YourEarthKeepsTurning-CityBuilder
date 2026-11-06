@@ -31,7 +31,7 @@ var dens: Array[Dictionary] = []
 ## The ground and how units find their way (see Pathing), and the town's plots, gates and paving (see Town).
 var pathing: Pathing
 var town: Town
-## The earth plates past the town, which turn between rounds (see Earth).
+## The earth plates past the town, which turn when the town ages up (see Earth).
 var earth: Earth
 ## {type, plot, pos, work_left, cooldown_left, goods (stalls), craft, craft_left, craft_tier, made (workshops)}
 var buildings: Array[Dictionary] = []
@@ -502,7 +502,7 @@ func _add_node(id: String, at: Vector2) -> void:
 		"heroes_only": def.get("heroes_only", false), "wild": def.get("wild", false), "age": def.get("age", "")})
 
 
-## A node counts once the town has reached its age, until the shifting earth takes it away.
+## A node counts once the town has reached its age, until it is gone.
 ## Goods carried back to the hearth go into stock and the `brought_in` tally.
 func bring_in(good: String, n: int) -> void:
 	run.stock[good] = int(run.stock[good]) + n
@@ -702,7 +702,7 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 			victim.target_tower = -1
 			victim.grudge_until = time + 8.0
 		return
-	# A raider who falls on a Barrow may get up again, once (data/plates.json near_kinds).
+	# A raider who falls on a Gravefield may get up again, once (data/plates.json near_kinds).
 	if victim.is_enemy() and not victim.rose_again and not victim.risen and earth.kind_at(victim.pos) != "":
 		var kd := earth.kind_def(earth.kind_at(victim.pos))
 		if rng.randf() < float(kd.get("rise_chance", 0.0)):
@@ -765,7 +765,7 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 	hero_ai.count_trophy(attacker)
 	market.pay_prizes(attacker, victim)
 	hero_ai.maybe_drop(attacker, victim)
-	# A hero who kills on a Barrow may dig up grave goods.
+	# A hero who kills on a Gravefield may dig up grave goods.
 	var grave := float(earth.kind_def(earth.kind_at(victim.pos)).get("grave_goods", 0.0))
 	if grave > 0.0 and rng.randf() < grave:
 		hero_ai.give_item(attacker, Loot.roll(content, rng, run.round_number, run.age))

@@ -46,9 +46,9 @@ func test_barrow_kings_lamp_keeps_the_dead_down_and_doubles_grave_goods() -> voi
 	var earth := run.world.earth
 	run.relics.append("barrow_kings_lamp")
 	var kd := earth.kind_def("barrow")
-	check_eq(float(kd["rise_chance"]), 0.0, "nobody rises on the Barrow")
+	check_eq(float(kd["rise_chance"]), 0.0, "nobody rises on the Gravefield")
 	check(is_equal_approx(float(kd["grave_goods"]), 0.24), "grave goods twice as often")
-	check_eq(String(kd["name"]), "Barrow", "the kind keeps its own data")
+	check_eq(String(kd["name"]), "Gravefield", "the kind keeps its own data")
 	run.dispose()
 
 
@@ -97,5 +97,5 @@ func test_a_plates_hover_names_what_changes_it() -> void:
 	var lines: Array = Tooltips.plate(run, "fen")["lines"]
 	check(lines.any(func(l: String) -> bool: return l.contains("Bog-drowner's stake")), "the Fen's hover names the stake")
 	var other: Array = Tooltips.plate(run, "barrow")["lines"]
-	check(not other.any(func(l: String) -> bool: return l.begins_with("Changed by")), "the Barrow's doesn't")
+	check(not other.any(func(l: String) -> bool: return l.begins_with("Changed by")), "the Gravefield's doesn't")
 	run.dispose()

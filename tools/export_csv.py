@@ -201,6 +201,7 @@ def main(raw_folder, out_folder):
                     for k in ["swallowed", "dens_swallowed", "ridges", "raised", "rifts", "grown", "roads_refunded"]}
                    if "shift" in rd else {"earth_" + k: "" for k in ["swallowed", "dens_swallowed", "ridges", "raised",
                                                                     "rifts", "grown", "roads_refunded"]}),
+                "earth_shift": rd["shift"].get("shift", "") if "shift" in rd else "",
                 "earth_woke": rd["shift"].get("woke", "") if "shift" in rd else "",
                 "earth_woke_ring": rd["shift"].get("woke_ring", "") if "shift" in rd else "",
                 "earth_omen": rd["shift"].get("omen", "") if "shift" in rd else "",

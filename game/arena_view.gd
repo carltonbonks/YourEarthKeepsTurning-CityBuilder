@@ -28,7 +28,7 @@ const HALF_ROOT2 := 0.70710678
 ## Placeholder heights of standing buildings, in world units. Buildings that shoot stand taller.
 const BUILDING_HEIGHT := 14.0
 const TOWER_HEIGHT := 32.0
-## How long the land takes to slide into place after the earth turns, in milliseconds (view only).
+## How long the plates take to slide into place after the earth turns, in milliseconds (view only).
 const SLIDE_MS := 1800.0
 ## The controls hint shows for this many rounds.
 const HELP_ROUNDS := 2
@@ -350,7 +350,7 @@ func _draw() -> void:
 	_ground_circle(Vector2.ZERO, radius, Color("#25301f"), 96)
 	_watch_shift()
 	for thicket in w.town.thickets:
-		_ground_circle(_slid(thicket["pos"]), float(thicket["radius"]), Color(content.town["thickets"]["color"]), 24)
+		_ground_circle(thicket["pos"], float(thicket["radius"]), Color(content.town["thickets"]["color"]), 24)
 	_draw_earth()
 	_ground_circle(Vector2.ZERO, content.num("settlement_radius"), Color("#33402a"), 64)
 	draw_polyline(_closed(_ground_ring(Vector2.ZERO, content.num("settlement_radius"), 64)), Color("#4d5c3a"), 1.0)
@@ -570,7 +570,7 @@ func _draw_node(node: Dictionary, font: Font) -> void:
 	var def: Dictionary = run.content.world["nodes"][node["type"]]
 	var left := float(node["amount"]) / float(node["max"])
 	var r := _node_radius(node)
-	var at := _slid(node["pos"])
+	var at: Vector2 = node["pos"]
 	var p := _stand(at, r)
 	var col := Color(def["color"])
 	if _has_art(node["type"]):
@@ -595,7 +595,7 @@ func _draw_den(den: Dictionary, font: Font) -> void:
 	if den.get("camp", false):
 		# The land the war camp holds: townsfolk won't gather inside this ring.
 		draw_polyline(_closed(_ground_ring(den["pos"], run.content.num("camp_hold_radius"), 40)), Color(0.8, 0.3, 0.2, 0.45), 1.5)
-	var at := _slid(den["pos"])
+	var at: Vector2 = den["pos"]
 	var p := _stand(at, r)
 	if _has_art(den["type"]):
 		sprites.draw(self, den["type"], _to_screen(at), sprites.building_scale(den["type"], _scale()))
@@ -1267,18 +1267,6 @@ func skip_turn() -> void:
 	turn.skip(self)
 	if _slide_from_ms >= 0.0:
 		_slide_from_ms = Time.get_ticks_msec() - SLIDE_MS
-
-
-## Where a thing on the plates is drawn while the land slides into place after a shift.
-func _slid(p: Vector2) -> Vector2:
-	if _slide_from_ms < 0.0:
-		return p
-	var t := (Time.get_ticks_msec() - _slide_from_ms) / SLIDE_MS
-	if t >= 1.0:
-		_slide_from_ms = -1.0
-		return p
-	var ease_t := 1.0 - pow(1.0 - t, 3.0)
-	return p.rotated(-(1.0 - ease_t) * run.world.earth.last_turn(p))
 
 
 ## Trails, worn paths and roads.

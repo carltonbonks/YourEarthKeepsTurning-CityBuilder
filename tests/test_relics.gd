@@ -160,20 +160,6 @@ func test_hollow_drum_no_probes_bigger_wave() -> void:
 	run.dispose()
 
 
-func test_lodestone_wheel_turns_the_near_ring_two_plates() -> void:
-	var run := _run()
-	var earth := run.world.earth
-	var seam := float(earth.rings[0]["seams"][0])
-	_give(run, "lodestone_wheel")
-	_to_relic(run)
-	run.choose_relic("")
-	check_eq(earth.shifts, 1, "one shift after the first round")
-	check(is_equal_approx(absf(angle_difference(seam, float(earth.rings[0]["seams"][0]))), absf(float(earth.rings[0]["step"])) * 2.0), "two plates round")
-	run.dispose()
-
-
-# --- Townsfolk and the horde ----------------------------------------------------
-
 func test_horde_drum_grows_with_fighters() -> void:
 	var run := _run()
 	var w := run.world
@@ -465,17 +451,6 @@ func test_beacon_pyre_one_side() -> void:
 
 
 # --- The earth -----------------------------------------------------------------------
-
-func test_stillstone_holds_the_near_ring() -> void:
-	var run := _run()
-	var earth := run.world.earth
-	check(earth.turn_of(0, 1) != 0.0, "the near ring turns")
-	_give(run, "stillstone")
-	check_eq(earth.turn_of(0, 1), 0.0, "and then it doesn't")
-	run.dispose()
-
-
-# --- Economy ----------------------------------------------------------------------------
 
 func test_moneylender_pays_interest() -> void:
 	var run := _run()

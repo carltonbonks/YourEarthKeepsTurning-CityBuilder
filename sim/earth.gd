@@ -1,34 +1,30 @@
 class_name Earth
 extends RefCounted
-## The turning earth (`world.earth`), read as this round's weather (Yusuf, 2026-10-25). Just past the still
-## town lies one ring of plates, each of a kind (Fen, Greenwood, Stonefield, Barrow), and once between rounds
-## the ring clicks round the hearth by one whole plate (`shift`, called by RunState as a new round begins).
+## The turning earth (`world.earth`). Just past the still town lies one ring of plates, each of a kind (Fen,
+## Greenwood, Stonefield, Gravefield), and the ground stays put while the town is in one age. When the town ages up the ring clicks round the hearth by one whole plate (Yusuf, 2026-11-06: fixed ground, turning at age-ups):
+## `turn_due` is set by RunState on the age-up and `shift` turns it as the next round begins.
 ## The night's attack crosses one of these plates on its way in (`crossing`), and each kind gives and takes:
 ## how fast people walk on it (`walk_factor`), how far the hearth and towers see raiders on it (`sight_at`),
 ## plants regrowing (`dawn`), raiders getting up again and heroes digging grave goods (World.damage).
 ## Relics, traditions and buildings change a kind's numbers by its tags (`kind_def`, plate_knobs).
-## Everything on the ring rides it: resource nodes, thickets, trails and roads, and anyone standing there.
+## Only the kinds of ground turn: resource nodes, dens, trails, roads and people stay where they are.
 ## Numbers are in data/plates.json.
 
 var w: World
 var def: Dictionary
-## Per ring: {name, r0, r1, step (radians a click turns it), click_every, seams: Array[float] (plate k runs from
+## Per ring: {name, r0, r1, step (radians a click turns it), seams: Array[float] (plate k runs from
 ## seams[k] to seams[k + 1]), plate_kinds: per plate its kind id from near_kinds}.
 var rings: Array[Dictionary] = []
 ## Shifts so far this run.
 var shifts := 0
-## What the last shift did (see RunRecord "shift"): {shift, roads_refunded}. Empty before the first shift.
+## What the last shift did (see RunRecord "shift"): {shift}. Empty before the first shift.
 var last := {}
-## Goes up whenever the ring turns, so the map slides the land into place.
+## Turns waiting for the next round to begin (one per age-up).
+var turn_due := 0
+## Goes up whenever the ring turns, so the map slides the plates into place.
 var turned := 0
 ## The last turn's turn per ring, in radians (for the map's slide).
 var last_turns: Array = []
-## The squares out on the ring (see _index_cells).
-var _cells := PackedInt32Array()
-var _cell_ring := PackedByteArray()
-var _cell_r := PackedFloat32Array()
-var _cell_a := PackedFloat32Array()
-var _j_of := PackedInt32Array()  ## Square -> its place in _cells, or -1 off the ring.
 ## Each near kind's numbers with what relics, traditions and standing buildings add by its tags (plate_knobs),
 ## and what they were worked out from: [relic count, tradition count, World.building_plate_knobs].
 var _kinds_now := {}
@@ -52,8 +48,7 @@ func _init(world: World) -> void:
 		var n := int(rd["plates"])
 		var width: float = TAU / n
 		var ring := {"name": rd["name"], "r0": float(rd["r0"]), "r1": float(rd["r1"]),
-			"step": width * float(rd.get("dir", 1)), "click_every": maxi(1, int(rd.get("click_every", 1))),
-			"seams": [], "plate_kinds": []}
+			"step": width * float(rd.get("dir", 1)), "seams": [], "plate_kinds": []}
 		for k in n:
 			ring["seams"].append(start + k * width + rng.randf_range(-0.15, 0.15) * width)
 			ring["plate_kinds"].append(dealt[k % dealt.size()])
@@ -153,142 +148,24 @@ func sight_at(p: Vector2) -> float:
 	return float(kind_def(kind).get("sight", 1.0)) if kind != "" else 1.0
 
 
-## How far ring ri turns on shift n, in radians: a whole plate's width on its clicks, else none. Stillstone holds
-## it still; the Lodestone wheel turns it further (earth_turns).
-func turn_of(ri: int, n: int) -> float:
-	if w.run.has_effect("still_ring"):
-		return 0.0
-	var ring := rings[ri]
-	if n % int(ring["click_every"]) != 0:
-		return 0.0
-	return float(ring["step"]) * (1.0 + w.run.mod("earth_turns"))
-
-
-## How far the land at p turned in the last turn (radians), for the map's slide.
-func last_turn(p: Vector2) -> float:
-	var ri := ring_at(p)
-	if ri < 0 or last_turns.is_empty():
-		return 0.0
-	return float(last_turns[ri])
-
-
 # --- The shift ---------------------------------------------------------------
 
-## Turns the earth once. Called as a new round begins (never in the first round).
+## Turns the ring by one whole plate if an age-up is waiting for it; else nothing. Called as a new round begins.
+## Only the plates' kinds move round: nothing standing on the ring is carried.
 func shift() -> void:
-	if not enabled():
+	if not enabled() or turn_due <= 0:
+		last = {}
 		return
-	var n := shifts + 1
-	last = {"shift": n, "roads_refunded": 0}
+	turn_due -= 1
+	shifts += 1
+	last = {"shift": shifts}
 	var turns: Array = []
 	for ri in rings.size():
-		turns.append(turn_of(ri, n))
-	var roads_before := _count_roads()
-	_clear_thickets()
-	_move_ground(turns)
-	_move_things(turns)
-	for ri in rings.size():
-		rings[ri]["seams"] = rings[ri]["seams"].map(func(s: float) -> float: return s + float(turns[ri]))
-	last_turns = turns.duplicate()
+		var t := float(rings[ri]["step"])
+		turns.append(t)
+		rings[ri]["seams"] = rings[ri]["seams"].map(func(s: float) -> float: return s + t)
+	last_turns = turns
 	turned += 1
-	_stamp_thickets()
-	_refund_roads(roads_before)
-	shifts = n
-
-
-## Trails, worn paths and roads out on the ring ride it square by square (each square looks back to where its
-## ground came from); thickets are stamped again afterwards.
-func _move_ground(turns: Array) -> void:
-	var p := w.pathing
-	_index_cells()
-	var old := p.ground.duplicate()
-	var old_traffic := p.traffic.duplicate()
-	var dest := {}
-	for j in _cells.size():
-		var i := _cells[j]
-		var t := float(turns[_cell_ring[j]])
-		if old[i] < Pathing.TRAIL or t == 0.0:
-			continue
-		var c := p.cell_of(Vector2.from_angle(_cell_a[j] + t) * _cell_r[j])
-		for dy in range(-1, 2):
-			for dx in range(-1, 2):
-				var cc := c + Vector2i(dx, dy)
-				if cc.x >= 0 and cc.y >= 0 and cc.x < p.cells and cc.y < p.cells:
-					dest[cc.y * p.cells + cc.x] = true
-		p.set_ground(i, Pathing.PLAIN)
-		p.traffic[i] = 0.0
-	for i: int in dest:
-		var j := _j_of[i]
-		if j < 0:
-			continue
-		var ri := _cell_ring[j]
-		var t := float(turns[ri])
-		if t == 0.0:
-			continue
-		var src := p.index_of(Vector2.from_angle(_cell_a[j] - t) * _cell_r[j])
-		if old[src] >= Pathing.TRAIL and _j_of[src] >= 0 and _cell_ring[_j_of[src]] == ri:
-			p.set_ground(i, old[src])
-			p.traffic[i] = old_traffic[src]
-
-
-## Every square out on the ring, once: its index, ring, distance from the hearth and angle.
-func _index_cells() -> void:
-	if not _cells.is_empty():
-		return
-	var p := w.pathing
-	_j_of.resize(p.ground.size())
-	_j_of.fill(-1)
-	for i in p.ground.size():
-		var at := p.center(i)
-		var ri := ring_at(at)
-		if ri < 0 or at.length() > w.content.num("world_radius"):
-			continue
-		_j_of[i] = _cells.size()
-		_cells.append(i)
-		_cell_ring.append(ri)
-		_cell_r.append(at.length())
-		_cell_a.append(at.angle())
-
-
-## Before a turn: thickets come up (they are laid again where they end up).
-func _clear_thickets() -> void:
-	var p := w.pathing
-	for thicket in w.town.thickets:
-		for i in p.cells_in_circle(thicket["pos"], float(thicket["radius"])):
-			if p.ground[i] == Pathing.THICKET:
-				p.set_ground(i, Pathing.PLAIN)
-
-
-## After a turn: thickets slow walkers again where they now stand.
-func _stamp_thickets() -> void:
-	var p := w.pathing
-	for thicket in w.town.thickets:
-		for i in p.cells_in_circle(thicket["pos"], float(thicket["radius"])):
-			if p.ground[i] < Pathing.TRAIL:
-				p.set_ground(i, Pathing.THICKET)
-
-
-## Where a point goes when the rings turn by `turns` (radians per ring). Points off the ring stay.
-func _carried(p: Vector2, turns: Array) -> Vector2:
-	var ri := ring_at(p)
-	return p if ri < 0 else p.rotated(float(turns[ri]))
-
-
-func _move_things(turns: Array) -> void:
-	for node in w.nodes:
-		if not node.get("gone", false):
-			node["pos"] = _carried(node["pos"], turns)
-	for den in w.dens:
-		den["pos"] = _carried(den["pos"], turns)
-	for thicket in w.town.thickets:
-		thicket["pos"] = _carried(thicket["pos"], turns)
-	for u: Unit in w.folk + w.run.heroes + w.enemies:
-		if not u.alive:
-			continue
-		u.pos = _carried(u.pos, turns)
-		u.wander_goal = _carried(u.wander_goal, turns)
-		u.path_version = -1
-		u.path = PackedVector2Array()
 
 
 # --- Each dawn ----------------------------------------------------------------------
@@ -303,25 +180,3 @@ func dawn() -> void:
 		var share := float(kind_def(kind_at(node["pos"])).get("regrow", 0.0))
 		if share > 0.0:
 			node["amount"] = mini(int(node["max"]), int(node["amount"]) + maxi(1, roundi(int(node["max"]) * share)))
-
-
-func _count_roads() -> Dictionary:
-	_index_cells()
-	var out := {}
-	var ground := w.pathing.ground
-	for i in _cells:
-		if ground[i] >= Pathing.FIRST_ROAD:
-			out[ground[i]] = int(out.get(ground[i], 0)) + 1
-	return out
-
-
-## Paving the turn carried off the map's squares is paid back, as when a building is put up over a road.
-func _refund_roads(before: Dictionary) -> void:
-	var after := _count_roads()
-	var lost := {}
-	for kind: int in before:
-		var gone := int(before[kind]) - int(after.get(kind, 0))
-		if gone > 0:
-			lost[kind] = gone
-			last["roads_refunded"] = int(last.get("roads_refunded", 0)) + gone
-	w.town.refund_roads(lost)
