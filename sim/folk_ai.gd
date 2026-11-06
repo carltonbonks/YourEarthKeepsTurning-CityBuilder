@@ -51,6 +51,11 @@ var _sergeants: Array[Unit] = []
 var _idle_time := {}
 ## Role -> time kind -> seconds this round (FolkAI._note_time), written to the record as "folk_time".
 var role_time := {}
+## Role -> task (FolkAI.task_key: "fetch:wood", "build", "patrol"...) -> seconds this round, written as "folk_tasks":
+## why a role is busy, not just how busy (Yusuf, 2026-11-06).
+var role_tasks := {}
+## Tasks whose moving is the task itself (or no job at all), never counted as walking to work.
+const WALK_EXEMPT := ["idle", "flee", "fight", "barricade", "run", "seer", ""]
 
 
 func _init(world: World) -> void:
@@ -215,9 +220,12 @@ func folk_sum(key: String) -> float:
 ## A new round: each townsperson's time and goods this round become last round's (Your people panel).
 func start_round() -> void:
 	role_time = {}
+	role_tasks = {}
 	for unit in w.folk:
 		unit.time_last = unit.time
 		unit.time = {}
+		unit.tasks_last = unit.tasks
+		unit.tasks = {}
 		unit.brought_last = unit.brought
 		unit.brought = 0
 
@@ -240,6 +248,31 @@ func _note_time(unit: Unit) -> void:
 	unit.time[kind] = float(unit.time.get(kind, 0.0)) + w.dt
 	var row: Dictionary = role_time.get_or_add(unit.type_id, {})
 	row[kind] = float(row.get(kind, 0.0)) + w.dt
+	var task := task_key(unit)
+	unit.tasks[task] = float(unit.tasks.get(task, 0.0)) + w.dt
+	var trow: Dictionary = role_tasks.get_or_add(unit.type_id, {})
+	trow[task] = float(trow.get(task, 0.0)) + w.dt
+
+
+## The task a step counts toward in the by-task tally: gathering and hauling home are "fetch:<goods>" (the goods
+## of the node they work or carry); anything else its activity or task ("build", "craft", "patrol", "idle"). A worker
+## on the move to or from a job counts as "walk:<that task>" (Yusuf, 2026-11-06: travel shows, and what it was for).
+func task_key(unit: Unit) -> String:
+	var t := unit.activity if unit.activity != "" else unit.task
+	var moved := unit.pos.distance_squared_to(unit.noted_pos) > 0.01
+	unit.noted_pos = unit.pos
+	var key := _task_of(unit, t)
+	if moved and unit.type_id != "warrior" and t not in WALK_EXEMPT:
+		return "walk:" + key
+	return key
+
+
+func _task_of(unit: Unit, t: String) -> String:
+	if t == "gather" and unit.task_index >= 0 and unit.task_index < w.nodes.size():
+		return "fetch:" + str(w.nodes[unit.task_index]["gives"])
+	if (t == "gather" or t == "return") and unit.carrying != "" and unit.carry_amount > 0:
+		return "fetch:" + unit.carrying
+	return t
 
 
 func _folk_act(unit: Unit) -> void:

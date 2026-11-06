@@ -108,18 +108,22 @@ func folk_card_cost(role: String) -> int:
 
 # --- Townsfolk at work (Yusuf, 2026-10-26) -----------------------------------------------------------------
 
-## How a role spent its time: {"kinds": {kind: seconds}, "total": seconds, "from": "this" or "last" round, or ""}.
-## This round once it has busy_min_seconds counted, else last round's record (always last round's while building).
+## How a role spent its time: {"kinds": {kind: seconds}, "tasks": {task: seconds} (FolkAI.task_key), "total": seconds,
+## "from": "this" or "last" round, or ""}. This round once it has busy_min_seconds counted, else last round's record
+## (always last round's while building).
 func busy_of(role: String) -> Dictionary:
-	var now: Dictionary = run.world.folk_ai.role_time.get(role, {})
+	var ai := run.world.folk_ai
+	var now: Dictionary = ai.role_time.get(role, {})
 	var total := _sum(now)
 	if total >= run.content.num("busy_min_seconds") and run.phase != RunState.Phase.BUILD:
-		return {"kinds": now.duplicate(), "total": total, "from": "this"}
+		return {"kinds": now.duplicate(), "tasks": ai.role_tasks.get(role, {}).duplicate(), "total": total, "from": "this"}
 	if not run.record.rounds.is_empty():
-		var last: Dictionary = run.record.rounds[-1].get("folk_time", {}).get(role, {})
+		var rd: Dictionary = run.record.rounds[-1]
+		var last: Dictionary = rd.get("folk_time", {}).get(role, {})
 		if _sum(last) >= run.content.num("busy_min_seconds"):
-			return {"kinds": last.duplicate(), "total": _sum(last), "from": "last"}
-	return {"kinds": {}, "total": 0.0, "from": ""}
+			return {"kinds": last.duplicate(), "tasks": rd.get("folk_tasks", {}).get(role, {}).duplicate(), "total": _sum(last),
+				"from": "last"}
+	return {"kinds": {}, "tasks": {}, "total": 0.0, "from": ""}
 
 
 static func _sum(kinds: Dictionary) -> float:
@@ -142,7 +146,8 @@ func busy_word(role: String) -> String:
 	return "stretched" if share > float(rule["stretched_above"]) else ("slack" if share < float(rule["slack_below"]) else "busy")
 
 
-## The share of a role's counted time in the kinds its busy word reads (idle for workers, fighting and healing for warriors).
+## The share of a role's counted time in the kinds its busy word reads (idle and fallback for workers, fighting and
+## healing for warriors).
 func busy_share(role: String, b := {}) -> float:
 	if b.is_empty():
 		b = busy_of(role)

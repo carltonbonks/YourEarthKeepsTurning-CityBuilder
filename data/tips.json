@@ -139,7 +139,7 @@
 			"builders": "Our new buildings stand half-raised. We need hands.",
 			"mood": "{hero} is restless and talks of leaving.",
 			"outmatched": "The third night's attack is stronger than all our fighters.",
-			"slack": "Our {people} stood idle much of last round. Give them work.",
+			"slack": "Our {people} spent much of last round idle or doing others' work. Give them work of their own.",
 			"slack_roles": {"tribesperson": "tribespeople", "craftsperson": "craftspeople"},
 			"fix": "The {card} card would help."
 		}

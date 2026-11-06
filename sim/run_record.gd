@@ -168,7 +168,10 @@ extends RefCounted
 ## 60: three traditions offered (Yusuf, 2026-10-30): top-level "tradition_offer" (the ids dealt before round 1).
 ## 61: the run's relic pool (Yusuf, 2026-11-05): top-level "relic_pool" (the ordinary relics this run could offer,
 ##     charters' additions included).
-const RECORD_FORMAT := 61
+## 62: why a role is busy (Yusuf, 2026-11-06): per round "folk_tasks" = {role: {task: seconds}}, the same time as
+##     "folk_time" split by task (FolkAI.task_key: "fetch:<goods>" for gathering and hauling, else "build", "craft",
+##     "assist", "patrol", "idle"...). The dawn word now counts fallback time as spare for workers (busy_words).
+const RECORD_FORMAT := 62
 
 var run: RunState
 ## Finished rounds, oldest first.
@@ -195,6 +198,7 @@ func to_record() -> Dictionary:
 		var current := entry.duplicate(true)
 		current["impact"] = rounded_impact(current.get("impact", {}))
 		current["folk_time"] = rounded_time(run.world.folk_ai.role_time)
+		current["folk_tasks"] = rounded_time(run.world.folk_ai.role_tasks)
 		all_rounds.append(current)
 	return {
 		"format": RECORD_FORMAT,
@@ -287,6 +291,7 @@ func end_round() -> void:
 	entry["combos_end"] = {}
 	entry["impact"] = rounded_impact(entry.get("impact", {}))
 	entry["folk_time"] = rounded_time(run.world.folk_ai.role_time)
+	entry["folk_tasks"] = rounded_time(run.world.folk_ai.role_tasks)
 	rounds.append(entry)
 	entry = {}
 

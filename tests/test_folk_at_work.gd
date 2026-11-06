@@ -113,14 +113,51 @@ func test_the_word_is_free_and_the_rest_needs_the_hut() -> void:
 	run.world.folk_ai.role_time = {"craftsperson": {"work": 50.0, "idle": 50.0}}
 	var u := run.world.folk_ai.add_folk("craftsperson")
 	u.time = {"work": 10.0, "idle": 2.0}
+	run.world.folk_ai.role_tasks = {"craftsperson": {"build": 20.0, "idle": 60.0, "walk:build": 20.0}}
 	var lines := FolkAtWork.card_lines(run, "craftsperson")
 	check(lines[0].begins_with("Slack"), "the card's hover says the word and why")
+	check(lines[1].begins_with("Mostly idle (60%)"), "and the biggest task, free")
+	check(FolkAtWork.card_bar(run, "craftsperson", 160.0) != null, "the card's task bar is free")
 	check(lines[-1].contains("Reeve's hut"), "and points to the hut for the rest")
 	check_eq(FolkAtWork.unit_line(run, u), "", "no day on the map hover without the hut")
 	_standing(run, "reeves_hut")
 	lines = FolkAtWork.card_lines(run, "craftsperson")
-	check(lines[1].begins_with("Their round:"), "with the hut the hover splits the round")
+	check(lines[-1].begins_with("Their round:"), "with the hut the hover splits the round")
+	check(lines[-1].contains("raising buildings 40% (20% walking)"), "by task, with the walking to it")
 	check(FolkAtWork.unit_line(run, u).begins_with("This round:"), "and the map hover shows their day")
+
+
+func test_the_tally_names_each_task_and_its_goods() -> void:
+	var run := _setup()
+	var w := run.world
+	var gatherer := w.folk_ai.add_folk("tribesperson")
+	w.folk_ai.begin_step()
+	var wood := -1
+	for i in w.nodes.size():
+		if w.nodes[i]["gives"] == "wood":
+			wood = i
+			break
+	gatherer.task = "gather"
+	gatherer.task_index = wood
+	gatherer.noted_pos = gatherer.pos
+	w.folk_ai._note_time(gatherer)
+	check(float(gatherer.tasks.get("fetch:wood", 0.0)) > 0.0, "gathering at a grove counts as gathering wood")
+	gatherer.pos += Vector2(5, 0)
+	w.folk_ai._note_time(gatherer)
+	check(float(gatherer.tasks.get("walk:fetch:wood", 0.0)) > 0.0, "on the move to it, it counts as walking for wood")
+	check(w.folk_ai.role_tasks["tribesperson"].has("walk:fetch:wood"), "the role adds it up too")
+	var list := FolkAtWork.purposes(gatherer.tasks)
+	check_eq(list.size(), 1, "the walking folds into what it was for")
+	check(float(list[0]["walk"]) > 0.0 and float(list[0]["doing"]) > 0.0, "split into walking and doing")
+
+
+func test_fallback_work_counts_as_spare() -> void:
+	var run := _setup()
+	run.world.folk_ai.role_time = {"craftsperson": {"work": 30.0, "fallback": 65.0, "idle": 5.0}}
+	check_eq(run.people.busy_word("craftsperson"), "slack", "a craftsperson mostly hauling wood is not busy at their trade")
+	run.world.folk_ai.role_tasks = {"craftsperson": {"fetch:wood": 20.0, "walk:fetch:wood": 45.0, "build": 30.0, "idle": 5.0}}
+	var why := FolkAtWork.why_line(run, "craftsperson", run.people.busy_of("craftsperson")["tasks"])
+	check(why.begins_with("Mostly gathering wood (65%): no building or bench needed them"), "the card says why: " + why)
 
 
 func test_the_record_keeps_each_roles_time() -> void:
@@ -128,3 +165,6 @@ func test_the_record_keeps_each_roles_time() -> void:
 	var rd: Dictionary = record["rounds"][2]
 	check(rd.has("folk_time"), "each round records folk_time")
 	check(float(rd["folk_time"].get("tribesperson", {}).get("work", 0)) > 0.0, "tribespeople worked")
+	check(rd.has("folk_tasks"), "and folk_tasks")
+	check(rd["folk_tasks"].get("tribesperson", {}).keys().any(func(k: String) -> bool: return k.contains("fetch:")),
+		"tribespeople gathered named goods")

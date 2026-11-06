@@ -117,6 +117,11 @@ var drilled_at := -1.0
 var activity := ""
 var time := {}
 var time_last := {}
+## Seconds this round by task (FolkAI.task_key), and last round's: what the time went on.
+var tasks := {}
+var tasks_last := {}
+## Where the townsperson stood when their last step was counted (FolkAI.task_key: walking or not).
+var noted_pos := Vector2.ZERO
 var brought := 0
 var brought_last := 0
 ## The barricade (index into World.barricades) this townsperson runs to raise, -1 for none.

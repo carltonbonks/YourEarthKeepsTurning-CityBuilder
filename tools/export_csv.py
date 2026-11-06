@@ -222,6 +222,9 @@ def main(raw_folder, out_folder):
                    for k in ["tribesperson", "craftsperson"]},
                 **{"time_%s_%s" % (r, k): rd.get("folk_time", {}).get(r, {}).get(k, 0) if "folk_time" in rd else ""
                    for r in ROLES for k in TIME_KINDS},
+                **{"tasks_" + r: "|".join("%s=%s" % (t, v) for t, v in sorted(
+                    rd.get("folk_tasks", {}).get(r, {}).items(), key=lambda kv: -kv[1])) if "folk_tasks" in rd else ""
+                   for r in ROLES},
                 "trips_bumped": sum(rd.get("trips_bumped", {}).values()) if "trips_bumped" in rd else "",
                 "escort_seconds": rd.get("escort_seconds", 0) if "marks_end" in rd else "",
                 "marks_earned": sum(rd.get("marks_earned", {}).values()) if "marks_end" in rd else "",
