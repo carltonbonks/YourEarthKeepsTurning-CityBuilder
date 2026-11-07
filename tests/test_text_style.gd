@@ -9,7 +9,7 @@ const BANNED := "\\b(settlements?|villages?|enem(y|ies)|attackers?|invaders?)\\b
 ## "Lv3" and "x3": levels are "Lv 3", copies and speeds "×3".
 const FORMATS := "\\bLv\\d|[^a-z]x%d|%dx\\b|\\bx\\d"
 ## Words a name may capitalise after its first word: places and the named.
-const PROPER := ["Fen", "Greenwood", "Stonefield", "Barrow", "Margrave", "Antlered", "Hollow", "Black", "King"]
+const PROPER := ["Fen", "Greenwood", "Stonefield", "Gravefield", "Barrow", "Margrave", "Antlered", "Hollow", "Black", "King"]
 
 
 func _code_strings() -> Array:

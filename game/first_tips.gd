@@ -50,7 +50,7 @@ static func due(run: RunState) -> Array[String]:
 					var built: bool = run.record.entry.get("actions", []).any(func(a: Dictionary) -> bool: return a["kind"] == "build")
 					now["first_build"] = not built
 					now["first_begin"] = built
-					now["first_earth"] = run.round_number >= 2
+					now["first_earth"] = run.world.earth.shifts > 0
 					now["first_age"] = not run.hand.milestone.is_empty()
 		RunState.Phase.PICK:
 			now["first_dawn"] = true

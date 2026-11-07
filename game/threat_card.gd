@@ -138,7 +138,7 @@ static func tip(r: RunState) -> Dictionary:
 		t["lines"].append("%s ×%d" % [content.enemies[id]["name"], counts[id]])
 	t["lines"].append("Power counts heroes, warriors, the hearth and towers against every raider coming.")
 	t["lines"].append("Earlier nights bring only wanderers and small probes.")
-	t["lines"].append("The warband comes by a den's way and crosses one near plate on its way in. Between rounds that ring clicks round a plate, so the ground it crosses changes: hover a plate on the map to see what it does.")
+	t["lines"].append("The warband comes by a den's way and crosses one near plate on its way in. The ground stays put until you raise a new age, when the ring clicks round a plate: hover a plate on the map to see what it does.")
 	if r.wave_eased > 0 or not r.waves.camp_due().is_empty():
 		t["lines"].append("Catch-up is a loan: when your town has fallen far behind, the warband holds raiders back for a round. They make a war camp in the wilds that blocks gathering nearby, then march with the next attack unless heroes break the camp first. A strong town never faces more for being strong.")
 	if not r.outmatched:

@@ -1,7 +1,7 @@
 class_name GroundProps
 extends RefCounted
 ## The look of the turning ring's plates (Yusuf, 2026-10-29, rendered art slice 3): reeds and pools on the
-## Fen, trees on the Greenwood, stones on the Stonefield, graves on the Barrow, scattered over each plate and
+## Fen, trees on the Greenwood, stones on the Stonefield, graves on the Gravefield, scattered over each plate and
 ## turning with it. Their spots come from the plate's place in the ring, not the run's dice, so they never
 ## change the game; nodes and dens keep a little room round them. View only: ArenaView asks `props` once a frame
 ## and draws each in its depth order. Sprites are art/sprites/plate_<kind>.png, one look per column.

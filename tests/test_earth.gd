@@ -1,6 +1,7 @@
 extends TestCase
-## The earth as this round's weather (sim/earth.gd, data/plates.json): one ring of plates just past the still town
-## clicks a whole plate round between rounds, and the plate kind the attack crosses shapes the round.
+## The turning earth (sim/earth.gd, data/plates.json): one ring of plates just past the still town keeps its
+## ground while the town is in one age and clicks a whole plate round after an age-up; the plate kind the attack
+## crosses shapes the round.
 
 
 func _run(seed_value := 4821, content: Content = null) -> RunState:
@@ -24,39 +25,39 @@ func _grove(w: World, p: Vector2) -> Dictionary:
 	return w.nodes[-1]
 
 
-func test_only_the_near_ring_turns_a_whole_plate_round_a_still_town() -> void:
+func test_a_turn_moves_only_the_kinds_of_ground() -> void:
 	var run := _run()
 	var w := run.world
 	var earth := w.earth
 	check_eq(earth.rings.size(), 1, "one ring of plates")
-	var still: Array = w.nodes.filter(func(n: Dictionary) -> bool: return earth.ring_at(n["pos"]) < 0)
-	var still_at: Array = still.map(func(n: Dictionary) -> Vector2: return n["pos"])
-	var dens_at: Array = w.dens.map(func(d: Dictionary) -> Vector2: return d["pos"])
 	var near := _grove(w, _point_of_kind(earth, "fen"))
-	var near_at: Vector2 = near["pos"]
-	var plots_before: Array = w.town.plots.map(func(p: Dictionary) -> Vector2: return p["pos"])
+	var nodes_at: Array = w.nodes.map(func(n: Dictionary) -> Vector2: return n["pos"])
+	var dens_at: Array = w.dens.map(func(d: Dictionary) -> Vector2: return d["pos"])
 	var seams_before: Array = earth.rings[0]["seams"].duplicate()
 	earth.shift()
-	check(not still.is_empty(), "some nodes sit off the ring")
-	for i in still.size():
-		check_eq(still[i]["pos"], still_at[i], "nodes off the ring never move")
+	check_eq(earth.shifts, 0, "no turn without an age-up")
+	check_eq(earth.rings[0]["seams"], seams_before, "the plates stay put")
+	earth.turn_due = 1
+	earth.shift()
+	check_eq(earth.shifts, 1, "an age-up's turn")
+	check_eq(earth.turn_due, 0, "used up")
+	check_eq(w.nodes.map(func(n: Dictionary) -> Vector2: return n["pos"]), nodes_at, "nodes, on the ring or not, never move")
 	check_eq(w.dens.map(func(d: Dictionary) -> Vector2: return d["pos"]), dens_at, "dens stay where they are")
+	check(earth.kind_at(near["pos"]) != "fen", "the grove now stands on other ground")
 	var step := TAU / float(run.content.plates["rings"][0]["plates"])
-	check(is_equal_approx(angle_difference(near_at.angle(), Vector2(near["pos"]).angle()), step), "a node on the ring turned a whole plate")
 	for k in seams_before.size():
-		check(is_equal_approx(angle_difference(float(seams_before[k]), float(earth.rings[0]["seams"][k])), step), "every plate edge turned with it")
-	check_eq(w.town.plots.map(func(p: Dictionary) -> Vector2: return p["pos"]), plots_before, "the town's plots stay put")
-	check_eq(earth.shifts, 1, "one shift counted")
+		check(is_equal_approx(angle_difference(float(seams_before[k]), float(earth.rings[0]["seams"][k])), step), "every plate edge turned a whole plate")
 	run.dispose()
 
 
-func test_a_new_round_turns_the_earth_once() -> void:
-	var run := _run()
+func _play_to(run: RunState, last_round: int, age_up_in := -1) -> void:
 	var bot := AutoPlayer.new()
-	while run.round_number < 3 and not run.is_over():
+	while run.round_number < last_round and not run.is_over():
 		match run.phase:
 			RunState.Phase.BUILD:
 				bot.build(run)
+				if run.round_number == age_up_in and run.world.earth.turn_due == 0:
+					run.on_building_done("bronze_moot")
 				run.begin_round()
 			RunState.Phase.PICK:
 				run.choose_pick(bot.pick(run))
@@ -64,8 +65,17 @@ func test_a_new_round_turns_the_earth_once() -> void:
 				run.run_until_pause()
 			RunState.Phase.RELIC:
 				run.choose_relic("")
-	check_eq(run.world.earth.shifts, 2, "a shift as rounds 2 and 3 began, none in round 1")
-	check(run.story.any(func(line: String) -> bool: return line.begins_with("The earth turns. This round the attack crosses the")),
+
+
+func test_the_ground_holds_until_an_age_up_then_turns_once() -> void:
+	var run := _run()
+	var seams: Array = run.world.earth.rings[0]["seams"].duplicate()
+	_play_to(run, 3)
+	check_eq(run.world.earth.shifts, 0, "rounds go by without the land turning")
+	check_eq(run.world.earth.rings[0]["seams"], seams, "the plates lie where they began")
+	_play_to(run, 5, 3)
+	check_eq(run.world.earth.shifts, 1, "the round after an age-up begins with one turn")
+	check(run.story.any(func(line: String) -> bool: return line.begins_with("The land turns with the new age. This round the attack crosses the")),
 		"the story says what ground the attack crosses now")
 	run.dispose()
 
@@ -81,6 +91,7 @@ func test_the_ring_keeps_its_shape() -> void:
 		return out
 	var before: Array = widths.call()
 	for n in 13:
+		earth.turn_due += 1
 		earth.shift()
 	check_eq(widths.call(), before, "plates turn as one: none grows or shrinks")
 	run.dispose()
@@ -96,28 +107,17 @@ func test_the_near_plates_are_dealt_one_of_each_kind() -> void:
 	run.dispose()
 
 
-func test_each_turn_puts_a_different_plate_in_the_attacks_way() -> void:
+func test_an_age_ups_turn_puts_a_different_plate_in_the_attacks_way() -> void:
 	var run := _run()
 	var w := run.world
 	var earth := w.earth
 	var a := float(w.wave_sides[0])
 	var first := earth.crossing(a)
 	check_eq(first, earth.kind_at(Vector2.from_angle(a) * 350.0), "the plate between its den and the town")
+	earth.turn_due = 1
 	earth.shift()
 	check(earth.crossing(a) != first, "after a turn the attack crosses other ground")
 	check(" ".join(EarthReport.ways(run)).contains(String(earth.kind_def(earth.crossing(a))["name"])), "and the threat card names it")
-	run.dispose()
-
-
-func test_stillstone_holds_the_ring_and_the_lodestone_wheel_turns_it_two_plates() -> void:
-	var run := _run()
-	var earth := run.world.earth
-	var step := float(earth.rings[0]["step"])
-	run.relics.append("stillstone")
-	check_eq(earth.turn_of(0, 1), 0.0, "Stillstone: the ring stays put")
-	run.relics.clear()
-	run.relics.append("lodestone_wheel")
-	check(is_equal_approx(earth.turn_of(0, 1), step * 2.0), "the Lodestone wheel: two plates at a turn")
 	run.dispose()
 
 
@@ -195,27 +195,16 @@ func test_greenwood_plants_regrow_each_dawn() -> void:
 	run.dispose()
 
 
-func test_trails_ride_their_plate() -> void:
-	var run := _run()
-	var w := run.world
-	var p := w.pathing
-	var at := _point_of_kind(w.earth, "fen")
-	p.set_ground(p.index_of(at), Pathing.TRAIL)
-	var turn := w.earth.turn_of(0, 1)
-	w.earth.shift()
-	check_eq(p.ground[p.index_of(at.rotated(turn))], Pathing.TRAIL, "the trail square moved with its plate")
-	run.dispose()
-
-
 func test_the_same_seed_shifts_the_same_way() -> void:
 	var a := _run(777)
 	var b := _run(777)
 	for n in 6:
+		a.world.earth.turn_due += 1
+		b.world.earth.turn_due += 1
 		a.world.earth.shift()
 		b.world.earth.shift()
-	check_eq(a.world.nodes.map(func(n: Dictionary) -> Vector2: return n["pos"]),
-		b.world.nodes.map(func(n: Dictionary) -> Vector2: return n["pos"]), "nodes end up in the same places")
-	check_eq(a.world.earth.rings[0]["seams"], b.world.earth.rings[0]["seams"], "and so do the plates")
+	check_eq(a.world.earth.rings[0]["plate_kinds"], b.world.earth.rings[0]["plate_kinds"], "the same kinds are dealt")
+	check_eq(a.world.earth.rings[0]["seams"], b.world.earth.rings[0]["seams"], "and the plates end up in the same places")
 	a.dispose()
 	b.dispose()
 
@@ -224,22 +213,22 @@ func test_a_still_earth_when_turned_off() -> void:
 	var content := Content.load_default()
 	content.plates["enabled"] = false
 	var run := RunState.new(content, 4821)
-	var before: Array = run.world.nodes.map(func(n: Dictionary) -> Vector2: return n["pos"])
+	run.world.earth.turn_due = 1
 	run.world.earth.shift()
-	check_eq(run.world.nodes.map(func(n: Dictionary) -> Vector2: return n["pos"]), before, "nothing moves")
+	check_eq(run.world.earth.shifts, 0, "nothing turns")
 	check_eq(run.world.earth.crossing(0.0), "", "and the attack crosses no plate")
 	run.dispose()
 
 
-func test_record_has_each_shift_and_the_ground_crossed() -> void:
+func test_record_has_the_ground_crossed_and_an_age_ups_shift() -> void:
 	var rec := bot_record()
 	var rounds: Array = rec["rounds"]
 	check(not rounds[0].has("shift"), "no shift before round 1")
 	check(rounds[0].has("crossing"), "round 1 notes the ground its attack crossed")
-	if rounds.size() > 1:
-		var shift: Dictionary = rounds[1].get("shift", {})
-		check_eq(shift.keys(), ["shift", "roads_refunded"], "round 2's shift says only which it was and any paving paid back")
-		check_eq(int(shift.get("shift", 0)), 1, "it was the first shift")
+	for i in range(1, rounds.size()):
+		if rounds[i].has("shift"):
+			check_eq(rounds[i]["shift"].keys(), ["shift"], "a shift says only which it was")
+			check(rounds[i - 1].has("aged_up"), "and comes the round after an age-up")
 
 
 func test_a_plates_hover_says_what_it_gives_and_takes() -> void:

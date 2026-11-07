@@ -3,7 +3,7 @@ extends RefCounted
 ## The way tonight's warned attack will come (Yusuf, 2026-10-27): a faint red line that draws itself from the
 ## map's edge to the hearth along the raiders' own route (World.raider_routes), holds, fades and draws again.
 ## Where it crosses the turning ring it takes on that plate's look (data/plates.json route_looks: the Fen wavy,
-## the Greenwood faint dots, the Stonefield bold chevrons, the Barrow crosses) with the plate's few words beside
+## the Greenwood faint dots, the Stonefield bold chevrons, the Gravefield crosses) with the plate's few words beside
 ## it, so when the ring turns under the line the crossing repaints with it. It shows from the build until the
 ## wave sets off and is for the player alone: townsfolk only know what they spot (FolkAI.raise_alarm). View only.
 ## Timings are in real milliseconds.

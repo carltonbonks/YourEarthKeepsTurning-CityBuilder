@@ -142,7 +142,7 @@ var grudge_until := -1.0
 var target_tower := -1
 ## A fallen enemy raised to fight for the town until dawn (Bone flute): not counted as a townsperson.
 var risen := false
-## A raider who fell on a Barrow and got up again (it only does so once).
+## A raider who fell on a Gravefield and got up again (it only does so once).
 var rose_again := false
 
 

@@ -622,6 +622,7 @@ func on_building_done(type: String) -> void:
 		charters_due += 1
 		world.town.lay_hearth_ground(next_age)
 		open_ring()
+		world.earth.turn_due += 1
 		tell("The %s is raised. The %s begins: %s." % [def["name"], content.age_name(age), content.ages["ages"][age].get("begins", "")], MOMENT)
 
 
@@ -1053,14 +1054,12 @@ func choose_relic(relic_id: String) -> void:
 			relic_fired("interest", interest)
 			tell("Shells lent out come back with %d more." % interest, AMBIENT)
 	world.earth.shift()
-	if has_effect("earth_turns"):
-		relic_fired("earth_turns")
 	_enter_build()
 	if not world.earth.last.is_empty():
 		record.note_value("shift", world.earth.last.duplicate(true))
 		var ground := world.wave_sides.map(func(a: float) -> String: return String(world.earth.kind_def(world.earth.crossing(a)).get("name", "")))
-		if not ground.has("") and not has_effect("still_ring"):
-			tell("The earth turns. This round the attack crosses the %s." % " and the ".join(ground))
+		if not ground.has(""):
+			tell("The land turns with the new age. This round the attack crosses the %s." % " and the ".join(ground))
 
 
 func _enter_build() -> void:

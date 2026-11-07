@@ -344,7 +344,7 @@ static func plate(run: RunState, kind: String) -> Dictionary:
 			by.append(bd["name"])
 	if not by.is_empty():
 		t["lines"].append("Changed by your %s." % ", ".join(by))
-	t["lines"].append("The near ring turns a plate between rounds, so the ground the attack crosses changes.")
+	t["lines"].append("The near ring turns a plate when you raise a new age, so the ground each attack crosses changes then.")
 	return t
 
 

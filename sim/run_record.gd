@@ -171,7 +171,10 @@ extends RefCounted
 ## 62: why a role is busy (Yusuf, 2026-11-06): per round "folk_tasks" = {role: {task: seconds}}, the same time as
 ##     "folk_time" split by task (FolkAI.task_key: "fetch:<goods>" for gathering and hauling, else "build", "craft",
 ##     "assist", "patrol", "idle"...). The dawn word now counts fallback time as spare for workers (busy_words).
-const RECORD_FORMAT := 62
+## 63: fixed ground that turns at age-ups (Yusuf, 2026-11-06): a round's "shift" (only in the round after an age-up)
+##     is {"shift": n}, nothing rides the ring so "roads_refunded" is gone; Stillstone and Lodestone wheel are cut.
+##     The Barrow plate is shown as the Gravefield (its id stays "barrow").
+const RECORD_FORMAT := 63
 
 var run: RunState
 ## Finished rounds, oldest first.
