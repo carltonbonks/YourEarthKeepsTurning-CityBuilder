@@ -174,7 +174,9 @@ extends RefCounted
 ## 63: fixed ground that turns at age-ups (Yusuf, 2026-11-06): a round's "shift" (only in the round after an age-up)
 ##     is {"shift": n}, nothing rides the ring so "roads_refunded" is gone; Stillstone and Lodestone wheel are cut.
 ##     The Barrow plate is shown as the Gravefield (its id stays "barrow").
-const RECORD_FORMAT := 63
+## 64: the runners' tab (Yusuf, 2026-11-07): per round "supply_tab" (provision recipe -> shells of price and fee the
+##     town covered for heroes who couldn't pay). A tab run's "market" sale records what the hero paid of the price.
+const RECORD_FORMAT := 64
 
 var run: RunState
 ## Finished rounds, oldest first.

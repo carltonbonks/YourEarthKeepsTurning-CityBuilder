@@ -1,12 +1,17 @@
 class_name SupplyPopups
 extends RefCounted
-## "+smoked meat" popups that rise where a runner hands supplies to a hero out in the wilds. View only: it compares the
-## world's running `supplies_delivered` count with what it saw last frame and reads the newest `supply_drops`.
+## "+smoked meat" popups that rise where a runner hands supplies to a hero out in the wilds, with a ring that opens
+## round the hero as it lands (a notice-tier beat) and "town's tab" under it when the town covered some of it. View
+## only: it compares the world's running `supplies_delivered` count with what it saw last frame and reads the newest
+## `supply_drops`.
 
 const RISE_MS := 2200.0
 const RISE_PX := 30.0
 const FONT_SIZE := UiKit.STRONG
 const COLOR := Color("#e8c890")
+const TAB_TEXT := "town's tab"
+const RING_MS := 700.0
+const RING_PX := 22.0
 
 var _world: World
 var _seen := 0
@@ -26,7 +31,7 @@ func update(w: World, now_ms: float) -> void:
 	var fresh := mini(w.supplies_delivered - _seen, w.supply_drops.size())
 	for i in range(w.supply_drops.size() - fresh, w.supply_drops.size()):
 		var drop: Dictionary = w.supply_drops[i]
-		popups.append({"pos": drop["pos"], "text": drop["text"], "born": now_ms})
+		popups.append({"pos": drop["pos"], "text": drop["text"], "tab": drop.get("tab", false), "born": now_ms})
 	_seen = w.supplies_delivered
 
 
@@ -38,6 +43,15 @@ func draw(view: CanvasItem, font: Font, now_ms: float, to_screen: Callable) -> v
 		var text: String = popup["text"]
 		var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
 		var at: Vector2 = to_screen.call(popup["pos"])
+		var age := now_ms - float(popup["born"])
+		if age < RING_MS:
+			var r := age / RING_MS
+			view.draw_arc(at, 6.0 + RING_PX * r, 0.0, TAU, 24, Color(UiKit.GOOD, 0.8 * (1.0 - r)), 2.0)
 		var p := Vector2(at.x - width * 0.5, at.y - 14.0 - RISE_PX * t)
 		view.draw_string_outline(font, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, 3, Color(0, 0, 0, 0.75 * alpha))
 		view.draw_string(font, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, Color(COLOR, alpha))
+		if popup["tab"]:
+			var tw := font.get_string_size(TAB_TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, UiKit.BODY).x
+			var q := Vector2(at.x - tw * 0.5, p.y + UiKit.BODY + 2.0)
+			view.draw_string_outline(font, q, TAB_TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, UiKit.BODY, 3, Color(0, 0, 0, 0.75 * alpha))
+			view.draw_string(font, q, TAB_TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, UiKit.BODY, Color(UiKit.DIM, alpha))

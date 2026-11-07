@@ -609,9 +609,10 @@ func _use_provision(hero: Unit, effect: String) -> bool:
 	return false
 
 
-## Out in the wilds with no provision left for what they are about to need, a hero who can pay sends for one: food
-## once their energy nears feeling tired, a poultice once their health nears falling back. A courier building's runner
-## brings it from the stall (FolkAI._dispatch_runners). Heroes who hoard only send when they have plenty to spare.
+## Out in the wilds with no provision left for what they are about to need, a hero sends for one: food once their
+## energy nears feeling tired, a poultice once their health nears falling back. A courier building's runner brings it
+## from the stall (FolkAI._dispatch_runners). With a building that keeps a tab (runners.tab), anyone may send and the
+## town covers what they can't pay; without one, only a hero who can pay does (hoarders only with plenty to spare).
 func _call_for_supplies(hero: Unit, t: Dictionary, retreat_at: float) -> void:
 	hero.supply_call = ""
 	if hero.runner != null and not runner_coming(hero):
@@ -632,7 +633,7 @@ func _call_for_supplies(hero: Unit, t: Dictionary, retreat_at: float) -> void:
 	var kind: String = w.content.buildings[w.buildings[pick["stall"]]["type"]]["stall"]["sells"]
 	if w.run.price_markup(kind) > float(t.get("max_markup", 1.5)) + 0.001:
 		return
-	if hero.gold < (int(pick["price"]) + w.folk_ai.runner_fee(hut)) * float(t.get("hoard", 1.0)):
+	if not w.folk_ai.runner_tab(hut) and hero.gold < (int(pick["price"]) + w.folk_ai.runner_fee(hut)) * float(t.get("hoard", 1.0)):
 		return
 	hero.supply_call = need
 
