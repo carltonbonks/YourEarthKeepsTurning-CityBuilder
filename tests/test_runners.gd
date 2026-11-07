@@ -1,6 +1,7 @@
 extends TestCase
 ## Runners: with a runners' hut (tag courier) standing, heroes in the wilds who run low on food or poultices send for
-## one, and a tribesperson runs it out from the provisions stall for the stall price plus a fee.
+## one, and a tribesperson runs it out from the provisions stall for the stall price plus a fee; the town covers what
+## a hero can't pay.
 
 
 ## A first morning with no monsters, dens or townsfolk, a market, a provisions stall holding `goods` and (if `hut`)
@@ -112,8 +113,40 @@ func test_no_hut_no_runners() -> void:
 	check(run.world.folk[0].errand_for == null, "and nobody runs")
 
 
-func test_a_hero_who_cannot_pay_sends_for_nothing() -> void:
+func test_the_town_covers_what_a_broke_hero_cannot_pay() -> void:
 	var run := _setup(["smoked_meat"])
+	var w := run.world
+	var hero := run.heroes[-1]
+	hero.gold = 2
+	_tired(run, hero)
+	var shells := int(run.stock["shells"])
+	_tick(run, 0.2)
+	check(w.hero_ai.runner_coming(hero), "a hero short of shells still sends for food")
+	_tick(run, 20.0)
+	check_eq(w.supplies_delivered, 1, "the runner reaches them")
+	var price := w.run.price_of({"recipe": "smoked_meat", "tier": 1})
+	var fee := int(run.content.buildings["runners_hut"]["runners"]["fee"])
+	check_eq(hero.gold, 0, "the hero pays what they have")
+	check_eq(int(run.stock["shells"]), shells + 2, "and only that reaches the town's stock")
+	check_eq(int(run.record.entry.get("supply_tab", {}).get("smoked_meat", 0)), price + fee - 2, "the town's share is recorded")
+	check(w.supply_drops[-1]["tab"], "the popup says the town covered it")
+	check_eq(w.buildings[w.market.stall_index("provisions")]["goods"].size(), 0, "the food still came off the stall")
+
+
+func test_a_hero_with_nothing_is_supplied_on_the_tab() -> void:
+	var run := _setup(["poultice"])
+	var hero := run.heroes[-1]
+	hero.gold = 0
+	var retreat_at := float(run.content.traits[hero.trait_id]["retreat_at"])
+	hero.hp = hero.max_hp * (retreat_at + 0.05)
+	_tick(run, 25.0)
+	check_eq(run.world.supplies_delivered, 1, "a penniless hero gets a poultice")
+	check_eq(hero.gold, 0, "and pays nothing")
+
+
+func test_without_a_tab_a_hero_who_cannot_pay_sends_for_nothing() -> void:
+	var run := _setup(["smoked_meat"])
+	run.content.buildings["runners_hut"]["runners"]["tab"] = false
 	var hero := run.heroes[-1]
 	hero.gold = 2
 	_tired(run, hero)

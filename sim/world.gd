@@ -68,7 +68,7 @@ var new_alarms: Array[Unit] = []
 ## Goods carried back to the hearth so far this run, by good: townsfolk hauls and what heroes bring in from the
 ## wilds (`bring_in`). Only grows. The view reads it for the "+2 stone" popups over the hearth.
 var brought_in := {}
-## Runners' deliveries to heroes in the wilds, newest last ({pos, text}), at most SUPPLY_DROPS_KEPT, and how many
+## Runners' deliveries to heroes in the wilds, newest last ({pos, text, tab: the town covered some of it}), at most SUPPLY_DROPS_KEPT, and how many
 ## there have been this run. The view reads them for the popups where supplies land.
 var supply_drops: Array[Dictionary] = []
 var supplies_delivered := 0
