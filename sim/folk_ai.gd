@@ -1153,6 +1153,12 @@ func runner_fee(hut: int) -> int:
 	return int(_runners_def(hut).get("fee", 0))
 
 
+## The town covers what a hero can't pay for a run (runners.tab): power now (stall goods and shells) for heroes who
+## stay out longer.
+func runner_tab(hut: int) -> bool:
+	return bool(_runners_def(hut).get("tab", false))
+
+
 ## Each step: heroes in the wilds who sent for supplies (HeroAI._call_for_supplies) get a runner, while the courier
 ## building has runners to spare. A runner is a tribesperson in town not hauling anything, nearest the building first.
 func _dispatch_runners() -> void:
@@ -1229,33 +1235,45 @@ func _run_errand(unit: Unit) -> void:
 		_deliver(unit, hero)
 
 
-## The hero pays the stall price and the fee into the town's stock and takes the provision; a hero who can no longer
-## pay sends the runner back.
+## The hero pays the stall price and the fee into the town's stock and takes the provision. With a tab
+## (runners.tab) the hero pays what they can and the town covers the rest; without one, a hero who can no longer pay
+## sends the runner back.
 func _deliver(unit: Unit, hero: Unit) -> void:
 	var good := unit.parcel.duplicate()
 	good.erase("stall")
 	var price := w.run.price_of(good)
-	var fee := runner_fee(courier_hut())
-	if hero.gold < price + fee:
+	var hut := courier_hut()
+	var fee := runner_fee(hut)
+	if hero.gold < price + fee and not runner_tab(hut):
 		_end_errand(unit)
 		return
-	hero.gold -= price + fee
-	w.run.stock["shells"] = int(w.run.stock["shells"]) + price + fee
-	w.run.record.note_hero_spending("market", price)
-	w.run.record.note_hero_spending("runners", fee)
-	w.run.record.note_market_sale(hero, good, price)
+	var paid := mini(maxi(hero.gold, 0), price + fee)
+	var covered := price + fee - paid
+	hero.gold -= paid
+	w.run.stock["shells"] = int(w.run.stock["shells"]) + paid
+	w.run.record.note_hero_spending("market", mini(paid, price))
+	w.run.record.note_hero_spending("runners", paid - mini(paid, price))
+	w.run.record.note_market_sale(hero, good, mini(paid, price))
 	w.run.record.note_count("supply_runs", 1, good["recipe"])
+	if covered > 0:
+		w.run.record.note_count("supply_tab", covered, good["recipe"])
 	w.run.record.note_impact("folk", unit.type_id, "supplied", 1.0)
 	var key := w.run.record.impact_key(hero)
 	if not key.is_empty():
 		w.run.record.note_impact(key[0], key[1], "supplied", 1.0)
 	var r: Dictionary = w.content.market["recipes"][good["recipe"]]
 	var effect := "heal" if w.content.market["provisions"][r["provision"]].has("heal") else "energy"
-	w.supply_drops.append({"pos": hero.pos, "text": "+%s" % w.content.recipe_name(good["recipe"])})
+	w.supply_drops.append({"pos": hero.pos, "text": "+%s" % w.content.recipe_name(good["recipe"]), "tab": covered > 0})
 	if w.supply_drops.size() > World.SUPPLY_DROPS_KEPT:
 		w.supply_drops.pop_front()
 	w.supplies_delivered += 1
-	w.run.tell("A runner reaches %s with %s (%d shells)." % [hero.display_name, w.content.recipe_name(good["recipe"]), price + fee], RunState.AMBIENT)
+	var what := w.content.recipe_name(good["recipe"])
+	if covered == 0:
+		w.run.tell("A runner reaches %s with %s (%d shells)." % [hero.display_name, what, paid], RunState.NOTICE)
+	elif paid == 0:
+		w.run.tell("A runner reaches %s with %s. The town covers it." % [hero.display_name, what], RunState.NOTICE)
+	else:
+		w.run.tell("A runner reaches %s with %s. They pay %d shells and the town covers %d." % [hero.display_name, what, paid, covered], RunState.NOTICE)
 	unit.parcel = {}
 	hero.pack.append(good["recipe"])
 	w.hero_ai.on_supplied(hero, effect)

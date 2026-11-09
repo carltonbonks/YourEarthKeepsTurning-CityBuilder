@@ -250,6 +250,7 @@ def main(raw_folder, out_folder):
                 "hero_spending_pedlar": rd.get("hero_spending", {}).get("pedlar", 0),
                 "hero_spending_runners": rd.get("hero_spending", {}).get("runners", 0),
                 "supply_runs": sum(rd.get("supply_runs", {}).values()),
+                "supply_tab_shells": sum(rd.get("supply_tab", {}).values()) if "supply_tab" in rd else "",
                 "runners_lost": sum(rd.get("runners_lost", {}).values()),
                 "market_goods_sold": len(rd.get("market", [])),
                 "market_shells": sum(m.get("price", 0) for m in rd.get("market", [])),
