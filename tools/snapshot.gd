@@ -22,6 +22,7 @@ extends SceneTree
 ## drafted=1 skips the round's blueprint draft, so the build hand shows without the draft over it.
 ## won=1 plays to the end of the run (or calls it won where the bot falls) and shows the victory partway through
 ## (won_ms= how far in, default 3500).
+## screen=title shows the title screen with the play data question (asked=1 hides it, as after an answer).
 ## size=<W>x<H> sets the window size (default 1600x1000), to check the screen layout at other sizes.
 ## glow=<building id> lights every one of that building as hovering its upgrade card does; sparkle=<building id>
 ## shows them sparkling as just after taking an upgrade (with drafted=1, so the draft is out of the way).
@@ -44,7 +45,7 @@ extends SceneTree
 ## long in real time before the picture (default 1400 with pick=1, so the muster's camera has glided in).
 
 func _init() -> void:
-	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0", "charter": "0", "guild": "", "path": "", "hungry": "0", "showme": "0", "hearth": "", "raiders": "0", "traditions": "0", "chose": "", "classic": "0", "wait_ms": "", "trading": "-1", "traded": "-1"}
+	var args := {"seed": "4821", "round": "4", "style": "market", "out": "user://snapshot.png", "mid": "0", "zoom": "1.2", "gates": "-1", "flat": "0", "pick": "0", "night": "0", "preview": "", "relic": "0", "impact": "0", "steps": "150", "venture": "", "venture_taken": "0", "give": "", "wave": "0", "pedlars": "0", "master": "", "ageup": "0", "levelup": "0", "deals": "", "drafts": "", "rolled": "0", "drafted": "0", "size": "1600x1000", "screen": "", "tips": "0", "seen": "", "won": "0", "won_ms": "3500", "glow": "", "sparkle": "", "intro": "0", "intro_ms": "3000", "gentle": "0", "doll": "0", "hover": "", "lastkill": "0", "lastkill_ms": "600", "reeve": "0", "people": "0", "charter": "0", "guild": "", "path": "", "hungry": "0", "showme": "0", "hearth": "", "raiders": "0", "traditions": "0", "chose": "", "classic": "0", "wait_ms": "", "trading": "-1", "traded": "-1", "asked": "0"}
 	for arg in OS.get_cmdline_user_args():
 		var kv := arg.split("=", true, 1)
 		if kv.size() == 2:
@@ -313,6 +314,7 @@ func _init() -> void:
 		main._advisor._show_me = args["showme"] == "1"
 	match args["screen"]:
 		"title":
+			main.settings.share_asked = args["asked"] == "1"
 			main._show_title()
 		"welcome":
 			main._overlays.show_welcome(true)

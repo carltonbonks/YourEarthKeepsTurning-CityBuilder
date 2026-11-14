@@ -34,6 +34,11 @@ var _held_for_sparkle := false
 var _held_for_kill := false
 ## Id of this run's file in Run history.
 var _run_id := ""
+## When the run began (for the record's "started_at" and "wall_seconds").
+var _run_started_at := ""
+var _run_started_ms := 0
+## Sends anonymous play data for players who said yes (Telemetry).
+var _telemetry: Telemetry
 ## Off in tests, so they never write runs to disk.
 var save_runs := true
 
@@ -66,6 +71,11 @@ func _ready() -> void:
 	settings.persist = save_runs
 	settings.apply(get_window() if is_inside_tree() else null)
 	_build_ui()
+	_telemetry = Telemetry.new()
+	_telemetry.settings = settings
+	_telemetry.dev = _dev_mode()
+	add_child(_telemetry)
+	_telemetry.start_session(StoryLog.build_label())
 	var url_seed := _url_seed()
 	# A playtest link with ?seed= goes straight into that run (and its tour).
 	_new_run(url_seed if url_seed >= 0 else _random_seed(), url_seed >= 0)
@@ -169,6 +179,8 @@ func _new_run(seed_value: int, tour := true) -> void:
 	run = RunState.new(content, seed_value)
 	run.gentle = not settings.intro_seen
 	_run_id = RunHistory.new_run_id(seed_value)
+	_run_started_at = Time.get_datetime_string_from_system(true) + "Z"
+	_run_started_ms = Time.get_ticks_msec()
 	_arena.run = run
 	_arena.reset_camera()
 	for part: Variant in [_top, _hand_view, _threat, _alerts, _heroes, _story, _overlays, _advisor]:
@@ -218,6 +230,7 @@ func _show_title() -> void:
 	_menu_open = false
 	_overlays.hide()
 	_title_screen.show()
+	_title_screen.ask_sharing(not settings.share_asked)
 	_tips.hide()
 
 
@@ -226,6 +239,9 @@ func _apply_settings() -> void:
 	settings.apply(get_window() if is_inside_tree() else null)
 	_arena.night_camera = settings.night_camera
 	_arena.art = settings.art
+	# Turning play data on sends this session at once; its runs follow from the next save.
+	if _telemetry != null:
+		_telemetry.start_session(StoryLog.build_label())
 
 
 func _found(ids: Array) -> void:
@@ -330,7 +346,9 @@ func _pick_relic(relic_id: String) -> void:
 
 func _save() -> void:
 	if save_runs:
-		RunHistory.save(_run_id, run)
+		var about := RunHistory.about(settings, _telemetry.dev, _telemetry.session_id, _run_started_at,
+			(Time.get_ticks_msec() - _run_started_ms) / 1000)
+		_telemetry.send_run(RunHistory.save(_run_id, run, about))
 
 
 func _restart(replay: bool) -> void:
@@ -631,6 +649,10 @@ func _build_ui() -> void:
 	_title_screen.how_to_play_pressed.connect(func() -> void: _overlays.show_welcome(false, true))
 	_title_screen.history_pressed.connect(func() -> void: _overlays.show_history())
 	_title_screen.settings_pressed.connect(func() -> void: _overlays.show_settings())
+	_title_screen.sharing_answered.connect(func(share: bool) -> void:
+		settings.set_sharing(share)
+		settings.save()
+		_apply_settings())
 	add_child(_title_screen)
 	add_child(_overlays)
 

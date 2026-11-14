@@ -6,7 +6,8 @@ extends RefCounted
 
 const PATH := "user://settings.cfg"
 ## Bump when the file's shape changes, and read older files in `load_saved`. 2: intro_seen.
-const FORMAT := 2
+## 3: share_data, share_asked and player_id (anonymous play data, opt-in; Yusuf, 2026-11-14).
+const FORMAT := 3
 ## The keys a player can move, in the order the Settings screen lists them, with their names there.
 const ACTIONS := {
 	"pause": "Pause and play",
@@ -43,6 +44,12 @@ var intro_seen := false
 var tour := true
 ## Picks play as scenes in the town (the dawn muster, DawnMuster; Yusuf, 2026-11-05); off shows the classic pop-ups.
 var picks_in_town := true
+## The player said yes to sending anonymous play data (Telemetry). Off until they do (opt-in, Yusuf 2026-11-14).
+var share_data := false
+## The title screen has asked once (whatever the answer), so it doesn't ask again.
+var share_asked := false
+## A random id made only once the player says yes, so their runs can be told apart; never a name or email.
+var player_id := ""
 var keys := DEFAULT_KEYS.duplicate()
 ## Off in tests, so they never write the player's settings.
 var persist := true
@@ -64,6 +71,9 @@ static func load_saved() -> GameSettings:
 	s.intro_seen = bool(cfg.get_value("play", "intro_seen", false))
 	s.tour = bool(cfg.get_value("play", "tour", s.tour))
 	s.picks_in_town = bool(cfg.get_value("play", "picks_in_town", s.picks_in_town))
+	s.share_data = bool(cfg.get_value("data", "share", false))
+	s.share_asked = bool(cfg.get_value("data", "asked", false))
+	s.player_id = str(cfg.get_value("data", "player_id", ""))
 	# Format 1's tips were paper notes; the highlights that replaced them start fresh, with the tour.
 	if int(cfg.get_value("meta", "format", 1)) < 2:
 		s.tips_seen = []
@@ -88,9 +98,29 @@ func save() -> void:
 	cfg.set_value("play", "intro_seen", intro_seen)
 	cfg.set_value("play", "tour", tour)
 	cfg.set_value("play", "picks_in_town", picks_in_town)
+	cfg.set_value("data", "share", share_data)
+	cfg.set_value("data", "asked", share_asked)
+	cfg.set_value("data", "player_id", player_id)
 	for action: String in ACTIONS:
 		cfg.set_value("keys", action, keys[action])
 	cfg.save(PATH)
+
+
+## Turns sharing on or off; turning it on makes the player's random id the first time.
+func set_sharing(on: bool) -> void:
+	share_data = on
+	share_asked = true
+	if on and player_id == "":
+		player_id = new_id()
+
+
+## A random id in the usual 8-4-4-4-12 hex form (a version 4 UUID), from the system's random source.
+static func new_id() -> String:
+	var b := Crypto.new().generate_random_bytes(16)
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	var h := b.hex_encode()
+	return "%s-%s-%s-%s-%s" % [h.substr(0, 8), h.substr(8, 4), h.substr(12, 4), h.substr(16, 4), h.substr(20, 12)]
 
 
 ## Puts the screen settings into effect on the game's window and the keys into the input map.

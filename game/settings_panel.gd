@@ -101,6 +101,20 @@ static func fill(box: VBoxContainer, settings: GameSettings, on_change: Callable
 		settings.advisor = levels[i]
 		changed.call())
 	_row(play, "The Elder's warnings", advisor)
+	var share := CheckBox.new()
+	share.button_pressed = settings.share_data
+	var who := UiKit.note(play, "", UiKit.CAPTION)
+	who.custom_minimum_size.x = 260
+	var show_who := func() -> void:
+		who.text = ("Sends your runs anonymously to the game's maker, for balancing. No names or emails. Your player id, to ask for your data to be deleted: %s" % settings.player_id) \
+			if settings.share_data else "Off: nothing is sent. On sends your runs anonymously, for balancing. No names or emails."
+	share.toggled.connect(func(on: bool) -> void:
+		settings.set_sharing(on)
+		show_who.call()
+		changed.call())
+	_row(play, "Share anonymous play data", share)
+	play.move_child(who, play.get_child_count() - 1)
+	show_who.call()
 	UiKit.note(play, "Sound and music settings arrive with the first sounds.", UiKit.CAPTION).custom_minimum_size.x = 260
 
 	var keys := _column(cols, "Keys")

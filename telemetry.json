@@ -1,0 +1,6 @@
+{
+	"_note": "Where anonymous play data goes (game/telemetry.gd, web/visit.js; tables in tools/telemetry/schema.sql). url: the Supabase project address; key: its public (publishable) key, safe to ship because the database only lets it call log_visit, log_session and save_run. Empty url or key sends nothing. max_record_kb: bigger uploads are skipped.",
+	"url": "",
+	"key": "",
+	"max_record_kb": 512
+}
