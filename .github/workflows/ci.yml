@@ -72,6 +72,8 @@ jobs:
           mkdir -p build/web
           ~/godot/godot --headless --path . --export-release "Web" build/web/index.html
           test -f build/web/index.wasm
+          # The visit counter (web/visit.js) reads these next to the page; see docs/PRIVACY.md.
+          cp web/visit.js telemetry.json build_info.txt build/web/
 
       - name: Upload web build
         uses: actions/upload-pages-artifact@v3

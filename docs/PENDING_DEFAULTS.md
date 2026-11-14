@@ -348,3 +348,6 @@ Yusuf asked for each run to offer relics from its own pool, like the blueprints.
 - **Charters:** each charter brings 3 more of its path's relics into the pool (`relic_pool_charter`), with a line in the story, so a mixed run widens toward its second path.
 - **Seeing it:** the relic pick's title shows the whole pool on hover, like the draft's. Rarity odds still apply within the pool; the curio dealer and Broken crown's gifts draw from it too.
 - **Running dry:** when too few pool relics are left for an offer (owned, or later rounds' `from_round`), the offer tops up from every relic.
+
+## Anonymous play data (2026-11-14)
+Yusuf chose opt-in. Claude's defaults: asked once on the title screen ("Share play data" / "No thanks"), a Settings switch that shows the player id; visits counted with no id from the page (`web/visit.js`); a run is sent at every save (each pause for a pick and the end), so unfinished runs arrive; uploads over 512 KB are skipped; at most 100 new runs per player a day; `?dev=1`, desktop and local builds never send.

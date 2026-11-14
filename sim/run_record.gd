@@ -176,7 +176,10 @@ extends RefCounted
 ##     The Barrow plate is shown as the Gravefield (its id stays "barrow").
 ## 64: the runners' tab (Yusuf, 2026-11-07): per round "supply_tab" (provision recipe -> shells of price and fee the
 ##     town covered for heroes who couldn't pay). A tab run's "market" sale records what the hero paid of the price.
-const RECORD_FORMAT := 64
+## 65: anonymous play data (Yusuf, 2026-11-14): the game adds "build" (the CI stamp, since "game_version" stopped
+##     changing), "dev", "session_id", "player_id" ("" unless the player shares play data), "started_at",
+##     "wall_seconds" and "settings" (RunHistory.about) beside the sim's record. The sim's own fields are unchanged.
+const RECORD_FORMAT := 65
 
 var run: RunState
 ## Finished rounds, oldest first.

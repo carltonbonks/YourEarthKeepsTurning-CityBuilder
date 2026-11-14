@@ -9,6 +9,8 @@ signal start_pressed(seed_value: int)
 signal how_to_play_pressed
 signal history_pressed
 signal settings_pressed
+## The player answered the play data question (yes or no thanks); it is asked once (GameSettings.share_asked).
+signal sharing_answered(share: bool)
 
 const GROUND := Color("#14120f")
 const EMBER := Color("#e39a4a")
@@ -23,6 +25,8 @@ const RINGS := [
 
 var _turn := 0.0
 var _seed_edit: LineEdit
+## The once-only question about sharing anonymous play data, in the bottom right corner.
+var _ask: PanelContainer
 
 
 func _init() -> void:
@@ -74,6 +78,15 @@ func _init() -> void:
 	if not OS.has_feature("web"):
 		_menu_button(column, "Quit", func() -> void: get_tree().quit())
 
+	# Bottom right, over the rings, so the menu keeps its place on a 720-high screen.
+	_ask = _sharing_question()
+	add_child(_ask)
+	_ask.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_ask.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_ask.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_ask.offset_right = -40
+	_ask.offset_bottom = -40
+
 	var footer := Label.new()
 	footer.text = "v%s · playtest build" % str(ProjectSettings.get_setting("application/config/version", ""))
 	footer.add_theme_font_size_override("font_size", UiKit.BODY)
@@ -82,6 +95,46 @@ func _init() -> void:
 	footer.position = Vector2(96, -44)
 	footer.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	add_child(footer)
+
+
+## Shows or hides the play data question (main.gd shows it until the player has answered once).
+func ask_sharing(show: bool) -> void:
+	_ask.visible = show
+
+
+func _sharing_question() -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.visible = false
+	panel.custom_minimum_size.x = 420
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.1, 0.09, 0.08, 0.92)
+	sb.border_color = Color("#5a4a36")
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(4)
+	sb.set_content_margin_all(12)
+	panel.add_theme_stylebox_override("panel", sb)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	var head := Label.new()
+	head.text = "Help balance the game?"
+	head.add_theme_font_size_override("font_size", UiKit.STRONG)
+	head.add_theme_color_override("font_color", EMBER)
+	box.add_child(head)
+	var body := UiKit.note(box, "This playtest can send your runs to its maker as anonymous play data: the choices you make and how each run goes. No names or emails. You can change this any time in Settings.", UiKit.BODY, MUTED)
+	body.custom_minimum_size.x = 396
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	box.add_child(row)
+	var yes := UiKit.button(row, "Share play data", func() -> void: _answer(true))
+	UiKit.primary(yes, UiKit.STRONG)
+	UiKit.secondary(UiKit.button(row, "No thanks", func() -> void: _answer(false)), UiKit.STRONG)
+	return panel
+
+
+func _answer(share: bool) -> void:
+	_ask.visible = false
+	sharing_answered.emit(share)
 
 
 func _menu_button(parent: Control, text: String, on_press: Callable, main := false) -> Button:
