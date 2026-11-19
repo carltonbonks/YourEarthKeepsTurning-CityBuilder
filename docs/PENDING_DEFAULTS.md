@@ -351,3 +351,12 @@ Yusuf asked for each run to offer relics from its own pool, like the blueprints.
 
 ## Anonymous play data (2026-11-14)
 Yusuf chose opt-in. Claude's defaults: asked once on the title screen ("Share play data" / "No thanks"), a Settings switch that shows the player id; visits counted with no id from the page (`web/visit.js`); a run is sent at every save (each pause for a pick and the end), so unfinished runs arrive; uploads over 512 KB are skipped; at most 100 new runs per player a day; `?dev=1`, desktop and local builds never send.
+
+## Sound slice 1: plumbing and interface sounds (2026-11-19)
+From the sound plan (https://claude.ai/artifact/DchJ6Lv3YXFh2HZcCjyhcv); Yusuf picked grounded and sparse, CC0 and CC-BY only, wordless voices. Claude's defaults, pending Yusuf's ear:
+- **The sounds** (all Kenney, CC0): a button click is a tiny dry tick (Interface Sounds); hovering a card the faintest tick; a check box a soft latch; cards dealt are page flips (RPG Audio), one per new card 70 ms apart, at most 5; a card taken is a book set down on wood; a blue roll a small glass glint, yellow a brighter one, orange a struck metal pot that rings for about a second and a half.
+- **Volumes** (manifest `volume_db`, files peak-levelled to -1 dBFS): click -14, hover -26, toggle -16, deal -15, pick -9, blue -17, yellow -13, orange -10. Master starts at 80%.
+- **What sounds by itself:** every button, check box and list; card hovers, deals and picks. A screen rebuilt with the same cards (same kind, name and roll) is silent, so refreshing the build hand doesn't flip. Sliders shown: Volume and Interface sounds; the other buses get theirs when they get sounds.
+- **Credits** on the title screen, built from the art and sound licence lines, plus Godot's MIT licence.
+- No balance change, so no bot run.
+

@@ -63,5 +63,5 @@ Commit the model, the manifest row, the PNG, its `.import` file and `index.json`
 
 - **3D models (preferred):** deliver `.glb` files to the scale, pivot, facing, rig and material-slot rules above. They go through the same renderer, so they match the camera and light of everything else.
 - **Finished 2D sprites:** allowed for a special piece. Deliver one PNG per id with the frame size and facings of its manifest row, feet at the row's anchor point, on a transparent background.
-- **Licence:** every manifest row says where its art comes from and under what terms (CC0, own work, bought from whom). A credits screen will be built from these lines.
+- **Licence:** every manifest row says where its art comes from and under what terms (CC0, own work, bought from whom). The Credits screen (on the title screen, `game/credits_panel.gd`) is built from these lines, with the sounds' (docs/SOUND_SPEC.md).
 - **AI-made art** is allowed while prototyping (Yusuf, 2026-10-29). Mark it in the licence line, because Steam asks for a disclosure and it all gets an artist pass before launch.

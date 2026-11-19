@@ -1,6 +1,6 @@
 class_name TitleScreen
 extends Control
-## The title screen the game opens on: New run, Play a seed, How to play, Run history, Settings and Quit
+## The title screen the game opens on: New run, Play a seed, How to play, Run history, Settings, Credits and Quit
 ## (desktop only). Behind the menu, rings of earth turn slowly round a campfire. There is no Continue
 ## (no mid-run saves for now, Yusuf 2026-10-24). Choices go back to the screen as signals.
 
@@ -9,6 +9,7 @@ signal start_pressed(seed_value: int)
 signal how_to_play_pressed
 signal history_pressed
 signal settings_pressed
+signal credits_pressed
 ## The player answered the play data question (yes or no thanks); it is asked once (GameSettings.share_asked).
 signal sharing_answered(share: bool)
 
@@ -75,6 +76,7 @@ func _init() -> void:
 	_menu_button(column, "How to play", func() -> void: how_to_play_pressed.emit())
 	_menu_button(column, "Run history", func() -> void: history_pressed.emit())
 	_menu_button(column, "Settings", func() -> void: settings_pressed.emit())
+	_menu_button(column, "Credits", func() -> void: credits_pressed.emit())
 	if not OS.has_feature("web"):
 		_menu_button(column, "Quit", func() -> void: get_tree().quit())
 

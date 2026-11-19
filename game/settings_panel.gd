@@ -1,8 +1,11 @@
 class_name SettingsPanel
 extends RefCounted
 ## The Settings screen (from the title screen and the menu): screen, play and keys, in three columns.
-## Every change saves and takes effect at once. Sound joins when the game has sounds.
+## Every change saves and takes effect at once. Sound sits under Screen: a slider for each bus that has sounds.
 
+## The volume sliders Settings shows, by bus, with their names there: only buses that have sounds so far
+## (audio/manifest.json; tests/test_sound.gd checks every bus with sounds has one).
+const VOLUME_ROWS := {"Master": "Volume", "UI": "Interface sounds"}
 
 
 ## Fills `box`; `on_back` closes it, `on_change` runs after any change (the screen applies it).
@@ -46,6 +49,13 @@ static func fill(box: VBoxContainer, settings: GameSettings, on_change: Callable
 		changed.call())
 	_row(screen, "Rendered art", art)
 	UiKit.note(screen, "Interface size makes the cards and text bigger or smaller. Rendered art off draws everything as plain shapes. V tilts the map in play (the flat map is always shapes).", UiKit.CAPTION).custom_minimum_size.x = 260
+	var gap := Control.new()
+	gap.custom_minimum_size.y = 12
+	screen.add_child(gap)
+	UiKit.note(screen, "SOUND", UiKit.BODY, UiKit.DIM)
+	for bus: String in VOLUME_ROWS:
+		_row(screen, VOLUME_ROWS[bus], _volume_slider(settings, bus))
+	UiKit.note(screen, "Music, the town and battle get their own sliders as their sounds arrive.", UiKit.CAPTION).custom_minimum_size.x = 260
 
 	var play := _column(cols, "Play")
 	var speed := OptionButton.new()
@@ -115,7 +125,6 @@ static func fill(box: VBoxContainer, settings: GameSettings, on_change: Callable
 	_row(play, "Share anonymous play data", share)
 	play.move_child(who, play.get_child_count() - 1)
 	show_who.call()
-	UiKit.note(play, "Sound and music settings arrive with the first sounds.", UiKit.CAPTION).custom_minimum_size.x = 260
 
 	var keys := _column(cols, "Keys")
 	var buttons := {}
@@ -131,6 +140,24 @@ static func fill(box: VBoxContainer, settings: GameSettings, on_change: Callable
 		buttons[action] = b
 		_row(keys, GameSettings.ACTIONS[action], b)
 	UiKit.note(keys, "Click a key, then press the new one. A key already in use swaps places.", UiKit.CAPTION).custom_minimum_size.x = 260
+
+
+## A slider for `bus`'s volume: it takes effect and saves as it moves, and clicks when let go so the level can be heard.
+static func _volume_slider(settings: GameSettings, bus: String) -> HSlider:
+	var slider := HSlider.new()
+	slider.min_value = 0
+	slider.max_value = 100
+	slider.step = 5
+	slider.custom_minimum_size.x = 120
+	slider.value = roundf(float(settings.volumes.get(bus, 1.0)) * 100.0)
+	slider.tooltip_text = "%d%%" % roundi(slider.value)
+	slider.value_changed.connect(func(v: float) -> void:
+		settings.volumes[bus] = v / 100.0
+		slider.tooltip_text = "%d%%" % roundi(v)
+		settings.apply_sound()
+		settings.save())
+	slider.drag_ended.connect(func(_changed: bool) -> void: SoundDirector.cue("ui.click"))
+	return slider
 
 
 static func _column(parent: Control, heading: String) -> VBoxContainer:

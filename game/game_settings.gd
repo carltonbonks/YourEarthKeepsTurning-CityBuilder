@@ -7,7 +7,8 @@ extends RefCounted
 const PATH := "user://settings.cfg"
 ## Bump when the file's shape changes, and read older files in `load_saved`. 2: intro_seen.
 ## 3: share_data, share_asked and player_id (anonymous play data, opt-in; Yusuf, 2026-11-14).
-const FORMAT := 3
+## 4: volumes (sound slice 1, 2026-11-19).
+const FORMAT := 4
 ## The keys a player can move, in the order the Settings screen lists them, with their names there.
 const ACTIONS := {
 	"pause": "Pause and play",
@@ -24,6 +25,8 @@ const DEFAULT_KEYS := {
 	"slower": KEY_BRACKETLEFT,
 }
 const UI_SCALES := [0.8, 0.9, 1.0, 1.1, 1.2]
+## The mixer buses the player sets a volume for, by bus name (default_bus_layout.tres), from 0 (silent) to 1.
+const DEFAULT_VOLUMES := {"Master": 0.8, "Music": 1.0, "Ambience": 1.0, "World": 1.0, "UI": 1.0, "Stingers": 1.0}
 
 var fullscreen := false
 var ui_scale := 1.0
@@ -51,6 +54,8 @@ var share_asked := false
 ## A random id made only once the player says yes, so their runs can be told apart; never a name or email.
 var player_id := ""
 var keys := DEFAULT_KEYS.duplicate()
+## How loud each bus plays (DEFAULT_VOLUMES' keys), 0 to 1; Settings shows a slider for the ones with sounds.
+var volumes := DEFAULT_VOLUMES.duplicate()
 ## Off in tests, so they never write the player's settings.
 var persist := true
 
@@ -79,6 +84,8 @@ static func load_saved() -> GameSettings:
 		s.tips_seen = []
 	for action: String in ACTIONS:
 		s.keys[action] = int(cfg.get_value("keys", action, DEFAULT_KEYS[action]))
+	for bus: String in DEFAULT_VOLUMES:
+		s.volumes[bus] = clampf(float(cfg.get_value("sound", bus, DEFAULT_VOLUMES[bus])), 0.0, 1.0)
 	return s
 
 
@@ -103,6 +110,8 @@ func save() -> void:
 	cfg.set_value("data", "player_id", player_id)
 	for action: String in ACTIONS:
 		cfg.set_value("keys", action, keys[action])
+	for bus: String in DEFAULT_VOLUMES:
+		cfg.set_value("sound", bus, volumes[bus])
 	cfg.save(PATH)
 
 
@@ -126,12 +135,25 @@ static func new_id() -> String:
 ## Puts the screen settings into effect on the game's window and the keys into the input map.
 func apply(window: Window) -> void:
 	apply_keys()
+	apply_sound()
 	if window == null or DisplayServer.get_name() == "headless":
 		return
 	window.content_scale_factor = ui_scale
 	var mode := DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED
 	if DisplayServer.window_get_mode() != mode:
 		DisplayServer.window_set_mode(mode)
+
+
+## Sets each bus's volume on the mixer (a bus at 0 is muted, not just very quiet).
+func apply_sound() -> void:
+	SoundDirector.ensure_buses()
+	for bus: String in volumes:
+		var i := AudioServer.get_bus_index(bus)
+		if i < 0:
+			continue
+		var v := clampf(float(volumes[bus]), 0.0, 1.0)
+		AudioServer.set_bus_mute(i, v <= 0.0)
+		AudioServer.set_bus_volume_db(i, linear_to_db(maxf(v, 0.0001)))
 
 
 func apply_keys() -> void:
