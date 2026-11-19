@@ -63,6 +63,8 @@ var _advisor_acc := 0.0
 var _tour: IntroTour
 ## The row under the map (heroes, story).
 var _bottom: HBoxContainer
+## Plays the game's sounds by moment (audio/manifest.json).
+var _sound: SoundDirector
 
 
 func _ready() -> void:
@@ -70,6 +72,9 @@ func _ready() -> void:
 	settings = GameSettings.load_saved()
 	settings.persist = save_runs
 	settings.apply(get_window() if is_inside_tree() else null)
+	# Before the interface is built, so it hears every button as it is made.
+	_sound = SoundDirector.new()
+	add_child(_sound)
 	_build_ui()
 	_telemetry = Telemetry.new()
 	_telemetry.settings = settings
@@ -649,6 +654,7 @@ func _build_ui() -> void:
 	_title_screen.how_to_play_pressed.connect(func() -> void: _overlays.show_welcome(false, true))
 	_title_screen.history_pressed.connect(func() -> void: _overlays.show_history())
 	_title_screen.settings_pressed.connect(func() -> void: _overlays.show_settings())
+	_title_screen.credits_pressed.connect(func() -> void: _overlays.show_credits())
 	_title_screen.sharing_answered.connect(func(share: bool) -> void:
 		settings.set_sharing(share)
 		settings.save()

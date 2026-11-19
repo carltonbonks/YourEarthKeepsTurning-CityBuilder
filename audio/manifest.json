@@ -1,0 +1,101 @@
+{
+	"_note": "Every sound in the game, by moment (the key the code asks for, `area.event`; code never names a file). name = the moment in a few words, as the Credits screen lists it. game/sound_director.gd plays them; docs/SOUND_SPEC.md is the handover guide. files = the variants under audio/, one picked at random each time (named <area>_<event>_<nn>.ogg, made with tools/import_sound.sh). bus = the mixer bus it plays on (default_bus_layout.tres: Music, Ambience, World, UI, Stingers, each with a volume slider in Settings once it has sounds). tier = the emphasis tier from docs/TEXT_STYLE.md (0 ambient, 1 notice, 2 problem, 3 moment, 4 run): louder and rarer as it rises. volume_db = how loud this moment plays (files are all peak-levelled to -1 dBFS, so this alone sets it). pitch_jitter = how far each play's pitch may wander either way (0.05 = 5%), so repeats don't sound stamped. max_voices = how many of this moment may sound at once; a new one past that is skipped. cooldown_s = a repeat sooner than this is skipped. brief = what the moment should feel like, for whoever redoes the sound: keep the intent, change the sound. licence = one line per source (author, where from, licence); the credits screen is built from these. Only CC0 and CC-BY sounds go in (the repo is public; no NC, ND or SA).",
+	"sounds": {
+		"ui.click": {
+			"name": "button click",
+			"files": ["sfx/ui_click_01.ogg", "sfx/ui_click_02.ogg", "sfx/ui_click_03.ogg"],
+			"bus": "UI",
+			"tier": 0,
+			"volume_db": -14.0,
+			"pitch_jitter": 0.06,
+			"max_voices": 2,
+			"cooldown_s": 0.04,
+			"brief": "Any button pressed: a small dry tick, felt more than heard. Never bright or electronic in a way that breaks the grit.",
+			"licence": ["Kenney (kenney.nl), Interface Sounds, CC0 1.0"]
+		},
+		"ui.hover": {
+			"name": "card hover",
+			"files": ["sfx/ui_hover_01.ogg", "sfx/ui_hover_02.ogg"],
+			"bus": "UI",
+			"tier": 0,
+			"volume_db": -26.0,
+			"pitch_jitter": 0.08,
+			"max_voices": 1,
+			"cooldown_s": 0.08,
+			"brief": "The mouse comes to rest on a card: the faintest touch, so sweeping across a hand isn't a rattle.",
+			"licence": ["Kenney (kenney.nl), Interface Sounds, CC0 1.0"]
+		},
+		"ui.toggle": {
+			"name": "setting switch",
+			"files": ["sfx/ui_toggle_01.ogg"],
+			"bus": "UI",
+			"tier": 0,
+			"volume_db": -16.0,
+			"pitch_jitter": 0.04,
+			"max_voices": 1,
+			"cooldown_s": 0.05,
+			"brief": "A setting switched or chosen from a list: a soft latch.",
+			"licence": ["Kenney (kenney.nl), Interface Sounds, CC0 1.0"]
+		},
+		"card.deal": {
+			"name": "cards dealt",
+			"files": ["sfx/card_deal_01.ogg", "sfx/card_deal_02.ogg", "sfx/card_deal_03.ogg"],
+			"bus": "UI",
+			"tier": 1,
+			"volume_db": -15.0,
+			"pitch_jitter": 0.07,
+			"max_voices": 2,
+			"cooldown_s": 0.05,
+			"brief": "Cards laid out for a pick: rough paper or hide turned over, one soft flip per card, quick.",
+			"licence": ["Kenney (kenney.nl), RPG Audio, CC0 1.0"]
+		},
+		"card.pick": {
+			"name": "card taken",
+			"files": ["sfx/card_pick_01.ogg", "sfx/card_pick_02.ogg", "sfx/card_pick_03.ogg"],
+			"bus": "UI",
+			"tier": 1,
+			"volume_db": -9.0,
+			"pitch_jitter": 0.05,
+			"max_voices": 1,
+			"cooldown_s": 0.1,
+			"brief": "A card taken: something with weight set down on wood. A decision made, not a menu click.",
+			"licence": ["Kenney (kenney.nl), RPG Audio, CC0 1.0"]
+		},
+		"card.roll_blue": {
+			"name": "blue card",
+			"files": ["sfx/card_roll_blue_01.ogg"],
+			"bus": "UI",
+			"tier": 1,
+			"volume_db": -17.0,
+			"pitch_jitter": 0.03,
+			"max_voices": 1,
+			"cooldown_s": 0.3,
+			"brief": "A blue (magic) card among the dealt ones: a small glint, there if you listen for it.",
+			"licence": ["Kenney (kenney.nl), Interface Sounds, CC0 1.0"]
+		},
+		"card.roll_yellow": {
+			"name": "yellow card",
+			"files": ["sfx/card_roll_yellow_01.ogg"],
+			"bus": "UI",
+			"tier": 2,
+			"volume_db": -13.0,
+			"pitch_jitter": 0.03,
+			"max_voices": 1,
+			"cooldown_s": 0.3,
+			"brief": "A yellow (powerful) card: a brighter glint that makes you look for it.",
+			"licence": ["Kenney (kenney.nl), Interface Sounds, CC0 1.0"]
+		},
+		"card.roll_orange": {
+			"name": "orange card",
+			"files": ["sfx/card_roll_orange_01.ogg"],
+			"bus": "UI",
+			"tier": 3,
+			"volume_db": -10.0,
+			"pitch_jitter": 0.0,
+			"max_voices": 1,
+			"cooldown_s": 0.5,
+			"brief": "An orange (mythic) card: a struck metal ring that hangs in the air. Rare, so it should stop you.",
+			"licence": ["Kenney (kenney.nl), RPG Audio, CC0 1.0"]
+		}
+	}
+}

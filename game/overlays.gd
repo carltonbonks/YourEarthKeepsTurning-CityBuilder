@@ -616,6 +616,12 @@ func show_welcome(before_run: bool, from_title := false) -> void:
 	show()
 
 
+func show_credits() -> void:
+	_clear()
+	CreditsPanel.fill(_box, func() -> void: closed.emit())
+	show()
+
+
 func show_settings() -> void:
 	_clear()
 	SettingsPanel.fill(_box, settings, func() -> void: settings_changed.emit(), func() -> void: closed.emit())
