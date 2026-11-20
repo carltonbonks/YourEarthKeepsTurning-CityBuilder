@@ -749,7 +749,7 @@ func damage(attacker: Unit, victim: Unit, amount: float, source := "") -> void:
 	attacker.kills += 1
 	attacker.xp += float(e["xp"]) * (1.0 + run.mod("xp_mult") + hero_ai.chosen_xp(attacker)
 		+ (content.num("hearty_xp") if attacker.well_fed else 0.0) + market.prize_xp(victim.type_id)
-		+ run.tag_mod("foe_xp", content.unit_tags(victim)))
+		+ run.tag_mod("foe_xp", content.unit_tags(victim)) + run.tag_mod("hero_xp", content.unit_tags(attacker)))
 	var earned := int(e["loot"]) + int(run.mod("loot_shells")) + int(Loot.total(content, attacker, "loot", run.gear_bonus()))
 	# Glory-hound's banner (plate_loot): heroes with the tag earn more for kills on the near ring.
 	if earth.kind_at(victim.pos) != "":
