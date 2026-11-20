@@ -44,5 +44,6 @@
 	"workshop": "craftspeople work here at a bench; some relics make workshops work faster or hold more",
 	"tower": "shoots at foes in range and can be broken; some relics make towers tougher",
 	"gate": "your people walk through and raiders must batter it down; some relics make gates tougher",
-	"prize": "pays heroes shells for kills of a kind of foe, from the town's stock; some relics raise the prize"
+	"prize": "pays heroes shells for kills of a kind of foe, from the town's stock; some relics raise the prize",
+	"everyday": "an everyday building you can build again, each copy dearer; some relics change what copies cost"
 }

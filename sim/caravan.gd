@@ -71,7 +71,7 @@ func lay_out() -> void:
 		var offer := {"deal": id, "need": need(id), "taken": false}
 		var def := deal(id)
 		CardRoll.roll_card(run.content, roll_rng, offer, "trade", {"give": not def["give"].is_empty(), "get": not def.get("get", {}).is_empty()},
-			run.round_number, run.content.num("trade_roll_mult"))
+			run.round_number, run.content.num("trade_roll_mult") * run.roll_odds("trade"))
 		offers.append(offer)
 	if not offers.is_empty():
 		run.tell("The %s lays out %d deals." % [trades["name"].to_lower(), offers.size()], RunState.AMBIENT)

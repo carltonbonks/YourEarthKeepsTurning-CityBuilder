@@ -32,8 +32,8 @@ static func roll_chance(content: Content, rarity_id: String, round_number: int) 
 
 
 ## Rolls a townsfolk dawn card's rarity and modifiers into the card ({kind: "folk", role, leaning?}).
-static func roll_folk(content: Content, rng: SeededRng, card: Dictionary, round_number: int) -> void:
-	var rarity := roll_rarity(content, rng, round_number)
+static func roll_folk(content: Content, rng: SeededRng, card: Dictionary, round_number: int, odds_mult := 1.0) -> void:
+	var rarity := roll_rarity(content, rng, round_number, odds_mult)
 	if rarity == "white":
 		return
 	var fits := {"role": card["role"], "leaning": card.has("leaning")}
@@ -115,8 +115,9 @@ static func fits_building(m: Dictionary, def: Dictionary) -> bool:
 
 
 ## Rolls a blueprint or upgrade offer (kind "blueprint" or "upgrade") for the building it is or changes.
-static func roll_building(content: Content, rng: SeededRng, card: Dictionary, kind: String, type: String, round_number: int) -> void:
-	roll_card(content, rng, card, kind, {"def": content.buildings[type]}, round_number)
+static func roll_building(content: Content, rng: SeededRng, card: Dictionary, kind: String, type: String, round_number: int,
+		odds_mult := 1.0) -> void:
+	roll_card(content, rng, card, kind, {"def": content.buildings[type]}, round_number, odds_mult)
 
 
 ## Writes a drafted card's modifiers into this run's data for a building (Content.for_run keeps it to this run), so

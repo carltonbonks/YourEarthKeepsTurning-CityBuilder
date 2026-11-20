@@ -145,6 +145,15 @@ func _init(game_content: Content, seed_value: int) -> void:
 
 # --- Modifiers -------------------------------------------------------------
 
+## How much likelier dealt cards of a kind roll a rarity this run: 1 + every owned roll_odds {kind: share}
+## (kinds: folk, hero, family, venture, blueprint, upgrade, trade).
+func roll_odds(kind: String) -> float:
+	var total := 1.0
+	for effects in _owned_effects():
+		total += float(effects.get("roll_odds", {}).get(kind, 0.0))
+	return maxf(0.0, total)
+
+
 ## Sum of one relic effect across all owned relics (0 if none have it).
 func mod(key: String) -> float:
 	var total := 0.0
@@ -498,8 +507,9 @@ func building_cost(type: String) -> Dictionary:
 	var def: Dictionary = content.buildings[type]
 	var grow := float(def.get("copy_cost", 0.0)) * world.count_buildings(type, false) if world != null else 0.0
 	var cost := {}
+	var mult := maxf(0.0, 1.0 + mod("build_cost_mult"))
 	for r: String in def["cost"]:
-		cost[r] = ceili(float(def["cost"][r]) * (1.0 + grow))
+		cost[r] = ceili(float(def["cost"][r]) * (1.0 + grow) * mult)
 	return cost
 
 
@@ -542,8 +552,13 @@ static func _add_to_def(def: Dictionary, key: String, amount: float, share := fa
 		at = at[parts[i]]
 	var last := parts[parts.size() - 1]
 	if share:
-		if at.has(last):
-			at[last] = float(at[last]) * (1.0 + amount)
+		# A share of a set of goods (cost) scales every good in it, never below 0.
+		if at.get(last) is Dictionary:
+			var goods: Dictionary = at[last]
+			for good: String in goods:
+				goods[good] = maxi(0, roundi(float(goods[good]) * (1.0 + amount)))
+		elif at.has(last):
+			at[last] = maxf(0.0, float(at[last]) * (1.0 + amount))
 		return
 	at[last] = maxf(0.0, float(at.get(last, 0.0)) + amount)
 
@@ -604,14 +619,19 @@ func price_markup(kind: String) -> float:
 func price_of(good: Dictionary) -> int:
 	var r: Dictionary = content.market["recipes"][good["recipe"]]
 	var discount := clampf(mod("gear_discount"), 0.0, 0.9) if r.has("item") else 0.0
-	return maxi(1, roundi(float(r["price"]) * int(good.get("tier", 1)) * price_markup(r["stall"]) * (1.0 - discount)))
+	return maxi(1, roundi(float(r["price"]) * int(good.get("tier", 1)) * price_markup(r["stall"]) * (1.0 - discount)
+		* maxf(0.1, 1.0 + mod("stall_markup"))))
 
 
 ## Tier a workshop makes a recipe at this round.
 func craft_tier(recipe_id: String) -> int:
 	var r: Dictionary = content.market["recipes"][recipe_id]
 	var tier := 1 + (round_number - 1) / int(content.market["tier_every_rounds"])
-	return clampi(tier, int(r.get("min_tier", 1)), int(r.get("max_tier", 1)))
+	tier = clampi(tier, int(r.get("min_tier", 1)), int(r.get("max_tier", 1)))
+	# craft_tier relics: gear a tier better, up to the best tier anything drops at.
+	if r.has("item") and mod("craft_tier") > 0.0:
+		tier = mini(tier + int(mod("craft_tier")), maxi(tier, int(content.items["drops"]["max_tier"])))
+	return tier
 
 
 ## Ends the build phase; the first dawn of the round follows.
@@ -666,7 +686,13 @@ func ring_closed() -> bool:
 
 ## What clearing the next closed ring costs ({} if none is closed).
 func ring_cost() -> Dictionary:
-	return content.town["rings"][rings_open].get("clear_cost", {}) if ring_closed() else {}
+	if not ring_closed():
+		return {}
+	var cost: Dictionary = content.town["rings"][rings_open].get("clear_cost", {}).duplicate()
+	var mult := maxf(0.0, 1.0 + mod("ring_cost_mult"))
+	for r: String in cost:
+		cost[r] = ceili(float(cost[r]) * mult)
+	return cost
 
 
 ## Opens the next closed ring (an age-up does it for free; BuildHand.clear_ring when the player pays).
