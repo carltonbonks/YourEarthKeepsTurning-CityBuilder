@@ -492,6 +492,10 @@ const RELIC_RANK := ["trophy_kings_crown", "wild_hunt_horn", "ancestors_horn", "
 	"turncoats_torc", "fire_arrows", "ram_thorn_stakes", "bone_flute", "moneylenders_knot", "hollow_drum", "bear_tooth_charm",
 	"blood_brother_knot", "wanderers_fire", "oxhide_sledges", "seed_cache",
 	"trophy_wall", "elders_whetstone", "bloodied_banner", "glory_hounds_banner", "taunting_drum", "swiftfoot_anklet",
+	# Hero nature and building kinds (2026-11-20): the broad ones first, then those for one class or trait.
+	"mother_halls_roofbeam", "masters_awl", "warlords_oath", "berserkers_paint", "oathkeepers_ring", "seed_mothers_basket",
+	"hearth_wardens_lintel", "thatchers_knot", "champions_girdle", "stalkers_shroud", "hunters_fetish", "hearthstone",
+	"healers_moss", "hares_foot", "gamblers_knucklebones", "skalds_drum", "bounty_nail", "innkeepers_tally", "tyrants_lash",
 	# Affinities: their node and gear halves pay every round, their plate half only when the attack crosses their kind.
 	"cairn_wardens_cord", "thorn_witchs_veil", "barrow_kings_lamp", "bog_drowners_stake",
 	# Spoils last: taking a pack-train's goods over a relic cost the bots 8-20 win-rate points (40 seeds).

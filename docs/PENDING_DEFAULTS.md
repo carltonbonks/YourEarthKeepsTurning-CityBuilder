@@ -349,6 +349,15 @@ Yusuf asked for each run to offer relics from its own pool, like the blueprints.
 - **Seeing it:** the relic pick's title shows the whole pool on hover, like the draft's. Rarity odds still apply within the pool; the curio dealer and Broken crown's gifts draw from it too.
 - **Running dry:** when too few pool relics are left for an offer (owned, or later rounds' `from_round`), the offer tops up from every relic.
 
+## Relic slice 1: hero nature and building kinds (2026-11-20)
+
+From Yusuf's relic coverage review (plan https://claude.ai/artifact/5vFFFJh8JQAmksit84d8iZ): **Yusuf chose heroes and buildings first, 50 or more new relics over the batch, mostly rule-changers on tags, and plate relics offered only when crossed.** Claude's defaults, pending playtest:
+- **New tags:** hero classes (hunter, champion, stalker, knight) and traits (brave, cautious, greedy, dutiful) carry their own tag; buildings carry their kind: lodging (longhouse, mead hall, shrine, guildhall), home (hut, townhouse), crop (garden, field), workshop (the ten benches), tower (watch post, Stone keep), gate, prize (the five buildings that post prizes).
+- **New hooks** (RunState.TAG_EFFECTS): hero_stats (hp, attack, speed, range by hero tag), hero_nature (shifts a trait's numbers, never below 0, HeroAI.trait_of), hero_xp (more XP from kills by the killer's tag), whim_weight (a whim that much likelier, -1 rules it out), building_add and building_mult (change every building of a kind for the rest of the run the moment the relic is taken, like an upgrade).
+- **17 relics:** Gambler's knucklebones, Oathkeeper's ring, Hare's foot, Berserker's paint, Hunter's fetish, Champion's girdle, Stalker's shroud, Skald's drum, Hearth-warden's lintel, Thatcher's knot, Healer's moss, Innkeeper's tally, Seed-mother's basket, Master's awl, Hearthstone, Bounty nail, and the orange Mother-hall's roofbeam (from round 5). **2 pacts:** Tyrant's lash (workshops twice as fast, homes house 1 fewer) and Warlord's oath (bold heroes +4 damage, cautious and dutiful 2 less). Relics 66 to 85, pacts 6 to 8.
+- **Thin relics:** a relic with plate_knobs is offered only while some standing den's way crosses a plate of its kind (Earth.tags_crossed; every kind once the dens are cleared). A relic with an age waits for it: Caravan seal and Smith-god's hammer need bronze.
+- **Pool:** `relic_pool_size` 26 to 35 (ordinary relics 52 to 69, so still about half of them each run).
+
 ## Anonymous play data (2026-11-14)
 Yusuf chose opt-in. Claude's defaults: asked once on the title screen ("Share play data" / "No thanks"), a Settings switch that shows the player id; visits counted with no id from the page (`web/visit.js`); a run is sent at every save (each pause for a pick and the end), so unfinished runs arrive; uploads over 512 KB are skipped; at most 100 new runs per player a day; `?dev=1`, desktop and local builds never send.
 

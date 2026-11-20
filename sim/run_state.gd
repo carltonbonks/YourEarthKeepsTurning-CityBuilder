@@ -162,8 +162,14 @@ func mod(key: String) -> float:
 
 
 ## Relic effects keyed on tags ({tag: ...}), read through tag_mod, tag_sums and gear_bonus.
+## Keyed on a hero's tags (class and trait): hero_stats {tag: {hp, attack, speed, range}} adds to their stats,
+## hero_nature {tag: {trait key: add}} shifts how they behave (HeroAI.trait_of), hero_xp {tag: share} more XP
+## from kills, whim_weight {tag: {whim: share}} makes a whim that much likelier (-1 rules it out). Keyed on a
+## building's tags: building_add {tag: {key: add}} and building_mult {tag: {key: share}} change every building
+## with the tag for the rest of the run, the moment the relic is taken (keys are paths, e.g. lodging.beds).
 const TAG_EFFECTS := ["foe_damage", "foe_spoils", "gear_bonus", "node_yield", "node_regrow", "plate_knobs", "foe_xp", "foe_glory",
-	"tower_grudge", "plate_loot", "mark_bonus"]
+	"tower_grudge", "plate_loot", "mark_bonus", "hero_stats", "hero_nature", "hero_xp", "whim_weight", "building_add",
+	"building_mult"]
 
 
 ## The effects of everything owned that has effects: relics, then traditions.
@@ -513,14 +519,7 @@ func take_upgrade(id: String, offer := {}) -> void:
 	var up: Dictionary = content.upgrades[id]
 	var def: Dictionary = content.buildings[up["building"]]
 	for key: String in up["add"]:
-		var parts := key.split(".")
-		var at: Dictionary = def
-		for i in parts.size() - 1:
-			if not at.has(parts[i]):
-				at[parts[i]] = {}
-			at = at[parts[i]]
-		var last := parts[parts.size() - 1]
-		at[last] = float(at.get(last, 0.0)) + float(up["add"][key])
+		_add_to_def(def, key, float(up["add"][key]))
 	upgrades.append(id)
 	var action := {"kind": "upgrade", "upgrade": id}
 	if offer.has("roll"):
@@ -528,6 +527,38 @@ func take_upgrade(id: String, offer := {}) -> void:
 		action["mods"] = offer["boons"].duplicate()
 	record.note_action(action)
 	tell("%s: %s" % [up["name"], up["text"]])
+
+
+## Adds `amount` to a number in a building's data by its path ("lodging.beds"), making the path if it's missing.
+## With `share`, multiplies an existing number by (1 + share) instead.
+static func _add_to_def(def: Dictionary, key: String, amount: float, share := false) -> void:
+	var parts := key.split(".")
+	var at: Dictionary = def
+	for i in parts.size() - 1:
+		if not at.has(parts[i]):
+			if share:
+				return
+			at[parts[i]] = {}
+		at = at[parts[i]]
+	var last := parts[parts.size() - 1]
+	if share:
+		if at.has(last):
+			at[last] = float(at[last]) * (1.0 + amount)
+		return
+	at[last] = maxf(0.0, float(at.get(last, 0.0)) + amount)
+
+
+## building_add / building_mult of a relic just taken: every building carrying the tag changes for the rest of the
+## run, as an upgrade does, so it covers buildings already standing and ones not yet drafted.
+func _apply_building_effects(effects: Dictionary) -> void:
+	for key: String in ["building_add", "building_mult"]:
+		var by_tag: Dictionary = effects.get(key, {})
+		for tag: String in by_tag:
+			for type: String in content.buildings:
+				if content.has_tag("building", type, tag):
+					for path: String in by_tag[tag]:
+						_add_to_def(content.buildings[type], path, float(by_tag[tag][path]), key == "building_mult")
+			relic_fired(key)
 
 
 ## True while building on a pedlar round until the player invites a pedlar or none (after the traditions).
@@ -1140,6 +1171,7 @@ func _gain_relic(relic_id: String) -> void:
 	relics.append(relic_id)
 	relic_acquired_round[relic_id] = round_number + 1
 	var effects: Dictionary = content.relics[relic_id]["effects"]
+	_apply_building_effects(effects)
 	world.hearth_hp = clampf(world.hearth_hp + hearth_max_hp() - before_max, 1.0, hearth_max_hp())
 	for i in int(effects.get("free_hero", 0)):
 		var hero := people.make_hero()
@@ -1162,9 +1194,23 @@ func _relic_pool(pacts: bool, whole := false) -> Array:
 	var run_pool := [] if pacts or whole else relic_pool()
 	var pool: Array = content.relics.keys().filter(func(id: String) -> bool:
 		return not relics.has(id) and content.has_tag("relic", id, "pact") == pacts and not content.has_tag("relic", id, "spoils") \
-			and int(content.relics[id].get("from_round", 0)) <= round_number and (run_pool.is_empty() or run_pool.has(id)))
+			and int(content.relics[id].get("from_round", 0)) <= round_number and (run_pool.is_empty() or run_pool.has(id)) \
+			and relic_can_come(id))
 	pool.sort()
 	return pool
+
+
+## Whether a relic can matter now (Yusuf, 2026-11-20): one with an age waits for the town to reach it, and one that
+## changes a plate kind (plate_knobs) is only offered while this age's attacks can cross a plate of that kind.
+func relic_can_come(id: String) -> bool:
+	var def: Dictionary = content.relics[id]
+	if not content.age_reached(age, str(def.get("age", ""))):
+		return false
+	var plates: Dictionary = def["effects"].get("plate_knobs", {})
+	if plates.is_empty() or world == null:
+		return true
+	var crossed := world.earth.tags_crossed()
+	return plates.keys().any(func(tag: String) -> bool: return tag in crossed)
 
 
 ## The ordinary relics (not pacts or spoils) in a fixed order.

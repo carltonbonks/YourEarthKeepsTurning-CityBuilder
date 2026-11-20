@@ -17,8 +17,21 @@ func _init(world: World) -> void:
 	w = world
 
 
+## A hero's trait data as it stands now: hero_nature relics ({hero tag: {key: add}}) shift its numbers
+## (retreat_at, greed, duty, caution, wilds, ...) for heroes with the tag, never below 0.
+func trait_of(hero: Unit) -> Dictionary:
+	var base: Dictionary = w.content.traits[hero.trait_id]
+	var shift := w.run.tag_sums("hero_nature", w.content.unit_tags(hero))
+	if shift.is_empty():
+		return base
+	var t := base.duplicate()
+	for key: String in shift:
+		t[key] = maxf(0.0, float(t.get(key, 0.0)) + float(shift[key]))
+	return t
+
+
 func hero_tick(hero: Unit) -> void:
-	var t: Dictionary = w.content.traits[hero.trait_id]
+	var t := trait_of(hero)
 	hero.cooldown_left -= w.dt
 	var retreat_at := clampf(float(t["retreat_at"]) + w.run.mod("retreat_shift"), 0.0, 0.95)
 	if hero.carry_amount > 0 and hero.pos.length() <= w.content.num("settlement_radius"):
@@ -217,7 +230,7 @@ func rest_tick(hero: Unit) -> void:
 	if w.is_night() and bed >= 0 and hero.paid_night != w.night_key():
 		hero.paid_night = w.night_key()
 		_pay_town(hero, int(def.get("night_price", 0)), "tavern")
-	if _wants_bed(hero, w.content.traits[hero.trait_id]) == "" and hero.energy >= w.content.num("energy_wake_at"):
+	if _wants_bed(hero, trait_of(hero)) == "" and hero.energy >= w.content.num("energy_wake_at"):
 		hero.resting = false
 
 
@@ -325,6 +338,11 @@ func roll_whims() -> void:
 				weights[id] = 0.0
 		if weights.has("trophy"):
 			weights["trophy"] = float(weights["trophy"]) * (1.0 + w.run.mod("trophy_whims"))
+		# whim_weight relics: whims likelier (or ruled out) for heroes with the tag.
+		var boost := w.run.tag_sums("whim_weight", w.content.unit_tags(hero))
+		for id: String in boost:
+			if weights.has(id):
+				weights[id] = maxf(0.0, float(weights[id]) * (1.0 + float(boost[id])))
 		hero.whim = rng.weighted(weights)
 		if hero.whim == "":
 			hero.whim = "none"
@@ -387,9 +405,13 @@ func apply_hero_stats(hero: Unit) -> void:
 				hero.max_hp -= float(w.content.items["affixes"]["cursed"].get("hp", 0.0))
 	if hero.hound:
 		hero.attack += float(kennel_def().get("attack", 0.0))
-	hero.attack_range = float(c["range"])
+	# hero_stats relics: more for heroes of a class or trait.
+	var nature := w.run.tag_sums("hero_stats", w.content.unit_tags(hero))
+	hero.max_hp = maxf(1.0, hero.max_hp + float(nature.get("hp", 0.0)))
+	hero.attack = maxf(1.0, hero.attack + float(nature.get("attack", 0.0)))
+	hero.attack_range = float(c["range"]) + float(nature.get("range", 0.0))
 	hero.cooldown = float(c["cooldown"])
-	hero.speed = float(c["speed"]) + Loot.total(w.content, hero, "speed", w.run.gear_bonus())
+	hero.speed = float(c["speed"]) + Loot.total(w.content, hero, "speed", w.run.gear_bonus()) + float(nature.get("speed", 0.0))
 	if old_max > 1.0 and hero.max_hp > old_max:
 		hero.hp += hero.max_hp - old_max
 	hero.hp = minf(hero.hp, hero.max_hp)
@@ -654,7 +676,7 @@ func _has_provision(hero: Unit, effect: String) -> bool:
 func on_supplied(hero: Unit, effect: String) -> void:
 	_use_provision(hero, effect)
 	if effect == "heal" and hero.retreating:
-		var retreat_at := float(w.content.traits[hero.trait_id]["retreat_at"]) + w.run.mod("retreat_shift")
+		var retreat_at := float(trait_of(hero)["retreat_at"]) + w.run.mod("retreat_shift")
 		if hero.hp_fraction() >= retreat_at + 0.1:
 			hero.retreating = false
 			w.run.tell("%s is patched up and turns back to the hunt." % hero.display_name, RunState.AMBIENT)

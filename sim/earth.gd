@@ -104,6 +104,26 @@ func crossing(a: float) -> String:
 	return kind_at_angle(a)
 
 
+## The tags of the plate kinds this age's attacks can cross: the kind on the way in from every den still standing
+## (attacks come by the dens' ways, World.roll_wave_sides). With no den left an attack may come from any side, so
+## every kind on the ring counts. Empty with the earth off.
+func tags_crossed() -> Array:
+	if not enabled():
+		return []
+	var kinds: Array = []
+	var ways: Array = w.dens.filter(func(d: Dictionary) -> bool: return not d.get("cleared", false))
+	if ways.is_empty():
+		kinds = rings[0]["plate_kinds"].duplicate()
+	for den: Dictionary in ways:
+		kinds.append(kind_at_angle(Vector2(den["pos"]).angle()))
+	var out: Array = []
+	for kind: String in kinds:
+		for tag: String in def["near_kinds"].get(kind, {}).get("tags", []):
+			if not out.has(tag):
+				out.append(tag)
+	return out
+
+
 ## What a near kind's numbers are before anything adds to them (a kind leaves out the ones it doesn't change).
 const KNOB_BASE := {"walk": 1.0, "raider_walk": 1.0, "sight": 1.0, "regrow": 0.0, "rise_chance": 0.0, "grave_goods": 0.0}
 
