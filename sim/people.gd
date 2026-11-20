@@ -190,13 +190,13 @@ func _roll_dawn_card(card: Dictionary, rng: SeededRng) -> void:
 	var content := run.content
 	match card["kind"]:
 		"folk":
-			CardRoll.roll_folk(content, rng, card, run.round_number)
+			CardRoll.roll_folk(content, rng, card, run.round_number, run.roll_odds("folk"))
 		"hero":
 			var hero: Unit = card["hero"]
-			CardRoll.roll_card(content, rng, card, "hero", {"weapon": hero.items.has("weapon")}, run.round_number)
+			CardRoll.roll_card(content, rng, card, "hero", {"weapon": hero.items.has("weapon")}, run.round_number, run.roll_odds("hero"))
 			_shape_hero(card, rng)
 		"family", "venture":
-			CardRoll.roll_card(content, rng, card, card["kind"], {}, run.round_number)
+			CardRoll.roll_card(content, rng, card, card["kind"], {}, run.round_number, run.roll_odds(card["kind"]))
 
 
 ## A rolled hero card's modifiers: levels, a hound, a better weapon, a price; the orange roll is a legend, a few levels
@@ -752,7 +752,7 @@ func heal_between_rounds() -> void:
 ## Gear and provisions are only bought at the market's stalls, by day (see World).
 func heroes_sell_finds() -> void:
 	var content := run.content
-	var tax_rate := float(content.items["sell_tax"])
+	var tax_rate := clampf(float(content.items["sell_tax"]) + run.mod("sell_tax"), 0.0, 0.9)
 	var where := "at the market" if run.world.count_buildings("market") > 0 else "to passing traders"
 	for hero in run.heroes:
 		if hero.spares.is_empty():

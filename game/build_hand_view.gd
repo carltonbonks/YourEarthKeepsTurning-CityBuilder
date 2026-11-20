@@ -261,7 +261,9 @@ func draft_entries() -> Array:
 ## The draft's reroll: once a round, a fresh draw of offers.
 func reroll_button() -> Button:
 	var redraw := UiKit.secondary(Button.new(), 13)
-	redraw.text = "Reroll\n%d shells" % run.hand.redraw_cost() if run.hand.redraws == 0 else "Rerolled\nthis round"
+	var cost := run.hand.redraw_cost()
+	var can := run.hand.redraws < 1 + int(run.mod("redraws"))
+	redraw.text = ("Reroll\nfree" if cost == 0 else "Reroll\n%d shells" % cost) if can else "Rerolled\nthis round"
 	redraw.custom_minimum_size = Vector2(86, 120)
 	redraw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	redraw.disabled = not run.hand.can_redraw()

@@ -496,6 +496,10 @@ const RELIC_RANK := ["trophy_kings_crown", "wild_hunt_horn", "ancestors_horn", "
 	"mother_halls_roofbeam", "masters_awl", "warlords_oath", "berserkers_paint", "oathkeepers_ring", "seed_mothers_basket",
 	"hearth_wardens_lintel", "thatchers_knot", "champions_girdle", "stalkers_shroud", "hunters_fetish", "hearthstone",
 	"healers_moss", "hares_foot", "gamblers_knucklebones", "skalds_drum", "bounty_nail", "innkeepers_tally", "tyrants_lash",
+	# Draft and market (2026-11-20).
+	"first_makers_hand", "builders_debt", "smiths_quench", "masons_mark", "pattern_book", "touchstone", "wardens_seal",
+	"carpenters_square", "stallkeepers_awning", "augurs_bones", "architects_cord", "diviners_sticks", "surveyors_stakes",
+	"fences_purse", "merchants_luckstone", "hagglers_tongue", "merchant_princes_chain",
 	# Affinities: their node and gear halves pay every round, their plate half only when the attack crosses their kind.
 	"cairn_wardens_cord", "thorn_witchs_veil", "barrow_kings_lamp", "bog_drowners_stake",
 	# Spoils last: taking a pack-train's goods over a relic cost the bots 8-20 win-rate points (40 seeds).
