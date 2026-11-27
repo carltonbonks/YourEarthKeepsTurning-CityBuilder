@@ -201,7 +201,7 @@ static func building(run: RunState, index: int) -> Dictionary:
 		var names := PackedStringArray()
 		for g: Dictionary in b["goods"]:
 			names.append("%s (tier %d)" % [c.recipe_name(g["recipe"]), int(g["tier"])])
-		t["lines"].append("On sale (%d of %d): %s" % [names.size(), int(c.market["stall_capacity"]),
+		t["lines"].append("On sale (%d of %d): %s" % [names.size(), run.world.market.stall_capacity(),
 			", ".join(names) if not names.is_empty() else "nothing"])
 	if def.has("workshop") and b["craft"] != "":
 		t["lines"].append("Making: %s" % c.recipe_name(b["craft"]))

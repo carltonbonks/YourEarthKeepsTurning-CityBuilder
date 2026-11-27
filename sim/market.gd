@@ -61,6 +61,11 @@ func _stall_load(kind: String) -> int:
 
 ## What a workshop should make next: something its stall has room for and the
 ## settlement can supply, favouring what the stall has least of. "" if nothing.
+## How many goods a stall holds (stall_capacity, plus relics).
+func stall_capacity() -> int:
+	return int(w.content.market["stall_capacity"]) + int(w.run.mod("stall_capacity"))
+
+
 func next_recipe(index: int) -> String:
 	var b := w.buildings[index]
 	var options := w.content.recipes_for(b["type"])
@@ -80,10 +85,10 @@ func next_recipe(index: int) -> String:
 				keep = w.run.fuel_needed_tonight() * float(r["keep_nights"])
 			if float(w.run.stock[good]) >= keep:
 				continue
-			score = float(w.run.stock[good]) / keep * float(w.content.market["stall_capacity"])
+			score = float(w.run.stock[good]) / keep * float(stall_capacity())
 		else:
 			var s := stall_index(r["stall"])
-			if s < 0 or _stall_load(r["stall"]) >= int(w.content.market["stall_capacity"]):
+			if s < 0 or _stall_load(r["stall"]) >= stall_capacity():
 				continue
 			score = w.buildings[s]["goods"].filter(func(g: Dictionary) -> bool: return g["recipe"] == id).size()
 		if score < best_score:
@@ -140,7 +145,8 @@ func finish_craft(index: int, crafter: Unit = null) -> void:
 	var good := {"recipe": id, "tier": int(b["craft_tier"]) + int(master.get("extra_tier", 0))}
 	if r.has("item"):
 		var affixes := []
-		var chance := float(w.content.market["affix_chance"]) if master.is_empty() else float(master.get("affix_chance", 0.0))
+		var chance := (float(w.content.market["affix_chance"]) if master.is_empty() else float(master.get("affix_chance", 0.0))) \
+			+ w.run.mod("craft_affix")
 		if w.rng.randf() < chance:
 			var ids: Array = w.content.items["affixes"].keys().filter(func(a: String) -> bool: return a != "cursed")
 			ids.sort()

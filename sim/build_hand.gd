@@ -58,6 +58,7 @@ func deal() -> void:
 	if _dealt_round != run.round_number:
 		var content := run.content
 		picks += content.int_num("blueprint_first_picks") if _dealt_round < 0 else content.int_num("blueprint_picks")
+		picks += int(run.mod("draft_picks"))
 		if _dealt_age != "" and _dealt_age != run.age:
 			picks += content.int_num("blueprint_age_picks")
 		_dealt_round = run.round_number
@@ -67,7 +68,8 @@ func deal() -> void:
 
 ## Rerolls the offers, once a round while a draft is left, for shells.
 func can_redraw() -> bool:
-	return run.phase == RunState.Phase.BUILD and picks > 0 and redraws == 0 and int(run.stock["shells"]) >= redraw_cost() \
+	return run.phase == RunState.Phase.BUILD and picks > 0 and redraws < 1 + int(run.mod("redraws")) \
+		and int(run.stock["shells"]) >= redraw_cost() \
 		and not run.has_effect("no_redraw") and not (run.gentle and run.round_number == 1)
 
 
@@ -83,8 +85,9 @@ func redraw() -> bool:
 	return true
 
 
+## Diviner's sticks (free_redraws): the first rerolls of a round cost nothing.
 func redraw_cost() -> int:
-	return run.content.int_num("build_redraw_cost")
+	return 0 if redraws < int(run.mod("free_redraws")) else run.content.int_num("build_redraw_cost")
 
 
 ## Basic buildings (homes and food, `basic` in data/buildings.json) that can go up now: always on offer,
@@ -484,9 +487,10 @@ func _fill(rng: SeededRng, avoid: Array = []) -> void:
 	_fills += 1
 	var roll_rng := SeededRng.stream(run.run_seed, "blueprint_roll", _fills)
 	for c in cards:
-		CardRoll.roll_building(content, roll_rng, c, "blueprint", c["building"], run.round_number)
+		CardRoll.roll_building(content, roll_rng, c, "blueprint", c["building"], run.round_number, run.roll_odds("blueprint"))
 	for c in upgrade_offers:
-		CardRoll.roll_building(content, roll_rng, c, "upgrade", content.upgrades[c["upgrade"]]["building"], run.round_number)
+		CardRoll.roll_building(content, roll_rng, c, "upgrade", content.upgrades[c["upgrade"]]["building"], run.round_number,
+			run.roll_odds("upgrade"))
 
 
 ## Deals one offer from the deepening offers (an "upgrade:<id>", a "craft:<id>" or a building a craft opened) and
